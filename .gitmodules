@@ -34,3 +34,9 @@
 [submodule "externals/vts-libs"]
 	path = externals/vts-libs
 	url = git@gitlab.citationtech.net:vts/vts-libs.git
+[submodule "externals/optics"]
+	path = externals/optics
+	url = git@gitlab.citationtech.net:lib/optics.git
+[submodule "externals/cvision"]
+	path = externals/cvision
+	url = git@gitlab.citationtech.net:lib/cvision.git
