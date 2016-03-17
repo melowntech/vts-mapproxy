@@ -1,0 +1,6 @@
+bin
+build
+lib
+obj-x86_64-linux-gnu
+debian
+core
