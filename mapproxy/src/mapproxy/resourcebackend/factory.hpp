@@ -5,15 +5,16 @@
 
 struct ResourceBackend::Factory {
     typedef std::shared_ptr<Factory> pointer;
+    typedef ResourceBackend::TypedConfig TypedConfig;
 
     virtual ~Factory() {}
-    virtual ResourceBackend::pointer create(const boost::any &config) = 0;
+    virtual ResourceBackend::pointer create(const TypedConfig &config) = 0;
 
     virtual service::UnrecognizedParser::optional
-    configure(const std::string &prefix, boost::any &config) = 0;
+    configure(const std::string &prefix, TypedConfig &config) = 0;
 
     virtual void printConfig(std::ostream &os, const std::string &prefix
-                             , const boost::any &config) = 0;
+                             , const TypedConfig &config) = 0;
 };
 
 #endif // mapproxy_resourcebackend_factory_hpp_included_

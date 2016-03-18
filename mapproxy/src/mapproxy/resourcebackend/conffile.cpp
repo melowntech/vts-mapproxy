@@ -13,20 +13,18 @@ namespace resource_backend {
 namespace {
 
 struct Factory : ResourceBackend::Factory {
-    virtual ResourceBackend::pointer create(const boost::any &config)
+    virtual ResourceBackend::pointer create(const TypedConfig &config)
     {
-        return std::make_shared<Conffile>
-            (boost::any_cast<Conffile::Config>(config));
+        return std::make_shared<Conffile>(config.value<Conffile::Config>());
     }
 
     virtual service::UnrecognizedParser::optional
-    configure(const std::string &prefix, boost::any &anyConfig)
+    configure(const std::string &prefix, TypedConfig &typedConfig)
     {
-        auto &config(boost::any_cast<Conffile::Config&>
-                     (anyConfig = Conffile::Config()));
+        auto &config(typedConfig.assign<Conffile::Config>());
 
         service::UnrecognizedParser parser
-            ("resource backend conffile: "
+            ("resource backend " + typedConfig.type + ": "
              "configuration file-based resource backend");
         parser.options.add_options()
             ((prefix + "path").c_str()
@@ -37,10 +35,9 @@ struct Factory : ResourceBackend::Factory {
     }
 
     void printConfig(std::ostream &os, const std::string &prefix
-                     , const boost::any &anyConfig)
+                     , const TypedConfig &typedConfig)
     {
-        const auto &config
-            (boost::any_cast<const Conffile::Config&>(anyConfig));
+        const auto &config(typedConfig.value<Conffile::Config>());
 
         os << prefix << "path = " << config.path << "\n";
     }

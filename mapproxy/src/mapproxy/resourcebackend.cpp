@@ -15,7 +15,7 @@ ResourceBackend::Factory::pointer findFactory(const std::string &type)
 {
     auto fregistry(registry.find(type));
     if (fregistry == registry.end()) {
-        LOGTHROW(err2, UnknownResourceBackend)
+        LOGTHROW(err1, UnknownResourceBackend)
             << "Unknown resource backend <" << type << ">.";
     }
     return fregistry->second;
@@ -30,18 +30,16 @@ void ResourceBackend::registerType(const std::string &type
 }
 
 service::UnrecognizedParser::optional
-ResourceBackend::configure(const std::string &prefix, const std::string &type
-                           , boost::any &config)
+ResourceBackend::configure(const std::string &prefix, TypedConfig &config)
 {
-    return findFactory(type)->configure(prefix, config);
+    return findFactory(config.type)->configure(prefix, config);
 }
 
 void ResourceBackend::printConfig(std::ostream &os, const std::string &prefix
-                                  , const std::string &type
-                                  , const boost::any &config)
+                                  , const TypedConfig &config)
 {
-    os << prefix << "type = " << type << "\n";
-    return findFactory(type)->printConfig(os, prefix, config);
+    os << prefix << "type = " << config.type << "\n";
+    return findFactory(config.type)->printConfig(os, prefix, config);
 }
 
 std::vector<std::string> ResourceBackend::listTypes(const std::string &prefix)
@@ -54,14 +52,14 @@ std::vector<std::string> ResourceBackend::listTypes(const std::string &prefix)
 }
 
 ResourceBackend::pointer
-ResourceBackend::create(const std::string &type, const boost::any &config)
+ResourceBackend::create(const TypedConfig &config)
 {
     try {
-        return findFactory(type)->create(config);
+        return findFactory(config.type)->create(config);
     } catch (const boost::bad_any_cast&) {
         LOGTHROW(err2, InvalidConfiguration)
             << "Passed configuration does not match resource backend <"
-            << type << ">.";
+            << config.type << ">.";
     }
     throw;
 }

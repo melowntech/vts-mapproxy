@@ -20,7 +20,27 @@ public:
 
     Resource::Groups load() const;
 
-    static pointer create(const std::string &type, const boost::any &config);
+    class TypedConfig {
+    public:
+        std::string type;
+
+        template <typename T>
+        T& value() { return boost::any_cast<T&>(value_); }
+        template <typename T>
+        const T& value() const { return boost::any_cast<const T&>(value_); }
+
+        template <typename T>
+        T& assign(const T &value = T()) {
+            return boost::any_cast<T&>(value_ = value);
+        }
+
+        TypedConfig(const std::string &type = "") : type(type) {}
+
+    private:
+        boost::any value_;
+    };
+
+    static pointer create(const TypedConfig &config);
 
     /** Processes configuration for resource backend as an unrecognized parser.
      *
@@ -29,12 +49,10 @@ public:
      * \param config placeholder for configuration (i.e. parsed data)
      */
     static service::UnrecognizedParser::optional
-    configure(const std::string &prefix, const std::string &type
-              , boost::any &config);
+    configure(const std::string &prefix, TypedConfig &config);
 
     static void printConfig(std::ostream &os, const std::string &prefix
-                            , const std::string &type
-                            , const boost::any &config);
+                            , const TypedConfig &config);
 
     static std::vector<std::string> listTypes(const std::string &prefix = "");
 
