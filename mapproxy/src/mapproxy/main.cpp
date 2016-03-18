@@ -130,8 +130,6 @@ void Daemon::configure(const po::variables_map &vars)
                                              , resourceBackendConfig_);
             })
         ;
-
-    (void) vars;
 }
 
 const std::string RBHelpPrefix(RBPrefix + "-");
@@ -173,6 +171,8 @@ bool Daemon::prePersonaSwitch()
 service::Service::Cleanup Daemon::start()
 {
     auto guard(std::make_shared<Stopper>(*this));
+
+    resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
 
     return guard;
 }

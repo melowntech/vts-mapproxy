@@ -24,6 +24,10 @@ find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(CURL REQUIRED)
 
+find_package(MySQL++ REQUIRED)
+add_definitions(${MYSQL++_DEFINITIONS})
+include_directories(${MYSQL++_INCLUDE_DIR})
+
 # dependencies
 add_subdirectory(src/dbglog)
 add_subdirectory(src/utility)

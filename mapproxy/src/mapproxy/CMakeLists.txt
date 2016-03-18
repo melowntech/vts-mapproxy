@@ -11,6 +11,7 @@ set(mapproxy_SOURCES
   resourcebackend.hpp resourcebackend.cpp
   resourcebackend/factory.hpp
   resourcebackend/conffile.hpp resourcebackend/conffile.cpp
+  resourcebackend/mysql.hpp resourcebackend/mysql.cpp
 
   main.cpp
   )
