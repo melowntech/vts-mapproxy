@@ -1,8 +1,17 @@
 # test program
 define_module(BINARY mapproxy
-  DEPENDS vts-libs service)
+  DEPENDS vts-libs service
+  Boost_FILESYSTEM
+  Boost_PROGRAM_OPTIONS)
 
 set(mapproxy_SOURCES
+  error.hpp
+  resources.hpp
+
+  resourcebackend.hpp resourcebackend.cpp
+  resourcebackend/factory.hpp
+  resourcebackend/conffile.hpp resourcebackend/conffile.cpp
+
   main.cpp
   )
 
