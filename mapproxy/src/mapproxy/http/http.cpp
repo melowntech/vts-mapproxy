@@ -22,6 +22,19 @@ struct ClientInfo {
     }
 };
 
+struct RequestInfo {
+    std::string url;
+    std::string method;
+    std::string version;
+    int responseCode;
+
+    RequestInfo(const std::string &url, const std::string &method
+                , const std::string &version)
+        : url(url), method(method), version(version)
+        , responseCode(MHD_HTTP_OK)
+    {}
+};
+
 template<typename CharT, typename Traits>
 inline std::basic_ostream<CharT, Traits>&
 operator<<(std::basic_ostream<CharT, Traits> &os, const ClientInfo &ci)
@@ -35,18 +48,13 @@ operator<<(std::basic_ostream<CharT, Traits> &os, const ClientInfo &ci)
     return os;
 }
 
-struct RequestInfo {
-    std::string url;
-    std::string method;
-    std::string version;
-    int responseCode;
-
-    RequestInfo(const std::string &url, const std::string &method
-                , const std::string &version)
-        : url(url), method(method), version(version)
-        , responseCode(MHD_HTTP_OK)
-    {}
-};
+template<typename CharT, typename Traits>
+inline std::basic_ostream<CharT, Traits>&
+operator<<(std::basic_ostream<CharT, Traits> &os, const RequestInfo &ri)
+{
+    return os << '"' << ri.method << " " << ri.url << ' ' << ri.version
+              << '"';
+}
 
 } // namespace
 
@@ -76,38 +84,28 @@ void mapproxy_http_callback_completed(void *cls, ::MHD_Connection *connection
     switch (toe) {
     case MHD_REQUEST_TERMINATED_COMPLETED_OK:
     case MHD_REQUEST_TERMINATED_WITH_ERROR:
-        LOG(err2) << "HTTP " << ClientInfo(connection)
-                  << " \"" << rinfo.method << " " << rinfo.url
-                  << ' ' << rinfo.version
-                  << "\" " << rinfo.responseCode << ".";
+        LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                  << ' ' << rinfo.responseCode << ".";
         return;
 
     case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
-        LOG(err2) << "HTTP " << ClientInfo(connection)
-                  << " \"" << rinfo.method << " " << rinfo.url
-                  << ' ' << rinfo.version
-                  << "\" [timed-out].";
+        LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                  << " [timed-out].";
         return;
 
     case MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
-        LOG(err2) << "HTTP " << ClientInfo(connection)
-                  << " \"" << rinfo.method << " " << rinfo.url
-                  << ' ' << rinfo.version
-                  << "\" [shutdown].";
+        LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                  << " [shutdown].";
         return;
 
     case MHD_REQUEST_TERMINATED_READ_ERROR:
-        LOG(err2) << "HTTP " << ClientInfo(connection)
-                  << " \"" << rinfo.method << " " << rinfo.url
-                  << ' ' << rinfo.version
-                  << "\" [read error].";
+        LOG(err2)<< "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                  << " [read error].";
         return;
 
     case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
-        LOG(err2) << "HTTP " << ClientInfo(connection)
-                  << " \"" << rinfo.method << " " << rinfo.url
-                  << ' ' << rinfo.version
-                  << "\" [aborted].";
+        LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                  << " [aborted].";
         return;
     }
 }
@@ -119,11 +117,13 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
 {
     if (!*info) {
         // setup, log and done
-        *info = new RequestInfo(url, method, version);
+        auto *rinfo(new RequestInfo(url, method, version));
+        *info = rinfo;
+
         // received request logging
-        LOG(info2) << "HTTP " << ClientInfo(connection)
-                   << " \"" << method << " " << url << ' '
-                   << version << "\"";
+        LOG(info2) << "HTTP " << ClientInfo(connection)  << ' ' << *rinfo
+                   << ".";
+
         return MHD_YES;
     }
 
