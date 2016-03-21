@@ -28,6 +28,10 @@ find_package(MySQL++ REQUIRED)
 add_definitions(${MYSQL++_DEFINITIONS})
 include_directories(${MYSQL++_INCLUDE_DIR})
 
+find_package(MHD REQUIRED)
+add_definitions(${MHD_DEFINITIONS})
+include_directories(${MHD_INCLUDE_DIR})
+
 # dependencies
 add_subdirectory(src/dbglog)
 add_subdirectory(src/utility)

@@ -1,6 +1,7 @@
 # test program
 define_module(BINARY mapproxy
   DEPENDS vts-libs service
+  MHD
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS)
 
@@ -17,6 +18,9 @@ set(mapproxy_SOURCES
   generator.hpp
   generator/generator.cpp
   generator/factory.hpp
+
+  http.hpp
+  http/http.cpp
 
   main.cpp
   )

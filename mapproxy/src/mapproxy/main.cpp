@@ -16,6 +16,7 @@
 
 #include "./error.hpp"
 #include "./resourcebackend.hpp"
+#include "./http.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -29,7 +30,8 @@ public:
         : service::Service("mapproxy", BUILD_TARGET_VERSION
                            , service::ENABLE_CONFIG_UNRECOGNIZED_OPTIONS
                            | service::ENABLE_UNRECOGNIZED_OPTIONS)
-        , listen_(3070)
+        , httpListen_(3070)
+        , httpThreadCount_(5)
     {}
 
 private:
@@ -63,10 +65,13 @@ private:
     };
     friend struct Stopper;
 
-    utility::TcpEndpoint listen_;
+    utility::TcpEndpoint httpListen_;
+    unsigned int httpThreadCount_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
 
     ResourceBackend::pointer resourceBackend_;
+
+    boost::optional<Http> http_;
 };
 
 void Daemon::configuration(po::options_description &cmdline
@@ -76,9 +81,12 @@ void Daemon::configuration(po::options_description &cmdline
     vr::registryConfiguration(cmdline, vr::defaultPath());
 
     config.add_options()
-        ("http.listen", po::value(&listen_)
-         ->default_value(listen_)->required()
+        ("http.listen", po::value(&httpListen_)
+         ->default_value(httpListen_)->required()
          , "TCP endpoint where to listen at.")
+        ("http.threadCount", po::value(&httpThreadCount_)
+         ->default_value(httpThreadCount_)->required()
+         , "Number of processing threads.")
 
         ("resource-backend.type"
          , po::value(&resourceBackendConfig_.type)->required()
@@ -122,7 +130,8 @@ void Daemon::configure(const po::variables_map &vars)
 
     LOG(info3, log_)
         << "Config:"
-        << "\n\thttp.listen = " << listen_
+        << "\n\thttp.listen = " << httpListen_
+        << "\n\thttp.threadCount = " << httpThreadCount_
         << "\n"
         << utility::LManip([&](std::ostream &os) {
                 ResourceBackend::printConfig(os, "\t" + RBPrefixDotted
@@ -172,6 +181,7 @@ service::Service::Cleanup Daemon::start()
     auto guard(std::make_shared<Stopper>(*this));
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
+    http_ = boost::in_place(httpListen_, httpThreadCount_);
 
     return guard;
 }
@@ -179,6 +189,8 @@ service::Service::Cleanup Daemon::start()
 void Daemon::cleanup()
 {
     // TODO: destroy stuff here
+    http_ = boost::none;
+    resourceBackend_.reset();
 }
 
 void Daemon::stat(std::ostream &os)
