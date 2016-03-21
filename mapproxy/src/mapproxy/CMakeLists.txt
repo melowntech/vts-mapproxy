@@ -8,10 +8,15 @@ set(mapproxy_SOURCES
   error.hpp
   resources.hpp
 
-  resourcebackend.hpp resourcebackend.cpp
+  resourcebackend.hpp
+  resourcebackend/resourcebackend.cpp
   resourcebackend/factory.hpp
   resourcebackend/conffile.hpp resourcebackend/conffile.cpp
   resourcebackend/mysql.hpp resourcebackend/mysql.cpp
+
+  generator.hpp
+  generator/generator.cpp
+  generator/factory.hpp
 
   main.cpp
   )

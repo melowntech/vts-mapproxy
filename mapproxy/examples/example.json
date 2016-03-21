@@ -1,0 +1,32 @@
+[
+    {
+        "comment": "Global 15m Landsat99-03 mosaic"
+        , "group": "melown"
+        , "id": "trueplanet"
+        , "type": "raster-tms"
+
+        , "referenceFrames" : {
+            "melown2015": {
+                "lodRange": [1,14]
+                , "tileRange": [[0,0],[0,0]]
+            }
+            , "webmerc-projected": {
+                "lodRange": [0,13]
+                , "tileRange": [[0,0],[0,0]]
+            }
+            , "webmerc-unprojected": {
+                "lodRange": [0,13]
+                , "tileRange": [[0,0],[0,0]]
+            }
+        }
+
+        , "credits": [ "usgs" ]
+        , "definition" : {
+            "data" : [ {
+                "nodeId" : { "lod": 0, "position": [0,0] }
+                , "path" : "/opt/vts/var/mapproxy/datasets/melown/trueplanet"
+            } ]
+            , "format":"jpg"
+        }
+    }
+]

@@ -1,7 +1,7 @@
 #ifndef mapproxy_resourcebackend_conffile_hpp_included_
 #define mapproxy_resourcebackend_conffile_hpp_included_
 
-#include "boost/filesystem/path.hpp"
+#include <boost/filesystem/path.hpp>
 
 #include "../resourcebackend.hpp"
 

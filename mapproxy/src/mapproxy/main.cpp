@@ -38,8 +38,7 @@ private:
                        , po::positional_options_description &pd);
 
     service::UnrecognizedParser::optional
-    configure(const po::variables_map &vars
-              , const std::vector<std::string> &unrecognized);
+    configure(const po::variables_map &vars, const std::vector<std::string>&);
 
     void configure(const po::variables_map &vars);
 

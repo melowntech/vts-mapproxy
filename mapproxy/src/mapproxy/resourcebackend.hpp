@@ -5,6 +5,7 @@
 #include <string>
 #include <iostream>
 
+#include <boost/noncopyable.hpp>
 #include <boost/any.hpp>
 #include <boost/program_options.hpp>
 
@@ -12,7 +13,7 @@
 
 #include "./resources.hpp"
 
-class ResourceBackend {
+class ResourceBackend : boost::noncopyable {
 public:
     typedef std::shared_ptr<ResourceBackend> pointer;
 

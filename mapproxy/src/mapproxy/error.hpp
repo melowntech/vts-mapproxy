@@ -8,14 +8,24 @@ struct Error : std::runtime_error {
     Error(const std::string &message) : std::runtime_error(message) {}
 };
 
-struct UnknownResourceBackend : std::runtime_error {
-    UnknownResourceBackend(const std::string &message)
-        : std::runtime_error(message) {}
+struct UnknownResourceBackend : Error {
+    UnknownResourceBackend(const std::string &message) : Error(message) {}
 };
 
-struct InvalidConfiguration : std::runtime_error {
-    InvalidConfiguration(const std::string &message)
-        : std::runtime_error(message) {}
+struct UnknownGenerator : Error {
+    UnknownGenerator(const std::string &message) : Error(message) {}
+};
+
+struct InvalidConfiguration : Error {
+    InvalidConfiguration(const std::string &message) : Error(message) {}
+};
+
+struct IOError : Error {
+    IOError(const std::string &message) : Error(message) {}
+};
+
+struct FormatError : Error {
+    FormatError(const std::string &message) : Error(message) {}
 };
 
 #endif // mapproxy_error_hpp_included_

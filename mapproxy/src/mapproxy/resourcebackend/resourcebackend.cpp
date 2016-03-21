@@ -1,8 +1,8 @@
 #include "dbglog/dbglog.hpp"
 
-#include "./error.hpp"
-#include "./resourcebackend.hpp"
-#include "./resourcebackend/factory.hpp"
+#include "../error.hpp"
+#include "../resourcebackend.hpp"
+#include "./factory.hpp"
 
 namespace po = boost::program_options;
 
