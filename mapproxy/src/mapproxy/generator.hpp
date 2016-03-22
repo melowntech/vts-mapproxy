@@ -40,8 +40,8 @@ public:
     void prepare();
 
     const Resource& resource() const { return resource_; }
-
     const Resource::Id& id() const { return resource_.id; }
+    const boost::filesystem::path& root() const { return root_; }
 
 protected:
     Generator(const boost::filesystem::path &root
@@ -49,6 +49,9 @@ protected:
         : root_(root), resource_(resource), ready_(false)
     {}
 
+    void makeReady();
+
+private:
     virtual void prepare_impl() = 0;
 
     const boost::filesystem::path root_;

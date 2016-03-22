@@ -46,6 +46,13 @@ Generator::pointer Generator::create(const Resource::Generator &type
     throw;
 }
 
+void Generator::makeReady()
+{
+    ready_ = true;
+    LOG(info2) << "Ready to serve resource <" << id()
+               << "> (type <" << resource().generator << ">).";
+}
+
 class Generators::Detail {
 public:
     Detail(const boost::filesystem::path &root
