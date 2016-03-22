@@ -18,7 +18,7 @@ public:
     Mysql(const Config &config);
 
 private:
-    virtual Resource::Groups load_impl() const;
+    virtual Resource::map load_impl() const;
 
     const Config config_;
 };

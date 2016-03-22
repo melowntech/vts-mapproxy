@@ -18,6 +18,7 @@ set(mapproxy_SOURCES
   generator.hpp
   generator/generator.cpp
   generator/factory.hpp
+  generator/tms-raster.hpp generator/tms-raster.cpp
 
   http.hpp
   http/http.cpp

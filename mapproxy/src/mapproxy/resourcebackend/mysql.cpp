@@ -60,7 +60,7 @@ Mysql::Mysql(const Config &config)
     // TODO: check validity
 }
 
-Resource::Groups Mysql::load_impl() const
+Resource::map Mysql::load_impl() const
 {
     return {};
 }

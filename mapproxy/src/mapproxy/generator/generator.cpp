@@ -7,30 +7,32 @@
 #include "../generator.hpp"
 #include "./factory.hpp"
 
+namespace fs = boost::filesystem;
+
 namespace {
 
-typedef std::map<std::string, Generator::Factory::pointer> Registry;
+typedef std::map<Resource::Generator, Generator::Factory::pointer> Registry;
 Registry registry;
 
-Generator::Factory::pointer findFactory(const std::string &type)
+Generator::Factory::pointer findFactory(const Resource::Generator &type)
 {
     auto fregistry(registry.find(type));
     if (fregistry == registry.end()) {
         LOGTHROW(err1, UnknownGenerator)
-            << "Unknown resource backend <" << type << ">.";
+            << "Unknown generator type <" << type << ">.";
     }
     return fregistry->second;
 }
 
 } // namespace
 
-void Generator::registerType(const std::string &type
+void Generator::registerType(const Resource::Generator &type
                              , const Factory::pointer &factory)
 {
     registry.insert(Registry::value_type(type, factory));
 }
 
-Generator::pointer Generator::create(const std::string &type
+Generator::pointer Generator::create(const Resource::Generator &type
                                      , const boost::filesystem::path &root
                                      , const Resource &resource)
 {
@@ -62,7 +64,9 @@ public:
     void stop();
 
 private:
-    void update(const Resource::Groups &resources);
+    void update(const Resource::map &resources);
+
+    fs::path makePath(const Resource::Id &id);
 
     void runUpdater();
 
@@ -70,11 +74,25 @@ private:
     ResourceBackend::pointer resourceBackend_;
     const int resourceUpdatePeriod_;
 
+    // resource updater stuff
     std::thread updater_;
     std::atomic<bool> updaterRunning_;
     std::mutex updaterLock_;
     std::condition_variable updaterCond_;
+
+    // internals
+    std::mutex servingLock_;
+    Generator::map serving_;
+
+    std::mutex preparingLock_;
+    Generator::list preparing_;
+    std::condition_variable preparingCond_;
 };
+
+fs::path Generators::Detail::makePath(const Resource::Id &id)
+{
+    return (root_ / id.group / id.id);
+}
 
 void Generators::Detail::start()
 {
@@ -155,8 +173,74 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
     return {};
 }
 
-void Generators::Detail::update(const Resource::Groups &resources)
+void Generators::Detail::update(const Resource::map &resources)
 {
     LOG(info2) << "Updating resources.";
-    (void) resources;
+
+    auto iresources(resources.begin()), eresources(resources.end());
+    auto iserving(serving_.begin()), eserving(serving_.end());
+
+    Generator::list toAdd;
+    Generator::list toRemove;
+
+    auto add([&](const Resource &res)
+    {
+        try {
+            toAdd.push_back(Generator::create
+                            (res.generator, makePath(res.id), res));
+        } catch (const std::exception &e) {
+            LOG(err2) << "Failed to create generator for resource <"
+                      << iresources->first << ">: <" << e.what() << ">.";
+        }
+    });
+
+    // process common stuff
+    while ((iresources != eresources) && (iserving != eserving)) {
+        if (iresources->first < iserving->first) {
+            // new resource
+            add(iresources->second);
+            ++iresources;
+        } else if (iserving->first < iresources->first) {
+            // removed resource
+            // TODO: remove
+            LOG(info2) << "removed: " << iserving->first;
+            toRemove.push_back(iserving->second);
+            ++iserving;
+        } else {
+            // existing resource
+            // TODO: check for change
+            LOG(info2) << "reused: " << iresources->first;
+            ++iresources;
+            ++iserving;
+        }
+    }
+
+    // process tail: added resources
+    for (; iresources != eresources; ++iresources) {
+        add(iresources->second);
+    }
+
+    // process tail: removed resources
+    for (; iserving != eserving; ++iserving) {
+        toRemove.push_back(iserving->second);
+    }
+
+    // add stuff
+    for (const auto &generator : toAdd) {
+        {
+            std::unique_lock<std::mutex> lock(servingLock_);
+            serving_.insert(Generator::map::value_type
+                            (generator->id(), generator));
+        }
+
+        if (!generator->ready()) {
+            std::unique_lock<std::mutex> lock(preparingLock_);
+            preparing_.push_back(generator);
+            preparingCond_.notify_one();
+        }
+    }
+
+    // TODO: process remove set
+
+    LOG(info2) << "Resources updated.";
 }

@@ -150,6 +150,7 @@ void Daemon::configure(const po::variables_map &vars)
         << "\n\tstore.path = " << storePath_
         << "\n\thttp.listen = " << httpListen_
         << "\n\thttp.threadCount = " << httpThreadCount_
+        << "\n\tresource-backend.updatePeriod = " << resourceUpdatePeriod_
         << "\n"
         << utility::LManip([&](std::ostream &os) {
                 ResourceBackend::printConfig(os, "\t" + RBPrefixDotted

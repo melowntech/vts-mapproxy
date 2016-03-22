@@ -98,9 +98,10 @@ Resource parseResource(const Json::Value &value)
 
     Resource r;
 
-    Json::get(r.group, value, "group");
-    Json::get(r.id, value, "id");
-    Json::get(r.id, value, "type");
+    Json::get(r.id.group, value, "group");
+    Json::get(r.id.id, value, "id");
+    Json::get(r.generator.type, value, "type");
+    Json::get(r.generator.driver, value, "driver");
 
     parseCredits(r.credits, value, "credits");
 
@@ -132,7 +133,7 @@ Resource parseResource(const Json::Value &value)
     return r;
 }
 
-void parseGroups(Resource::Groups &groups, const Json::Value &value)
+void parseResources(Resource::map &resources, const Json::Value &value)
 {
     if (!value.isArray()) {
         LOGTHROW(err1, Json::Error)
@@ -144,16 +145,14 @@ void parseGroups(Resource::Groups &groups, const Json::Value &value)
         // parse resource and remember
         auto res(parseResource(item));
 
-        auto &group(groups[res.group]);
-        if (!group.insert(Resource::Group::value_type(res.id, res)).second) {
+        if (!resources.insert(Resource::map::value_type(res.id, res)).second) {
             LOGTHROW(err1, Json::Error)
-                << "Duplicate entry for <" << res.group << ">/<"
-                << res.id << ">.";
+                << "Duplicate entry for <" << res.id << ">.";
         }
     }
 }
 
-Resource::Groups loadConfig(std::istream &in, const fs::path &path)
+Resource::map loadConfig(std::istream &in, const fs::path &path)
 {
     Json::Value config;
     Json::Reader reader;
@@ -163,9 +162,10 @@ Resource::Groups loadConfig(std::istream &in, const fs::path &path)
             << reader.getFormattedErrorMessages() << ">.";
     }
 
-    Resource::Groups groups;
+    Resource::map resources;
+
     try {
-        parseGroups(groups, config);
+        parseResources(resources, config);
     } catch (const Json::Error &e) {
         LOGTHROW(err1, FormatError)
             << "Invalid resource config file " << path
@@ -176,10 +176,10 @@ Resource::Groups loadConfig(std::istream &in, const fs::path &path)
             << " format: <" << e.what() << ">.";
     }
 
-    return groups;
+    return resources;
 }
 
-Resource::Groups loadConfig(const fs::path &path)
+Resource::map loadConfig(const fs::path &path)
 {
     std::ifstream f;
     f.exceptions(std::ios::badbit | std::ios::failbit);
@@ -204,7 +204,7 @@ Conffile::Conffile(const Config &config)
     load_impl();
 }
 
-Resource::Groups Conffile::load_impl() const
+Resource::map Conffile::load_impl() const
 {
     return detail::loadConfig(config_.path);
 }

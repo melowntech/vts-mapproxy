@@ -19,7 +19,7 @@ public:
 
     virtual ~ResourceBackend() {}
 
-    Resource::Groups load() const;
+    Resource::map load() const;
 
     class TypedConfig {
     public:
@@ -65,10 +65,10 @@ public:
 protected:
     ResourceBackend() {}
 
-    virtual Resource::Groups load_impl() const = 0;
+    virtual Resource::map load_impl() const = 0;
 };
 
-inline Resource::Groups ResourceBackend::load() const
+inline Resource::map ResourceBackend::load() const
 {
     return load_impl();
 }
