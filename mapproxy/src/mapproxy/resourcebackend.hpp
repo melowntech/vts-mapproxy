@@ -68,12 +68,11 @@ protected:
     virtual Resource::Groups load_impl() const = 0;
 };
 
-// inlines
-
-// just forward
 inline Resource::Groups ResourceBackend::load() const
 {
     return load_impl();
 }
+
+// inlines
 
 #endif // mapproxy_resourcebackend_hpp_included_

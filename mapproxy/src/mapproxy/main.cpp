@@ -10,12 +10,14 @@
 
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
+#include "utility/buildsys.hpp"
 #include "service/service.hpp"
 
 #include "vts-libs/registry/po.hpp"
 
 #include "./error.hpp"
 #include "./resourcebackend.hpp"
+#include "./generator.hpp"
 #include "./http.hpp"
 
 namespace po = boost::program_options;
@@ -30,8 +32,10 @@ public:
         : service::Service("mapproxy", BUILD_TARGET_VERSION
                            , service::ENABLE_CONFIG_UNRECOGNIZED_OPTIONS
                            | service::ENABLE_UNRECOGNIZED_OPTIONS)
+        , storePath_(utility::buildsys::installPath("var/mapproxy"))
         , httpListen_(3070)
         , httpThreadCount_(5)
+        , resourceUpdatePeriod_(300)
     {}
 
 private:
@@ -65,11 +69,15 @@ private:
     };
     friend struct Stopper;
 
+    fs::path storePath_;
+
     utility::TcpEndpoint httpListen_;
     unsigned int httpThreadCount_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
+    int resourceUpdatePeriod_;
 
     ResourceBackend::pointer resourceBackend_;
+    boost::optional<Generators> generators_;
 
     boost::optional<Http> http_;
 };
@@ -81,6 +89,10 @@ void Daemon::configuration(po::options_description &cmdline
     vr::registryConfiguration(cmdline, vr::defaultPath());
 
     config.add_options()
+        ("store.path", po::value(&storePath_)
+         ->default_value(storePath_)->required()
+         , "Path to internal store.")
+
         ("http.listen", po::value(&httpListen_)
          ->default_value(httpListen_)->required()
          , "TCP endpoint where to listen at.")
@@ -94,6 +106,10 @@ void Daemon::configuration(po::options_description &cmdline
             + boost::lexical_cast<std::string>
             (utility::join(ResourceBackend::listTypes(), ", "))
             + ".").c_str())
+        ("resource-backend.updatePeriod"
+         , po::value(&resourceUpdatePeriod_)
+         ->default_value(resourceUpdatePeriod_)->required()
+         , "Update period between resource list update (in seconds).")
         ;
 
     (void) cmdline;
@@ -109,9 +125,7 @@ Daemon::configure(const po::variables_map &vars
 {
     // configure resource backend
     const auto RBType(RBPrefixDotted + "type");
-
     if (!vars.count(RBType)) { return {}; }
-
     try {
         // fetch backend type
         resourceBackendConfig_.type = vars[RBType].as<std::string>();
@@ -128,8 +142,12 @@ void Daemon::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
 
+    // absolutize store path
+    storePath_ = absolute(storePath_);
+
     LOG(info3, log_)
         << "Config:"
+        << "\n\tstore.path = " << storePath_
         << "\n\thttp.listen = " << httpListen_
         << "\n\thttp.threadCount = " << httpThreadCount_
         << "\n"
@@ -181,6 +199,8 @@ service::Service::Cleanup Daemon::start()
     auto guard(std::make_shared<Stopper>(*this));
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
+    generators_ = boost::in_place(storePath_, resourceBackend_
+                                  , resourceUpdatePeriod_);
     http_ = boost::in_place(httpListen_, httpThreadCount_);
 
     return guard;
@@ -188,8 +208,9 @@ service::Service::Cleanup Daemon::start()
 
 void Daemon::cleanup()
 {
-    // TODO: destroy stuff here
+    // destroy, in reverse order
     http_ = boost::none;
+    generators_.reset();
     resourceBackend_.reset();
 }
 
