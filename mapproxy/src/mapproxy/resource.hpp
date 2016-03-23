@@ -70,7 +70,6 @@ struct Resource {
 UTILITY_GENERATE_ENUM(RasterFormat,
     ((jpg))
     ((png))
-    ((tiff))
 )
 
 namespace resdef {

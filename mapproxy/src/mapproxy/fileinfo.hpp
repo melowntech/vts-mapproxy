@@ -1,30 +1,27 @@
 #ifndef mapproxy_fileinfo_hpp_included_
 #define mapproxy_fileinfo_hpp_included_
 
-#include "utility/enum-io.hpp"
-
-#include "vts-libs/storage/filetypes.hpp"
-#include "vts-libs/storage/support.hpp"
-#include "vts-libs/vts/basetypes.hpp"
-
 #include "./resource.hpp"
 
-namespace vs = vadstena::storage;
-namespace vts = vadstena::vts;
-
+/** Parsed file information.
+ */
 struct FileInfo {
     FileInfo(const std::string &url);
 
-    // full url
+    /**Full url.
+     */
     std::string url;
 
-    // reference frame
+    /** Reference frame.
+     */
     std::string referenceFrame;
 
-    // resource generator type
+    /** Resource generator type.
+     */
     std::string generatorType;
 
-    // handling resource ID
+    /** Handling resource ID.
+     */
     Resource::Id resourceId;
 
     /** Requested filename. Parsed by appropriate generator.
