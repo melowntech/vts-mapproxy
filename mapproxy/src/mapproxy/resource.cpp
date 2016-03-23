@@ -345,10 +345,44 @@ void save(const boost::filesystem::path &path, const Resource &resource)
     detail::saveResource(f, resource);
 }
 
+namespace detail {
+
+template<typename T>
+bool sameDefinition(const Resource &l, const Resource &r)
+{
+    return (getDefinition<T>(l) == getDefinition<T>(r));
+}
+
+} // namespace detail
+
 bool Resource::operator==(const Resource &o) const
 {
-    // TODO: implement me
-    (void) o;
+    if (!(id == o.id)) { return false; }
+    if (!(generator == o.generator)) { return false; }
+    if (credits != o.credits) { return false; }
+    if (referenceFrames != o.referenceFrames) { return false; }
+
+    if (generator == resdef::TmsRaster::generator) {
+        if (!detail::sameDefinition<resdef::TmsRaster>(*this, o)) {
+            return false;
+        }
+    } else if (generator == resdef::SurfaceSpheroid::generator) {
+        if (!detail::sameDefinition<resdef::SurfaceSpheroid>(*this, o)) {
+            return false;
+        }
+    } else if (generator == resdef::SurfaceDem::generator) {
+        if (!detail::sameDefinition<resdef::SurfaceDem>(*this, o)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool Resource::ReferenceFrame::operator==(const ReferenceFrame &o) const
+{
+    if (lodRange != o.lodRange) { return false; }
+    if (tileRange != o.tileRange) { return false; }
     return true;
 }
 

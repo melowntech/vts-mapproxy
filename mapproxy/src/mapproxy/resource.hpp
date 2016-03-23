@@ -21,6 +21,7 @@ struct Resource {
         Id(const std::string &group, const std::string &id)
             : group(group), id(id) {}
         bool operator<(const Id &o) const;
+        bool operator==(const Id &o) const;
     };
 
     struct Generator {
@@ -45,6 +46,7 @@ struct Resource {
         vr::TileRange tileRange;
 
         typedef std::map<std::string, ReferenceFrame> map;
+        bool operator==(const ReferenceFrame &o) const;
     };
 
     ReferenceFrame::map referenceFrames;
@@ -140,6 +142,10 @@ inline bool Resource::Id::operator<(const Id &o) const {
     if (group < o.group) { return true; }
     else if (o.group < group) { return true; }
     return id < o.id;
+}
+
+inline bool Resource::Id::operator==(const Id &o) const {
+    return ((group == o.group) || (id == o.id));
 }
 
 inline bool Resource::Generator::operator<(const Generator &o) const {
