@@ -11,6 +11,8 @@ namespace fs = boost::filesystem;
 
 namespace {
 
+const std::string ResourceFile("resource.json");
+
 typedef std::map<Resource::Generator, Generator::Factory::pointer> Registry;
 Registry registry;
 
@@ -44,6 +46,31 @@ Generator::pointer Generator::create(const Resource::Generator &type
             << type << ">.";
     }
     throw;
+}
+
+Generator::Generator(const boost::filesystem::path &root
+                     , const Resource &resource)
+    : root_(root), resource_(resource), savedResource_(resource)
+    , fresh_(false), ready_(false)
+{
+    // TODO: handle failed creation
+    auto rfile(root / ResourceFile);
+
+    if (create_directories(root)) {
+        // new resource
+        fresh_ = true;
+        save(rfile, resource);
+    } else {
+        // reopen of existing dataset
+        savedResource_ = loadResource(rfile);
+        if (savedResource_ != resource) {
+            LOG(warn3)
+                << "Definition of resource <" << resource.id
+                << "> differs from the one stored in store at "
+                << root << "; using stored definition.";
+            resource_ = savedResource_;
+        }
+    }
 }
 
 void Generator::makeReady()
@@ -240,6 +267,8 @@ void Generators::Detail::update(const Resource::map &resources)
                             (generator->id(), generator));
         }
 
+        // TODO: better prepare set; probably multi-index container: sequence
+        // with additional resource index map
         if (!generator->ready()) {
             std::unique_lock<std::mutex> lock(preparingLock_);
             preparing_.push_back(generator);
@@ -247,7 +276,15 @@ void Generators::Detail::update(const Resource::map &resources)
         }
     }
 
-    // TODO: process remove set
+    // remove stuff
+    for (const auto &generator : toRemove) {
+        // TODO: remove from prepare set (should be m-i container as mentioned
+        // above)
+        {
+            std::unique_lock<std::mutex> lock(servingLock_);
+            serving_.erase(generator->id());
+        }
+    }
 
     LOG(info2) << "Resources updated.";
 }

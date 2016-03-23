@@ -19,6 +19,7 @@
 #include "./resourcebackend.hpp"
 #include "./generator.hpp"
 #include "./http.hpp"
+#include "./core.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -78,7 +79,7 @@ private:
 
     ResourceBackend::pointer resourceBackend_;
     boost::optional<Generators> generators_;
-
+    boost::optional<Core> core_;
     boost::optional<Http> http_;
 };
 
@@ -202,7 +203,8 @@ service::Service::Cleanup Daemon::start()
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
     generators_ = boost::in_place(storePath_, resourceBackend_
                                   , resourceUpdatePeriod_);
-    http_ = boost::in_place(httpListen_, httpThreadCount_);
+    core_ = boost::in_place(std::ref(*generators_));
+    http_ = boost::in_place(httpListen_, httpThreadCount_, std::ref(*core_));
 
     return guard;
 }
@@ -211,6 +213,7 @@ void Daemon::cleanup()
 {
     // destroy, in reverse order
     http_ = boost::none;
+    core_ = boost::none;
     generators_.reset();
     resourceBackend_.reset();
 }

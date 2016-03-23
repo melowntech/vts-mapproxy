@@ -1,7 +1,12 @@
-#ifndef mapproxy_resources_hpp_included_
-#define mapproxy_resources_hpp_included_
+#ifndef mapproxy_resource_hpp_included_
+#define mapproxy_resource_hpp_included_
 
 #include <iostream>
+
+#include <boost/filesystem/path.hpp>
+#include <boost/any.hpp>
+
+#include "utility/enum-io.hpp"
 
 #include "vts-libs/registry.hpp"
 
@@ -26,16 +31,13 @@ struct Resource {
         Generator(const std::string &type, const std::string &driver)
             : type(type), driver(driver) {}
         bool operator<(const Generator &o) const;
+        bool operator==(const Generator &o) const;
     };
 
     Id id;
     Generator generator;
 
     vr::IdSet credits;
-
-    /** URL path this resource is available at.
-     */
-    std::string pathTemplate;
 
     struct ReferenceFrame {
         const vr::ReferenceFrame *referenceFrame;
@@ -58,9 +60,66 @@ struct Resource {
     typedef std::vector<Resource> list;
 
     Resource() {}
+
+    bool operator==(const Resource &o) const;
+    bool operator!=(const Resource &o) const;
 };
 
-// inlines
+UTILITY_GENERATE_ENUM(RasterFormat,
+    ((jpg))
+    ((png))
+    ((tiff))
+)
+
+namespace resdef {
+
+struct TmsRaster {
+    static Resource::Generator generator;
+
+    boost::filesystem::path datasetPath;
+    boost::filesystem::path maskPath;
+    RasterFormat format;
+
+    TmsRaster() : format(RasterFormat::jpg) {}
+    bool operator==(const TmsRaster &o) const;
+};
+
+struct SurfaceSpheroid {
+    static Resource::Generator generator;
+
+    double a;
+    double b;
+    unsigned int textureLayerId;
+
+    SurfaceSpheroid() : a(), b(), textureLayerId() {}
+    bool operator==(const SurfaceSpheroid &o) const;
+};
+
+struct SurfaceDem {
+    static Resource::Generator generator;
+
+    boost::filesystem::path datasetPath;
+    unsigned int textureLayerId;
+
+    SurfaceDem() : textureLayerId() {}
+    bool operator==(const SurfaceDem &o) const;
+};
+
+} // namespace resdef
+
+/** Load resources from given path.
+ */
+Resource::map loadResources(const boost::filesystem::path &path);
+
+/** Load single resource from given path.
+ */
+Resource loadResource(const boost::filesystem::path &path);
+
+/** Save single resource to given path.
+ */
+void save(const boost::filesystem::path &path, const Resource &resource);
+
+// inlines + IO
 
 template<typename CharT, typename Traits>
 inline std::basic_ostream<CharT, Traits>&
@@ -89,4 +148,12 @@ inline bool Resource::Generator::operator<(const Generator &o) const {
     return driver < o.driver;
 }
 
-#endif // mapproxy_resources_hpp_included_
+inline bool Resource::Generator::operator==(const Generator &o) const {
+    return ((type == o.type) || (driver == o.driver));
+}
+
+inline bool Resource::operator!=(const Resource &o) const
+{
+    return !(*this == o);
+}
+#endif // mapproxy_resource_hpp_included_

@@ -7,7 +7,8 @@ define_module(BINARY mapproxy
 
 set(mapproxy_SOURCES
   error.hpp
-  resources.hpp
+  resource.hpp resource.cpp
+  fileinfo.hpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp
@@ -22,6 +23,9 @@ set(mapproxy_SOURCES
 
   http.hpp
   http/http.cpp
+  contentgenerator.hpp
+
+  core.hpp core.cpp
 
   main.cpp
   )

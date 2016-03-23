@@ -23,7 +23,7 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        ({"tms", "tms-raster"}, std::make_shared<Factory>());
+        (resdef::TmsRaster::generator, std::make_shared<Factory>());
 });
 
 } // namespace
@@ -31,20 +31,15 @@ utility::PreMain Factory::register_([]()
 TmsRaster::TmsRaster(const boost::filesystem::path &root
                      , const Resource &resource)
     : Generator(root, resource)
+    , definition_(boost::any_cast<resdef::TmsRaster>(resource.definition))
 {
-    // TODO: remove if new and fails to run
-    if (create_directories(this->root())) {
-        // new dataset
-    } else {
-        // reopen of existing dataset
-    }
-
+    // TODO: check datasets
     makeReady();
 }
 
 void TmsRaster::prepare_impl()
 {
-    LOG(info4) << "Preparing.";
+    LOG(info2) << "No need to prepare.";
 }
 
 } // namespace generator

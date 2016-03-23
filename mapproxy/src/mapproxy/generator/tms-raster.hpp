@@ -12,6 +12,8 @@ public:
 
 private:
     virtual void prepare_impl();
+
+    const resdef::TmsRaster &definition_;
 };
 
 } // namespace generator

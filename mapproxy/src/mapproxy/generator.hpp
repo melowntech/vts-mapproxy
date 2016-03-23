@@ -10,7 +10,7 @@
 #include <boost/any.hpp>
 #include <boost/filesystem/path.hpp>
 
-#include "./resources.hpp"
+#include "./resource.hpp"
 #include "./resourcebackend.hpp"
 
 /** Dataset generator.
@@ -45,17 +45,18 @@ public:
 
 protected:
     Generator(const boost::filesystem::path &root
-              , const Resource &resource)
-        : root_(root), resource_(resource), ready_(false)
-    {}
+              , const Resource &resource);
 
     void makeReady();
+    bool fresh() const { return fresh_; }
 
 private:
     virtual void prepare_impl() = 0;
 
     const boost::filesystem::path root_;
-    const Resource resource_;
+    Resource resource_;
+    Resource savedResource_;
+    bool fresh_;
     std::atomic<bool> ready_;
 };
 

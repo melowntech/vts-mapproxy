@@ -6,10 +6,13 @@
 
 #include "utility/tcpendpoint.hpp"
 
+#include "contentgenerator.hpp"
+
 class Http {
 public:
     Http(const utility::TcpEndpoint &listen
-         , unsigned int threadCount);
+         , unsigned int threadCount
+         , ContentGenerator &contentGenerator);
 
     struct Detail;
 

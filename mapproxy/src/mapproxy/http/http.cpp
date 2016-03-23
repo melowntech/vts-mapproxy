@@ -59,13 +59,15 @@ operator<<(std::basic_ostream<CharT, Traits> &os, const RequestInfo &ri)
 } // namespace
 
 struct Http::Detail : boost::noncopyable {
-    Detail(const utility::TcpEndpoint &listen, unsigned int threadCount);
+    Detail(const utility::TcpEndpoint &listen, unsigned int threadCount
+           , ContentGenerator &contentGenerator);
     ~Detail() {
         if (daemon) { ::MHD_stop_daemon(daemon); }
     }
 
     int request(::MHD_Connection *connection, RequestInfo &requestInfo);
 
+    ContentGenerator &contentGenerator;
     ::MHD_Daemon *daemon;
 };
 
@@ -137,8 +139,10 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
 } // extent "C"
 
 Http::Detail::Detail(const utility::TcpEndpoint &listen
-                     , unsigned int threadCount)
-    : daemon(::MHD_start_daemon
+                     , unsigned int threadCount
+                     , ContentGenerator &contentGenerator)
+    : contentGenerator(contentGenerator)
+    , daemon(::MHD_start_daemon
              ((MHD_USE_POLL_INTERNALLY | MHD_USE_SUSPEND_RESUME)
               , listen.value.port()
               , nullptr, nullptr
@@ -155,15 +159,62 @@ Http::Detail::Detail(const utility::TcpEndpoint &listen
 {
 }
 
+namespace {
+
+class HttpSink : public Sink {
+public:
+    HttpSink(::MHD_Connection *connection, RequestInfo &ri)
+        : conn_(connection), ri_(ri)
+    {}
+
+private:
+    virtual void content_impl(const std::string &data)
+    {
+        auto response(responseHandle
+                      (::MHD_create_response_from_buffer
+                       (data.size(), const_cast<char*>(data.data())
+                        ,  MHD_RESPMEM_MUST_COPY)));
+
+        // TODO: check error code
+        ::MHD_queue_response(conn_, (ri_.responseCode = 200), response.get());
+    }
+
+    virtual void error_impl(const std::exception_ptr &exc)
+    {
+        try {
+            std::rethrow_exception(exc);
+        } catch (const std::exception) {
+            // TODO: handle
+        } catch (...) {
+            // TODO: handle
+        }
+    }
+
+    std::shared_ptr< ::MHD_Response> responseHandle(MHD_Response *response)
+    {
+        return std::shared_ptr< ::MHD_Response>
+            (response, [](::MHD_Response *response) {
+                if (response) { ::MHD_destroy_response(response); }
+            });
+    }
+
+    ::MHD_Connection *conn_;
+    RequestInfo &ri_;
+};
+
+} // namespace
+
 int Http::Detail::request(::MHD_Connection *connection
-                          , RequestInfo &requestInfo)
+                          , RequestInfo &ri)
 {
-    (void) connection;
-    (void) requestInfo;
+    contentGenerator.generate
+        (ri.url, std::make_shared<HttpSink>(connection, ri));
+
     return MHD_YES;
 }
 
-Http::Http(const utility::TcpEndpoint &listen, unsigned int threadCount)
-    : detail_(std::make_shared<Detail>(listen, threadCount))
+Http::Http(const utility::TcpEndpoint &listen, unsigned int threadCount
+           , ContentGenerator &contentGenerator)
+    : detail_(std::make_shared<Detail>(listen, threadCount, contentGenerator))
 {
 }
