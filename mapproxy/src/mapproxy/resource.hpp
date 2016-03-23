@@ -56,8 +56,6 @@ struct Resource {
      */
     boost::any definition;
 
-    // TODO: fill in other stuff here
-
     typedef std::map<Id, Resource> map;
     typedef std::vector<Resource> list;
 
