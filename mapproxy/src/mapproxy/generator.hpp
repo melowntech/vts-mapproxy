@@ -43,6 +43,8 @@ public:
     const Resource::Id& id() const { return resource_.id; }
     const boost::filesystem::path& root() const { return root_; }
 
+    bool check(const Resource &resource) const;
+
 protected:
     Generator(const boost::filesystem::path &root
               , const Resource &resource);

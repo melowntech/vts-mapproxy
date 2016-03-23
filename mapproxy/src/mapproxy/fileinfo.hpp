@@ -1,6 +1,8 @@
 #ifndef mapproxy_fileinfo_hpp_included_
 #define mapproxy_fileinfo_hpp_included_
 
+#include "utility/enum-io.hpp"
+
 #include "vts-libs/storage/filetypes.hpp"
 #include "vts-libs/storage/support.hpp"
 #include "vts-libs/vts/basetypes.hpp"
@@ -19,37 +21,15 @@ struct FileInfo {
     // reference frame
     std::string referenceFrame;
 
+    // resource generator type
+    std::string generatorType;
+
     // handling resource ID
     Resource::Id resourceId;
 
-    // type of file
-    enum class Type { unknown, file, tileFile, support };
-
-    // type of file
-    Type type;
-
-    // tileset file, valid only when (type == Type::file)
-    vs::File file;
-
-    // tileset tile file, valid only when (type == Type::tileFile)
-    vs::TileFile tileFile;
-
-    // support file, valid only when (type == Type::support)
-    const vs::SupportFile::Files::value_type *support;
-
-    /** Request for raw file, not translation.
+    /** Requested filename. Parsed by appropriate generator.
      */
-    bool raw;
-
-    /** tileId; valid only when (type == Type::tileFile)
-     */
-    vts::TileId tileId;
-
-    /** Sub tile file. Used for textures in atlas.
-     */
-    unsigned int subTileFile;
-
-    const vr::DataFile *registry;
+    std::string filename;
 };
 
 #endif // mapproxy_fileinfo_hpp_included_

@@ -1,44 +1,47 @@
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
+
+#include "utility/streams.hpp"
+
+#include "vts-libs/vts/tileop.hpp"
+
+#include "./error.hpp"
 #include "./fileinfo.hpp"
+
+namespace ba = boost::algorithm;
+
+namespace constants {
+    const std::string Config("mapConfig.json");
+}
 
 FileInfo::FileInfo(const std::string &url)
     : url(url)
 {
+    std::vector<std::string> components;
+    ba::split(components, url, ba::is_any_of("/")
+              , ba::token_compress_on);
+
+    if (components.size() == 3) {
+        // only reference frame -> allow only map config
+        referenceFrame = components[1];
+        if (components[2] != constants::Config) {
+            LOGTHROW(err1, NotFound)
+                << "URL <" << url << "> not found: reference frame "
+                "supports only map configuration.";
+        }
+        return;
+    }
+
+    if (components.size() != 6) {
+        LOGTHROW(err1, NotFound)
+            << "URL <" << url << "> not found: invalid number "
+            "of path components.";
+    }
+
+    // full file path
+    referenceFrame = components[1];
+    generatorType = components[2];
+    resourceId.group = components[3];
+    resourceId.id = components[4];
+    filename = components[5];
 }
-
-#if 0
-    // reference frame
-    std::string referenceFrame;
-
-    // handling resource ID
-    Resource::Id resourceId;
-
-    // type of file
-    enum class Type { unknown, file, tileFile, support };
-
-    // type of file
-    Type type;
-
-    // tileset file, valid only when (type == Type::file)
-    vs::File file;
-
-    // tileset tile file, valid only when (type == Type::tileFile)
-    vs::TileFile tileFile;
-
-    // support file, valid only when (type == Type::support)
-    const vs::SupportFile::Files::value_type *support;
-
-    /** Request for raw file, not translation.
-     */
-    bool raw;
-
-    /** tileId; valid only when (type == Type::tileFile)
-     */
-    vadstena::vts::TileId tileId;
-
-    /** Sub tile file. Used for textures in atlas.
-     */
-    unsigned int subTileFile;
-
-    const vr::DataFile *registry;
-};
-#endif

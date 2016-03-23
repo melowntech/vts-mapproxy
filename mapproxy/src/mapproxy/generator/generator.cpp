@@ -73,6 +73,18 @@ Generator::Generator(const boost::filesystem::path &root
     }
 }
 
+bool Generator::check(const Resource &resource) const
+{
+    if (resource_ != resource) {
+        LOG(warn2)
+            << "Definition of resource <" << resource.id
+            << "> differs from the one stored in store at "
+            << root_ << "; using stored definition.";
+        return false;
+    }
+    return true;
+}
+
 void Generator::makeReady()
 {
     ready_ = true;
@@ -236,14 +248,11 @@ void Generators::Detail::update(const Resource::map &resources)
             ++iresources;
         } else if (iserving->first < iresources->first) {
             // removed resource
-            // TODO: remove
-            LOG(info2) << "removed: " << iserving->first;
             toRemove.push_back(iserving->second);
             ++iserving;
         } else {
             // existing resource
-            // TODO: check for change
-            LOG(info2) << "reused: " << iresources->first;
+            iserving->second->check(iresources->second);
             ++iresources;
             ++iserving;
         }

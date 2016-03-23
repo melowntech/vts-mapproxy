@@ -8,7 +8,6 @@ define_module(BINARY mapproxy
 set(mapproxy_SOURCES
   error.hpp
   resource.hpp resource.cpp
-  fileinfo.hpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp
@@ -21,10 +20,10 @@ set(mapproxy_SOURCES
   generator/factory.hpp
   generator/tms-raster.hpp generator/tms-raster.cpp
 
-  http.hpp
-  http/http.cpp
+  http.hpp http.cpp
   contentgenerator.hpp
 
+  fileinfo.hpp fileinfo.cpp
   core.hpp core.cpp
 
   main.cpp

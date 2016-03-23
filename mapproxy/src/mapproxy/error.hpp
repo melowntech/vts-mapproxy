@@ -28,4 +28,8 @@ struct FormatError : Error {
     FormatError(const std::string &message) : Error(message) {}
 };
 
+struct NotFound : Error {
+    NotFound(const std::string &message) : Error(message) {}
+};
+
 #endif // mapproxy_error_hpp_included_
