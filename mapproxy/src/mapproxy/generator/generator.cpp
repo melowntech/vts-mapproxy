@@ -211,14 +211,6 @@ Generator::pointer Generators::Detail::matchUrl(const std::string &path)
     return {};
 }
 
-Generator::list
-Generators::Detail::referenceFrame(const std::string &referenceFrame)
-    const
-{
-    (void) referenceFrame;
-    return {};
-}
-
 void Generators::Detail::update(const Resource::map &resources)
 {
     LOG(info2) << "Updating resources.";
@@ -296,4 +288,22 @@ void Generators::Detail::update(const Resource::map &resources)
     }
 
     LOG(info2) << "Resources updated.";
+}
+
+Generator::list
+Generators::Detail::referenceFrame(const std::string &referenceFrame)
+    const
+{
+    Generator::list out;
+
+    // use only ready generators that handle datasets for given reference frame
+    for (const auto &item: serving_) {
+        if (item.second->ready()
+            && item.second->handlesReferenceFrame(referenceFrame))
+        {
+            out.push_back(item.second);
+        }
+    }
+
+    return out;
 }

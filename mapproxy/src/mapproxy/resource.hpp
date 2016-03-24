@@ -17,6 +17,8 @@ struct Resource {
         std::string group;
         std::string id;
 
+        std::string fullId() const { return group + "-" + id; }
+
         Id() {}
         Id(const std::string &group, const std::string &id)
             : group(group), id(id) {}
@@ -38,7 +40,7 @@ struct Resource {
     Id id;
     Generator generator;
 
-    vr::IdSet credits;
+    vr::StringIdSet credits;
 
     struct ReferenceFrame {
         const vr::ReferenceFrame *referenceFrame;

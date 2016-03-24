@@ -10,8 +10,12 @@
 #include <boost/any.hpp>
 #include <boost/filesystem/path.hpp>
 
+#include "vts-libs/vts/mapconfig.hpp"
+
 #include "./resource.hpp"
 #include "./resourcebackend.hpp"
+
+namespace vts = vadstena::vts;
 
 /** Dataset generator.
  */
@@ -45,6 +49,10 @@ public:
 
     bool check(const Resource &resource) const;
 
+    bool handlesReferenceFrame(const std::string &referenceFrame) const;
+
+    vts::MapConfig mapConfig(const std::string &referenceFrame) const;
+
 protected:
     Generator(const boost::filesystem::path &root
               , const Resource &resource);
@@ -54,6 +62,8 @@ protected:
 
 private:
     virtual void prepare_impl() = 0;
+    virtual vts::MapConfig mapConfig_impl(const std::string &referenceFrame)
+        const = 0;
 
     const boost::filesystem::path root_;
     Resource resource_;
@@ -97,6 +107,18 @@ private:
 inline void Generator::prepare()
 {
     prepare_impl();
+}
+
+inline vts::MapConfig Generator::mapConfig(const std::string &referenceFrame)
+    const
+{
+    return mapConfig_impl(referenceFrame);
+}
+
+inline bool Generator::handlesReferenceFrame(const std::string &referenceFrame)
+    const
+{
+    return resource_.referenceFrames.count(referenceFrame);
 }
 
 #endif // mapproxy_generator_hpp_included_

@@ -29,7 +29,15 @@ set(mapproxy_SOURCES
   main.cpp
   )
 
-add_executable(mapproxy ${mapproxy_SOURCES})
+# old tilestorage browser files
+set(mapproxy_BROWSER_SOURCES
+  browser2d.hpp browser2d.cpp
+  )
+file_to_cpp(mapproxy_BROWSER_SOURCES
+  browser2d::index_html
+  browser2d/index.html)
+
+add_executable(mapproxy ${mapproxy_SOURCES} ${mapproxy_BROWSER_SOURCES})
 target_link_libraries(mapproxy ${MODULE_LIBRARIES})
 buildsys_binary(mapproxy)
 set_target_version(mapproxy ${mapproxy_VERSION})

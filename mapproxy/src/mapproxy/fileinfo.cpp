@@ -15,7 +15,7 @@ namespace constants {
 }
 
 FileInfo::FileInfo(const std::string &url)
-    : url(url)
+    : url(url), type(Type::resourceFile)
 {
     std::vector<std::string> components;
     ba::split(components, url, ba::is_any_of("/")
@@ -29,6 +29,8 @@ FileInfo::FileInfo(const std::string &url)
                 << "URL <" << url << "> not found: reference frame "
                 "supports only map configuration.";
         }
+
+        type = Type::rfMapConfig;
         return;
     }
 
@@ -38,7 +40,7 @@ FileInfo::FileInfo(const std::string &url)
             "of path components.";
     }
 
-    // full file path
+    // full resource file path
     referenceFrame = components[1];
     generatorType = components[2];
     resourceId.group = components[3];

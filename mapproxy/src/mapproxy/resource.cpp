@@ -23,7 +23,7 @@ Resource::Generator SurfaceDem::generator("surface", "surface-dem");
 
 namespace detail {
 
-void parseCredits(vr::IdSet &ids, const Json::Value &object
+void parseCredits(vr::StringIdSet &ids, const Json::Value &object
                   , const char *name)
 {
     const Json::Value &value(object[name]);
@@ -44,7 +44,7 @@ void parseCredits(vr::IdSet &ids, const Json::Value &object
             return vr::Registry::credit(element.asString());
         }());
 
-        ids.insert(credit.numericId);
+        ids.insert(credit.id);
     }
 }
 

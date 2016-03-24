@@ -6,6 +6,7 @@
 
 #include "dbglog/dbglog.hpp"
 
+#include "./error.hpp"
 #include "./http.hpp"
 
 namespace {
@@ -27,6 +28,7 @@ struct RequestInfo {
     std::string method;
     std::string version;
     int responseCode;
+    std::string errorReason;
 
     RequestInfo(const std::string &url, const std::string &method
                 , const std::string &version)
@@ -85,9 +87,19 @@ void mapproxy_http_callback_completed(void *cls, ::MHD_Connection *connection
 
     switch (toe) {
     case MHD_REQUEST_TERMINATED_COMPLETED_OK:
+        if (rinfo.responseCode == MHD_HTTP_OK) {
+            LOG(info3) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                       << ' ' << rinfo.responseCode << ".";
+        } else {
+            LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                      << ' ' << rinfo.responseCode << "; reason: <"
+                      << rinfo.errorReason << ">.";
+        }
+        return;
+
     case MHD_REQUEST_TERMINATED_WITH_ERROR:
         LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                  << ' ' << rinfo.responseCode << ".";
+                  << " [internal error].";
         return;
 
     case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
@@ -117,6 +129,7 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
                                    , const char *version
                                    , const char *, size_t *, void **info)
 {
+    dbglog::thread_id("http");
     if (!*info) {
         // setup, log and done
         auto *rinfo(new RequestInfo(url, method, version));
@@ -136,7 +149,7 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
         (connection, *rinfo);
 }
 
-} // extent "C"
+} // extern "C"
 
 Http::Detail::Detail(const utility::TcpEndpoint &listen
                      , unsigned int threadCount
@@ -157,9 +170,53 @@ Http::Detail::Detail(const utility::TcpEndpoint &listen
 
               , MHD_OPTION_END))
 {
+    if (!daemon) {
+        LOGTHROW(err1, Error) << "Cannot start HTTP daemon.";
+    }
 }
 
 namespace {
+
+class ResponseHandle {
+public:
+    ResponseHandle() : response_() {}
+    ResponseHandle(const std::string &data, bool copy = true) {
+        buffer(data, copy);
+    }
+
+    ~ResponseHandle() {
+        if (response_) { ::MHD_destroy_response(response_); }
+    }
+
+    void buffer(const std::string &data, bool copy = true) {
+        response_ = ::MHD_create_response_from_buffer
+            (data.size(), const_cast<char*>(data.data())
+             ,  copy ? MHD_RESPMEM_MUST_COPY : MHD_RESPMEM_PERSISTENT);
+    }
+
+    operator MHD_Response*() { return response_; }
+
+private:
+    MHD_Response *response_;
+};
+
+const std::string error404(R"RAW(<html>
+<head><title>404 Not Found</title></head>
+<body bgcolor="white">
+<center><h1>404 Not Found</h1></center>
+)RAW");
+
+const std::string error500(R"RAW(<html>
+<head><title>500 Internal Server Error</title></head>
+<body bgcolor="white">
+<center><h1>500 Internal Server Error</h1></center>
+)RAW");
+
+const std::string error503(R"RAW(<html>
+<head><title>503 Service Temporarily Unavailable</title></head>
+<body bgcolor="white">
+<center><h1>503 Service Temporarily Unavailable</h1></center>
+)RAW");
 
 class HttpSink : public Sink {
 public:
@@ -170,32 +227,37 @@ public:
 private:
     virtual void content_impl(const std::string &data)
     {
-        auto response(responseHandle
-                      (::MHD_create_response_from_buffer
-                       (data.size(), const_cast<char*>(data.data())
-                        ,  MHD_RESPMEM_MUST_COPY)));
-
-        // TODO: check error code
-        ::MHD_queue_response(conn_, (ri_.responseCode = 200), response.get());
+        ::MHD_queue_response(conn_, (ri_.responseCode = MHD_HTTP_OK)
+                             , ResponseHandle(data));
     }
 
     virtual void error_impl(const std::exception_ptr &exc)
     {
+        const std::string *body;
         try {
             std::rethrow_exception(exc);
-        } catch (const std::exception) {
-            // TODO: handle
+        } catch (const NotFound &e) {
+            ri_.responseCode = MHD_HTTP_NOT_FOUND;
+            ri_.errorReason = e.what();
+            body = &error404;
+        } catch (const Unavailable &e) {
+            ri_.responseCode = MHD_HTTP_SERVICE_UNAVAILABLE;
+            ri_.errorReason = e.what();
+            body = &error503;
+        } catch (const std::exception &e) {
+            ri_.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+            ri_.errorReason = e.what();
+            body = &error500;
         } catch (...) {
-            // TODO: handle
+            ri_.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+            ri_.errorReason = "Unknown exception caught.";
+            body = &error500;
         }
-    }
 
-    std::shared_ptr< ::MHD_Response> responseHandle(MHD_Response *response)
-    {
-        return std::shared_ptr< ::MHD_Response>
-            (response, [](::MHD_Response *response) {
-                if (response) { ::MHD_destroy_response(response); }
-            });
+        // enqueue response with proper status and body; body is static string
+        // and this not copied
+        ::MHD_queue_response(conn_, ri_.responseCode
+                             , ResponseHandle(*body, false));
     }
 
     ::MHD_Connection *conn_;
@@ -207,8 +269,12 @@ private:
 int Http::Detail::request(::MHD_Connection *connection
                           , RequestInfo &ri)
 {
-    contentGenerator.generate
-        (ri.url, std::make_shared<HttpSink>(connection, ri));
+    auto sink(std::make_shared<HttpSink>(connection, ri));
+    try {
+        contentGenerator.generate(ri.url, sink);
+    } catch (...) {
+        sink->error();
+    }
 
     return MHD_YES;
 }

@@ -1,6 +1,12 @@
-#include "./fileinfo.hpp"
+#include "utility/raise.hpp"
 
+#include "vts-libs/vts/mapconfig.hpp"
+
+#include "./fileinfo.hpp"
+#include "./error.hpp"
 #include "./core.hpp"
+
+namespace vts = vadstena::vts;
 
 struct Core::Detail : boost::noncopyable {
     Detail(Generators &generators)
@@ -9,6 +15,12 @@ struct Core::Detail : boost::noncopyable {
 
     void generate(const std::string &location
                   , const Sink::pointer &sink);
+
+    void generateRfMapConfig(const std::string &referenceFrame
+                             , const Sink::pointer &sink);
+
+    void generateResourceFile(const FileInfo &fi
+                              , const Sink::pointer &sink);
 
     Generators &generators;
 };
@@ -26,8 +38,46 @@ void Core::generate_impl(const std::string &location
 void Core::Detail::generate(const std::string &location
                             , const Sink::pointer &sink)
 {
-    FileInfo fi(location);
+    try {
+        FileInfo fi(location);
 
+        switch (fi.type) {
+        case FileInfo::Type::rfMapConfig:
+            generateRfMapConfig(fi.referenceFrame, sink);
+            break;
+
+        case FileInfo::Type::resourceFile:
+            generateResourceFile(fi, sink);
+            break;
+        }
+    } catch (...) {
+        sink->error();
+    }
+}
+
+void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
+                                       , const Sink::pointer &sink)
+{
+    auto genlist(generators.referenceFrame(referenceFrame));
+    if (genlist.empty()) {
+        sink->error(utility::makeError<NotFound>
+                    ("No data for <%s>.", referenceFrame));
+    }
+
+    // build map
+    vts::MapConfig mapConfig;
+    for (const auto &generator : genlist) {
+        mapConfig.merge(generator->mapConfig(referenceFrame));
+    }
+
+    std::ostringstream os;
+    vts::saveMapConfig(mapConfig, os);
+    sink->content(os.str());
+}
+
+void Core::Detail::generateResourceFile(const FileInfo &fi
+                                        , const Sink::pointer &sink)
+{
     (void) fi;
     (void) sink;
 }

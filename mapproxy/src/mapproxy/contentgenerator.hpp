@@ -15,7 +15,9 @@ public:
     virtual ~Sink() {}
 
     void content(const std::string &data);
+    void error();
     void error(const std::exception_ptr &exc);
+    template <typename T> void error(const T &exc);
 
 private:
     virtual void content_impl(const std::string &data) = 0;
@@ -43,6 +45,21 @@ inline void Sink::content(const std::string &data)
 inline void Sink::error(const std::exception_ptr &exc)
 {
     error_impl(exc);
+}
+
+template <typename T>
+inline void Sink::error(const T &exc)
+{
+    try {
+        throw exc;
+    } catch (...) {
+        error_impl(std::current_exception());
+    }
+}
+
+inline void Sink::error()
+{
+    error_impl(std::current_exception());
 }
 
 inline void ContentGenerator::generate(const std::string &location

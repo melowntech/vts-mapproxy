@@ -12,6 +12,8 @@ public:
 
 private:
     virtual void prepare_impl();
+    virtual vts::MapConfig mapConfig_impl(const std::string &referenceFrame)
+        const;
 
     const resdef::TmsRaster &definition_;
 };

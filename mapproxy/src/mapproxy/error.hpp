@@ -28,8 +28,16 @@ struct FormatError : Error {
     FormatError(const std::string &message) : Error(message) {}
 };
 
+/** Given URL does not exist.
+ */
 struct NotFound : Error {
     NotFound(const std::string &message) : Error(message) {}
+};
+
+/** Given URL is not available now.
+ */
+struct Unavailable : Error {
+    Unavailable(const std::string &message) : Error(message) {}
 };
 
 #endif // mapproxy_error_hpp_included_
