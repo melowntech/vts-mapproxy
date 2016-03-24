@@ -34,6 +34,12 @@ struct NotFound : Error {
     NotFound(const std::string &message) : Error(message) {}
 };
 
+/** Given URL does not exist.
+ */
+struct NotAllowed : Error {
+    NotAllowed(const std::string &message) : Error(message) {}
+};
+
 /** Given URL is not available now.
  */
 struct Unavailable : Error {

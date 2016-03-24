@@ -6,6 +6,8 @@
 
 #include "dbglog/dbglog.hpp"
 
+#include "utility/raise.hpp"
+
 #include "./error.hpp"
 #include "./http.hpp"
 
@@ -218,6 +220,12 @@ const std::string error503(R"RAW(<html>
 <center><h1>503 Service Temporarily Unavailable</h1></center>
 )RAW");
 
+const std::string error405(R"RAW(<html>
+<head><title>405 Method Not Allowed</title></head>
+<body bgcolor="white">
+<center><h1>405 Method Not Allowed</h1></center>
+)RAW");
+
 class HttpSink : public Sink {
 public:
     HttpSink(::MHD_Connection *connection, RequestInfo &ri)
@@ -240,6 +248,10 @@ private:
             ri_.responseCode = MHD_HTTP_NOT_FOUND;
             ri_.errorReason = e.what();
             body = &error404;
+        } catch (const NotAllowed &e) {
+            ri_.responseCode = MHD_HTTP_METHOD_NOT_ALLOWED;
+            ri_.errorReason = e.what();
+            body = &error405;
         } catch (const Unavailable &e) {
             ri_.responseCode = MHD_HTTP_SERVICE_UNAVAILABLE;
             ri_.errorReason = e.what();
@@ -271,7 +283,12 @@ int Http::Detail::request(::MHD_Connection *connection
 {
     auto sink(std::make_shared<HttpSink>(connection, ri));
     try {
-        contentGenerator.generate(ri.url, sink);
+        if ((ri.method == "HEAD") || (ri.method == "GET")) {
+            contentGenerator.generate(ri.url, sink);
+        } else {
+            sink->error(utility::makeError<NotAllowed>
+                        ("Method %s is not supported.", ri.method));
+        }
     } catch (...) {
         sink->error();
     }
