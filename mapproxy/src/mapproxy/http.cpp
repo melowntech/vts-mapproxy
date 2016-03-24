@@ -1,3 +1,5 @@
+#include <ctime>
+
 #include <boost/noncopyable.hpp>
 
 #include <arpa/inet.h>
@@ -196,7 +198,8 @@ public:
              ,  copy ? MHD_RESPMEM_MUST_COPY : MHD_RESPMEM_PERSISTENT);
     }
 
-    operator MHD_Response*() { return response_; }
+    MHD_Response* get() { return response_; }
+    operator MHD_Response*() { return get(); }
 
 private:
     MHD_Response *response_;
@@ -226,6 +229,20 @@ const std::string error405(R"RAW(<html>
 <center><h1>405 Method Not Allowed</h1></center>
 )RAW");
 
+const char *weekDays[7] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+std::string formatHttpDate(time_t time)
+{
+    if (time < 0) { time = std::time(nullptr); }
+    tm bd;
+    ::gmtime_r(&time, &bd);
+    char buf[32];
+    std::memcpy(buf, weekDays[bd.tm_wday], 3);
+    std::strftime(buf + 3, sizeof(buf) - 1
+                  , ", %d %b %Y %H:%M:%S GMT", &bd);
+    return buf;
+}
+
 class HttpSink : public Sink {
 public:
     HttpSink(::MHD_Connection *connection, RequestInfo &ri)
@@ -233,10 +250,19 @@ public:
     {}
 
 private:
-    virtual void content_impl(const std::string &data)
+    virtual void content_impl(const std::string &data
+                              , const FileInfo &stat)
     {
+        ResponseHandle response(data);
+        ::MHD_add_response_header
+              (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
+               , stat.contentType.c_str());
+        ::MHD_add_response_header
+              (response.get(), MHD_HTTP_HEADER_LAST_MODIFIED
+               , formatHttpDate(stat.lastModified).c_str());
+
         ::MHD_queue_response(conn_, (ri_.responseCode = MHD_HTTP_OK)
-                             , ResponseHandle(data));
+                             , response);
     }
 
     virtual void error_impl(const std::exception_ptr &exc)
