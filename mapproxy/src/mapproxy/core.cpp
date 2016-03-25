@@ -67,7 +67,7 @@ void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
     // build map
     vts::MapConfig mapConfig;
     for (const auto &generator : genlist) {
-        mapConfig.merge(generator->mapConfig(referenceFrame));
+        mapConfig.merge(generator->mapConfig(referenceFrame, {}));
     }
 
     std::ostringstream os;
@@ -79,6 +79,7 @@ void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
 void Core::Detail::generateResourceFile(const FileInfo &fi
                                         , const Sink::pointer &sink)
 {
-    (void) fi;
+    auto generator(generators.generator(fi));
+    (void) generator;
     (void) sink;
 }

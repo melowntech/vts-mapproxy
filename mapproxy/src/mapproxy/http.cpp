@@ -9,6 +9,7 @@
 #include "dbglog/dbglog.hpp"
 
 #include "utility/raise.hpp"
+#include "utility/gccversion.hpp"
 
 #include "./error.hpp"
 #include "./http.hpp"
@@ -76,6 +77,28 @@ struct Http::Detail : boost::noncopyable {
     ContentGenerator &contentGenerator;
     ::MHD_Daemon *daemon;
 };
+
+namespace {
+
+UTILITY_THREAD_LOCAL std::string *lastError = nullptr;
+
+void setLastError(const char *value)
+{
+    if (lastError) { delete lastError; }
+    lastError = new std::string(value);
+}
+
+std::string getLastError()
+{
+    std::string value("unknown");
+    if (lastError) {
+        value = *lastError;
+        delete lastError;
+    }
+    return value;
+}
+
+} // namespace
 
 extern "C" {
 
@@ -153,6 +176,14 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
         (connection, *rinfo);
 }
 
+void mapproxy_http_callback_error(void*, const char *fmt, va_list ap)
+{
+    char buf[1024];
+    ::vsnprintf(buf, sizeof(buf) - 1, fmt, ap);
+    buf[sizeof(buf) - 1] = '\0';
+    setLastError(buf);
+}
+
 } // extern "C"
 
 Http::Detail::Detail(const utility::TcpEndpoint &listen
@@ -160,7 +191,8 @@ Http::Detail::Detail(const utility::TcpEndpoint &listen
                      , ContentGenerator &contentGenerator)
     : contentGenerator(contentGenerator)
     , daemon(::MHD_start_daemon
-             ((MHD_USE_POLL_INTERNALLY | MHD_USE_SUSPEND_RESUME)
+             ((MHD_USE_POLL_INTERNALLY | MHD_USE_SUSPEND_RESUME
+               | MHD_USE_DEBUG)
               , listen.value.port()
               , nullptr, nullptr
               , &mapproxy_http_callback_request, this
@@ -172,10 +204,14 @@ Http::Detail::Detail(const utility::TcpEndpoint &listen
               , MHD_OPTION_NOTIFY_COMPLETED
               , &mapproxy_http_callback_completed, this
 
+              , MHD_OPTION_EXTERNAL_LOGGER
+              , &mapproxy_http_callback_error, this
+
               , MHD_OPTION_END))
 {
     if (!daemon) {
-        LOGTHROW(err1, Error) << "Cannot start HTTP daemon.";
+        LOGTHROW(err2, Error)
+            << "Cannot start HTTP daemon (reason: " << getLastError() << ").";
     }
 }
 

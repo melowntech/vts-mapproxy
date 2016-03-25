@@ -47,7 +47,8 @@ void TmsRaster::prepare_impl()
     LOG(info2) << "No need to prepare.";
 }
 
-vts::MapConfig TmsRaster::mapConfig_impl(const std::string &referenceFrame)
+vts::MapConfig TmsRaster::mapConfig_impl(const std::string &referenceFrame
+                                         , const boost::filesystem::path &root)
     const
 {
     const auto &res(resource());
@@ -67,7 +68,12 @@ vts::MapConfig TmsRaster::mapConfig_impl(const std::string &referenceFrame)
     bl.id = res.id.fullId();
     bl.numericId = 0; // no numeric ID
     bl.type = vr::BoundLayer::Type::raster;
+
     bl.url = str(boost::format("{lod}-{x}-{y}.%s") % definition_.format);
+    if (!root.empty()) {
+        bl.url = (root / bl.url).string();
+    }
+
     bl.lodRange = rf.lodRange;
     bl.tileRange = rf.tileRange;
     bl.credits = res.credits;

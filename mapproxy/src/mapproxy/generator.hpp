@@ -14,6 +14,7 @@
 
 #include "./resource.hpp"
 #include "./resourcebackend.hpp"
+#include "./fileinfo.hpp"
 
 namespace vts = vadstena::vts;
 
@@ -51,7 +52,8 @@ public:
 
     bool handlesReferenceFrame(const std::string &referenceFrame) const;
 
-    vts::MapConfig mapConfig(const std::string &referenceFrame) const;
+    vts::MapConfig mapConfig(const std::string &referenceFrame
+                             , const boost::filesystem::path &root) const;
 
 protected:
     Generator(const boost::filesystem::path &root
@@ -62,8 +64,9 @@ protected:
 
 private:
     virtual void prepare_impl() = 0;
-    virtual vts::MapConfig mapConfig_impl(const std::string &referenceFrame)
-        const = 0;
+    virtual vts::MapConfig
+    mapConfig_impl(const std::string &referenceFrame
+                   , const boost::filesystem::path &root) const = 0;
 
     const boost::filesystem::path root_;
     Resource resource_;
@@ -84,14 +87,13 @@ public:
 
     ~Generators();
 
-    /** Matches URL path and returns appropriate generator or null in case of no
-     *  match.
+    /** Returns generator for requested file.
      */
-    Generator::pointer matchUrl(const std::string &path);
+    Generator::pointer generator(const FileInfo &fileInfo) const;
 
     /** Returns list of all generators for given referenceFrame.
      */
-    Generator::list referenceFrame(const std::string &referenceFrame);
+    Generator::list referenceFrame(const std::string &referenceFrame) const;
 
     // internals
     struct Detail;
@@ -109,10 +111,11 @@ inline void Generator::prepare()
     prepare_impl();
 }
 
-inline vts::MapConfig Generator::mapConfig(const std::string &referenceFrame)
-    const
+inline vts::MapConfig
+Generator::mapConfig(const std::string &referenceFrame
+                     , const boost::filesystem::path &root) const
 {
-    return mapConfig_impl(referenceFrame);
+    return mapConfig_impl(referenceFrame, root);
 }
 
 inline bool Generator::handlesReferenceFrame(const std::string &referenceFrame)

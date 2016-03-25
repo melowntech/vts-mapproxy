@@ -102,7 +102,7 @@ public:
         , updaterRunning_(false)
     {}
 
-    Generator::pointer matchUrl(const std::string &path) const;
+    Generator::pointer generator(const FileInfo &fileInfo) const;
 
     Generator::list referenceFrame(const std::string &referenceFrame) const;
 
@@ -194,21 +194,16 @@ Generators::~Generators()
     detail().stop();
 }
 
-Generator::pointer Generators::matchUrl(const std::string &path)
-{
-    return detail().matchUrl(path);
-}
-
 Generator::list Generators::referenceFrame(const std::string &referenceFrame)
+    const
 {
     return detail().referenceFrame(referenceFrame);
 }
 
-Generator::pointer Generators::Detail::matchUrl(const std::string &path)
+Generator::pointer Generators::generator(const FileInfo &fileInfo)
     const
 {
-    (void) path;
-    return {};
+    return detail().generator(fileInfo);
 }
 
 void Generators::Detail::update(const Resource::map &resources)
@@ -306,4 +301,11 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
     }
 
     return out;
+}
+
+Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
+    const
+{
+    (void) fileInfo;
+    return {};
 }
