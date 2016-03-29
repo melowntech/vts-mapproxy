@@ -409,4 +409,47 @@ bool SurfaceDem::operator==(const SurfaceDem &o) const
     return true;
 }
 
+
 } // namespace resdef
+
+boost::filesystem::path prependRoot(const boost::filesystem::path &path
+                                    , const Resource &resource
+                                    , const std::string &referenceFrame
+                                    , ResourceRoot root)
+{
+    boost::filesystem::path out;
+
+    switch (root) {
+    case ResourceRoot::referenceFrame:
+        out /= referenceFrame;
+        // no fallback
+
+    case ResourceRoot::type:
+        out /= resource.generator.type;
+        // no fallback
+
+    case ResourceRoot::group:
+        out /= resource.id.group;
+        // no fallback
+
+    case ResourceRoot::id:
+        out /= resource.id.id;
+        // no fallback
+
+    case ResourceRoot::none:
+        // nothing
+        break;
+    }
+
+    out /= path;
+    return out;
+}
+
+std::string prependRoot(const std::string &path
+                        , const Resource &resource
+                        , const std::string &referenceFrame
+                        , ResourceRoot root)
+{
+    fs::path tmp(path);
+    return prependRoot(tmp, resource, referenceFrame, root).string();
+}

@@ -67,13 +67,13 @@ void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
     // build map
     vts::MapConfig mapConfig;
     for (const auto &generator : genlist) {
-        mapConfig.merge(generator->mapConfig(referenceFrame, {}));
+        mapConfig.merge(generator->mapConfig
+                        (referenceFrame, ResourceRoot::type));
     }
 
     std::ostringstream os;
     vts::saveMapConfig(mapConfig, os);
-    sink->content(os.str()
-                  , Sink::FileInfo("application/json"));
+    sink->content(os.str(), Sink::FileInfo("application/json"));
 }
 
 void Core::Detail::generateResourceFile(const FileInfo &fi

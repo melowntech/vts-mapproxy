@@ -53,7 +53,7 @@ public:
     bool handlesReferenceFrame(const std::string &referenceFrame) const;
 
     vts::MapConfig mapConfig(const std::string &referenceFrame
-                             , const boost::filesystem::path &root) const;
+                             , ResourceRoot root) const;
 
 protected:
     Generator(const boost::filesystem::path &root
@@ -66,7 +66,7 @@ private:
     virtual void prepare_impl() = 0;
     virtual vts::MapConfig
     mapConfig_impl(const std::string &referenceFrame
-                   , const boost::filesystem::path &root) const = 0;
+                   , ResourceRoot root) const = 0;
 
     const boost::filesystem::path root_;
     Resource resource_;
@@ -113,7 +113,7 @@ inline void Generator::prepare()
 
 inline vts::MapConfig
 Generator::mapConfig(const std::string &referenceFrame
-                     , const boost::filesystem::path &root) const
+                     , ResourceRoot root) const
 {
     return mapConfig_impl(referenceFrame, root);
 }

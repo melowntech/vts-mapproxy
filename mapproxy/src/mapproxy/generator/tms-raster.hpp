@@ -14,7 +14,7 @@ private:
     virtual void prepare_impl();
     virtual vts::MapConfig
     mapConfig_impl(const std::string &referenceFrame
-                   , const boost::filesystem::path &root) const;
+                   , ResourceRoot root) const;
 
     const resdef::TmsRaster &definition_;
 };

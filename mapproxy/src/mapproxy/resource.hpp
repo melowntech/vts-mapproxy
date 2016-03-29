@@ -72,6 +72,16 @@ UTILITY_GENERATE_ENUM(RasterFormat,
     ((png))
 )
 
+/** What directory is resource root:
+ */
+UTILITY_GENERATE_ENUM(ResourceRoot,
+    ((referenceFrame))
+    ((type))
+    ((group))
+    ((id))
+    ((none))
+)
+
 namespace resdef {
 
 struct TmsRaster {
@@ -119,6 +129,15 @@ Resource loadResource(const boost::filesystem::path &path);
 /** Save single resource to given path.
  */
 void save(const boost::filesystem::path &path, const Resource &resource);
+
+boost::filesystem::path prependRoot(const boost::filesystem::path &path
+                                    , const Resource &resource
+                                    , const std::string &referenceFrame
+                                    , ResourceRoot root);
+
+std::string prependRoot(const std::string &path, const Resource &resource
+                        , const std::string &referenceFrame
+                        , ResourceRoot root);
 
 // inlines + IO
 
