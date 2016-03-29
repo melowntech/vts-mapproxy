@@ -84,7 +84,11 @@ UTILITY_THREAD_LOCAL std::string *lastError = nullptr;
 
 void setLastError(const char *value)
 {
-    if (lastError) { delete lastError; }
+    if (lastError) {
+        LOG(warn2) << "Last microhttpd library error in this thread has "
+            "not been reclaimed. It read: <" << *lastError << ">.";
+        delete lastError;
+    }
     lastError = new std::string(value);
 }
 
@@ -97,6 +101,11 @@ std::string getLastError()
     }
     return value;
 }
+
+#define CHECK_MHD_ERROR(res, what) \
+    if (!res) { \
+        LOGTHROW(err2, IOError) << what << ": <" << getLastError() << ">."; \
+    }
 
 } // namespace
 
@@ -209,10 +218,7 @@ Http::Detail::Detail(const utility::TcpEndpoint &listen
 
               , MHD_OPTION_END))
 {
-    if (!daemon) {
-        LOGTHROW(err2, Error)
-            << "Cannot start HTTP daemon (reason: " << getLastError() << ").";
-    }
+    CHECK_MHD_ERROR(daemon, "Cannot start HTTP daemon");
 }
 
 namespace {
@@ -290,15 +296,18 @@ private:
                               , const FileInfo &stat)
     {
         ResponseHandle response(data);
-        ::MHD_add_response_header
-              (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
-               , stat.contentType.c_str());
-        ::MHD_add_response_header
-              (response.get(), MHD_HTTP_HEADER_LAST_MODIFIED
-               , formatHttpDate(stat.lastModified).c_str());
+        CHECK_MHD_ERROR(::MHD_add_response_header
+                        (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
+                         , stat.contentType.c_str())
+                        , "Unable to set response header");
+        CHECK_MHD_ERROR(::MHD_add_response_header
+                        (response.get(), MHD_HTTP_HEADER_LAST_MODIFIED
+                         , formatHttpDate(stat.lastModified).c_str())
+                         , "Unable to set response header");
 
-        ::MHD_queue_response(conn_, (ri_.responseCode = MHD_HTTP_OK)
-                             , response);
+        CHECK_MHD_ERROR(::MHD_queue_response
+                        (conn_, (ri_.responseCode = MHD_HTTP_OK), response)
+                        , "Unable to enqueue HTTP response");
     }
 
     virtual void error_impl(const std::exception_ptr &exc)
@@ -330,8 +339,9 @@ private:
 
         // enqueue response with proper status and body; body is static string
         // and this not copied
-        ::MHD_queue_response(conn_, ri_.responseCode
-                             , ResponseHandle(*body, false));
+        CHECK_MHD_ERROR(::MHD_queue_response(conn_, ri_.responseCode
+                                             , ResponseHandle(*body, false))
+                        , "Unable to enqueue HTTP response");
     }
 
     ::MHD_Connection *conn_;
