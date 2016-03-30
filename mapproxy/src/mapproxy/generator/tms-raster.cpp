@@ -51,21 +51,13 @@ void TmsRaster::prepare_impl()
     LOG(info2) << "No need to prepare.";
 }
 
-vts::MapConfig TmsRaster::mapConfig_impl(const std::string &referenceFrame
-                                         , ResourceRoot root)
+vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
     const
 {
     const auto &res(resource());
-    auto frfd(res.referenceFrames.find(referenceFrame));
-    if (frfd == res.referenceFrames.end()) {
-        LOGTHROW(err1, NotFound)
-            << "Reference frame <" << referenceFrame << "> is not handed by "
-            << "this resource generator.";
-    }
-    const auto &rf(frfd->second);
 
     vts::MapConfig mapConfig;
-    mapConfig.referenceFrame = *rf.referenceFrame;
+    mapConfig.referenceFrame = *res.referenceFrame;
 
     // this is Tiled service: we have bound layer only
     vr::BoundLayer bl;
@@ -76,10 +68,10 @@ vts::MapConfig TmsRaster::mapConfig_impl(const std::string &referenceFrame
     // build url
     bl.url = prependRoot
         (str(boost::format("{lod}-{x}-{y}.%s") % definition_.format)
-         , resource(), referenceFrame, root);
+         , resource(), root);
 
-    bl.lodRange = rf.lodRange;
-    bl.tileRange = rf.tileRange;
+    bl.lodRange = res.lodRange;
+    bl.tileRange = res.tileRange;
     bl.credits = res.credits;
     mapConfig.boundLayers.add(bl);
 
@@ -98,14 +90,12 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
 
     case TmsFileInfo::Type::config: {
         std::ostringstream os;
-        mapConfig(os, fileInfo.referenceFrame, ResourceRoot::none);
+        mapConfig(os, ResourceRoot::none);
         sink->content(os.str(), fi.sinkFileInfo());
         return {};
     };
 
     case TmsFileInfo::Type::support:
-        LOG(info4) << "Size: " << fi.support->size << " vs "
-                   << sizeof(browser2d::index_html);
         sink->content(fi.support->data, fi.support->size
                       , fi.sinkFileInfo(), false);
         return {};

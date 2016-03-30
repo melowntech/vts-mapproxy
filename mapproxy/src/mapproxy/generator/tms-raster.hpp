@@ -12,8 +12,7 @@ public:
 private:
     virtual void prepare_impl();
     virtual vts::MapConfig
-    mapConfig_impl(const std::string &referenceFrame
-                   , ResourceRoot root) const;
+    mapConfig_impl(ResourceRoot root) const;
 
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , const Sink::pointer &sink) const;

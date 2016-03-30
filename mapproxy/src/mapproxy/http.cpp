@@ -34,6 +34,7 @@ struct RequestInfo {
     std::string version;
     int responseCode;
     std::string errorReason;
+    std::string location;
 
     RequestInfo(const std::string &url, const std::string &method
                 , const std::string &version)
@@ -102,9 +103,10 @@ std::string getLastError()
     return value;
 }
 
-#define CHECK_MHD_ERROR(res, what) \
-    if (!res) { \
-        LOGTHROW(err2, IOError) << what << ": <" << getLastError() << ">."; \
+#define CHECK_MHD_ERROR(res, what)                              \
+    if (!res) {                                                 \
+        LOGTHROW(err2, IOError)                                 \
+            << what << "; reason: <" << getLastError() << ">."; \
     }
 
 } // namespace
@@ -123,10 +125,20 @@ void mapproxy_http_callback_completed(void *cls, ::MHD_Connection *connection
 
     switch (toe) {
     case MHD_REQUEST_TERMINATED_COMPLETED_OK:
-        if (rinfo.responseCode == MHD_HTTP_OK) {
-            LOG(info3) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                       << ' ' << rinfo.responseCode << ".";
-        } else {
+        switch (rinfo.responseCode / 100) {
+        case 2:
+        case 3:
+            if (rinfo.location.empty()) {
+                LOG(info3) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                           << ' ' << rinfo.responseCode << ".";
+            } else {
+                LOG(info3) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
+                           << ' ' << rinfo.responseCode
+                           << " -> \"" << rinfo.location << "\".";
+            }
+            return;
+
+        default:
             LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
                       << ' ' << rinfo.responseCode << "; reason: <"
                       << rinfo.errorReason << ">.";
@@ -314,6 +326,44 @@ private:
                         , "Unable to enqueue HTTP response");
     }
 
+    virtual void seeOther_impl(const std::string &url)
+    {
+        // TODO: compose body
+        ResponseHandle response("", false);
+
+        ri_.responseCode = MHD_HTTP_SEE_OTHER;
+        ri_.location = url;
+
+        CHECK_MHD_ERROR(::MHD_add_response_header
+                        (response.get(), MHD_HTTP_HEADER_LOCATION
+                         , url.c_str())
+                        , "Unable to set response header");
+        CHECK_MHD_ERROR(::MHD_queue_response
+                        (conn_, ri_.responseCode, response)
+                        , "Unable to enqueue HTTP response");
+    }
+
+    virtual void listing_impl(const std::vector<std::string> &list)
+    {
+        std::ostringstream os;
+        os << R"RAW(<html>
+<head><title>Index of /</title></head>
+<body bgcolor="white">
+<h1>Index of )RAW";
+        os << ri_.url;
+        os << "\n</h1><hr><pre><a href=\"../\">../</a>\n";
+
+        for (const auto &item : list) {
+            os << "<a href=\"" << item << "/\">" << item << "/</a>\n";
+        }
+
+        os << R"RAW(</pre><hr></body>
+</html>
+)RAW";
+
+        content(os.str(), { "text/html" });
+    }
+
     virtual void error_impl(const std::exception_ptr &exc)
     {
         const std::string *body;
@@ -343,8 +393,12 @@ private:
 
         // enqueue response with proper status and body; body is static string
         // and this not copied
-        CHECK_MHD_ERROR(::MHD_queue_response(conn_, ri_.responseCode
-                                             , ResponseHandle(*body, false))
+        ResponseHandle response(*body, false);
+        CHECK_MHD_ERROR(::MHD_add_response_header
+                        (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
+                         , "text/html")
+                        , "Unable to set response header");
+        CHECK_MHD_ERROR(::MHD_queue_response(conn_, ri_.responseCode, response)
                         , "Unable to enqueue HTTP response");
     }
 

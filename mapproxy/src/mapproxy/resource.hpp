@@ -14,24 +14,27 @@ namespace vr = vadstena::registry;
 
 struct Resource {
     struct Id {
+        std::string referenceFrame;
         std::string group;
         std::string id;
 
         std::string fullId() const { return group + "-" + id; }
 
         Id() {}
-        Id(const std::string &group, const std::string &id)
-            : group(group), id(id) {}
+        Id(const std::string &referenceFrame, const std::string &group
+           , const std::string &id)
+            : referenceFrame(referenceFrame), group(group), id(id) {}
         bool operator<(const Id &o) const;
         bool operator==(const Id &o) const;
     };
 
     struct Generator {
-        std::string type;
+        enum Type { tms, surface };
+        Type type;
         std::string driver;
 
         Generator() {}
-        Generator(const std::string &type, const std::string &driver)
+        Generator(Type type, const std::string &driver)
             : type(type), driver(driver) {}
         bool operator<(const Generator &o) const;
         bool operator==(const Generator &o) const;
@@ -42,16 +45,9 @@ struct Resource {
 
     vr::StringIdSet credits;
 
-    struct ReferenceFrame {
-        const vr::ReferenceFrame *referenceFrame;
-        vr::LodRange lodRange;
-        vr::TileRange tileRange;
-
-        typedef std::map<std::string, ReferenceFrame> map;
-        bool operator==(const ReferenceFrame &o) const;
-    };
-
-    ReferenceFrame::map referenceFrames;
+    const vr::ReferenceFrame *referenceFrame;
+    vr::LodRange lodRange;
+    vr::TileRange tileRange;
 
     template <typename T> const T& definition() const {
         return boost::any_cast<const T&>(definition_);
@@ -75,6 +71,11 @@ private:
      */
     boost::any definition_;
 };
+
+UTILITY_GENERATE_ENUM_IO(Resource::Generator::Type,
+    ((tms))
+    ((surface))
+)
 
 UTILITY_GENERATE_ENUM(RasterFormat,
     ((jpg))
@@ -135,7 +136,7 @@ Resource::map loadResources(const boost::filesystem::path &path);
 
 /** Load single resource from given path.
  */
-Resource loadResource(const boost::filesystem::path &path);
+Resource::list loadResource(const boost::filesystem::path &path);
 
 /** Save single resource to given path.
  */
@@ -143,11 +144,9 @@ void save(const boost::filesystem::path &path, const Resource &resource);
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource &resource
-                                    , const std::string &referenceFrame
                                     , ResourceRoot root);
 
 std::string prependRoot(const std::string &path, const Resource &resource
-                        , const std::string &referenceFrame
                         , ResourceRoot root);
 
 std::string contentType(RasterFormat format);
@@ -158,7 +157,7 @@ template<typename CharT, typename Traits>
 inline std::basic_ostream<CharT, Traits>&
 operator<<(std::basic_ostream<CharT, Traits> &os, const Resource::Id &rid)
 {
-    return os << rid.group << '/' << rid.id;
+    return os << rid.referenceFrame << '/' << rid.group << '/' << rid.id;
 }
 
 template<typename CharT, typename Traits>
@@ -170,13 +169,19 @@ operator<<(std::basic_ostream<CharT, Traits> &os
 }
 
 inline bool Resource::Id::operator<(const Id &o) const {
+    if (referenceFrame < o.referenceFrame) { return true; }
+    else if (o.referenceFrame < referenceFrame) { return false; }
+
     if (group < o.group) { return true; }
-    else if (o.group < group) { return true; }
+    else if (o.group < group) { return false; }
+
     return id < o.id;
 }
 
 inline bool Resource::Id::operator==(const Id &o) const {
-    return ((group == o.group) || (id == o.id));
+    return ((referenceFrame == o.referenceFrame)
+            && (group == o.group)
+            && (id == o.id));
 }
 
 inline bool Resource::Generator::operator<(const Generator &o) const {

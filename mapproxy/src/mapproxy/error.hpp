@@ -46,4 +46,10 @@ struct Unavailable : Error {
     Unavailable(const std::string &message) : Error(message) {}
 };
 
+/** Internal Error
+ */
+struct InternalError : Error {
+    InternalError(const std::string &message) : Error(message) {}
+};
+
 #endif // mapproxy_error_hpp_included_

@@ -47,6 +47,14 @@ public:
     void content(const void *data, std::size_t size
                  , const FileInfo &stat, bool needCopy);
 
+    /** Tell client to look somewhere else.
+     */
+    void seeOther(const std::string &url);
+
+    /** Generates listing.
+     */
+    void listing(const std::vector<std::string> &list);
+
     /** Sends current exception to the client.
      */
     void error();
@@ -62,6 +70,8 @@ public:
 private:
     virtual void content_impl(const void *data, std::size_t size
                               , const FileInfo &stat, bool needCopy) = 0;
+    virtual void seeOther_impl(const std::string &url) = 0;
+    virtual void listing_impl(const std::vector<std::string> &list) = 0;
     virtual void error_impl(const std::exception_ptr &exc) = 0;
 };
 
@@ -89,6 +99,11 @@ inline void Sink::content(const void *data, std::size_t size
     content_impl(data, size, stat, needCopy);
 }
 
+inline void Sink::seeOther(const std::string &url)
+{
+    seeOther_impl(url);
+}
+
 inline void Sink::error(const std::exception_ptr &exc)
 {
     error_impl(exc);
@@ -102,6 +117,11 @@ inline void Sink::error(const T &exc)
     } catch (...) {
         error_impl(std::current_exception());
     }
+}
+
+inline void Sink::listing(const std::vector<std::string> &list)
+{
+    listing_impl(list);
 }
 
 inline void Sink::error()

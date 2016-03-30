@@ -57,15 +57,18 @@ public:
 
     const Resource& resource() const { return resource_; }
     const Resource::Id& id() const { return resource_.id; }
+    const std::string& group() const { return resource_.id.group; }
+    Resource::Generator::Type type() const { return resource_.generator.type; }
+    const std::string& referenceFrame() const {
+        return resource_.id.referenceFrame;
+    }
+
     const Config& config() const { return config_; }
     const boost::filesystem::path& root() const { return config_.root; }
 
     bool check(const Resource &resource) const;
 
-    bool handlesReferenceFrame(const std::string &referenceFrame) const;
-
-    vts::MapConfig mapConfig(const std::string &referenceFrame
-                             , ResourceRoot root) const;
+    vts::MapConfig mapConfig(ResourceRoot root) const;
 
     Task generateFile(const FileInfo &fileInfo
                       , const Sink::pointer &sink) const;
@@ -76,19 +79,16 @@ protected:
     void makeReady();
     bool fresh() const { return fresh_; }
 
-    void mapConfig(std::ostream &os, const std::string &referenceFrame
-                   , ResourceRoot root) const;
+    void mapConfig(std::ostream &os, ResourceRoot root) const;
 
 private:
     virtual void prepare_impl() = 0;
-    virtual vts::MapConfig
-    mapConfig_impl(const std::string &referenceFrame
-                   , ResourceRoot root) const = 0;
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
 
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , const Sink::pointer &sink) const = 0;
 
-    const Config config_;
+    Config config_;
     Resource resource_;
     Resource savedResource_;
     bool fresh_;
@@ -114,6 +114,8 @@ public:
 
     ~Generators();
 
+    const Config& config() const;
+
     /** Returns generator for requested file.
      */
     Generator::pointer generator(const FileInfo &fileInfo) const;
@@ -121,6 +123,14 @@ public:
     /** Returns list of all generators for given referenceFrame.
      */
     Generator::list referenceFrame(const std::string &referenceFrame) const;
+
+    std::vector<std::string> listGroups(const std::string &referenceFrame
+                                        , Resource::Generator::Type type)
+        const;
+
+    std::vector<std::string> listIds(const std::string &referenceFrame
+                                     , Resource::Generator::Type type
+                                     , const std::string &group) const;
 
     // internals
     struct Detail;
@@ -138,11 +148,9 @@ inline void Generator::prepare()
     prepare_impl();
 }
 
-inline vts::MapConfig
-Generator::mapConfig(const std::string &referenceFrame
-                     , ResourceRoot root) const
+inline vts::MapConfig Generator::mapConfig(ResourceRoot root) const
 {
-    return mapConfig_impl(referenceFrame, root);
+    return mapConfig_impl(root);
 }
 
 inline Generator::Task Generator::generateFile(const FileInfo &fileInfo
@@ -150,12 +158,6 @@ inline Generator::Task Generator::generateFile(const FileInfo &fileInfo
     const
 {
     return generateFile_impl(fileInfo, sink);
-}
-
-inline bool Generator::handlesReferenceFrame(const std::string &referenceFrame)
-    const
-{
-    return resource_.referenceFrames.count(referenceFrame);
 }
 
 #endif // mapproxy_generator_hpp_included_

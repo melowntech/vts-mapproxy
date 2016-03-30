@@ -2,6 +2,12 @@
 #include <condition_variable>
 #include <sstream>
 
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/identity.hpp>
+#include <boost/multi_index/global_fun.hpp>
+#include <boost/multi_index/mem_fun.hpp>
+
 #include "dbglog/dbglog.hpp"
 
 #include "../error.hpp"
@@ -9,6 +15,7 @@
 #include "./factory.hpp"
 
 namespace fs = boost::filesystem;
+namespace bmi = boost::multi_index;
 
 namespace {
 
@@ -54,6 +61,9 @@ Generator::Generator(const Config &config
     : config_(config), resource_(resource), savedResource_(resource)
     , fresh_(false), ready_(false)
 {
+    config_.root = (config_.root / resource_.id.referenceFrame
+                    / resource_.id.group / resource_.id.id);
+
     // TODO: handle failed creation
     auto rfile(root() / ResourceFile);
 
@@ -63,7 +73,7 @@ Generator::Generator(const Config &config
         save(rfile, resource);
     } else {
         // reopen of existing dataset
-        savedResource_ = loadResource(rfile);
+        savedResource_ = loadResource(rfile).front();
         if (savedResource_ != resource) {
             LOG(warn3)
                 << "Definition of resource <" << resource.id
@@ -93,6 +103,64 @@ void Generator::makeReady()
                << "> (type <" << resource().generator << ">).";
 }
 
+void Generator::mapConfig(std::ostream &os, ResourceRoot root) const
+{
+    vts::MapConfig mc(mapConfig(root));
+    vts::saveMapConfig(mc, os);
+}
+
+namespace {
+
+struct TypeKey {
+    std::string referenceFrame;
+    Resource::Generator::Type type;
+
+    bool operator<(const TypeKey &o) const {
+        if (referenceFrame < o.referenceFrame) { return true; }
+        if (o.referenceFrame < referenceFrame) { return false; }
+        return type < o.type;
+    }
+
+    TypeKey(const std::string &referenceFrame, Resource::Generator::Type type)
+        : referenceFrame(referenceFrame), type(type)
+    {}
+};
+
+TypeKey extractTypeKey(const Generator &generator)
+{
+    const auto r(generator.resource());
+    return { r.id.referenceFrame, r.generator.type };
+}
+
+struct GroupKey {
+    std::string referenceFrame;
+    Resource::Generator::Type type;
+    std::string group;
+
+    bool operator<(const GroupKey &o) const {
+        if (referenceFrame < o.referenceFrame) { return true; }
+        if (o.referenceFrame < referenceFrame) { return false; }
+
+        if (group < o.group) { return true; }
+        if (o.group < group) { return false; }
+
+        return type < o.type;
+    }
+
+    GroupKey(const std::string &referenceFrame, Resource::Generator::Type type
+             , const std::string &group)
+        : referenceFrame(referenceFrame), type(type), group(group)
+    {}
+};
+
+GroupKey extractGroupKey(const Generator &generator)
+{
+    const auto r(generator.resource());
+    return { r.id.referenceFrame, r.generator.type, r.id.group };
+}
+
+} // namespace
+
 class Generators::Detail {
 public:
     Detail(const Generators::Config &config
@@ -105,8 +173,18 @@ public:
 
     Generator::list referenceFrame(const std::string &referenceFrame) const;
 
+    std::vector<std::string> listGroups(const std::string &referenceFrame
+                                        , Resource::Generator::Type type)
+        const;
+
+    std::vector<std::string> listIds(const std::string &referenceFrame
+                                     , Resource::Generator::Type type
+                                     , const std::string &group) const;
+
     void start();
     void stop();
+
+    inline const Config& config() const { return config_; }
 
 private:
     void update(const Resource::map &resources);
@@ -124,9 +202,48 @@ private:
     std::mutex updaterLock_;
     std::condition_variable updaterCond_;
 
-    // internals
+    struct ResourceIdIdx {};
+    struct GroupIdx {};
+    struct TypeIdx {};
+    struct ReferenceFrameIdx {};
+
+    typedef boost::multi_index_container<
+        Generator::pointer
+        , bmi::indexed_by<
+              bmi::ordered_unique<bmi::identity<Generator::pointer> >
+
+              , bmi::ordered_unique<
+                    bmi::tag<ResourceIdIdx>
+                    , BOOST_MULTI_INDEX_CONST_MEM_FUN
+                    (Generator, const Resource::Id&, id)
+                    >
+
+              , bmi::ordered_non_unique<
+                    bmi::tag<TypeIdx>
+                    , bmi::global_fun<const Generator&, TypeKey
+                                      , &extractTypeKey>
+                    >
+
+              , bmi::ordered_non_unique<
+                    bmi::tag<GroupIdx>
+                    , bmi::global_fun<const Generator&, GroupKey
+                                      , &extractGroupKey>
+                    >
+
+              , bmi::ordered_unique<
+                    bmi::tag<ReferenceFrameIdx>
+                    , BOOST_MULTI_INDEX_CONST_MEM_FUN
+                    (Generator, const std::string&, referenceFrame)
+                    >
+              >
+
+        > GeneratorMap;
+
+
+
+        // internals
     mutable std::mutex servingLock_;
-    Generator::map serving_;
+    GeneratorMap serving_;
 
     std::mutex preparingLock_;
     Generator::list preparing_;
@@ -207,7 +324,8 @@ void Generators::Detail::update(const Resource::map &resources)
     LOG(info2) << "Updating resources.";
 
     auto iresources(resources.begin()), eresources(resources.end());
-    auto iserving(serving_.begin()), eserving(serving_.end());
+    auto &idx(serving_.get<ResourceIdIdx>());
+    auto iserving(idx.begin()), eserving(idx.end());
 
     Generator::list toAdd;
     Generator::list toRemove;
@@ -227,17 +345,17 @@ void Generators::Detail::update(const Resource::map &resources)
 
     // process common stuff
     while ((iresources != eresources) && (iserving != eserving)) {
-        if (iresources->first < iserving->first) {
+        if (iresources->first < (*iserving)->id()) {
             // new resource
             add(iresources->second);
             ++iresources;
-        } else if (iserving->first < iresources->first) {
+        } else if ((*iserving)->id() < iresources->first) {
             // removed resource
-            toRemove.push_back(iserving->second);
+            toRemove.push_back(*iserving);
             ++iserving;
         } else {
             // existing resource
-            iserving->second->check(iresources->second);
+            (*iserving)->check(iresources->second);
             ++iresources;
             ++iserving;
         }
@@ -250,15 +368,15 @@ void Generators::Detail::update(const Resource::map &resources)
 
     // process tail: removed resources
     for (; iserving != eserving; ++iserving) {
-        toRemove.push_back(iserving->second);
+        toRemove.push_back(*iserving);
     }
+
 
     // add stuff
     for (const auto &generator : toAdd) {
         {
             std::unique_lock<std::mutex> lock(servingLock_);
-            serving_.insert(Generator::map::value_type
-                            (generator->id(), generator));
+            serving_.insert(generator);
         }
 
         // TODO: better prepare set; probably multi-index container: sequence
@@ -276,7 +394,7 @@ void Generators::Detail::update(const Resource::map &resources)
         // above)
         {
             std::unique_lock<std::mutex> lock(servingLock_);
-            serving_.erase(generator->id());
+            serving_.erase(generator);
         }
     }
 
@@ -291,11 +409,13 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
 
     // use only ready generators that handle datasets for given reference frame
     std::unique_lock<std::mutex> lock(servingLock_);
-    for (const auto &item: serving_) {
-        if (item.second->ready()
-            && item.second->handlesReferenceFrame(referenceFrame))
-        {
-            out.push_back(item.second);
+
+    auto &idx(serving_.get<ReferenceFrameIdx>());
+    for (auto range(idx.equal_range(referenceFrame));
+         range.first != range.second; ++range.first)
+    {
+        if ((*range.first)->ready()) {
+            out.push_back(*range.first);
         }
     }
 
@@ -309,17 +429,15 @@ Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
     auto generator([&]() -> Generator::pointer
     {
         std::unique_lock<std::mutex> lock(servingLock_);
-        auto fserving(serving_.find(fileInfo.resourceId));
-        if (fserving == serving_.end()) { return {}; }
-        return fserving->second;
+        auto &idx(serving_.get<ResourceIdIdx>());
+        auto fserving(idx.find(fileInfo.resourceId));
+        if (fserving == idx.end()) { return {}; }
+        return *fserving;
     }());
 
-    const auto &resource(generator->resource());
+    if (!generator) { return generator; }
 
-    // check reference frame
-    if (!resource.referenceFrames.count(fileInfo.referenceFrame)) {
-        return {};
-    }
+    const auto &resource(generator->resource());
 
     // check generator type
     if (fileInfo.generatorType != resource.generator.type) {
@@ -329,9 +447,61 @@ Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
     return generator;
 }
 
-void Generator::mapConfig(std::ostream &os, const std::string &referenceFrame
-                          , ResourceRoot root) const
+const Generators::Config& Generators::config() const {
+    return detail().config();
+}
+
+std::vector<std::string>
+Generators::Detail::listGroups(const std::string &referenceFrame
+                               , Resource::Generator::Type type)
+    const
 {
-    vts::MapConfig mc(mapConfig(referenceFrame, root));
-    vts::saveMapConfig(mc, os);
+    std::vector<std::string> out;
+    {
+        std::unique_lock<std::mutex> lock(servingLock_);
+        auto &idx(serving_.get<TypeIdx>());
+        for (auto range(idx.equal_range(TypeKey(referenceFrame, type)));
+             range.first != range.second; ++range.first)
+        {
+            out.push_back((*range.first)->group());
+        }
+    }
+
+    return out;
+}
+
+std::vector<std::string>
+Generators::Detail::listIds(const std::string &referenceFrame
+                            , Resource::Generator::Type type
+                            , const std::string &group)
+    const
+{
+    std::vector<std::string> out;
+    {
+        std::unique_lock<std::mutex> lock(servingLock_);
+        auto &idx(serving_.get<GroupIdx>());
+        for (auto range(idx.equal_range
+                        (GroupKey(referenceFrame, type, group)));
+             range.first != range.second; ++range.first)
+        {
+            out.push_back((*range.first)->id().id);
+        }
+    }
+
+    return out;
+}
+
+std::vector<std::string>
+Generators::listGroups(const std::string &referenceFrame
+                       , Resource::Generator::Type type) const
+{
+    return detail().listGroups(referenceFrame, type);
+}
+
+std::vector<std::string>
+Generators::listIds(const std::string &referenceFrame
+                    , Resource::Generator::Type type
+                    , const std::string &group) const
+{
+    return detail().listIds(referenceFrame, type, group);
 }

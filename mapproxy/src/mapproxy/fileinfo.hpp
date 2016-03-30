@@ -24,11 +24,15 @@ struct FileInfo {
      */
     std::string url;
 
-    /** Reference frame.
-     */
-    std::string referenceFrame;
+    enum class Type {
+        dirRedir
+        , referenceFrameListing, typeListing, groupListing, idListing
 
-    enum class Type { rfMapConfig, resourceFile };
+        , referenceFrameBrowser, typeBrowser, groupBrowser
+
+        , referenceFrameMapConfig, typeMapConfig, groupMapConfig
+        , resourceFile
+    };
 
     /** Type of file to generate.
      */
@@ -37,7 +41,7 @@ struct FileInfo {
     /** Resource generator type.
      *  Valid only if type == Type::resourceFile.
      */
-    std::string generatorType;
+    Resource::Generator::Type generatorType;
 
     /** Handling resource ID.
      *  Valid only if type == Type::resourceFile.

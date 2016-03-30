@@ -1,3 +1,5 @@
+#include <boost/lexical_cast.hpp>
+
 #include "dbglog/dbglog.hpp"
 
 #include "jsoncpp/json.hpp"
@@ -15,9 +17,12 @@ namespace vs = vadstena::storage;
 
 namespace resdef {
 
-Resource::Generator TmsRaster::generator("tms", "tms-raster");
-Resource::Generator SurfaceSpheroid::generator("surface", "surface-sphereoid");
-Resource::Generator SurfaceDem::generator("surface", "surface-dem");
+Resource::Generator TmsRaster::generator
+    (Resource::Generator::Type::tms, "tms-raster");
+Resource::Generator SurfaceSpheroid::generator
+    (Resource::Generator::Type::surface, "surface-sphereoid");
+Resource::Generator SurfaceDem::generator
+    (Resource::Generator::Type::surface, "surface-dem");
 
 } // namespace resdef
 
@@ -133,7 +138,7 @@ void buildDefinition(Json::Value &value, const Resource &r)
         << "Unknown generator <" << r.generator << ">.";
 }
 
-Resource parseResource(const Json::Value &value)
+Resource::list parseResource(const Json::Value &value)
 {
     if (!value.isObject()) {
         LOGTHROW(err1, Json::Error)
@@ -144,7 +149,9 @@ Resource parseResource(const Json::Value &value)
 
     Json::get(r.id.group, value, "group");
     Json::get(r.id.id, value, "id");
-    Json::get(r.generator.type, value, "type");
+    std::string tmp;
+    Json::get(tmp, value, "type");
+    r.generator.type = boost::lexical_cast<Resource::Generator::Type>(tmp);
     Json::get(r.generator.driver, value, "driver");
 
     parseCredits(r.credits, value, "credits");
@@ -155,21 +162,26 @@ Resource parseResource(const Json::Value &value)
             << "Type of referenceFrames is not an object.";
     }
 
+    parseDefinition(r, value["definition"]);
+
+    Resource::list out;
+
     for (const auto &name : referenceFrames.getMemberNames()) {
         const auto &content(referenceFrames[name]);
 
-        auto &rfd(r.referenceFrames[name]);
-        // NB: function either returns valid reference of throws
-        rfd.referenceFrame = &vr::Registry::referenceFrame(name);
+        out.push_back(r);
+        auto &rr(out.back());
+        rr.id.referenceFrame = name;
 
-        Json::get(rfd.lodRange.min, content, "lodRange", 0);
-        Json::get(rfd.lodRange.max, content, "lodRange", 1);
-        rfd.tileRange = vr::tileRangeFromJson(content["tileRange"]);
+        // NB: function either returns valid reference of throws
+        rr.referenceFrame = &vr::Registry::referenceFrame(name);
+
+        Json::get(rr.lodRange.min, content, "lodRange", 0);
+        Json::get(rr.lodRange.max, content, "lodRange", 1);
+        rr.tileRange = vr::tileRangeFromJson(content["tileRange"]);
     }
 
-    parseDefinition(r, value["definition"]);
-
-    return r;
+    return out;
 }
 
 void parseResources(Resource::map &resources, const Json::Value &value)
@@ -182,11 +194,15 @@ void parseResources(Resource::map &resources, const Json::Value &value)
     // process all definitions
     for (const auto &item : value) {
         // parse resource and remember
-        auto res(parseResource(item));
+        auto resList(parseResource(item));
 
-        if (!resources.insert(Resource::map::value_type(res.id, res)).second) {
-            LOGTHROW(err1, Json::Error)
-                << "Duplicate entry for <" << res.id << ">.";
+        for (const auto &res : resList) {
+            if (!resources.insert(Resource::map::value_type(res.id, res))
+                .second)
+            {
+                LOGTHROW(err1, Json::Error)
+                    << "Duplicate entry for <" << res.id << ">.";
+            }
         }
     }
 }
@@ -218,7 +234,7 @@ Resource::map loadResources(std::istream &in, const fs::path &path)
     return resources;
 }
 
-Resource loadResource(std::istream &in, const fs::path &path)
+Resource::list loadResource(std::istream &in, const fs::path &path)
 {
     Json::Value config;
     Json::Reader reader;
@@ -254,22 +270,19 @@ void buildResource(Json::Value &value, const Resource &r)
     for (auto cid : r.credits) { credits.append(cid); }
 
     Json::Value &referenceFrames(value["referenceFrames"]);
-    for (const auto &item : r.referenceFrames) {
-        auto &content(referenceFrames[item.first] = Json::objectValue);
-        const auto &rfd(item.second);
+    auto &content(referenceFrames[r.id.referenceFrame] = Json::objectValue);
 
-        auto &lodRange(content["lodRange"] = Json::arrayValue);
-        lodRange.append(rfd.lodRange.min);
-        lodRange.append(rfd.lodRange.max);
+    auto &lodRange(content["lodRange"] = Json::arrayValue);
+    lodRange.append(r.lodRange.min);
+    lodRange.append(r.lodRange.max);
 
-        auto &tileRange(content["tileRange"] = Json::arrayValue);
-        auto &tileRange0(tileRange.append(Json::arrayValue));
-        tileRange0.append(rfd.tileRange.ll(0));
-        tileRange0.append(rfd.tileRange.ll(1));
-        auto &tileRange1(tileRange.append(Json::arrayValue));
-        tileRange1.append(rfd.tileRange.ur(0));
-        tileRange1.append(rfd.tileRange.ur(1));
-    }
+    auto &tileRange(content["tileRange"] = Json::arrayValue);
+    auto &tileRange0(tileRange.append(Json::arrayValue));
+    tileRange0.append(r.tileRange.ll(0));
+    tileRange0.append(r.tileRange.ll(1));
+    auto &tileRange1(tileRange.append(Json::arrayValue));
+    tileRange1.append(r.tileRange.ur(0));
+    tileRange1.append(r.tileRange.ur(1));
 
     buildDefinition(value["definition"], r);
 }
@@ -301,7 +314,7 @@ Resource::map loadResources(const boost::filesystem::path &path)
     return detail::loadResources(f, path);
 }
 
-Resource loadResource(const boost::filesystem::path &path)
+Resource::list loadResource(const boost::filesystem::path &path)
 {
     std::ifstream f;
     f.exceptions(std::ios::badbit | std::ios::failbit);
@@ -348,7 +361,9 @@ bool Resource::operator==(const Resource &o) const
     if (!(id == o.id)) { return false; }
     if (!(generator == o.generator)) { return false; }
     if (credits != o.credits) { return false; }
-    if (referenceFrames != o.referenceFrames) { return false; }
+
+    if (lodRange != o.lodRange) { return false; }
+    if (tileRange != o.tileRange) { return false; }
 
     if (generator == resdef::TmsRaster::generator) {
         if (!detail::sameDefinition<resdef::TmsRaster>(*this, o)) {
@@ -364,13 +379,6 @@ bool Resource::operator==(const Resource &o) const
         }
     }
 
-    return true;
-}
-
-bool Resource::ReferenceFrame::operator==(const ReferenceFrame &o) const
-{
-    if (lodRange != o.lodRange) { return false; }
-    if (tileRange != o.tileRange) { return false; }
     return true;
 }
 
@@ -402,18 +410,17 @@ bool SurfaceDem::operator==(const SurfaceDem &o) const
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource &resource
-                                    , const std::string &referenceFrame
                                     , ResourceRoot root)
 {
     boost::filesystem::path out;
 
     switch (root) {
     case ResourceRoot::referenceFrame:
-        out /= referenceFrame;
+        out /= resource.id.referenceFrame;
         // no fallback
 
     case ResourceRoot::type:
-        out /= resource.generator.type;
+        out /= boost::lexical_cast<std::string>(resource.generator.type);
         // no fallback
 
     case ResourceRoot::group:
@@ -435,11 +442,10 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
 
 std::string prependRoot(const std::string &path
                         , const Resource &resource
-                        , const std::string &referenceFrame
                         , ResourceRoot root)
 {
     fs::path tmp(path);
-    return prependRoot(tmp, resource, referenceFrame, root).string();
+    return prependRoot(tmp, resource, root).string();
 }
 
 std::string contentType(RasterFormat format)
