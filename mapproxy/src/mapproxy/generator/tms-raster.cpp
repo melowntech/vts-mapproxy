@@ -2,6 +2,7 @@
 #include <boost/format.hpp>
 
 #include "utility/premain.hpp"
+#include "utility/raise.hpp"
 
 #include "vts-libs/vts/io.hpp"
 
@@ -40,7 +41,7 @@ utility::PreMain Factory::register_([]()
 TmsRaster::TmsRaster(const Config &config, const Resource &resource)
     : Generator(config, resource)
     , definition_(boost::any_cast<const resdef::TmsRaster&>
-                  (resource.definition))
+                  (this->resource().definition))
 {
     // TODO: check datasets
     makeReady();
@@ -106,7 +107,16 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
                       , fi.sinkFileInfo(), false);
         return {};
 
-    case TmsFileInfo::Type::imagery:
+    case TmsFileInfo::Type::imagery: {
+        if (fi.format != definition_.format) {
+            sink->error(utility::makeError<NotFound>
+                        ("Format <%s> is not supported by this resource (%s)."
+                         , fi.format, definition_.format));
+            return {};
+        }
+        break;
+    }
+
     case TmsFileInfo::Type::mask:
         // TODO: implement me
         break;

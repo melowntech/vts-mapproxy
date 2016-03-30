@@ -34,8 +34,7 @@ public:
                            , service::ENABLE_CONFIG_UNRECOGNIZED_OPTIONS
                            | service::ENABLE_UNRECOGNIZED_OPTIONS)
         , storePath_(utility::buildsys::installPath("var/mapproxy"))
-        , httpListen_(3070)
-        , httpThreadCount_(5)
+        , httpListen_(3070), httpThreadCount_(5), httpEnableBrowser_(false)
         , resourceUpdatePeriod_(300)
     {}
 
@@ -74,6 +73,7 @@ private:
 
     utility::TcpEndpoint httpListen_;
     unsigned int httpThreadCount_;
+    bool httpEnableBrowser_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
     int resourceUpdatePeriod_;
 
@@ -100,6 +100,9 @@ void Daemon::configuration(po::options_description &cmdline
         ("http.threadCount", po::value(&httpThreadCount_)
          ->default_value(httpThreadCount_)->required()
          , "Number of processing threads.")
+        ("http.enableBrowser", po::value(&httpEnableBrowser_)
+         ->default_value(httpEnableBrowser_)->required()
+         , "Enables resource browsering functionaly if set to true.")
 
         ("resource-backend.type"
          , po::value(&resourceBackendConfig_.type)->required()
@@ -207,7 +210,10 @@ service::Service::Cleanup Daemon::start()
         gconf.resourceUpdatePeriod = resourceUpdatePeriod_;
 
         // TODO: make configurable
-        gconf.fileFlags = FileFlags::browserEnabled;
+        gconf.fileFlags = FileFlags::none;
+        if (httpEnableBrowser_) {
+            gconf.fileFlags |= FileFlags::browserEnabled;
+        }
         generators_ = boost::in_place(gconf, resourceBackend_);
     }
     core_ = boost::in_place(std::ref(*generators_));
