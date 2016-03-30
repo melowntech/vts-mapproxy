@@ -53,10 +53,13 @@ struct Resource {
 
     ReferenceFrame::map referenceFrames;
 
-    /** Definition: based on type and driver, created by resource
-     *  parser/generator and interpreted by driver.
-     */
-    boost::any definition;
+    template <typename T> const T& definition() const {
+        return boost::any_cast<const T&>(definition_);
+    }
+
+    template <typename T> T& assignDefinition(const T &definition = T()) {
+        return boost::any_cast<T&>(definition_ = definition);
+    }
 
     typedef std::map<Id, Resource> map;
     typedef std::vector<Resource> list;
@@ -65,6 +68,12 @@ struct Resource {
 
     bool operator==(const Resource &o) const;
     bool operator!=(const Resource &o) const;
+
+private:
+    /** Definition: based on type and driver, created by resource
+     *  parser/generator and interpreted by driver.
+     */
+    boost::any definition_;
 };
 
 UTILITY_GENERATE_ENUM(RasterFormat,

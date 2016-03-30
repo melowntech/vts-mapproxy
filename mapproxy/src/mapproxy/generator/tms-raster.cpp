@@ -40,8 +40,7 @@ utility::PreMain Factory::register_([]()
 
 TmsRaster::TmsRaster(const Config &config, const Resource &resource)
     : Generator(config, resource)
-    , definition_(boost::any_cast<const resdef::TmsRaster&>
-                  (this->resource().definition))
+    , definition_(this->resource().definition<resdef::TmsRaster>())
 {
     // TODO: check datasets
     makeReady();
@@ -93,6 +92,10 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
     TmsFileInfo fi(fileInfo, config().fileFlags);
 
     switch (fi.type) {
+    case TmsFileInfo::Type::unknown:
+        sink->error(utility::makeError<NotFound>("Unrecognized filename."));
+        return {};
+
     case TmsFileInfo::Type::config: {
         std::ostringstream os;
         mapConfig(os, fileInfo.referenceFrame, ResourceRoot::none);

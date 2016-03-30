@@ -61,7 +61,7 @@ struct TmsFileInfo {
      */
     FileInfo fileInfo;
 
-    enum class Type { config, imagery, mask, support };
+    enum class Type { unknown, config, imagery, mask, support };
 
     /** File type.
      */

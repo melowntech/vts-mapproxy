@@ -93,7 +93,7 @@ inline const char* parsePart(const char *p, T &value)
 } // namespace
 
 TmsFileInfo::TmsFileInfo(const FileInfo &fi, int flags)
-    : fileInfo(fi), support()
+    : fileInfo(fi), type(Type::unknown), support()
 {
     if ([&]() -> bool
     {
@@ -161,6 +161,8 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
         return { contentType(MaskFormat), lastModified };
     case Type::support:
         return { support->contentType, support->lastModified };
+    case Type::unknown:
+        return {};
     }
 
     return {};

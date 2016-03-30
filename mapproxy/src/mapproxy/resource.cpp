@@ -76,25 +76,19 @@ void parseDefinition(resdef::SurfaceDem &def, const Json::Value &value)
     (void) value;
 }
 
-template <typename T>
-T& createDefinition(Resource &r)
-{
-    return boost::any_cast<T&>(r.definition = T());
-}
-
 void parseDefinition(Resource &r, const Json::Value &value)
 {
     if (r.generator == resdef::TmsRaster::generator) {
         return parseDefinition
-            (createDefinition<resdef::TmsRaster>(r), value);
+            (r.assignDefinition<resdef::TmsRaster>(), value);
     }
     if (r.generator == resdef::SurfaceSpheroid::generator) {
         return parseDefinition
-            (createDefinition<resdef::SurfaceSpheroid>(r), value);
+            (r.assignDefinition<resdef::SurfaceSpheroid>(), value);
     }
     if (r.generator == resdef::SurfaceDem::generator) {
         return parseDefinition
-            (createDefinition<resdef::SurfaceDem>(r), value);
+            (r.assignDefinition<resdef::SurfaceDem>(), value);
     }
 
     LOGTHROW(err1, UnknownGenerator)
@@ -120,25 +114,19 @@ void buildDefinition(Json::Value &value, const resdef::SurfaceDem &def)
     (void) def;
 }
 
-template <typename T>
-const T& getDefinition(const Resource &r)
-{
-    return boost::any_cast<const T&>(r.definition);
-}
-
 void buildDefinition(Json::Value &value, const Resource &r)
 {
     if (r.generator == resdef::TmsRaster::generator) {
         return buildDefinition
-            (value, getDefinition<resdef::TmsRaster>(r));
+            (value, r.definition<resdef::TmsRaster>());
     }
     if (r.generator == resdef::SurfaceSpheroid::generator) {
         return buildDefinition
-            (value, getDefinition<resdef::SurfaceSpheroid>(r));
+            (value, r.definition<resdef::SurfaceSpheroid>());
     }
     if (r.generator == resdef::SurfaceDem::generator) {
         return buildDefinition
-            (value, getDefinition<resdef::SurfaceDem>(r));
+            (value, r.definition<resdef::SurfaceDem>());
     }
 
     LOGTHROW(err1, UnknownGenerator)
@@ -350,7 +338,7 @@ namespace detail {
 template<typename T>
 bool sameDefinition(const Resource &l, const Resource &r)
 {
-    return (getDefinition<T>(l) == getDefinition<T>(r));
+    return (l.definition<T>() == r.definition<T>());
 }
 
 } // namespace detail
