@@ -227,17 +227,21 @@ class ResponseHandle {
 public:
     ResponseHandle() : response_() {}
     ResponseHandle(const std::string &data, bool copy = true) {
-        buffer(data, copy);
+        buffer(data.data(), data.size(), copy);
+    }
+
+    ResponseHandle(const void *data, std::size_t size, bool copy) {
+        buffer(data, size, copy);
     }
 
     ~ResponseHandle() {
         if (response_) { ::MHD_destroy_response(response_); }
     }
 
-    void buffer(const std::string &data, bool copy = true) {
+    void buffer(const void *data, std::size_t size, bool copy) {
         response_ = ::MHD_create_response_from_buffer
-            (data.size(), const_cast<char*>(data.data())
-             ,  copy ? MHD_RESPMEM_MUST_COPY : MHD_RESPMEM_PERSISTENT);
+            (size, const_cast<void*>(data)
+             , copy ? MHD_RESPMEM_MUST_COPY : MHD_RESPMEM_PERSISTENT);
     }
 
     MHD_Response* get() { return response_; }
@@ -292,10 +296,10 @@ public:
     {}
 
 private:
-    virtual void content_impl(const std::string &data
-                              , const FileInfo &stat)
+    virtual void content_impl(const void *data, std::size_t size
+                              , const FileInfo &stat, bool needCopy)
     {
-        ResponseHandle response(data);
+        ResponseHandle response(data, size, needCopy);
         CHECK_MHD_ERROR(::MHD_add_response_header
                         (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
                          , stat.contentType.c_str())

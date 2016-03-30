@@ -3,10 +3,14 @@
 
 #include "utility/premain.hpp"
 
+#include "vts-libs/vts/io.hpp"
+
 #include "../error.hpp"
 
 #include "./tms-raster.hpp"
 #include "./factory.hpp"
+
+#include "browser2d/index.html.hpp"
 
 namespace vr = vadstena::registry;
 
@@ -15,10 +19,10 @@ namespace generator {
 namespace {
 
 struct Factory : Generator::Factory {
-    virtual Generator::pointer create(const boost::filesystem::path &root
+    virtual Generator::pointer create(const Generator::Config &config
                                       , const Resource &resource)
     {
-        return std::make_shared<TmsRaster>(root, resource);
+        return std::make_shared<TmsRaster>(config, resource);
     }
 
 private:
@@ -33,10 +37,10 @@ utility::PreMain Factory::register_([]()
 
 } // namespace
 
-TmsRaster::TmsRaster(const boost::filesystem::path &root
-                     , const Resource &resource)
-    : Generator(root, resource)
-    , definition_(boost::any_cast<resdef::TmsRaster>(resource.definition))
+TmsRaster::TmsRaster(const Config &config, const Resource &resource)
+    : Generator(config, resource)
+    , definition_(boost::any_cast<const resdef::TmsRaster&>
+                  (resource.definition))
 {
     // TODO: check datasets
     makeReady();
@@ -69,6 +73,7 @@ vts::MapConfig TmsRaster::mapConfig_impl(const std::string &referenceFrame
     bl.numericId = 0; // no numeric ID
     bl.type = vr::BoundLayer::Type::raster;
 
+    // build url
     bl.url = prependRoot
         (str(boost::format("{lod}-{x}-{y}.%s") % definition_.format)
          , resource(), referenceFrame, root);
@@ -79,6 +84,35 @@ vts::MapConfig TmsRaster::mapConfig_impl(const std::string &referenceFrame
     mapConfig.boundLayers.add(bl);
 
     return mapConfig;
+}
+
+Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
+                                             , const Sink::pointer &sink) const
+{
+    TmsFileInfo fi(fileInfo, config().fileFlags);
+
+    switch (fi.type) {
+    case TmsFileInfo::Type::config: {
+        std::ostringstream os;
+        mapConfig(os, fileInfo.referenceFrame, ResourceRoot::none);
+        sink->content(os.str(), fi.sinkFileInfo());
+        return {};
+    };
+
+    case TmsFileInfo::Type::support:
+        LOG(info4) << "Size: " << fi.support->size << " vs "
+                   << sizeof(browser2d::index_html);
+        sink->content(fi.support->data, fi.support->size
+                      , fi.sinkFileInfo(), false);
+        return {};
+
+    case TmsFileInfo::Type::imagery:
+    case TmsFileInfo::Type::mask:
+        // TODO: implement me
+        break;
+    }
+
+    return {};
 }
 
 } // namespace generator

@@ -453,3 +453,12 @@ std::string prependRoot(const std::string &path
     fs::path tmp(path);
     return prependRoot(tmp, resource, referenceFrame, root).string();
 }
+
+std::string contentType(RasterFormat format)
+{
+    switch (format) {
+    case RasterFormat::jpg: return "image/jpeg";
+    case RasterFormat::png: return "image/png";
+    }
+    return {};
+}

@@ -1,5 +1,6 @@
 #include <thread>
 #include <condition_variable>
+#include <sstream>
 
 #include "dbglog/dbglog.hpp"
 
@@ -34,12 +35,12 @@ void Generator::registerType(const Resource::Generator &type
     registry.insert(Registry::value_type(type, factory));
 }
 
-Generator::pointer Generator::create(const Resource::Generator &type
-                                     , const boost::filesystem::path &root
+Generator::pointer Generator::create(const Config &config
+                                     , const Resource::Generator &type
                                      , const Resource &resource)
 {
     try {
-        return findFactory(type)->create(root, resource);
+        return findFactory(type)->create(config, resource);
     } catch (const boost::bad_any_cast&) {
         LOGTHROW(err2, InvalidConfiguration)
             << "Passed resource does not match generator <"
@@ -48,15 +49,15 @@ Generator::pointer Generator::create(const Resource::Generator &type
     throw;
 }
 
-Generator::Generator(const boost::filesystem::path &root
+Generator::Generator(const Config &config
                      , const Resource &resource)
-    : root_(root), resource_(resource), savedResource_(resource)
+    : config_(config), resource_(resource), savedResource_(resource)
     , fresh_(false), ready_(false)
 {
     // TODO: handle failed creation
-    auto rfile(root / ResourceFile);
+    auto rfile(root() / ResourceFile);
 
-    if (create_directories(root)) {
+    if (create_directories(root())) {
         // new resource
         fresh_ = true;
         save(rfile, resource);
@@ -67,7 +68,7 @@ Generator::Generator(const boost::filesystem::path &root
             LOG(warn3)
                 << "Definition of resource <" << resource.id
                 << "> differs from the one stored in store at "
-                << root << "; using stored definition.";
+                << root() << "; using stored definition.";
             resource_ = savedResource_;
         }
     }
@@ -79,7 +80,7 @@ bool Generator::check(const Resource &resource) const
         LOG(warn2)
             << "Definition of resource <" << resource.id
             << "> differs from the one stored in store at "
-            << root_ << "; using stored definition.";
+            << root() << "; using stored definition.";
         return false;
     }
     return true;
@@ -94,11 +95,9 @@ void Generator::makeReady()
 
 class Generators::Detail {
 public:
-    Detail(const boost::filesystem::path &root
-           , const ResourceBackend::pointer &resourceBackend
-           , int resourceUpdatePeriod)
-        : root_(root), resourceBackend_(resourceBackend)
-        , resourceUpdatePeriod_(resourceUpdatePeriod)
+    Detail(const Generators::Config &config
+           , const ResourceBackend::pointer &resourceBackend)
+        : config_(config), resourceBackend_(resourceBackend)
         , updaterRunning_(false)
     {}
 
@@ -116,9 +115,8 @@ private:
 
     void runUpdater();
 
-    const boost::filesystem::path root_;
+    const Config config_;
     ResourceBackend::pointer resourceBackend_;
-    const int resourceUpdatePeriod_;
 
     // resource updater stuff
     std::thread updater_;
@@ -127,7 +125,7 @@ private:
     std::condition_variable updaterCond_;
 
     // internals
-    std::mutex servingLock_;
+    mutable std::mutex servingLock_;
     Generator::map serving_;
 
     std::mutex preparingLock_;
@@ -137,7 +135,7 @@ private:
 
 fs::path Generators::Detail::makePath(const Resource::Id &id)
 {
-    return (root_ / id.group / id.id);
+    return (config_.root / id.group / id.id);
 }
 
 void Generators::Detail::start()
@@ -163,7 +161,7 @@ void Generators::Detail::runUpdater()
 
 
     while (updaterRunning_) {
-        std::chrono::seconds sleep(resourceUpdatePeriod_);
+        std::chrono::seconds sleep(config_.resourceUpdatePeriod);
 
         try {
             update(resourceBackend_->load());
@@ -180,11 +178,9 @@ void Generators::Detail::runUpdater()
     }
 }
 
-Generators::Generators(const boost::filesystem::path &root
-                       , const ResourceBackend::pointer &resourceBackend
-                       , int resourceUpdatePeriod)
-    : detail_(std::make_shared<Detail>
-              (root, resourceBackend, resourceUpdatePeriod))
+Generators::Generators(const Config &config
+                       , const ResourceBackend::pointer &resourceBackend)
+    : detail_(std::make_shared<Detail>(config, resourceBackend))
 {
     detail().start();
 }
@@ -219,8 +215,10 @@ void Generators::Detail::update(const Resource::map &resources)
     auto add([&](const Resource &res)
     {
         try {
-            toAdd.push_back(Generator::create
-                            (res.generator, makePath(res.id), res));
+            Generator::Config config;
+            config.root = makePath(res.id);
+            config.fileFlags = config_.fileFlags;
+            toAdd.push_back(Generator::create(config, res.generator, res));
         } catch (const std::exception &e) {
             LOG(err2) << "Failed to create generator for resource <"
                       << iresources->first << ">: <" << e.what() << ">.";
@@ -292,6 +290,7 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
     Generator::list out;
 
     // use only ready generators that handle datasets for given reference frame
+    std::unique_lock<std::mutex> lock(servingLock_);
     for (const auto &item: serving_) {
         if (item.second->ready()
             && item.second->handlesReferenceFrame(referenceFrame))
@@ -306,6 +305,33 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
 Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
     const
 {
-    (void) fileInfo;
-    return {};
+    // find generator (under lock)
+    auto generator([&]() -> Generator::pointer
+    {
+        std::unique_lock<std::mutex> lock(servingLock_);
+        auto fserving(serving_.find(fileInfo.resourceId));
+        if (fserving == serving_.end()) { return {}; }
+        return fserving->second;
+    }());
+
+    const auto &resource(generator->resource());
+
+    // check reference frame
+    if (!resource.referenceFrames.count(fileInfo.referenceFrame)) {
+        return {};
+    }
+
+    // check generator type
+    if (fileInfo.generatorType != resource.generator.type) {
+        return {};
+    }
+
+    return generator;
+}
+
+void Generator::mapConfig(std::ostream &os, const std::string &referenceFrame
+                          , ResourceRoot root) const
+{
+    vts::MapConfig mc(mapConfig(referenceFrame, root));
+    vts::saveMapConfig(mc, os);
 }

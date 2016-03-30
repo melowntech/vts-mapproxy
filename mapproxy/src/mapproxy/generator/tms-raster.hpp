@@ -7,14 +7,16 @@ namespace generator {
 
 class TmsRaster : public Generator {
 public:
-    TmsRaster(const boost::filesystem::path &root
-              , const Resource &resource);
+    TmsRaster(const Config &config, const Resource &resource);
 
 private:
     virtual void prepare_impl();
     virtual vts::MapConfig
     mapConfig_impl(const std::string &referenceFrame
                    , ResourceRoot root) const;
+
+    virtual Task generateFile_impl(const FileInfo &fileInfo
+                                   , const Sink::pointer &sink) const;
 
     const resdef::TmsRaster &definition_;
 };

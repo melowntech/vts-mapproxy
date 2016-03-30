@@ -6,7 +6,7 @@
 struct Generator::Factory {
     typedef std::shared_ptr<Factory> pointer;
     virtual ~Factory() {}
-    virtual Generator::pointer create(const boost::filesystem::path &root
+    virtual Generator::pointer create(const Config &config
                                       , const Resource &resource) = 0;
 };
 

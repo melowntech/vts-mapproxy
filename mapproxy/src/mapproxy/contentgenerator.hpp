@@ -26,7 +26,8 @@ public:
          */
         std::time_t lastModified;
 
-        FileInfo(const std::string &contentType, std::time_t lastModified = -1)
+        FileInfo(const std::string &contentType = "application/octet-stream"
+                 , std::time_t lastModified = -1)
             : contentType(contentType), lastModified(lastModified)
         {}
     };
@@ -36,6 +37,15 @@ public:
      * \param stat file info (size is ignored)
      */
     void content(const std::string &data, const FileInfo &stat);
+
+    /** Sends content to client.
+     * \param data data top send
+     * \param size size of data
+     * \param stat file info (size is ignored)
+     * \param needCopy data are copied if set to true
+     */
+    void content(const void *data, std::size_t size
+                 , const FileInfo &stat, bool needCopy);
 
     /** Sends current exception to the client.
      */
@@ -50,8 +60,8 @@ public:
     template <typename T> void error(const T &exc);
 
 private:
-    virtual void content_impl(const std::string &data
-                              , const FileInfo &stat) = 0;
+    virtual void content_impl(const void *data, std::size_t size
+                              , const FileInfo &stat, bool needCopy) = 0;
     virtual void error_impl(const std::exception_ptr &exc) = 0;
 };
 
@@ -70,7 +80,13 @@ private:
 
 inline void Sink::content(const std::string &data, const FileInfo &stat)
 {
-    content_impl(data, stat);
+    content_impl(data.data(), data.size(), stat, true);
+}
+
+inline void Sink::content(const void *data, std::size_t size
+                          , const FileInfo &stat, bool needCopy)
+{
+    content_impl(data, size, stat, needCopy);
 }
 
 inline void Sink::error(const std::exception_ptr &exc)

@@ -201,8 +201,15 @@ service::Service::Cleanup Daemon::start()
     auto guard(std::make_shared<Stopper>(*this));
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
-    generators_ = boost::in_place(storePath_, resourceBackend_
-                                  , resourceUpdatePeriod_);
+    {
+        Generators::Config gconf;
+        gconf.root = storePath_;
+        gconf.resourceUpdatePeriod = resourceUpdatePeriod_;
+
+        // TODO: make configurable
+        gconf.fileFlags = FileFlags::browserEnabled;
+        generators_ = boost::in_place(gconf, resourceBackend_);
+    }
     core_ = boost::in_place(std::ref(*generators_));
     http_ = boost::in_place(httpListen_, httpThreadCount_, std::ref(*core_));
 

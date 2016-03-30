@@ -80,6 +80,13 @@ void Core::Detail::generateResourceFile(const FileInfo &fi
                                         , const Sink::pointer &sink)
 {
     auto generator(generators.generator(fi));
-    (void) generator;
-    (void) sink;
+    if (!generator) {
+        sink->error(utility::makeError<NotFound>
+                    ("No generator for URL <%s> found.", fi.url));
+    }
+
+    if (auto task = generator->generateFile(fi, sink)) {
+        // TODO: enqueue task
+        (void) task;
+    }
 }

@@ -15,6 +15,7 @@
 #include "./resource.hpp"
 #include "./resourcebackend.hpp"
 #include "./fileinfo.hpp"
+#include "./contentgenerator.hpp"
 
 namespace vts = vadstena::vts;
 
@@ -25,11 +26,21 @@ public:
     typedef std::shared_ptr<Generator> pointer;
     typedef std::vector<pointer> list;
     typedef std::map<Resource::Id, pointer> map;
+    typedef std::function<void()> Task;
+
+    /** Configuration
+     */
+    struct Config {
+        boost::filesystem::path root;
+        int fileFlags;
+
+        Config() : fileFlags() {}
+    };
 
     virtual ~Generator() {}
 
-    static Generator::pointer create(const Resource::Generator &type
-                                     , const boost::filesystem::path &root
+    static Generator::pointer create(const Config &config
+                                     , const Resource::Generator &type
                                      , const Resource &resource);
 
     struct Factory;
@@ -46,7 +57,8 @@ public:
 
     const Resource& resource() const { return resource_; }
     const Resource::Id& id() const { return resource_.id; }
-    const boost::filesystem::path& root() const { return root_; }
+    const Config& config() const { return config_; }
+    const boost::filesystem::path& root() const { return config_.root; }
 
     bool check(const Resource &resource) const;
 
@@ -55,12 +67,17 @@ public:
     vts::MapConfig mapConfig(const std::string &referenceFrame
                              , ResourceRoot root) const;
 
+    Task generateFile(const FileInfo &fileInfo
+                      , const Sink::pointer &sink) const;
+
 protected:
-    Generator(const boost::filesystem::path &root
-              , const Resource &resource);
+    Generator(const Config &config, const Resource &resource);
 
     void makeReady();
     bool fresh() const { return fresh_; }
+
+    void mapConfig(std::ostream &os, const std::string &referenceFrame
+                   , ResourceRoot root) const;
 
 private:
     virtual void prepare_impl() = 0;
@@ -68,7 +85,10 @@ private:
     mapConfig_impl(const std::string &referenceFrame
                    , ResourceRoot root) const = 0;
 
-    const boost::filesystem::path root_;
+    virtual Task generateFile_impl(const FileInfo &fileInfo
+                                   , const Sink::pointer &sink) const = 0;
+
+    const Config config_;
     Resource resource_;
     Resource savedResource_;
     bool fresh_;
@@ -79,11 +99,18 @@ private:
  */
 class Generators {
 public:
+    struct Config {
+        boost::filesystem::path root;
+        int fileFlags;
+        int resourceUpdatePeriod;
+
+        Config() : fileFlags(), resourceUpdatePeriod(100) {}
+    };
+
     /** Creates generator set.
      */
-    Generators(const boost::filesystem::path &root
-               , const ResourceBackend::pointer &resourceBackend
-               , int resourceUpdatePeriod);
+    Generators(const Config &config
+               , const ResourceBackend::pointer &resourceBackend);
 
     ~Generators();
 
@@ -116,6 +143,13 @@ Generator::mapConfig(const std::string &referenceFrame
                      , ResourceRoot root) const
 {
     return mapConfig_impl(referenceFrame, root);
+}
+
+inline Generator::Task Generator::generateFile(const FileInfo &fileInfo
+                                               , const Sink::pointer &sink)
+    const
+{
+    return generateFile_impl(fileInfo, sink);
 }
 
 inline bool Generator::handlesReferenceFrame(const std::string &referenceFrame)

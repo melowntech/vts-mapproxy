@@ -72,6 +72,8 @@ UTILITY_GENERATE_ENUM(RasterFormat,
     ((png))
 )
 
+constexpr RasterFormat MaskFormat = RasterFormat::png;
+
 /** What directory is resource root:
  */
 UTILITY_GENERATE_ENUM(ResourceRoot,
@@ -138,6 +140,8 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
 std::string prependRoot(const std::string &path, const Resource &resource
                         , const std::string &referenceFrame
                         , ResourceRoot root);
+
+std::string contentType(RasterFormat format);
 
 // inlines + IO
 
