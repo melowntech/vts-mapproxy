@@ -75,12 +75,15 @@ std::string getName(const T &value)
 }
 
 template <typename Container>
-std::vector<std::string> buildListing(const Container &container)
+Sink::Listing buildListing(const Container &container
+                           , const Sink::Listing &bootstrap = Sink::Listing())
 {
-    std::vector<std::string> out;
+    Sink::Listing out(bootstrap);
+
     for (const auto &item : container) {
-        out.push_back(getName(item));
+        out.emplace_back(getName(item), Sink::ListingItem::Type::dir);
     }
+
     return out;
 }
 
@@ -129,6 +132,7 @@ void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
     if (genlist.empty()) {
         sink->error(utility::makeError<NotFound>
                     ("No data for <%s>.", referenceFrame));
+        return;
     }
 
     // build map
@@ -158,6 +162,19 @@ void Core::Detail::generateResourceFile(const FileInfo &fi
     }
 }
 
+namespace {
+
+Sink::Listing browsableDirectoryContent = {
+    { "index.html" }
+    , { "mapConfig.json" }
+};
+
+Sink::Listing otherDirectoryContent = {
+    { "index.html" }
+};
+
+} // namespace
+
 void Core::Detail::generateListing(const FileInfo &fi
                                    , const Sink::pointer &sink)
 {
@@ -165,26 +182,29 @@ void Core::Detail::generateListing(const FileInfo &fi
 
     switch (fi.type) {
     case FileInfo::Type::referenceFrameListing:
-        sink->listing(buildListing(vr::Registry::referenceFrames()));
+        sink->listing(buildListing(vr::Registry::referenceFrames()
+                                   , otherDirectoryContent));
         return;
 
     case FileInfo::Type::typeListing:
         sink->listing
-            (buildListing(enumerationValues
-                          (Resource::Generator::Type())));
+            (buildListing(enumerationValues(Resource::Generator::Type())
+                          , browsableDirectoryContent));
         return;
 
     case FileInfo::Type::groupListing:
         sink->listing(buildListing
                       (generators.listGroups
-                       (fi.resourceId.referenceFrame, fi.generatorType)));
+                       (fi.resourceId.referenceFrame, fi.generatorType)
+                       , browsableDirectoryContent));
         return;
 
     case FileInfo::Type::idListing:
         sink->listing(buildListing
                       (generators.listIds
                        (fi.resourceId.referenceFrame, fi.generatorType
-                        , fi.resourceId.group)));
+                        , fi.resourceId.group)
+                       , browsableDirectoryContent));
         return;
 
     default: break;

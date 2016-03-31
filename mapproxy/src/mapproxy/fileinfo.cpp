@@ -4,6 +4,7 @@
 
 #include "utility/streams.hpp"
 
+#include "vts-libs/registry.hpp"
 #include "vts-libs/vts/tileop.hpp"
 
 #include "./error.hpp"
@@ -11,6 +12,7 @@
 #include "./browser2d.hpp"
 
 namespace ba = boost::algorithm;
+namespace vr = vadstena::registry;
 
 namespace constants {
     const std::string Config("mapConfig.json");
@@ -40,6 +42,17 @@ void asEnumChecked(const std::string &str, E &value, const std::string message)
     }
 }
 
+const std::string& checkReferenceFrame(const std::string &referenceFrame)
+{
+    if (vr::Registry::referenceFrame(referenceFrame, std::nothrow)) {
+        return referenceFrame;
+    }
+
+    LOGTHROW(err1, NotFound)
+        << "<" << referenceFrame << "> is not known reference frame.";
+    throw;
+}
+
 } // namespace
 
 FileInfo::FileInfo(const std::string &url)
@@ -65,7 +78,7 @@ FileInfo::FileInfo(const std::string &url)
         return;
 
     case 2:
-        resourceId.referenceFrame = components[1];
+        resourceId.referenceFrame = checkReferenceFrame(components[1]);
         filename = components[2];
 
         if (filename == constants::Config) {
@@ -88,7 +101,7 @@ FileInfo::FileInfo(const std::string &url)
 
     case 3:
         // only reference frame -> allow only map config
-        resourceId.referenceFrame = components[1];
+        resourceId.referenceFrame = checkReferenceFrame(components[1]);
         asEnumChecked<Resource::Generator::Type, NotFound>
             (components[2], generatorType, "Unknown generator type.");
         filename = components[3];
@@ -113,7 +126,7 @@ FileInfo::FileInfo(const std::string &url)
 
     case 4:
         // only reference frame -> allow only map config
-        resourceId.referenceFrame = components[1];
+        resourceId.referenceFrame = checkReferenceFrame(components[1]);
         asEnumChecked<Resource::Generator::Type, NotFound>
             (components[2], generatorType, "Unknown generator type.");
         resourceId.group = components[3];
@@ -139,7 +152,7 @@ FileInfo::FileInfo(const std::string &url)
 
     case 5:
         // full resource file path
-        resourceId.referenceFrame = components[1];
+        resourceId.referenceFrame = checkReferenceFrame(components[1]);
         asEnumChecked<Resource::Generator::Type, NotFound>
             (components[2], generatorType, "Unknown generator type.");
         resourceId.group = components[3];

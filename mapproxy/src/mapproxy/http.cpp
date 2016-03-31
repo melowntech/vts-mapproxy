@@ -1,4 +1,5 @@
 #include <ctime>
+#include <algorithm>
 
 #include <boost/noncopyable.hpp>
 
@@ -35,11 +36,12 @@ struct RequestInfo {
     int responseCode;
     std::string errorReason;
     std::string location;
+    bool sent;
 
     RequestInfo(const std::string &url, const std::string &method
                 , const std::string &version)
         : url(url), method(method), version(version)
-        , responseCode(MHD_HTTP_OK)
+        , responseCode(MHD_HTTP_OK), sent(false)
     {}
 };
 
@@ -311,6 +313,8 @@ private:
     virtual void content_impl(const void *data, std::size_t size
                               , const FileInfo &stat, bool needCopy)
     {
+        if (sent()) { return; }
+
         ResponseHandle response(data, size, needCopy);
         CHECK_MHD_ERROR(::MHD_add_response_header
                         (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
@@ -324,10 +328,13 @@ private:
         CHECK_MHD_ERROR(::MHD_queue_response
                         (conn_, (ri_.responseCode = MHD_HTTP_OK), response)
                         , "Unable to enqueue HTTP response");
+        ri_.sent = true;
     }
 
     virtual void seeOther_impl(const std::string &url)
     {
+        if (sent()) { return; }
+
         // TODO: compose body
         ResponseHandle response("", false);
 
@@ -341,20 +348,36 @@ private:
         CHECK_MHD_ERROR(::MHD_queue_response
                         (conn_, ri_.responseCode, response)
                         , "Unable to enqueue HTTP response");
+        ri_.sent = true;
     }
 
-    virtual void listing_impl(const std::vector<std::string> &list)
+    virtual void listing_impl(const Listing &list)
     {
+        if (sent()) { return; }
+
         std::ostringstream os;
         os << R"RAW(<html>
-<head><title>Index of /</title></head>
+<head><title>Index of )RAW" << ri_.url
+           << R"RAW(</title></head>
 <body bgcolor="white">
-<h1>Index of )RAW";
-        os << ri_.url;
-        os << "\n</h1><hr><pre><a href=\"../\">../</a>\n";
+<h1>Index of )RAW"
+           << ri_.url
+           << "\n</h1><hr><pre><a href=\"../\">../</a>\n";
 
-        for (const auto &item : list) {
-            os << "<a href=\"" << item << "/\">" << item << "/</a>\n";
+        auto sorted(list);
+        std::sort(sorted.begin(), sorted.end());
+
+        for (const auto &item : sorted) {
+            switch (item.type) {
+            case ListingItem::Type::file:
+                os << "<a href=\"" << item.name << "\">"
+                   << item.name << "</a>\n";
+                break;
+            case ListingItem::Type::dir:
+                os << "<a href=\"" << item.name << "/\">"
+                   << item.name << "/</a>\n";
+                break;
+            }
         }
 
         os << R"RAW(</pre><hr></body>
@@ -366,6 +389,8 @@ private:
 
     virtual void error_impl(const std::exception_ptr &exc)
     {
+        if (sent()) { return; }
+
         const std::string *body;
         try {
             std::rethrow_exception(exc);
@@ -392,7 +417,7 @@ private:
         }
 
         // enqueue response with proper status and body; body is static string
-        // and this not copied
+        // and thus not copied
         ResponseHandle response(*body, false);
         CHECK_MHD_ERROR(::MHD_add_response_header
                         (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
@@ -400,6 +425,16 @@ private:
                         , "Unable to set response header");
         CHECK_MHD_ERROR(::MHD_queue_response(conn_, ri_.responseCode, response)
                         , "Unable to enqueue HTTP response");
+        ri_.sent = true;
+    }
+
+    bool sent() const {
+        if (ri_.sent) {
+            LOG(warn3)
+                << "Logic error in your code: attempt to send "
+                "another response while it was already sent.";
+        }
+        return ri_.sent;
     }
 
     ::MHD_Connection *conn_;

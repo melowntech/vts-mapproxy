@@ -32,6 +32,21 @@ public:
         {}
     };
 
+    struct ListingItem {
+        enum class Type { dir, file };
+
+        std::string name;
+        Type type;
+
+        ListingItem(const std::string &name = "", Type type = Type::file)
+            : name(name), type(type)
+        {}
+
+        bool operator<(const ListingItem &o) const;
+    };
+
+    typedef std::vector<ListingItem> Listing;
+
     /** Sends content to client.
      * \param data data top send
      * \param stat file info (size is ignored)
@@ -53,7 +68,7 @@ public:
 
     /** Generates listing.
      */
-    void listing(const std::vector<std::string> &list);
+    void listing(const Listing &list);
 
     /** Sends current exception to the client.
      */
@@ -71,7 +86,7 @@ private:
     virtual void content_impl(const void *data, std::size_t size
                               , const FileInfo &stat, bool needCopy) = 0;
     virtual void seeOther_impl(const std::string &url) = 0;
-    virtual void listing_impl(const std::vector<std::string> &list) = 0;
+    virtual void listing_impl(const Listing &list) = 0;
     virtual void error_impl(const std::exception_ptr &exc) = 0;
 };
 
@@ -119,7 +134,7 @@ inline void Sink::error(const T &exc)
     }
 }
 
-inline void Sink::listing(const std::vector<std::string> &list)
+inline void Sink::listing(const Listing &list)
 {
     listing_impl(list);
 }
@@ -133,6 +148,13 @@ inline void ContentGenerator::generate(const std::string &location
                                        , const Sink::pointer &sink)
 {
     return generate_impl(location, sink);
+}
+
+inline bool Sink::ListingItem::operator<(const ListingItem &o) const
+{
+    if (type < o.type) { return true; }
+    if (o.type < type) { return false; }
+    return name < o.name;
 }
 
 #endif // mapproxy_contentgenerator_hpp_included_
