@@ -2,6 +2,7 @@
 #include <condition_variable>
 #include <sstream>
 
+#include <boost/filesystem.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>
@@ -107,6 +108,13 @@ void Generator::mapConfig(std::ostream &os, ResourceRoot root) const
 {
     vts::MapConfig mc(mapConfig(root));
     vts::saveMapConfig(mc, os);
+}
+
+std::string Generator::absoluteDataset(const std::string &path)
+    const
+{
+    // TODO: handle non-path resources (i.e. URL's)
+    return absolute(path, config_.resourceRoot).string();
 }
 
 namespace {
@@ -233,7 +241,7 @@ private:
               , bmi::ordered_unique<
                     bmi::tag<ReferenceFrameIdx>
                     , BOOST_MULTI_INDEX_CONST_MEM_FUN
-                    (Generator, const std::string&, referenceFrame)
+                    (Generator, const std::string&, referenceFrameId)
                     >
               >
 
@@ -333,9 +341,8 @@ void Generators::Detail::update(const Resource::map &resources)
     auto add([&](const Resource &res)
     {
         try {
-            Generator::Config config;
+            Generator::Config config(config_);
             config.root = makePath(res.id);
-            config.fileFlags = config_.fileFlags;
             toAdd.push_back(Generator::create(config, res.generator, res));
         } catch (const std::exception &e) {
             LOG(err2) << "Failed to create generator for resource <"

@@ -9,8 +9,10 @@
 #include "utility/enum-io.hpp"
 
 #include "vts-libs/registry.hpp"
+#include "vts-libs/vts/basetypes.hpp"
 
 namespace vr = vadstena::registry;
+namespace vts = vadstena::vts;
 
 struct Resource {
     struct Id {
@@ -42,6 +44,10 @@ struct Resource {
 
     Id id;
     Generator generator;
+
+    /** Data root from configuration.
+     */
+    boost::filesystem::path root;
 
     vr::StringIdSet credits;
 
@@ -99,11 +105,11 @@ namespace resdef {
 struct TmsRaster {
     static Resource::Generator generator;
 
-    boost::filesystem::path datasetPath;
-    boost::filesystem::path maskPath;
+    std::string dataset;
+    std::string mask;
     RasterFormat format;
 
-    TmsRaster() : format(RasterFormat::jpg) {}
+    TmsRaster(): format(RasterFormat::jpg) {}
     bool operator==(const TmsRaster &o) const;
 };
 
@@ -121,7 +127,7 @@ struct SurfaceSpheroid {
 struct SurfaceDem {
     static Resource::Generator generator;
 
-    boost::filesystem::path datasetPath;
+    std::string dataset;
     unsigned int textureLayerId;
 
     SurfaceDem() : textureLayerId() {}
@@ -150,6 +156,8 @@ std::string prependRoot(const std::string &path, const Resource &resource
                         , ResourceRoot root);
 
 std::string contentType(RasterFormat format);
+
+bool checkRanges(const Resource &resource, const vts::TileId &tileId);
 
 // inlines + IO
 

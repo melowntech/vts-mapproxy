@@ -4,7 +4,10 @@
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
 
+#include "geo/geodataset.hpp"
+
 #include "vts-libs/vts/io.hpp"
+#include "vts-libs/vts/nodeinfo.hpp"
 
 #include "../error.hpp"
 
@@ -83,22 +86,36 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
 {
     TmsFileInfo fi(fileInfo, config().fileFlags);
 
+    // check for valid tileId
+    switch (fi.type) {
+    case TmsFileInfo::Type::image:
+    case TmsFileInfo::Type::mask:
+        if (!checkRanges(resource(), fi.tileId)) {
+            sink->error(utility::makeError<NotFound>
+                        ("TileId outside of configured range."));
+            return {};
+        }
+        break;
+
+    default: break;
+    }
+
     switch (fi.type) {
     case TmsFileInfo::Type::unknown:
         sink->error(utility::makeError<NotFound>("Unrecognized filename."));
-        return {};
+        break;
 
     case TmsFileInfo::Type::config: {
         std::ostringstream os;
         mapConfig(os, ResourceRoot::none);
         sink->content(os.str(), fi.sinkFileInfo());
-        return {};
+        break;
     };
 
     case TmsFileInfo::Type::support:
         sink->content(fi.support->data, fi.support->size
                       , fi.sinkFileInfo(), false);
-        return {};
+        break;
 
     case TmsFileInfo::Type::image: {
         if (fi.format != definition_.format) {
@@ -121,19 +138,42 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
     return {};
 }
 
-
 void TmsRaster::generateTileImage(const vts::TileId tileId
                                   , const Sink::pointer &sink) const
 {
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.valid()) {
+        sink->error(utility::makeError<NotFound>
+                    ("TileId outside of valid reference frame tree."));
+        return;
+    }
+
+    // open source dataset
+    auto srcSet(geo::GeoDataset::open(absoluteDataset(definition_.dataset)));
+
+    // spatial-division SRS
+    const geo::SrsDefinition sds(vr::Registry::srs(nodeInfo.srs()).srsDef);
+
+    // warp
+    auto tileSet(geo::GeoDataset::deriveInMemory
+                 (srcSet, sds, math::Size2(256, 256)
+                  , nodeInfo.extents()));
+    srcSet.warpInto(tileSet, geo::GeoDataset::Resampling::cubic);
+
     sink->error(utility::makeError<InternalError>
-                ("Tile generation not implemented yet."));
-    (void) tileId;
-    (void) sink;
+                ("Mask generation not implemented yet."));
 }
 
 void TmsRaster::generateTileMask(const vts::TileId tileId
                                  , const Sink::pointer &sink) const
 {
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.valid()) {
+        sink->error(utility::makeError<NotFound>
+                    ("TileId outside of valid reference frame tree."));
+        return;
+    }
+
     sink->error(utility::makeError<InternalError>
                 ("Mask generation not implemented yet."));
     (void) tileId;

@@ -23,8 +23,8 @@
         },
         "credits": [1],
         "definition": {
-           "dataset": "/opt/vts/var/mapproxy/datasets/melown/trueplanet",
-           "mask": "/opt/vts/var/mapproxy/datasets/melown/trueplanet-mask.tif",
+           "dataset": "melown/trueplanet",
+           "mask": "melown/trueplanet-mask.tif",
            "format":"jpg"
         }
     }

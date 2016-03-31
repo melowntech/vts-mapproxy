@@ -29,19 +29,50 @@ struct ClientInfo {
     }
 };
 
+class ResponseHandle : boost::noncopyable {
+public:
+    ResponseHandle() : response_() {}
+
+    ~ResponseHandle() {
+        if (response_) { ::MHD_destroy_response(response_); }
+    }
+
+    void buffer(const std::string &data, bool copy) {
+        buffer(data.data(), data.size(), copy);
+    }
+
+    void buffer(const void *data, std::size_t size, bool copy) {
+        LOG(info2) << "Setting response.";
+        response_ = ::MHD_create_response_from_buffer
+            (size, const_cast<void*>(data)
+             , copy ? MHD_RESPMEM_MUST_COPY : MHD_RESPMEM_PERSISTENT);
+    }
+
+    MHD_Response* get() { return response_; }
+    operator MHD_Response*() { return get(); }
+    operator bool() const { return response_; }
+
+private:
+    MHD_Response *response_;
+};
+
 struct RequestInfo {
+    bool handling;
+
     std::string url;
     std::string method;
     std::string version;
     int responseCode;
     std::string errorReason;
     std::string location;
-    bool sent;
+
+    ResponseHandle response;
 
     RequestInfo(const std::string &url, const std::string &method
                 , const std::string &version)
-        : url(url), method(method), version(version)
-        , responseCode(MHD_HTTP_OK), sent(false)
+        : handling(false)
+        , url(url), method(method), version(version)
+        , responseCode(MHD_HTTP_OK)
     {}
 };
 
@@ -115,14 +146,16 @@ std::string getLastError()
 
 extern "C" {
 
-void mapproxy_http_callback_completed(void *cls, ::MHD_Connection *connection
+void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
                                       , void **info
                                       , enum MHD_RequestTerminationCode toe)
 {
-    (void) cls;
-
     // put into unique ptr to ensude deletion
     std::unique_ptr<RequestInfo> pinfo(static_cast<RequestInfo*>(*info));
+
+    // reset associated info
+    LOG(info4) << "Deleted " << *info;
+    *info = nullptr;
     auto &rinfo(*pinfo);
 
     switch (toe) {
@@ -131,45 +164,61 @@ void mapproxy_http_callback_completed(void *cls, ::MHD_Connection *connection
         case 2:
         case 3:
             if (rinfo.location.empty()) {
-                LOG(info3) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                           << ' ' << rinfo.responseCode << ".";
+                LOG(info3)
+                    << connection
+                    << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+                    << ' ' << rinfo.responseCode << ".";
             } else {
-                LOG(info3) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                           << ' ' << rinfo.responseCode
-                           << " -> \"" << rinfo.location << "\".";
+                LOG(info3)
+                    << connection
+                    << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+                    << ' ' << rinfo.responseCode
+                    << " -> \"" << rinfo.location << "\".";
             }
             return;
 
         default:
-            LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                      << ' ' << rinfo.responseCode << "; reason: <"
-                      << rinfo.errorReason << ">.";
+            LOG(err2)
+                << connection
+                << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+                << ' ' << rinfo.responseCode << "; reason: <"
+                << rinfo.errorReason << ">.";
         }
         return;
 
     case MHD_REQUEST_TERMINATED_WITH_ERROR:
-        LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                  << " [internal error].";
+        LOG(err2)
+             << connection
+             << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+             << " [internal error].";
         return;
 
     case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
-        LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                  << " [timed-out].";
+        LOG(err2)
+            << connection
+            << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+            << " [timed-out].";
         return;
 
     case MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
-        LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                  << " [shutdown].";
+        LOG(err2)
+            << connection
+            << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+            << " [shutdown].";
         return;
 
     case MHD_REQUEST_TERMINATED_READ_ERROR:
-        LOG(err2)<< "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                  << " [read error].";
+        LOG(err2)
+            << connection
+            << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+            << " [read error].";
         return;
 
     case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
-        LOG(err2) << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                  << " [aborted].";
+        LOG(err2)
+            << connection
+            << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+            << " [aborted].";
         return;
     }
 }
@@ -177,26 +226,36 @@ void mapproxy_http_callback_completed(void *cls, ::MHD_Connection *connection
 int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
                                    , const char *url, const char *method
                                    , const char *version
-                                   , const char *, size_t *, void **info)
+                                   , const char*, size_t*, void **info)
 {
-    dbglog::thread_id("http");
     if (!*info) {
         // setup, log and done
-        auto *rinfo(new RequestInfo(url, method, version));
+        auto rinfo(new RequestInfo(url, method, version));
         *info = rinfo;
 
         // received request logging
-        LOG(info2) << "HTTP " << ClientInfo(connection)  << ' ' << *rinfo
-                   << ".";
+        LOG(info2)
+            << connection
+            << " HTTP " << ClientInfo(connection)  << ' ' << *rinfo
+            << ".";
 
+        LOG(info4) << "Created " << rinfo;
         return MHD_YES;
     }
 
-    auto *rinfo(static_cast<RequestInfo*>(*info));
-
     // second call -> process
-    return static_cast<Http::Detail*>(cls)->request
-        (connection, *rinfo);
+    auto *rinfo(static_cast<RequestInfo*>(*info));
+    if (rinfo->response) {
+        LOG(info2) << "Enqueueing response.";
+        CHECK_MHD_ERROR(::MHD_queue_response
+                        (connection, rinfo->responseCode, rinfo->response)
+                        , "Unable to enqueue HTTP response");
+    } else if (!rinfo->handling) {
+        LOG(info4) << "Handing " << rinfo;
+        rinfo->handling = true;
+        return static_cast<Http::Detail*>(cls)->request(connection, *rinfo);
+    }
+    return MHD_YES;
 }
 
 void mapproxy_http_callback_error(void*, const char *fmt, va_list ap)
@@ -236,34 +295,6 @@ Http::Detail::Detail(const utility::TcpEndpoint &listen
 }
 
 namespace {
-
-class ResponseHandle {
-public:
-    ResponseHandle() : response_() {}
-    ResponseHandle(const std::string &data, bool copy = true) {
-        buffer(data.data(), data.size(), copy);
-    }
-
-    ResponseHandle(const void *data, std::size_t size, bool copy) {
-        buffer(data, size, copy);
-    }
-
-    ~ResponseHandle() {
-        if (response_) { ::MHD_destroy_response(response_); }
-    }
-
-    void buffer(const void *data, std::size_t size, bool copy) {
-        response_ = ::MHD_create_response_from_buffer
-            (size, const_cast<void*>(data)
-             , copy ? MHD_RESPMEM_MUST_COPY : MHD_RESPMEM_PERSISTENT);
-    }
-
-    MHD_Response* get() { return response_; }
-    operator MHD_Response*() { return get(); }
-
-private:
-    MHD_Response *response_;
-};
 
 const std::string error404(R"RAW(<html>
 <head><title>404 Not Found</title></head>
@@ -315,17 +346,17 @@ private:
     {
         if (sent()) { return; }
 
-        ResponseHandle response(data, size, needCopy);
+        ri_.response.buffer(data, size, needCopy);
         CHECK_MHD_ERROR(::MHD_add_response_header
-                        (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
+                        (ri_.response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
                          , stat.contentType.c_str())
                         , "Unable to set response header");
         CHECK_MHD_ERROR(::MHD_add_response_header
-                        (response.get(), MHD_HTTP_HEADER_LAST_MODIFIED
+                        (ri_.response.get(), MHD_HTTP_HEADER_LAST_MODIFIED
                          , formatHttpDate(stat.lastModified).c_str())
                          , "Unable to set response header");
 
-        enqueue(response);
+        enqueue();
     }
 
     virtual void seeOther_impl(const std::string &url)
@@ -333,16 +364,16 @@ private:
         if (sent()) { return; }
 
         // TODO: compose body
-        ResponseHandle response("", false);
+        ri_.response.buffer("", false);
 
         ri_.responseCode = MHD_HTTP_SEE_OTHER;
         ri_.location = url;
 
         CHECK_MHD_ERROR(::MHD_add_response_header
-                        (response.get(), MHD_HTTP_HEADER_LOCATION
+                        (ri_.response.get(), MHD_HTTP_HEADER_LOCATION
                          , url.c_str())
                         , "Unable to set response header");
-        enqueue(response);
+        enqueue();
     }
 
     virtual void listing_impl(const Listing &list)
@@ -410,33 +441,31 @@ private:
             body = &error500;
         }
 
-        LOG(info4) << "About to send http error: <" << ri_.errorReason << ">.";
+        LOG(debug) << "About to send http error: <" << ri_.errorReason << ">.";
 
         // enqueue response with proper status and body; body is static string
         // and thus not copied
-        ResponseHandle response(*body, false);
+        ri_.response.buffer(*body, false);
+
         CHECK_MHD_ERROR(::MHD_add_response_header
-                        (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
+                        (ri_.response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
                          , "text/html")
                         , "Unable to set response header");
-        enqueue(response);
+        enqueue();
     }
 
     bool sent() const {
-        if (ri_.sent) {
+        if (ri_.response) {
             LOG(warn3)
                 << "Logic error in your code: attempt to send "
                 "another response while it was already sent.";
         }
-        return ri_.sent;
+        return bool(ri_.response);
     }
 
-    void enqueue(ResponseHandle &response) {
-        CHECK_MHD_ERROR(::MHD_queue_response(conn_, ri_.responseCode, response)
-                        , "Unable to enqueue HTTP response");
-        ri_.sent = true;
-
-        // force event loop wakeup
+    void enqueue() {
+        // force event loop wakeup (suspend and immediately resume)
+        // TODO: make better via another pipe
         ::MHD_suspend_connection(conn_);
         ::MHD_resume_connection(conn_);
     }

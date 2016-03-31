@@ -54,7 +54,8 @@ private:
     void start(std::size_t count);
     void stop();
     void worker(std::size_t id);
-    void post(const Generator::Task &task);
+    void post(const Generator::Task &task
+              , const Sink::pointer &sink);
 
     Generators &generators_;
     bool browserEnabled_;
@@ -112,10 +113,19 @@ void Core::Detail::worker(std::size_t id)
 
 }
 
-void Core::Detail::post(const Generator::Task &task)
+void Core::Detail::post(const Generator::Task &task
+                        , const Sink::pointer &sink)
 {
     if (!task) { return; }
-    ios_.post(task);
+
+    ios_.post([=]()
+    {
+        try {
+            task();
+        } catch (...) {
+            sink->error();
+        }
+    });
 }
 
 Core::Core(Generators &generators)
@@ -235,7 +245,7 @@ void Core::Detail::generateResourceFile(const FileInfo &fi
         return;
     }
 
-    post(generator->generateFile(fi, sink));
+    post(generator->generateFile(fi, sink), sink);
 }
 
 namespace {

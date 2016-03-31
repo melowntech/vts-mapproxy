@@ -33,10 +33,14 @@ public:
         : service::Service("mapproxy", BUILD_TARGET_VERSION
                            , service::ENABLE_CONFIG_UNRECOGNIZED_OPTIONS
                            | service::ENABLE_UNRECOGNIZED_OPTIONS)
-        , storePath_(utility::buildsys::installPath("var/mapproxy"))
         , httpListen_(3070), httpThreadCount_(5), httpEnableBrowser_(false)
-        , resourceUpdatePeriod_(300)
-    {}
+    {
+        generatorsConfig_.root
+            = utility::buildsys::installPath("var/mapproxy/store");
+        generatorsConfig_.resourceRoot
+            = utility::buildsys::installPath("var/mapproxy/datasets");
+        generatorsConfig_.resourceUpdatePeriod = 300;
+    }
 
 private:
     void configuration(po::options_description &cmdline
@@ -69,13 +73,13 @@ private:
     };
     friend struct Stopper;
 
-    fs::path storePath_;
+    fs::path resourceRoot_;
 
     utility::TcpEndpoint httpListen_;
     unsigned int httpThreadCount_;
     bool httpEnableBrowser_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
-    int resourceUpdatePeriod_;
+    Generators::Config generatorsConfig_;
 
     ResourceBackend::pointer resourceBackend_;
     boost::optional<Generators> generators_;
@@ -90,8 +94,8 @@ void Daemon::configuration(po::options_description &cmdline
     vr::registryConfiguration(cmdline, vr::defaultPath());
 
     config.add_options()
-        ("store.path", po::value(&storePath_)
-         ->default_value(storePath_)->required()
+        ("store.path", po::value(&generatorsConfig_.root)
+         ->default_value(generatorsConfig_.root)->required()
          , "Path to internal store.")
 
         ("http.listen", po::value(&httpListen_)
@@ -111,9 +115,13 @@ void Daemon::configuration(po::options_description &cmdline
             (utility::join(ResourceBackend::listTypes(), ", "))
             + ".").c_str())
         ("resource-backend.updatePeriod"
-         , po::value(&resourceUpdatePeriod_)
-         ->default_value(resourceUpdatePeriod_)->required()
+         , po::value(&generatorsConfig_.resourceUpdatePeriod)
+         ->default_value(generatorsConfig_.resourceUpdatePeriod)->required()
          , "Update period between resource list update (in seconds).")
+        ("resource-backend.root"
+         , po::value(&generatorsConfig_.resourceRoot)
+         ->default_value(generatorsConfig_.resourceRoot)->required()
+         , "Root of datasets defined as relative path.")
         ;
 
     (void) cmdline;
@@ -146,15 +154,22 @@ void Daemon::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
 
-    // absolutize store path
-    storePath_ = absolute(storePath_);
+    // prepare generators' configuration
+    generatorsConfig_.root = absolute(generatorsConfig_.root);
+    generatorsConfig_.resourceRoot = absolute(generatorsConfig_.resourceRoot);
+    if (httpEnableBrowser_) {
+        generatorsConfig_.fileFlags |= FileFlags::browserEnabled;
+    }
 
     LOG(info3, log_)
         << "Config:"
-        << "\n\tstore.path = " << storePath_
+        << "\n\tstore.path = " << generatorsConfig_.root
         << "\n\thttp.listen = " << httpListen_
         << "\n\thttp.threadCount = " << httpThreadCount_
-        << "\n\tresource-backend.updatePeriod = " << resourceUpdatePeriod_
+        << "\n\tresource-backend.updatePeriod = "
+        << generatorsConfig_.resourceUpdatePeriod
+        << "\n\tresource-backend.root = "
+        << generatorsConfig_.resourceRoot
         << "\n"
         << utility::LManip([&](std::ostream &os) {
                 ResourceBackend::printConfig(os, "\t" + RBPrefixDotted
@@ -204,18 +219,7 @@ service::Service::Cleanup Daemon::start()
     auto guard(std::make_shared<Stopper>(*this));
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
-    {
-        Generators::Config gconf;
-        gconf.root = storePath_;
-        gconf.resourceUpdatePeriod = resourceUpdatePeriod_;
-
-        // TODO: make configurable
-        gconf.fileFlags = FileFlags::none;
-        if (httpEnableBrowser_) {
-            gconf.fileFlags |= FileFlags::browserEnabled;
-        }
-        generators_ = boost::in_place(gconf, resourceBackend_);
-    }
+    generators_ = boost::in_place(generatorsConfig_, resourceBackend_);
     core_ = boost::in_place(std::ref(*generators_));
     http_ = boost::in_place(httpListen_, httpThreadCount_, std::ref(*core_));
 

@@ -6,6 +6,7 @@
 #include "jsoncpp/as.hpp"
 
 #include "vts-libs/registry/json.hpp"
+#include "vts-libs/vts/tileop.hpp"
 
 #include "./error.hpp"
 #include "./resource.hpp"
@@ -56,8 +57,9 @@ void parseCredits(vr::StringIdSet &ids, const Json::Value &object
 void parseDefinition(resdef::TmsRaster &def, const Json::Value &value)
 {
     std::string s;
-    Json::get(s, value, "dataset"); def.datasetPath = s;
-    Json::get(s, value, "mask"); def.maskPath = s;
+
+    Json::get(def.dataset, value, "dataset");
+    Json::get(def.mask, value, "mask");;
     if (value.isMember("format")) {
         Json::get(s, value, "format");
         try {
@@ -102,8 +104,8 @@ void parseDefinition(Resource &r, const Json::Value &value)
 
 void buildDefinition(Json::Value &value, const resdef::TmsRaster &def)
 {
-    value["dataset"] = def.datasetPath.string();
-    value["mask"] = def.maskPath.string();
+    value["dataset"] = def.dataset;
+    value["mask"] = def.mask;
     value["format"] = boost::lexical_cast<std::string>(def.format);
 }
 
@@ -455,4 +457,19 @@ std::string contentType(RasterFormat format)
     case RasterFormat::png: return "image/png";
     }
     return {};
+}
+
+bool checkRanges(const Resource &resource, const vts::TileId &tileId)
+{
+    if (!in(tileId.lod, resource.lodRange)) {
+        return false;
+    }
+
+    // tileId.lod is inside lorRange, so difference is always positive
+    auto pTileId(parent(tileId, tileId.lod - resource.lodRange.min));
+    if (!inside(resource.tileRange, pTileId.x, pTileId.y)) {
+        return false;
+    }
+
+    return true;
 }

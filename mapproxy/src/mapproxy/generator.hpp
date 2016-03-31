@@ -32,6 +32,7 @@ public:
      */
     struct Config {
         boost::filesystem::path root;
+        boost::filesystem::path resourceRoot;
         int fileFlags;
 
         Config() : fileFlags() {}
@@ -59,12 +60,18 @@ public:
     const Resource::Id& id() const { return resource_.id; }
     const std::string& group() const { return resource_.id.group; }
     Resource::Generator::Type type() const { return resource_.generator.type; }
-    const std::string& referenceFrame() const {
+    const std::string& referenceFrameId() const {
         return resource_.id.referenceFrame;
+    }
+    const vr::ReferenceFrame& referenceFrame() const {
+        return *resource_.referenceFrame;
     }
 
     const Config& config() const { return config_; }
     const boost::filesystem::path& root() const { return config_.root; }
+    const boost::filesystem::path& resourceRoot() const {
+        return config_.resourceRoot;
+    }
 
     bool check(const Resource &resource) const;
 
@@ -80,6 +87,8 @@ protected:
     bool fresh() const { return fresh_; }
 
     void mapConfig(std::ostream &os, ResourceRoot root) const;
+
+    std::string absoluteDataset(const std::string &path) const;
 
 private:
     virtual void prepare_impl() = 0;
@@ -99,12 +108,10 @@ private:
  */
 class Generators {
 public:
-    struct Config {
-        boost::filesystem::path root;
-        int fileFlags;
+    struct Config : Generator::Config {
         int resourceUpdatePeriod;
 
-        Config() : fileFlags(), resourceUpdatePeriod(100) {}
+        Config() : resourceUpdatePeriod(100) {}
     };
 
     /** Creates generator set.

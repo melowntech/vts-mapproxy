@@ -8,6 +8,7 @@
 #include <boost/noncopyable.hpp>
 #include <boost/any.hpp>
 #include <boost/program_options.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include "service/program.hpp"
 
@@ -23,6 +24,8 @@ public:
 
     class TypedConfig {
     public:
+        /** Resource backend type.
+         */
         std::string type;
 
         template <typename T>
