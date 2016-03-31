@@ -1,5 +1,6 @@
 #include <ctime>
 #include <algorithm>
+#include <atomic>
 
 #include <boost/noncopyable.hpp>
 
@@ -16,6 +17,38 @@
 #include "./http.hpp"
 
 namespace {
+
+UTILITY_THREAD_LOCAL std::string *lastError = nullptr;
+
+UTILITY_THREAD_LOCAL std::size_t thisIsHttpThread = 0;
+
+std::atomic<std::size_t> httpThreadIdGenerator(0);
+
+void setLastError(const char *value)
+{
+    if (lastError) {
+        LOG(warn2) << "Last microhttpd library error in this thread has "
+            "not been reclaimed. It read: <" << *lastError << ">.";
+        delete lastError;
+    }
+    lastError = new std::string(value);
+}
+
+std::string getLastError()
+{
+    std::string value("unknown");
+    if (lastError) {
+        value = *lastError;
+        delete lastError;
+    }
+    return value;
+}
+
+#define CHECK_MHD_ERROR(res, what)                              \
+    if (!res) {                                                 \
+        LOGTHROW(err2, IOError)                                 \
+            << what << "; reason: <" << getLastError() << ">."; \
+    }
 
 struct ClientInfo {
     const ::sockaddr *addr;
@@ -67,13 +100,25 @@ struct RequestInfo {
     std::string location;
 
     ResponseHandle response;
+    bool enqueued;
 
     RequestInfo(const std::string &url, const std::string &method
                 , const std::string &version)
         : handling(false)
         , url(url), method(method), version(version)
         , responseCode(MHD_HTTP_OK)
+        , enqueued(false)
     {}
+
+    void enqueue(::MHD_Connection *connection) {
+        if (enqueued) { return; }
+
+        LOG(info2) << "Enqueueing response.";
+        CHECK_MHD_ERROR(::MHD_queue_response
+                        (connection, responseCode, response)
+                        , "Unable to enqueue HTTP response");
+        enqueued = true;
+    }
 };
 
 template<typename CharT, typename Traits>
@@ -111,38 +156,6 @@ struct Http::Detail : boost::noncopyable {
     ContentGenerator &contentGenerator;
     ::MHD_Daemon *daemon;
 };
-
-namespace {
-
-UTILITY_THREAD_LOCAL std::string *lastError = nullptr;
-
-void setLastError(const char *value)
-{
-    if (lastError) {
-        LOG(warn2) << "Last microhttpd library error in this thread has "
-            "not been reclaimed. It read: <" << *lastError << ">.";
-        delete lastError;
-    }
-    lastError = new std::string(value);
-}
-
-std::string getLastError()
-{
-    std::string value("unknown");
-    if (lastError) {
-        value = *lastError;
-        delete lastError;
-    }
-    return value;
-}
-
-#define CHECK_MHD_ERROR(res, what)                              \
-    if (!res) {                                                 \
-        LOGTHROW(err2, IOError)                                 \
-            << what << "; reason: <" << getLastError() << ">."; \
-    }
-
-} // namespace
 
 extern "C" {
 
@@ -228,6 +241,12 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
                                    , const char *version
                                    , const char*, size_t*, void **info)
 {
+    // mark as http thread
+    if (!thisIsHttpThread) {
+        thisIsHttpThread = ++httpThreadIdGenerator;
+        dbglog::thread_id(str(boost::format("http:%u") % thisIsHttpThread));
+    }
+
     if (!*info) {
         // setup, log and done
         auto rinfo(new RequestInfo(url, method, version));
@@ -246,10 +265,7 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
     // second call -> process
     auto *rinfo(static_cast<RequestInfo*>(*info));
     if (rinfo->response) {
-        LOG(info2) << "Enqueueing response.";
-        CHECK_MHD_ERROR(::MHD_queue_response
-                        (connection, rinfo->responseCode, rinfo->response)
-                        , "Unable to enqueue HTTP response");
+        rinfo->enqueue(connection);
     } else if (!rinfo->handling) {
         LOG(info4) << "Handing " << rinfo;
         rinfo->handling = true;
@@ -464,10 +480,15 @@ private:
     }
 
     void enqueue() {
-        // force event loop wakeup (suspend and immediately resume)
-        // TODO: make better via another pipe
-        ::MHD_suspend_connection(conn_);
-        ::MHD_resume_connection(conn_);
+        if (thisIsHttpThread) {
+            // marked as HTTP thread, just enqueue
+            ri_.enqueue(conn_);
+        } else  {
+            // force event loop wakeup (suspend and immediately resume)
+            // TODO: make better via another pipe
+            ::MHD_suspend_connection(conn_);
+            ::MHD_resume_connection(conn_);
+        }
     }
 
     ::MHD_Connection *conn_;

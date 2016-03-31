@@ -161,7 +161,7 @@ void TmsRaster::generateTileImage(const vts::TileId tileId
     srcSet.warpInto(tileSet, geo::GeoDataset::Resampling::cubic);
 
     sink->error(utility::makeError<InternalError>
-                ("Mask generation not implemented yet."));
+                ("Tile generation not implemented yet."));
 }
 
 void TmsRaster::generateTileMask(const vts::TileId tileId

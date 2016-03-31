@@ -77,7 +77,7 @@ void Core::Detail::start(std::size_t count)
         std::function<void()> func;
     } guard(std::bind(&Detail::stop, this));
 
-    for (std::size_t id(0); id < count; ++id) {
+    for (std::size_t id(1); id <= count; ++id) {
         workers_.emplace_back(&Detail::worker, this, id);
     }
 
