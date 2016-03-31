@@ -325,10 +325,7 @@ private:
                          , formatHttpDate(stat.lastModified).c_str())
                          , "Unable to set response header");
 
-        CHECK_MHD_ERROR(::MHD_queue_response
-                        (conn_, (ri_.responseCode = MHD_HTTP_OK), response)
-                        , "Unable to enqueue HTTP response");
-        ri_.sent = true;
+        enqueue(response);
     }
 
     virtual void seeOther_impl(const std::string &url)
@@ -345,10 +342,7 @@ private:
                         (response.get(), MHD_HTTP_HEADER_LOCATION
                          , url.c_str())
                         , "Unable to set response header");
-        CHECK_MHD_ERROR(::MHD_queue_response
-                        (conn_, ri_.responseCode, response)
-                        , "Unable to enqueue HTTP response");
-        ri_.sent = true;
+        enqueue(response);
     }
 
     virtual void listing_impl(const Listing &list)
@@ -416,6 +410,8 @@ private:
             body = &error500;
         }
 
+        LOG(info4) << "About to send http error: <" << ri_.errorReason << ">.";
+
         // enqueue response with proper status and body; body is static string
         // and thus not copied
         ResponseHandle response(*body, false);
@@ -423,9 +419,7 @@ private:
                         (response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
                          , "text/html")
                         , "Unable to set response header");
-        CHECK_MHD_ERROR(::MHD_queue_response(conn_, ri_.responseCode, response)
-                        , "Unable to enqueue HTTP response");
-        ri_.sent = true;
+        enqueue(response);
     }
 
     bool sent() const {
@@ -435,6 +429,16 @@ private:
                 "another response while it was already sent.";
         }
         return ri_.sent;
+    }
+
+    void enqueue(ResponseHandle &response) {
+        CHECK_MHD_ERROR(::MHD_queue_response(conn_, ri_.responseCode, response)
+                        , "Unable to enqueue HTTP response");
+        ri_.sent = true;
+
+        // force event loop wakeup
+        ::MHD_suspend_connection(conn_);
+        ::MHD_resume_connection(conn_);
     }
 
     ::MHD_Connection *conn_;

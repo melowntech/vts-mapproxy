@@ -232,7 +232,7 @@ TmsFileInfo::TmsFileInfo(const FileInfo &fi, int flags)
             type = Type::mask;
         } else {
             // another file -> parse as format
-            type = Type::imagery;
+            type = Type::image;
             if (!asEnum<RasterFormat>(ext, format)) { return false; }
         }
 
@@ -269,7 +269,7 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
     switch (type) {
     case Type::config:
         return { "application/json", lastModified };
-    case Type::imagery:
+    case Type::image:
         return { contentType(format), lastModified };
     case Type::mask:
         return { contentType(MaskFormat), lastModified };

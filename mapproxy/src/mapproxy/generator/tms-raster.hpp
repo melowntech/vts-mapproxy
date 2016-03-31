@@ -17,6 +17,12 @@ private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , const Sink::pointer &sink) const;
 
+    void generateTileImage(const vts::TileId tileId
+                           , const Sink::pointer &sink) const;
+
+    void generateTileMask(const vts::TileId tileId
+                          , const Sink::pointer &sink) const;
+
     const resdef::TmsRaster &definition_;
 };
 

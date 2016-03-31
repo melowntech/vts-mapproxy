@@ -100,22 +100,44 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
                       , fi.sinkFileInfo(), false);
         return {};
 
-    case TmsFileInfo::Type::imagery: {
+    case TmsFileInfo::Type::image: {
         if (fi.format != definition_.format) {
             sink->error(utility::makeError<NotFound>
                         ("Format <%s> is not supported by this resource (%s)."
                          , fi.format, definition_.format));
             return {};
         }
-        break;
+        return [=]() {
+            generateTileImage(fi.tileId, sink);
+        };
     }
 
     case TmsFileInfo::Type::mask:
-        // TODO: implement me
-        break;
+        return [=]() {
+            generateTileMask(fi.tileId, sink);
+        };
     }
 
     return {};
+}
+
+
+void TmsRaster::generateTileImage(const vts::TileId tileId
+                                  , const Sink::pointer &sink) const
+{
+    sink->error(utility::makeError<InternalError>
+                ("Tile generation not implemented yet."));
+    (void) tileId;
+    (void) sink;
+}
+
+void TmsRaster::generateTileMask(const vts::TileId tileId
+                                 , const Sink::pointer &sink) const
+{
+    sink->error(utility::makeError<InternalError>
+                ("Mask generation not implemented yet."));
+    (void) tileId;
+    (void) sink;
 }
 
 } // namespace generator
