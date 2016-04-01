@@ -52,4 +52,10 @@ struct InternalError : Error {
     InternalError(const std::string &message) : Error(message) {}
 };
 
+/** Request aborted
+ */
+struct RequestAborted : Error {
+    RequestAborted(const std::string &message) : Error(message) {}
+};
+
 #endif // mapproxy_error_hpp_included_

@@ -1,6 +1,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 
+#include <opencv2/highgui/highgui.hpp>
+
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
 
@@ -141,6 +143,8 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
 void TmsRaster::generateTileImage(const vts::TileId tileId
                                   , const Sink::pointer &sink) const
 {
+    sink->checkAborted();
+
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
     if (!nodeInfo.valid()) {
         sink->error(utility::makeError<NotFound>
@@ -160,8 +164,19 @@ void TmsRaster::generateTileImage(const vts::TileId tileId
                   , nodeInfo.extents()));
     srcSet.warpInto(tileSet, geo::GeoDataset::Resampling::cubic);
 
-    sink->error(utility::makeError<InternalError>
-                ("Tile generation not implemented yet."));
+    sink->checkAborted();
+
+    // export
+    cv::Mat tile;
+    tileSet.exportCvMat(tile, CV_8UC3);
+
+    // serialize
+    std::vector<unsigned char> buf;
+    // TODO: configurable quality
+    cv::imencode(".jpg", tile, buf
+                 , { cv::IMWRITE_JPEG_QUALITY, 75 });
+
+    sink->content(buf, Sink::FileInfo(contentType(definition_.format)));
 }
 
 void TmsRaster::generateTileMask(const vts::TileId tileId

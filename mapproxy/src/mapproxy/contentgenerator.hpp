@@ -55,6 +55,13 @@ public:
 
     /** Sends content to client.
      * \param data data top send
+     * \param stat file info (size is ignored)
+     */
+    template <typename T>
+    void content(const std::vector<T> &data, const FileInfo &stat);
+
+    /** Sends content to client.
+     * \param data data top send
      * \param size size of data
      * \param stat file info (size is ignored)
      * \param needCopy data are copied if set to true
@@ -82,12 +89,18 @@ public:
      */
     template <typename T> void error(const T &exc);
 
+    /** Checks wheter client aborted request.
+     *  Throws RequestAborted exception when true.
+     */
+    void checkAborted() const;
+
 private:
     virtual void content_impl(const void *data, std::size_t size
                               , const FileInfo &stat, bool needCopy) = 0;
     virtual void seeOther_impl(const std::string &url) = 0;
     virtual void listing_impl(const Listing &list) = 0;
     virtual void error_impl(const std::exception_ptr &exc) = 0;
+    virtual bool checkAborted_impl() const = 0;
 };
 
 class ContentGenerator {
@@ -114,6 +127,12 @@ inline void Sink::content(const void *data, std::size_t size
     content_impl(data, size, stat, needCopy);
 }
 
+template <typename T>
+inline void Sink::content(const std::vector<T> &data, const FileInfo &stat)
+{
+    content_impl(data.data(), data.size() * sizeof(T), stat, true);
+}
+
 inline void Sink::seeOther(const std::string &url)
 {
     seeOther_impl(url);
@@ -130,18 +149,13 @@ inline void Sink::error(const T &exc)
     try {
         throw exc;
     } catch (...) {
-        error_impl(std::current_exception());
+        error();
     }
 }
 
 inline void Sink::listing(const Listing &list)
 {
     listing_impl(list);
-}
-
-inline void Sink::error()
-{
-    error_impl(std::current_exception());
 }
 
 inline void ContentGenerator::generate(const std::string &location

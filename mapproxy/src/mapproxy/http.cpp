@@ -75,7 +75,6 @@ public:
     }
 
     void buffer(const void *data, std::size_t size, bool copy) {
-        LOG(info2) << "Setting response.";
         response_ = ::MHD_create_response_from_buffer
             (size, const_cast<void*>(data)
              , copy ? MHD_RESPMEM_MUST_COPY : MHD_RESPMEM_PERSISTENT);
@@ -89,8 +88,13 @@ private:
     MHD_Response *response_;
 };
 
-struct RequestInfo {
-    bool handling;
+struct RequestInfo : boost::noncopyable {
+    struct State {
+        enum {
+            fresh, handling, enqueueable, enqueued, finished
+        };
+    };
+    std::atomic<int> state;
 
     std::string url;
     std::string method;
@@ -100,25 +104,53 @@ struct RequestInfo {
     std::string location;
 
     ResponseHandle response;
-    bool enqueued;
 
     RequestInfo(const std::string &url, const std::string &method
                 , const std::string &version)
-        : handling(false)
+        : state(State::fresh)
         , url(url), method(method), version(version)
         , responseCode(MHD_HTTP_OK)
-        , enqueued(false)
+        , refcount_(1)
     {}
 
     void enqueue(::MHD_Connection *connection) {
-        if (enqueued) { return; }
-
-        LOG(info2) << "Enqueueing response.";
-        CHECK_MHD_ERROR(::MHD_queue_response
-                        (connection, responseCode, response)
-                        , "Unable to enqueue HTTP response");
-        enqueued = true;
+        if (thisIsHttpThread) {
+            // marked as HTTP thread, just enqueue
+            LOG(info2) << "Enqueueing response.";
+            CHECK_MHD_ERROR(::MHD_queue_response
+                            (connection, responseCode, response)
+                            , "Unable to enqueue HTTP response");
+            state = State::enqueued;
+        } else {
+            // force event loop wakeup (suspend and immediately resume)
+            // TODO: make better via another pipe
+            state = State::enqueueable;
+            ::MHD_suspend_connection(connection);
+            ::MHD_resume_connection(connection);
+        }
     }
+
+    static RequestInfo *addRef(RequestInfo *ri) {
+        ri->inc();
+        return ri;
+    };
+
+    static void decRef(RequestInfo *ri) {
+        if (ri->dec()) {
+            delete ri;
+        }
+    };
+
+private:
+    /** Increment reference count.
+     */
+    void inc() { ++refcount_; }
+
+    /** Decrement reference count and return true when it reaches zero.
+     */
+    bool dec() { return !--refcount_; }
+
+    std::atomic<std::size_t> refcount_;
 };
 
 template<typename CharT, typename Traits>
@@ -151,7 +183,7 @@ struct Http::Detail : boost::noncopyable {
         if (daemon) { ::MHD_stop_daemon(daemon); }
     }
 
-    int request(::MHD_Connection *connection, RequestInfo &requestInfo);
+    int request(::MHD_Connection *connection, RequestInfo *requestInfo);
 
     ContentGenerator &contentGenerator;
     ::MHD_Daemon *daemon;
@@ -163,13 +195,30 @@ void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
                                       , void **info
                                       , enum MHD_RequestTerminationCode toe)
 {
-    // put into unique ptr to ensude deletion
-    std::unique_ptr<RequestInfo> pinfo(static_cast<RequestInfo*>(*info));
+    // Request info holder/deleter
+    class Deleter {
+    public:
+        Deleter(void **info)
+            : info_(info), ri_(static_cast<RequestInfo*>(*info_))
+        {}
 
-    // reset associated info
-    LOG(info4) << "Deleted " << *info;
-    *info = nullptr;
-    auto &rinfo(*pinfo);
+        ~Deleter() {
+            // decrement reference
+            RequestInfo::decRef(ri_);
+            // and get rid of pointer
+            *info_ = nullptr;
+        }
+
+        RequestInfo& get() { return *ri_; }
+
+    private:
+        void **info_;
+        RequestInfo *ri_;
+    } deleter(info);
+
+    auto &rinfo(deleter.get());
+    // mark as finished
+    rinfo.state = RequestInfo::State::finished;
 
     switch (toe) {
     case MHD_REQUEST_TERMINATED_COMPLETED_OK:
@@ -178,13 +227,11 @@ void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
         case 3:
             if (rinfo.location.empty()) {
                 LOG(info3)
-                    << connection
-                    << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+                    << "HTTP " << ClientInfo(connection) << ' ' << rinfo
                     << ' ' << rinfo.responseCode << ".";
             } else {
                 LOG(info3)
-                    << connection
-                    << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+                    << "HTTP " << ClientInfo(connection) << ' ' << rinfo
                     << ' ' << rinfo.responseCode
                     << " -> \"" << rinfo.location << "\".";
             }
@@ -192,8 +239,7 @@ void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
 
         default:
             LOG(err2)
-                << connection
-                << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+                << "HTTP " << ClientInfo(connection) << ' ' << rinfo
                 << ' ' << rinfo.responseCode << "; reason: <"
                 << rinfo.errorReason << ">.";
         }
@@ -201,36 +247,31 @@ void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
 
     case MHD_REQUEST_TERMINATED_WITH_ERROR:
         LOG(err2)
-             << connection
-             << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+             << "HTTP " << ClientInfo(connection) << ' ' << rinfo
              << " [internal error].";
         return;
 
     case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
         LOG(err2)
-            << connection
-            << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+            << "HTTP " << ClientInfo(connection) << ' ' << rinfo
             << " [timed-out].";
         return;
 
     case MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
         LOG(err2)
-            << connection
-            << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+            << "HTTP " << ClientInfo(connection) << ' ' << rinfo
             << " [shutdown].";
         return;
 
     case MHD_REQUEST_TERMINATED_READ_ERROR:
         LOG(err2)
-            << connection
-            << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+            << "HTTP " << ClientInfo(connection) << ' ' << rinfo
             << " [read error].";
         return;
 
     case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
         LOG(err2)
-            << connection
-            << " HTTP " << ClientInfo(connection) << ' ' << rinfo
+            << "HTTP " << ClientInfo(connection) << ' ' << rinfo
             << " [aborted].";
         return;
     }
@@ -254,23 +295,28 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
 
         // received request logging
         LOG(info2)
-            << connection
-            << " HTTP " << ClientInfo(connection)  << ' ' << *rinfo
+            << "HTTP " << ClientInfo(connection)  << ' ' << *rinfo
             << ".";
 
-        LOG(info4) << "Created " << rinfo;
         return MHD_YES;
     }
 
     // second call -> process
     auto *rinfo(static_cast<RequestInfo*>(*info));
-    if (rinfo->response) {
+
+    switch (rinfo->state) {
+    case RequestInfo::State::enqueueable:
         rinfo->enqueue(connection);
-    } else if (!rinfo->handling) {
-        LOG(info4) << "Handing " << rinfo;
-        rinfo->handling = true;
-        return static_cast<Http::Detail*>(cls)->request(connection, *rinfo);
+        break;
+
+    case RequestInfo::State::fresh:
+        rinfo->state = RequestInfo::State::handling;
+        return static_cast<Http::Detail*>(cls)->request(connection, rinfo);
+
+    default:
+        break;
     }
+
     return MHD_YES;
 }
 
@@ -352,15 +398,18 @@ std::string formatHttpDate(time_t time)
 
 class HttpSink : public Sink {
 public:
-    HttpSink(::MHD_Connection *connection, RequestInfo &ri)
-        : conn_(connection), ri_(ri)
+    HttpSink(::MHD_Connection *connection, RequestInfo *ri)
+        : conn_(connection), riRaw_(RequestInfo::addRef(ri))
+        , ri_(*ri)
     {}
+
+    ~HttpSink() { RequestInfo::decRef(riRaw_); }
 
 private:
     virtual void content_impl(const void *data, std::size_t size
                               , const FileInfo &stat, bool needCopy)
     {
-        if (sent()) { return; }
+        if (!valid()) { return; }
 
         ri_.response.buffer(data, size, needCopy);
         CHECK_MHD_ERROR(::MHD_add_response_header
@@ -377,7 +426,7 @@ private:
 
     virtual void seeOther_impl(const std::string &url)
     {
-        if (sent()) { return; }
+        if (!valid()) { return; }
 
         // TODO: compose body
         ri_.response.buffer("", false);
@@ -394,7 +443,7 @@ private:
 
     virtual void listing_impl(const Listing &list)
     {
-        if (sent()) { return; }
+        if (!valid()) { return; }
 
         std::ostringstream os;
         os << R"RAW(<html>
@@ -430,7 +479,7 @@ private:
 
     virtual void error_impl(const std::exception_ptr &exc)
     {
-        if (sent()) { return; }
+        if (!valid()) { return; }
 
         const std::string *body;
         try {
@@ -470,43 +519,47 @@ private:
         enqueue();
     }
 
-    bool sent() const {
-        if (ri_.response) {
+    bool finished() const {
+        return (ri_.state == RequestInfo::State::finished);
+    }
+
+    bool checkAborted_impl() const {
+        return finished();
+    }
+
+    bool valid() const {
+        if (finished()) { return false; }
+
+        if (ri_.state != RequestInfo::State::handling) {
             LOG(warn3)
                 << "Logic error in your code: attempt to send "
                 "another response while it was already sent.";
+            return false;
         }
-        return bool(ri_.response);
+        return true;
     }
 
     void enqueue() {
-        if (thisIsHttpThread) {
-            // marked as HTTP thread, just enqueue
-            ri_.enqueue(conn_);
-        } else  {
-            // force event loop wakeup (suspend and immediately resume)
-            // TODO: make better via another pipe
-            ::MHD_suspend_connection(conn_);
-            ::MHD_resume_connection(conn_);
-        }
+        ri_.enqueue(conn_);
     }
 
     ::MHD_Connection *conn_;
+    RequestInfo *riRaw_;
     RequestInfo &ri_;
 };
 
 } // namespace
 
 int Http::Detail::request(::MHD_Connection *connection
-                          , RequestInfo &ri)
+                          , RequestInfo *ri)
 {
     auto sink(std::make_shared<HttpSink>(connection, ri));
     try {
-        if ((ri.method == "HEAD") || (ri.method == "GET")) {
-            contentGenerator.generate(ri.url, sink);
+        if ((ri->method == "HEAD") || (ri->method == "GET")) {
+            contentGenerator.generate(ri->url, sink);
         } else {
             sink->error(utility::makeError<NotAllowed>
-                        ("Method %s is not supported.", ri.method));
+                        ("Method %s is not supported.", ri->method));
         }
     } catch (...) {
         sink->error();

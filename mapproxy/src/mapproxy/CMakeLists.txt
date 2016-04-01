@@ -21,7 +21,7 @@ set(mapproxy_SOURCES
   generator/tms-raster.hpp generator/tms-raster.cpp
 
   http.hpp http.cpp
-  contentgenerator.hpp
+  contentgenerator.hpp contentgenerator.cpp
 
   fileinfo.hpp fileinfo.cpp
   core.hpp core.cpp
