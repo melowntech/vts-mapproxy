@@ -265,7 +265,7 @@ void buildResource(Json::Value &value, const Resource &r)
 {
     value["group"] = r.id.group;
     value["id"] = r.id.id;
-    value["type"] = r.generator.type;
+    value["type"] = boost::lexical_cast<std::string>(r.generator.type);
     value["driver"] = r.generator.driver;
 
     auto &credits(value["credits"] = Json::arrayValue);

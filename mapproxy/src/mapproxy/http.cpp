@@ -89,6 +89,11 @@ private:
 };
 
 struct RequestInfo : boost::noncopyable {
+    static std::atomic<std::size_t> idGenerator;
+
+    std::size_t id;
+    dbglog::module lm;
+
     struct State {
         enum {
             fresh, handling, enqueueable, enqueued, finished
@@ -107,7 +112,9 @@ struct RequestInfo : boost::noncopyable {
 
     RequestInfo(const std::string &url, const std::string &method
                 , const std::string &version)
-        : state(State::fresh)
+        : id(++idGenerator)
+        , lm(dbglog::make_module(str(boost::format("req:%u") % id)))
+        , state(State::fresh)
         , url(url), method(method), version(version)
         , responseCode(MHD_HTTP_OK)
         , refcount_(1)
@@ -116,18 +123,23 @@ struct RequestInfo : boost::noncopyable {
     void enqueue(::MHD_Connection *connection) {
         if (thisIsHttpThread) {
             // marked as HTTP thread, just enqueue
-            LOG(info2) << "Enqueueing response.";
+            LOG(info2, lm) << "Enqueueing response.";
             CHECK_MHD_ERROR(::MHD_queue_response
                             (connection, responseCode, response)
                             , "Unable to enqueue HTTP response");
             state = State::enqueued;
         } else {
-            // force event loop wakeup (suspend and immediately resume)
             // TODO: make better via another pipe
             state = State::enqueueable;
-            ::MHD_suspend_connection(connection);
-            ::MHD_resume_connection(connection);
+            // MHD_resume_connection(connection);
         }
+    }
+
+    void suspend(::MHD_Connection *connection) {
+        (void) connection;
+        // if (thisIsHttpThread && (state != State::enqueued)) {
+        //     MHD_suspend_connection(connection);
+        // }
     }
 
     static RequestInfo *addRef(RequestInfo *ri) {
@@ -152,6 +164,8 @@ private:
 
     std::atomic<std::size_t> refcount_;
 };
+
+std::atomic<std::size_t> RequestInfo::idGenerator(0);
 
 template<typename CharT, typename Traits>
 inline std::basic_ostream<CharT, Traits>&
@@ -226,11 +240,11 @@ void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
         case 2:
         case 3:
             if (rinfo.location.empty()) {
-                LOG(info3)
+                LOG(info3, rinfo.lm)
                     << "HTTP " << ClientInfo(connection) << ' ' << rinfo
                     << ' ' << rinfo.responseCode << ".";
             } else {
-                LOG(info3)
+                LOG(info3, rinfo.lm)
                     << "HTTP " << ClientInfo(connection) << ' ' << rinfo
                     << ' ' << rinfo.responseCode
                     << " -> \"" << rinfo.location << "\".";
@@ -238,7 +252,7 @@ void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
             return;
 
         default:
-            LOG(err2)
+            LOG(err2, rinfo.lm)
                 << "HTTP " << ClientInfo(connection) << ' ' << rinfo
                 << ' ' << rinfo.responseCode << "; reason: <"
                 << rinfo.errorReason << ">.";
@@ -246,31 +260,31 @@ void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
         return;
 
     case MHD_REQUEST_TERMINATED_WITH_ERROR:
-        LOG(err2)
+        LOG(err2, rinfo.lm)
              << "HTTP " << ClientInfo(connection) << ' ' << rinfo
              << " [internal error].";
         return;
 
     case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
-        LOG(err2)
+        LOG(err2, rinfo.lm)
             << "HTTP " << ClientInfo(connection) << ' ' << rinfo
             << " [timed-out].";
         return;
 
     case MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
-        LOG(err2)
+        LOG(err2, rinfo.lm)
             << "HTTP " << ClientInfo(connection) << ' ' << rinfo
             << " [shutdown].";
         return;
 
     case MHD_REQUEST_TERMINATED_READ_ERROR:
-        LOG(err2)
+        LOG(err2, rinfo.lm)
             << "HTTP " << ClientInfo(connection) << ' ' << rinfo
             << " [read error].";
         return;
 
     case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
-        LOG(err2)
+        LOG(err2, rinfo.lm)
             << "HTTP " << ClientInfo(connection) << ' ' << rinfo
             << " [aborted].";
         return;
@@ -294,7 +308,7 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
         *info = rinfo;
 
         // received request logging
-        LOG(info2)
+        LOG(info2, rinfo->lm)
             << "HTTP " << ClientInfo(connection)  << ' ' << *rinfo
             << ".";
 
@@ -312,6 +326,11 @@ int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
     case RequestInfo::State::fresh:
         rinfo->state = RequestInfo::State::handling;
         return static_cast<Http::Detail*>(cls)->request(connection, rinfo);
+
+    case RequestInfo::State::handling:
+        LOG(info4, rinfo->lm)
+            << "Request handler called again while handling data.";
+        break;
 
     default:
         break;
@@ -335,7 +354,7 @@ Http::Detail::Detail(const utility::TcpEndpoint &listen
                      , ContentGenerator &contentGenerator)
     : contentGenerator(contentGenerator)
     , daemon(::MHD_start_daemon
-             ((MHD_USE_POLL_INTERNALLY | MHD_USE_SUSPEND_RESUME
+             ((MHD_USE_EPOLL_INTERNALLY_LINUX_ONLY | MHD_USE_SUSPEND_RESUME
                | MHD_USE_DEBUG)
               , listen.value.port()
               , nullptr, nullptr
@@ -557,6 +576,7 @@ int Http::Detail::request(::MHD_Connection *connection
     try {
         if ((ri->method == "HEAD") || (ri->method == "GET")) {
             contentGenerator.generate(ri->url, sink);
+            ri->suspend(connection);
         } else {
             sink->error(utility::makeError<NotAllowed>
                         ("Method %s is not supported.", ri->method));

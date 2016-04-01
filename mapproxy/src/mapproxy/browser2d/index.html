@@ -31,17 +31,32 @@
 
       loadMapConfig(function (mc) {
           var boundLayers = mc["boundLayers"];
+          var credits = mc["credits"];
+          var copyyear = "&copy; " + new Date().getFullYear() + " ";
+
           var maxLod = 0;
           for (var name in boundLayers) {
               if (!boundLayers.hasOwnProperty(name)) { continue; }
 
               var bl = boundLayers[name];
-              var url = bl.url;
-              url = url.replace(/{lod}/g, "{z}");
+              var url = bl.url.replace(/{lod}/g, "{z}");
+
+              var attribution = "";
+              var prefix = "";
+              for (var creditIndex in credits) {
+                  var credit = credits[creditIndex];
+                  attribution += prefix;
+                  if (credit.copyrighted != false) {
+                      attribution += copyyear;
+                  }
+                  attribution += credit.notice;
+                  prefix = ", ";
+              }
 
               var tl = new L.TileLayer(url, {
                   minZoom: bl.lodRange[0]
                   , maxZoom: bl.lodRange[1]
+                  , attribution: attribution
               });
 
               if (bl.lodRange[1] > maxLod) {

@@ -5,8 +5,6 @@
         "id": "trueplanet",
         "type": "tms",
         "driver": "tms-raster",
-        "lodRange": [0,13],
-        "tileRange": [[0,0],[0,0]],
         "referenceFrames": {
             "melown2015": {
                 "lodRange": [1,14],
@@ -21,7 +19,7 @@
                 "tileRange": [[0,0],[0,0]]
             }
         },
-        "credits": [1],
+        "credits": ["citationtech"],
         "definition": {
            "dataset": "melown/trueplanet",
            "mask": "melown/trueplanet-mask.tif",
