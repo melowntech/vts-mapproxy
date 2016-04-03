@@ -1,381 +1,60 @@
 #include <ctime>
 #include <algorithm>
 #include <atomic>
+#include <thread>
+#include <memory>
 
 #include <boost/noncopyable.hpp>
+#include <boost/asio.hpp>
+#include <boost/format.hpp>
 
 #include <arpa/inet.h>
-
-#include <microhttpd.h>
 
 #include "dbglog/dbglog.hpp"
 
 #include "utility/raise.hpp"
 #include "utility/gccversion.hpp"
+#include "utility/streams.hpp"
+#include "utility/enum-io.hpp"
+#include "utility/buildsys.hpp"
 
 #include "./error.hpp"
 #include "./http.hpp"
 
+namespace asio = boost::asio;
+namespace ip = asio::ip;
+namespace ubs = utility::buildsys;
+
 namespace {
 
-UTILITY_THREAD_LOCAL std::string *lastError = nullptr;
+enum class StatusCode {
+    OK = 200
 
-UTILITY_THREAD_LOCAL std::size_t thisIsHttpThread = 0;
+    , SeeOther = 302
 
-std::atomic<std::size_t> httpThreadIdGenerator(0);
+    , BadRequest = 400
+    , NotFound = 404
+    , NotAllowed = 405
 
-void setLastError(const char *value)
-{
-    if (lastError) {
-        LOG(warn2) << "Last microhttpd library error in this thread has "
-            "not been reclaimed. It read: <" << *lastError << ">.";
-        delete lastError;
-    }
-    lastError = new std::string(value);
-}
-
-std::string getLastError()
-{
-    std::string value("unknown");
-    if (lastError) {
-        value = *lastError;
-        delete lastError;
-    }
-    return value;
-}
-
-#define CHECK_MHD_ERROR(res, what)                              \
-    if (!res) {                                                 \
-        LOGTHROW(err2, IOError)                                 \
-            << what << "; reason: <" << getLastError() << ">."; \
-    }
-
-struct ClientInfo {
-    const ::sockaddr *addr;
-
-    ClientInfo(::MHD_Connection *connection)
-        : addr()
-    {
-        auto client(::MHD_get_connection_info
-                (connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS));
-        if (client) { addr = client->client_addr; }
-    }
+    , InternalServerError = 500
+    , ServiceUnavailable = 503
 };
 
-class ResponseHandle : boost::noncopyable {
-public:
-    ResponseHandle() : response_() {}
+UTILITY_GENERATE_ENUM_IO(StatusCode,
+    ((OK)("OK"))
+    ((SeeOther)("See Other" ))
+    ((BadRequest)("Bad Request"))
+    ((NotFound)("Not Found"))
+    ((NotAllowed)("Not Allowed"))
+    ((InternalServerError)("Internal Server Error"))
+    ((ServiceUnavailable)("Service Unavailabe"))
+)
 
-    ~ResponseHandle() {
-        if (response_) { ::MHD_destroy_response(response_); }
-    }
-
-    void buffer(const std::string &data, bool copy) {
-        buffer(data.data(), data.size(), copy);
-    }
-
-    void buffer(const void *data, std::size_t size, bool copy) {
-        response_ = ::MHD_create_response_from_buffer
-            (size, const_cast<void*>(data)
-             , copy ? MHD_RESPMEM_MUST_COPY : MHD_RESPMEM_PERSISTENT);
-    }
-
-    MHD_Response* get() { return response_; }
-    operator MHD_Response*() { return get(); }
-    operator bool() const { return response_; }
-
-private:
-    MHD_Response *response_;
-};
-
-struct RequestInfo : boost::noncopyable {
-    static std::atomic<std::size_t> idGenerator;
-
-    std::size_t id;
-    dbglog::module lm;
-
-    struct State {
-        enum {
-            fresh, handling, enqueueable, enqueued, finished
-        };
-    };
-    std::atomic<int> state;
-
-    std::string url;
-    std::string method;
-    std::string version;
-    int responseCode;
-    std::string errorReason;
-    std::string location;
-
-    ResponseHandle response;
-
-    RequestInfo(const std::string &url, const std::string &method
-                , const std::string &version)
-        : id(++idGenerator)
-        , lm(dbglog::make_module(str(boost::format("req:%u") % id)))
-        , state(State::fresh)
-        , url(url), method(method), version(version)
-        , responseCode(MHD_HTTP_OK)
-        , refcount_(1)
-    {}
-
-    void enqueue(::MHD_Connection *connection) {
-        if (thisIsHttpThread) {
-            // marked as HTTP thread, just enqueue
-            LOG(info2, lm) << "Enqueueing response.";
-            CHECK_MHD_ERROR(::MHD_queue_response
-                            (connection, responseCode, response)
-                            , "Unable to enqueue HTTP response");
-            state = State::enqueued;
-        } else {
-            // TODO: make better via another pipe
-            state = State::enqueueable;
-            // MHD_resume_connection(connection);
-        }
-    }
-
-    void suspend(::MHD_Connection *connection) {
-        (void) connection;
-        // if (thisIsHttpThread && (state != State::enqueued)) {
-        //     MHD_suspend_connection(connection);
-        // }
-    }
-
-    static RequestInfo *addRef(RequestInfo *ri) {
-        ri->inc();
-        return ri;
-    };
-
-    static void decRef(RequestInfo *ri) {
-        if (ri->dec()) {
-            delete ri;
-        }
-    };
-
-private:
-    /** Increment reference count.
-     */
-    void inc() { ++refcount_; }
-
-    /** Decrement reference count and return true when it reaches zero.
-     */
-    bool dec() { return !--refcount_; }
-
-    std::atomic<std::size_t> refcount_;
-};
-
-std::atomic<std::size_t> RequestInfo::idGenerator(0);
-
-template<typename CharT, typename Traits>
-inline std::basic_ostream<CharT, Traits>&
-operator<<(std::basic_ostream<CharT, Traits> &os, const ClientInfo &ci)
-{
-    if (!ci.addr) { return os << '-'; }
-
-    char buf[INET_ADDRSTRLEN + 1];
-    const auto *addr(reinterpret_cast<const ::sockaddr_in*>(ci.addr));
-    os << ::inet_ntop(AF_INET, &addr->sin_addr, buf, INET_ADDRSTRLEN + 1);
-
-    return os;
-}
-
-template<typename CharT, typename Traits>
-inline std::basic_ostream<CharT, Traits>&
-operator<<(std::basic_ostream<CharT, Traits> &os, const RequestInfo &ri)
-{
-    return os << '"' << ri.method << " " << ri.url << ' ' << ri.version
-              << '"';
-}
-
-} // namespace
-
-struct Http::Detail : boost::noncopyable {
-    Detail(const utility::TcpEndpoint &listen, unsigned int threadCount
-           , ContentGenerator &contentGenerator);
-    ~Detail() {
-        if (daemon) { ::MHD_stop_daemon(daemon); }
-    }
-
-    int request(::MHD_Connection *connection, RequestInfo *requestInfo);
-
-    ContentGenerator &contentGenerator;
-    ::MHD_Daemon *daemon;
-};
-
-extern "C" {
-
-void mapproxy_http_callback_completed(void*, ::MHD_Connection *connection
-                                      , void **info
-                                      , enum MHD_RequestTerminationCode toe)
-{
-    // Request info holder/deleter
-    class Deleter {
-    public:
-        Deleter(void **info)
-            : info_(info), ri_(static_cast<RequestInfo*>(*info_))
-        {}
-
-        ~Deleter() {
-            // decrement reference
-            RequestInfo::decRef(ri_);
-            // and get rid of pointer
-            *info_ = nullptr;
-        }
-
-        RequestInfo& get() { return *ri_; }
-
-    private:
-        void **info_;
-        RequestInfo *ri_;
-    } deleter(info);
-
-    auto &rinfo(deleter.get());
-    // mark as finished
-    rinfo.state = RequestInfo::State::finished;
-
-    switch (toe) {
-    case MHD_REQUEST_TERMINATED_COMPLETED_OK:
-        switch (rinfo.responseCode / 100) {
-        case 2:
-        case 3:
-            if (rinfo.location.empty()) {
-                LOG(info3, rinfo.lm)
-                    << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                    << ' ' << rinfo.responseCode << ".";
-            } else {
-                LOG(info3, rinfo.lm)
-                    << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                    << ' ' << rinfo.responseCode
-                    << " -> \"" << rinfo.location << "\".";
-            }
-            return;
-
-        default:
-            LOG(err2, rinfo.lm)
-                << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-                << ' ' << rinfo.responseCode << "; reason: <"
-                << rinfo.errorReason << ">.";
-        }
-        return;
-
-    case MHD_REQUEST_TERMINATED_WITH_ERROR:
-        LOG(err2, rinfo.lm)
-             << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-             << " [internal error].";
-        return;
-
-    case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
-        LOG(err2, rinfo.lm)
-            << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-            << " [timed-out].";
-        return;
-
-    case MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
-        LOG(err2, rinfo.lm)
-            << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-            << " [shutdown].";
-        return;
-
-    case MHD_REQUEST_TERMINATED_READ_ERROR:
-        LOG(err2, rinfo.lm)
-            << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-            << " [read error].";
-        return;
-
-    case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
-        LOG(err2, rinfo.lm)
-            << "HTTP " << ClientInfo(connection) << ' ' << rinfo
-            << " [aborted].";
-        return;
-    }
-}
-
-int mapproxy_http_callback_request(void *cls, ::MHD_Connection *connection
-                                   , const char *url, const char *method
-                                   , const char *version
-                                   , const char*, size_t*, void **info)
-{
-    // mark as http thread
-    if (!thisIsHttpThread) {
-        thisIsHttpThread = ++httpThreadIdGenerator;
-        dbglog::thread_id(str(boost::format("http:%u") % thisIsHttpThread));
-    }
-
-    if (!*info) {
-        // setup, log and done
-        auto rinfo(new RequestInfo(url, method, version));
-        *info = rinfo;
-
-        // received request logging
-        LOG(info2, rinfo->lm)
-            << "HTTP " << ClientInfo(connection)  << ' ' << *rinfo
-            << ".";
-
-        return MHD_YES;
-    }
-
-    // second call -> process
-    auto *rinfo(static_cast<RequestInfo*>(*info));
-
-    switch (rinfo->state) {
-    case RequestInfo::State::enqueueable:
-        rinfo->enqueue(connection);
-        break;
-
-    case RequestInfo::State::fresh:
-        rinfo->state = RequestInfo::State::handling;
-        return static_cast<Http::Detail*>(cls)->request(connection, rinfo);
-
-    case RequestInfo::State::handling:
-        LOG(info4, rinfo->lm)
-            << "Request handler called again while handling data.";
-        break;
-
-    default:
-        break;
-    }
-
-    return MHD_YES;
-}
-
-void mapproxy_http_callback_error(void*, const char *fmt, va_list ap)
-{
-    char buf[1024];
-    ::vsnprintf(buf, sizeof(buf) - 1, fmt, ap);
-    buf[sizeof(buf) - 1] = '\0';
-    setLastError(buf);
-}
-
-} // extern "C"
-
-Http::Detail::Detail(const utility::TcpEndpoint &listen
-                     , unsigned int threadCount
-                     , ContentGenerator &contentGenerator)
-    : contentGenerator(contentGenerator)
-    , daemon(::MHD_start_daemon
-             ((MHD_USE_EPOLL_INTERNALLY_LINUX_ONLY | MHD_USE_SUSPEND_RESUME
-               | MHD_USE_DEBUG)
-              , listen.value.port()
-              , nullptr, nullptr
-              , &mapproxy_http_callback_request, this
-              // TODO: get sock addr from endpoint
-              // , MHD_OPTION_SOCK_ADDR, ???
-              , MHD_OPTION_THREAD_POOL_SIZE
-              , (unsigned int)(threadCount)
-
-              , MHD_OPTION_NOTIFY_COMPLETED
-              , &mapproxy_http_callback_completed, this
-
-              , MHD_OPTION_EXTERNAL_LOGGER
-              , &mapproxy_http_callback_error, this
-
-              , MHD_OPTION_END))
-{
-    CHECK_MHD_ERROR(daemon, "Cannot start HTTP daemon");
-}
-
-namespace {
+const std::string error400(R"RAW(<html>
+<head><title>400 Bad Request</title></head>
+<body bgcolor="white">
+<center><h1>400 Bad Request</h1></center>
+)RAW");
 
 const std::string error404(R"RAW(<html>
 <head><title>404 Not Found</title></head>
@@ -415,14 +94,506 @@ std::string formatHttpDate(time_t time)
     return buf;
 }
 
-class HttpSink : public Sink {
+class Connection;
+
+struct Header {
+    std::string name;
+    std::string value;
+
+    typedef std::vector<Header> list;
+
+    Header() {}
+    Header(const std::string &name, const std::string &value)
+        : name(name), value(value) {}
+};
+
+struct Request {
+    std::string method;
+    std::string uri;
+    std::string version;
+    Header::list headers;
+    std::size_t lines;
+
+    enum class State { reading, ready, broken };
+    State state;
+
+    typedef std::vector<Request> list;
+
+    Request() { clear(); }
+
+    void makeReady() { state = State::ready; }
+    void makeBroken() { state = State::broken; }
+
+    void clear() {
+        method.clear();
+        uri.clear();
+        version = "HTTP/1.1";
+        headers.clear();
+        lines = 0;
+        state = State::reading;
+    }
+};
+
+struct Response {
+    StatusCode code;
+    Header::list headers;
+    std::string reason;
+    bool close;
+
+    Response(StatusCode code = StatusCode::OK)
+        : code(code), close(false)
+    {}
+};
+
+class Connection
+    : boost::noncopyable
+    , public std::enable_shared_from_this<Connection>
+{
 public:
-    HttpSink(::MHD_Connection *connection, RequestInfo *ri)
-        : conn_(connection), riRaw_(RequestInfo::addRef(ri))
-        , ri_(*ri)
+    typedef std::shared_ptr<Connection> pointer;
+
+    Connection(Http::Detail &owner, asio::io_service &ios)
+        : owner_(owner), ios_(ios), strand_(ios), socket_(ios_)
+        , requestData_(1024) // max line size
+        , state_(State::ready)
     {}
 
-    ~HttpSink() { RequestInfo::decRef(riRaw_); }
+    ip::tcp::socket& socket() {return  socket_; }
+
+    void sendResponse(const Request &request, const Response &response
+                      , const std::string &data, bool persistent = false)
+    {
+        sendResponse(request, response, data.data(), data.size(), persistent);
+    }
+
+    void sendResponse(const Request &request, const Response &response
+                      , const void *data = nullptr, const size_t size = 0
+                      , bool persistent = false);
+
+    void start();
+
+    bool valid() const;
+
+private:
+    void startRequest();
+    void readRequest();
+    void readHeader();
+
+    Request pop() {
+        auto r(requests_.front());
+        requests_.erase(requests_.begin());
+        return r;
+    }
+
+    void process();
+    void badRequest();
+    void close(const boost::system::error_code &ec);
+    void close();
+
+    void makeReady();
+
+    Http::Detail &owner_;
+
+    asio::io_service &ios_;
+    asio::strand strand_;
+    ip::tcp::socket socket_;
+    asio::streambuf requestData_;
+    asio::streambuf responseData_;
+
+    Request::list requests_;
+
+    enum class State { ready, busy, busyClose, closed };
+    State state_;
+};
+
+} // namespace
+
+class Http::Detail : boost::noncopyable {
+public:
+    Detail(const utility::TcpEndpoint &listen, unsigned int threadCount
+           , ContentGenerator &contentGenerator);
+    ~Detail() { stop(); }
+
+    void request(const Connection::pointer &connection
+                 , const Request &request);
+
+private:
+    void start(std::size_t count);
+    void stop();
+    void worker(std::size_t id);
+
+    void startAccept();
+
+    ContentGenerator &contentGenerator_;
+
+    asio::io_service ios_;
+    asio::io_service::work work_;
+    ip::tcp::acceptor acceptor_;
+    std::vector<std::thread> workers_;
+};
+
+Http::Detail::Detail(const utility::TcpEndpoint &listen
+                     , unsigned int threadCount
+                     , ContentGenerator &contentGenerator)
+    : contentGenerator_(contentGenerator)
+    , work_(ios_)
+    , acceptor_(ios_, listen.value, true)
+{
+    start(threadCount);
+}
+
+void Http::Detail::start(std::size_t count)
+{
+    // make sure threads are released when something goes wrong
+    struct Guard {
+        Guard(const std::function<void()> &func) : func(func) {}
+        ~Guard() { if (func) { func(); } }
+        void release() { func = {}; }
+        std::function<void()> func;
+    } guard(std::bind(&Detail::stop, this));
+
+    for (std::size_t id(1); id <= count; ++id) {
+        workers_.emplace_back(&Detail::worker, this, id);
+    }
+
+    guard.release();
+
+    startAccept();
+}
+
+void Http::Detail::stop()
+{
+    ios_.stop();
+
+    while (!workers_.empty()) {
+        workers_.back().join();
+        workers_.pop_back();
+    }
+}
+
+void Http::Detail::worker(std::size_t id)
+{
+    dbglog::thread_id(str(boost::format("http:%u") % id));
+    LOG(info2) << "Spawned HTTP worker id:" << id << ".";
+
+    for (;;) {
+        try {
+            ios_.run();
+            LOG(info2) << "Terminated HTTP worker id:" << id << ".";
+            return;
+        } catch (const std::exception &e) {
+            LOG(err3)
+                << "Uncaught exception in HTTP worker: <" << e.what()
+                << ">. Going on.";
+        }
+    }
+}
+
+void Http::Detail::startAccept()
+{
+    auto conn(std::make_shared<Connection>(*this, ios_));
+
+    acceptor_.async_accept(conn->socket()
+                           , [=](const boost::system::error_code &ec)
+    {
+        if (!ec) {
+            conn->start();
+        }
+
+        startAccept();
+    });
+}
+
+void Connection::process()
+{
+    switch (state_) {
+    case State::busy:
+    case State::busyClose:
+        return;
+
+    case State::closed:
+        socket_.close();
+        return;
+
+    case State::ready:
+        // about to try to run a request
+        break;
+    }
+
+    // try request
+    switch (requests_.front().state) {
+    case Request::State::ready:
+        state_ = State::busy;
+        owner_.request(shared_from_this(), pop());
+        break;
+
+    case Request::State::broken:
+        badRequest();
+        break;
+
+    default:
+        // nothing to do now
+        break;
+    }
+}
+
+void Connection::makeReady()
+{
+    switch (state_) {
+    case State::busy:
+        state_ = State::ready;
+        break;
+
+    case State::busyClose:
+        close();
+        break;
+
+    case State::closed:
+    case State::ready:
+        break;
+    }
+}
+
+void Connection::close(const boost::system::error_code &ec)
+{
+    if (ec != asio::error::misc_errors::eof) {
+        LOG(info4) << "error: " << ec << " closing";
+        close();
+    } else {
+        LOG(info2) << "Connection closed.";
+        state_ = State::closed;
+    }
+}
+
+void Connection::close()
+{
+    state_ = State::closed;
+    boost::system::error_code cec;
+    socket_.close(cec);
+}
+
+bool Connection::valid() const
+{
+    switch (state_) {
+    case State::closed:
+    case State::busyClose:
+        return false;
+
+    default: break;
+    }
+    return true;
+}
+
+void Connection::start()
+{
+    requests_.emplace_back();
+    readRequest();
+}
+
+void Connection::readRequest()
+{
+    auto self(shared_from_this());
+
+    auto parseRequest([self, this](const boost::system::error_code &ec
+                                   , std::size_t bytes)
+    {
+        auto &request(requests_.back());
+
+        if (ec) {
+            // handle error
+            close(ec);
+            return;
+        }
+
+        ++request.lines;
+
+        if (bytes == 2) {
+            // empty line -> restart request parsing
+            requestData_.consume(bytes);
+            readRequest();
+            return;
+        }
+
+        std::istream is(&requestData_);
+        is.unsetf(std::ios_base::skipws);
+        if (!(is >> request.method >> utility::expect(' ')
+              >> request.uri >> utility::expect(' ')
+              >> request.version
+              >> utility::expect('\r') >> utility::expect('\n')))
+        {
+            request.makeBroken();
+            process();
+            return;
+        }
+        readHeader();
+    });
+
+    requests_.back().clear();
+    asio::async_read_until(socket_, requestData_, "\r\n"
+                           , strand_.wrap(parseRequest));
+}
+
+void Connection::readHeader()
+{
+    auto self(shared_from_this());
+
+    auto parseHeader([self, this](const boost::system::error_code &ec
+                                  , std::size_t bytes)
+    {
+        auto &request(requests_.back());
+
+        if (ec) {
+            // handle error
+            close(ec);
+            return;
+        }
+
+        ++request.lines;
+
+        if (bytes == 2) {
+            // empty line -> restart request parsing
+            requestData_.consume(bytes);
+            request.makeReady();
+
+            // try to process immediately
+            process();
+
+            // and start again
+            start();
+            return;
+        }
+
+        std::istream is(&requestData_);
+        if (std::isspace(is.peek())) {
+            // TODO: check for first line
+            if (request.headers.empty()) {
+                LOG(info4) << "invalid continuation";
+                request.makeBroken();
+                process();
+                return;
+            }
+
+            auto &header(request.headers.back());
+            if (!std::getline(is, header.value, '\r')) {
+                request.makeBroken();
+                process();
+                return;
+            }
+            // eat '\n'
+            is.get();
+            readHeader();
+            return;
+        }
+
+        request.headers.emplace_back();
+        auto &header(request.headers.back());
+
+        if (!std::getline(is, header.name, ':')) {
+            request.makeBroken();
+            process();
+            return;
+        }
+        if (!std::getline(is, header.value, '\r')) {
+            request.makeBroken();
+            process();
+            return;
+        }
+        // eat '\n'
+        is.get();
+
+        readHeader();
+    });
+
+    asio::async_read_until(socket_, requestData_, "\r\n"
+                           , strand_.wrap(parseHeader));
+}
+
+void Connection::badRequest()
+{
+    Response response(StatusCode::BadRequest);
+    response.close = true;
+    response.reason = "Bad request";
+
+    LOG(debug) << "About to send http error: <" << response.code << ">.";
+
+    response.headers.emplace_back("Content-Type", "text/html");
+
+    sendResponse({}, response, error400, true);
+}
+
+void Connection::sendResponse(const Request &request, const Response &response
+                              , const void *data, const size_t size
+                              , bool persistent)
+{
+    std::ostream os(&responseData_);
+
+    os << request.version << ' ' << static_cast<int>(response.code) << ' '
+       << response.code << "\r\n";
+
+    os << "Date: " << formatHttpDate(-1) << "\r\n";
+    os << "Server: " << ubs::TargetName << '/' << ubs::TargetVersion << "\r\n";
+    for (const auto &hdr : response.headers) {
+        os << hdr.name << ": "  << hdr.value << "\r\n";
+    }
+
+    // optional data
+    if (data) { os << "Content-Length: " << size << "\r\n"; }
+    if (response.close) { os << "Connection: close\r\n"; }
+
+    os << "\r\n";
+
+    if (request.method == "HEAD") {
+        // HEAD request -> send no data
+        data = nullptr;
+    }
+
+    if (!persistent && data) {
+        os.write(static_cast<const char*>(data), size);
+    }
+
+    // mark as busy/close
+    if (response.close) {
+        state_ = State::busyClose;
+    }
+
+    auto self(shared_from_this());
+    auto writeResponse([self, this](const boost::system::error_code &ec
+                                    , std::size_t)
+    {
+        if (ec) {
+            close(ec);
+            return;
+        }
+
+        // response sent, not busy for now
+        makeReady();
+
+        // response written, try next request immediately
+        process();
+    });
+
+    if (persistent && data) {
+        std::vector<asio::const_buffer> buffers = {
+            responseData_.data()
+            , asio::const_buffer(data, size)
+        };
+
+        asio::async_write(socket_, buffers
+                          , strand_.wrap(writeResponse));
+    } else {
+        asio::async_write(socket_, responseData_.data()
+                          , strand_.wrap(writeResponse));
+    }
+}
+
+namespace {
+
+class HttpSink : public Sink {
+public:
+    HttpSink(const Request &request, const Connection::pointer &connection)
+        : request_(request), connection_(connection)
+    {}
+    ~HttpSink() {}
 
 private:
     virtual void content_impl(const void *data, std::size_t size
@@ -430,47 +601,36 @@ private:
     {
         if (!valid()) { return; }
 
-        ri_.response.buffer(data, size, needCopy);
-        CHECK_MHD_ERROR(::MHD_add_response_header
-                        (ri_.response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
-                         , stat.contentType.c_str())
-                        , "Unable to set response header");
-        CHECK_MHD_ERROR(::MHD_add_response_header
-                        (ri_.response.get(), MHD_HTTP_HEADER_LAST_MODIFIED
-                         , formatHttpDate(stat.lastModified).c_str())
-                         , "Unable to set response header");
+        Response response;
+        response.headers.emplace_back("Content-Type", stat.contentType);
+        response.headers.emplace_back
+            ("Last-Modified", formatHttpDate(stat.lastModified));
 
-        enqueue();
+        connection_->sendResponse(request_, response, data, size, !needCopy);
     }
 
     virtual void seeOther_impl(const std::string &url)
     {
         if (!valid()) { return; }
 
-        // TODO: compose body
-        ri_.response.buffer("", false);
-
-        ri_.responseCode = MHD_HTTP_SEE_OTHER;
-        ri_.location = url;
-
-        CHECK_MHD_ERROR(::MHD_add_response_header
-                        (ri_.response.get(), MHD_HTTP_HEADER_LOCATION
-                         , url.c_str())
-                        , "Unable to set response header");
-        enqueue();
+        Response response(StatusCode::SeeOther);
+        response.headers.emplace_back("Location", url);
+        connection_->sendResponse(request_, response);
     }
 
     virtual void listing_impl(const Listing &list)
     {
         if (!valid()) { return; }
 
+        std::string path;
+
         std::ostringstream os;
         os << R"RAW(<html>
-<head><title>Index of )RAW" << ri_.url
+<head><title>Index of )RAW" << path
            << R"RAW(</title></head>
 <body bgcolor="white">
 <h1>Index of )RAW"
-           << ri_.url
+           << path
            << "\n</h1><hr><pre><a href=\"../\">../</a>\n";
 
         auto sorted(list);
@@ -501,45 +661,42 @@ private:
         if (!valid()) { return; }
 
         const std::string *body;
+        Response response;
+
         try {
             std::rethrow_exception(exc);
         } catch (const NotFound &e) {
-            ri_.responseCode = MHD_HTTP_NOT_FOUND;
-            ri_.errorReason = e.what();
+            response.code = StatusCode::NotFound;
+            response.reason = e.what();
             body = &error404;
         } catch (const NotAllowed &e) {
-            ri_.responseCode = MHD_HTTP_METHOD_NOT_ALLOWED;
-            ri_.errorReason = e.what();
+            response.code = StatusCode::NotAllowed;
+            response.reason = e.what();
             body = &error405;
         } catch (const Unavailable &e) {
-            ri_.responseCode = MHD_HTTP_SERVICE_UNAVAILABLE;
-            ri_.errorReason = e.what();
+            response.code = StatusCode::ServiceUnavailable;
+            response.reason = e.what();
             body = &error503;
         } catch (const std::exception &e) {
-            ri_.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
-            ri_.errorReason = e.what();
+            response.code = StatusCode::InternalServerError;
+            response.reason = e.what();
             body = &error500;
         } catch (...) {
-            ri_.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
-            ri_.errorReason = "Unknown exception caught.";
-            body = &error500;
+            response.code = StatusCode::InternalServerError;
+            response.reason = "Uknonw";
         }
 
-        LOG(debug) << "About to send http error: <" << ri_.errorReason << ">.";
+        LOG(debug) << "About to send http error: <" << response.code << ">.";
 
-        // enqueue response with proper status and body; body is static string
-        // and thus not copied
-        ri_.response.buffer(*body, false);
+        response.headers.emplace_back("Content-Type", "text/html");
 
-        CHECK_MHD_ERROR(::MHD_add_response_header
-                        (ri_.response.get(), MHD_HTTP_HEADER_CONTENT_TYPE
-                         , "text/html")
-                        , "Unable to set response header");
-        enqueue();
+        connection_->sendResponse
+            (request_, response, body->data(), body->size(), true);
     }
 
     bool finished() const {
-        return (ri_.state == RequestInfo::State::finished);
+        return false;
+        // return (ri_.state == RequestInfo::State::finished);
     }
 
     bool checkAborted_impl() const {
@@ -547,45 +704,33 @@ private:
     }
 
     bool valid() const {
-        if (finished()) { return false; }
-
-        if (ri_.state != RequestInfo::State::handling) {
-            LOG(warn3)
-                << "Logic error in your code: attempt to send "
-                "another response while it was already sent.";
-            return false;
-        }
-        return true;
+        return connection_->valid();
     }
 
     void enqueue() {
-        ri_.enqueue(conn_);
+        // ri_.enqueue(conn_);
     }
 
-    ::MHD_Connection *conn_;
-    RequestInfo *riRaw_;
-    RequestInfo &ri_;
+    Request request_;
+    Connection::pointer connection_;
 };
 
 } // namespace
 
-int Http::Detail::request(::MHD_Connection *connection
-                          , RequestInfo *ri)
+void Http::Detail::request(const Connection::pointer &connection
+                           , const Request &request)
 {
-    auto sink(std::make_shared<HttpSink>(connection, ri));
+    auto sink(std::make_shared<HttpSink>(request, connection));
     try {
-        if ((ri->method == "HEAD") || (ri->method == "GET")) {
-            contentGenerator.generate(ri->url, sink);
-            ri->suspend(connection);
+        if ((request.method == "HEAD") || (request.method == "GET")) {
+            contentGenerator_.generate(request.uri, sink);
         } else {
             sink->error(utility::makeError<NotAllowed>
-                        ("Method %s is not supported.", ri->method));
+                        ("Method %s is not supported.", request.method));
         }
     } catch (...) {
         sink->error();
     }
-
-    return MHD_YES;
 }
 
 Http::Http(const utility::TcpEndpoint &listen, unsigned int threadCount
