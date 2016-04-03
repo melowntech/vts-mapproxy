@@ -164,17 +164,32 @@ std::string getName(const T &value)
     return boost::lexical_cast<std::string>(value);
 }
 
-template <typename Container>
-Sink::Listing buildListing(const Container &container
-                           , const Sink::Listing &bootstrap = Sink::Listing())
+template <bool allowEmpty, typename Container>
+inline Sink::Listing
+buildListing(const Container &container
+             , const Sink::Listing &bootstrap = Sink::Listing())
 {
     Sink::Listing out(bootstrap);
 
+    bool empty(true);
     for (const auto &item : container) {
         out.emplace_back(getName(item), Sink::ListingItem::Type::dir);
+        empty = false;
+    }
+
+    if (!allowEmpty && empty) {
+        throw NotFound("Empty listing");
     }
 
     return out;
+}
+
+template <typename Container>
+inline Sink::Listing
+buildListing(const Container &container
+             , const Sink::Listing &bootstrap = Sink::Listing())
+{
+    return buildListing<true, Container>(container, bootstrap);
 }
 
 } // namespace
@@ -287,7 +302,7 @@ void Core::Detail::generateListing(const FileInfo &fi
         return;
 
     case FileInfo::Type::idListing:
-        sink->listing(buildListing
+        sink->listing(buildListing<false>
                       (generators_.listIds
                        (fi.resourceId.referenceFrame, fi.generatorType
                         , fi.resourceId.group)

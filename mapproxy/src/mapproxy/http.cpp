@@ -325,14 +325,12 @@ void Http::Detail::worker(std::size_t id)
 
 void Http::Detail::addConnection(const Connection::pointer &conn)
 {
-    LOG(info4, conn->lm()) << "added";
     std::unique_lock<std::mutex> lock(connMutex_);
     connections_.insert(conn);
 }
 
 void Http::Detail::removeConnection(const Connection::pointer &conn)
 {
-    LOG(info4, conn->lm()) << "removed";
     {
         std::unique_lock<std::mutex> lock(connMutex_);
         connections_.erase(conn);
