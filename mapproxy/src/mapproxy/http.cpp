@@ -354,7 +354,7 @@ void Http::Detail::startAccept()
             // aborted -> closing shop
             return;
         } else {
-            LOG(info4) << "error accepting: " << ec;
+            LOG(err2) << "error accepting: " << ec;
         }
 
         startAccept();
