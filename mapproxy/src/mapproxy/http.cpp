@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <atomic>
 #include <thread>
+#include <condition_variable>
 #include <memory>
 
 #include <boost/noncopyable.hpp>
@@ -151,9 +152,12 @@ class Connection
 {
 public:
     typedef std::shared_ptr<Connection> pointer;
+    typedef std::set<pointer> set;
 
     Connection(Http::Detail &owner, asio::io_service &ios)
-        : owner_(owner), ios_(ios), strand_(ios), socket_(ios_)
+        : id_(++idGenerator_)
+        , lm_(dbglog::make_module(str(boost::format("conn:%s") % id_)))
+        , owner_(owner), ios_(ios), strand_(ios), socket_(ios_)
         , requestData_(1024) // max line size
         , state_(State::ready)
     {}
@@ -174,6 +178,10 @@ public:
 
     bool valid() const;
 
+    void close();
+
+    dbglog::module& lm() { return lm_; }
+
 private:
     void startRequest();
     void readRequest();
@@ -188,9 +196,13 @@ private:
     void process();
     void badRequest();
     void close(const boost::system::error_code &ec);
-    void close();
 
     void makeReady();
+
+    static std::atomic<std::size_t> idGenerator_;
+
+    std::atomic<std::size_t> id_;
+    dbglog::module lm_;
 
     Http::Detail &owner_;
 
@@ -206,6 +218,8 @@ private:
     State state_;
 };
 
+std::atomic<std::size_t> Connection::idGenerator_(0);
+
 } // namespace
 
 class Http::Detail : boost::noncopyable {
@@ -217,6 +231,9 @@ public:
     void request(const Connection::pointer &connection
                  , const Request &request);
 
+    void addConnection(const Connection::pointer &conn);
+    void removeConnection(const Connection::pointer &conn);
+
 private:
     void start(std::size_t count);
     void stop();
@@ -227,16 +244,20 @@ private:
     ContentGenerator &contentGenerator_;
 
     asio::io_service ios_;
-    asio::io_service::work work_;
+    boost::optional<asio::io_service::work> work_;
     ip::tcp::acceptor acceptor_;
     std::vector<std::thread> workers_;
+
+    Connection::set connections_;
+    std::mutex connMutex_;
+    std::condition_variable connCond_;
 };
 
 Http::Detail::Detail(const utility::TcpEndpoint &listen
                      , unsigned int threadCount
                      , ContentGenerator &contentGenerator)
     : contentGenerator_(contentGenerator)
-    , work_(ios_)
+    , work_(std::ref(ios_))
     , acceptor_(ios_, listen.value, true)
 {
     start(threadCount);
@@ -263,7 +284,20 @@ void Http::Detail::start(std::size_t count)
 
 void Http::Detail::stop()
 {
-    ios_.stop();
+    acceptor_.close();
+
+    {
+        std::unique_lock<std::mutex> lock(connMutex_);
+        for (const auto &item : connections_) {
+            item->close();
+        }
+
+        while (!connections_.empty()) {
+            connCond_.wait(lock);
+        }
+    }
+
+    work_ = boost::none;
 
     while (!workers_.empty()) {
         workers_.back().join();
@@ -289,6 +323,25 @@ void Http::Detail::worker(std::size_t id)
     }
 }
 
+void Http::Detail::addConnection(const Connection::pointer &conn)
+{
+    LOG(info4, conn->lm()) << "added";
+    std::unique_lock<std::mutex> lock(connMutex_);
+    connections_.insert(conn);
+}
+
+void Http::Detail::removeConnection(const Connection::pointer &conn)
+{
+    LOG(info4, conn->lm()) << "removed";
+    {
+        std::unique_lock<std::mutex> lock(connMutex_);
+        connections_.erase(conn);
+    }
+    connCond_.notify_one();
+}
+
+void addRemove(const Connection::pointer &conn);
+
 void Http::Detail::startAccept()
 {
     auto conn(std::make_shared<Connection>(*this, ios_));
@@ -297,11 +350,27 @@ void Http::Detail::startAccept()
                            , [=](const boost::system::error_code &ec)
     {
         if (!ec) {
+            addConnection(conn);
             conn->start();
+        } else if (ec == asio::error::operation_aborted) {
+            // aborted -> closing shop
+            return;
+        } else {
+            LOG(info4) << "error accepting: " << ec;
         }
 
         startAccept();
     });
+}
+
+void prelogAndProcess(Http::Detail &detail
+                      , const Connection::pointer &connection
+                      , const Request &request)
+{
+    LOG(info2, connection->lm())
+        << "HTTP \"" << request.method << ' ' << request.uri
+        << ' ' << request.version << "\".";
+    detail.request(connection, request);
 }
 
 void Connection::process()
@@ -311,8 +380,8 @@ void Connection::process()
     case State::busyClose:
         return;
 
+
     case State::closed:
-        socket_.close();
         return;
 
     case State::ready:
@@ -324,7 +393,7 @@ void Connection::process()
     switch (requests_.front().state) {
     case Request::State::ready:
         state_ = State::busy;
-        owner_.request(shared_from_this(), pop());
+        prelogAndProcess(owner_, shared_from_this(), pop());
         break;
 
     case Request::State::broken:
@@ -356,20 +425,28 @@ void Connection::makeReady()
 
 void Connection::close(const boost::system::error_code &ec)
 {
-    if (ec != asio::error::misc_errors::eof) {
-        LOG(info4) << "error: " << ec << " closing";
-        close();
+    if ((ec == asio::error::misc_errors::eof)
+        || (ec == asio::error::operation_aborted))
+    {
+        LOG(info2, lm_) << "Aborted";
     } else {
-        LOG(info2) << "Connection closed.";
-        state_ = State::closed;
+        LOG(err2, lm_) << "Error: " << ec;
+        boost::system::error_code cec;
+        socket_.close(cec);
     }
+
+    // aborted
+    state_ = State::closed;
+    owner_.removeConnection(shared_from_this());
 }
 
 void Connection::close()
 {
-    state_ = State::closed;
-    boost::system::error_code cec;
-    socket_.close(cec);
+    if (state_ != State::closed) {
+        LOG(info2, lm_) << "Connection closed.";
+        boost::system::error_code cec;
+        socket_.close(cec);
+    }
 }
 
 bool Connection::valid() const
@@ -465,9 +542,7 @@ void Connection::readHeader()
 
         std::istream is(&requestData_);
         if (std::isspace(is.peek())) {
-            // TODO: check for first line
             if (request.headers.empty()) {
-                LOG(info4) << "invalid continuation";
                 request.makeBroken();
                 process();
                 return;
@@ -537,7 +612,11 @@ void Connection::sendResponse(const Request &request, const Response &response
     }
 
     // optional data
-    if (data) { os << "Content-Length: " << size << "\r\n"; }
+    if (data) {
+        os << "Content-Length: " << size << "\r\n";
+    } else {
+        os << "Content-Length: 0\r\n";
+    }
     if (response.close) { os << "Connection: close\r\n"; }
 
     os << "\r\n";
@@ -558,12 +637,14 @@ void Connection::sendResponse(const Request &request, const Response &response
 
     auto self(shared_from_this());
     auto writeResponse([self, this](const boost::system::error_code &ec
-                                    , std::size_t)
+                                    , std::size_t bytes)
     {
         if (ec) {
             close(ec);
             return;
         }
+
+        responseData_.consume(bytes);
 
         // response sent, not busy for now
         makeReady();

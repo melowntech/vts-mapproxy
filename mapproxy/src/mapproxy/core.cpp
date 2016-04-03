@@ -86,6 +86,7 @@ void Core::Detail::start(std::size_t count)
 
 void Core::Detail::stop()
 {
+    LOG(info4) << "stopping core";
     ios_.stop();
 
     while (!workers_.empty()) {
