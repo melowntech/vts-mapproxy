@@ -25,5 +25,32 @@
            "mask": "melown/trueplanet-mask.tif",
            "format":"jpg"
         }
+    },
+    {
+        "comment": "Geoland Basemap 30cm orthophoto of Austria",
+        "group": "basemap-at",
+        "id": "orthophoto",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [15,19],
+                "tileRange": [[8630,5626],[8975,5813]]
+            },
+            "webmerc-projected": {
+                "lodRange": [14,18],
+                "tileRange": [[8630,5626],[8975,5813]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [14,18],
+                "tileRange": [[8630,5626],[8975,5813]]
+            }
+        },
+        "credits": ["basemap-at"],
+        "definition": {
+           "dataset": "melown/basemap-at-orthophoto.xml",
+           "mask": "melown/basemap-at-orthophoto.xml",
+           "format":"jpg"
+        }
     }
 ]

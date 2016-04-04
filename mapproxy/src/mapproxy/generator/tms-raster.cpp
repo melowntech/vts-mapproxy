@@ -166,6 +166,15 @@ void TmsRaster::generateTileImage(const vts::TileId tileId
 
     sink->checkAborted();
 
+    // TODO: warp mask and check
+
+    if (tileSet.cmask().empty()) {
+        // no data -> not found
+        sink->error(utility::makeError<NotFound>
+                    ("Tile has no valid data."));
+        return;
+    }
+
     // export
     cv::Mat tile;
     tileSet.exportCvMat(tile, CV_8UC3);
