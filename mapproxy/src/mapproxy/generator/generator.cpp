@@ -238,7 +238,7 @@ private:
                                       , &extractGroupKey>
                     >
 
-              , bmi::ordered_unique<
+              , bmi::ordered_non_unique<
                     bmi::tag<ReferenceFrameIdx>
                     , BOOST_MULTI_INDEX_CONST_MEM_FUN
                     (Generator, const std::string&, referenceFrameId)
@@ -416,7 +416,6 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
 
     // use only ready generators that handle datasets for given reference frame
     std::unique_lock<std::mutex> lock(servingLock_);
-
     auto &idx(serving_.get<ReferenceFrameIdx>());
     for (auto range(idx.equal_range(referenceFrame));
          range.first != range.second; ++range.first)
@@ -466,6 +465,7 @@ Generators::Detail::listGroups(const std::string &referenceFrame
     std::vector<std::string> out;
     {
         std::unique_lock<std::mutex> lock(servingLock_);
+
         auto &idx(serving_.get<TypeIdx>());
         for (auto range(idx.equal_range(TypeKey(referenceFrame, type)));
              range.first != range.second; ++range.first)
