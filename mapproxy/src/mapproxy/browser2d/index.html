@@ -53,17 +53,28 @@
                   prefix = ", ";
               }
 
+              if (bl.lodRange[1] > maxLod) {
+                  maxLod = bl.lodRange[1];
+              }
+
               var tl = new L.TileLayer(url, {
                   minZoom: bl.lodRange[0]
                   , maxZoom: bl.lodRange[1]
                   , attribution: attribution
               });
-
-              if (bl.lodRange[1] > maxLod) {
-                  maxLod = bl.lodRange[1];
-              }
-
               map.addLayer(tl);
+
+              if (bl.maskUrl) {
+                  var murl = bl.maskUrl.replace(/{lod}/g, "{z}");
+
+                  var mtl = new L.TileLayer(murl, {
+                      minZoom: bl.lodRange[0]
+                      , maxZoom: bl.lodRange[1]
+                      , attribution: attribution
+                      , opacity: 0.1
+                  });
+                  map.addLayer(mtl);
+              }
           }
 
           // TODO: set from view mapConfig position

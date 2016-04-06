@@ -305,7 +305,10 @@ void Generators::Detail::runUpdater()
         // sleep for 5 minutes
         {
             std::unique_lock<std::mutex> lock(updaterLock_);
-            updaterCond_.wait_for(lock, sleep);
+            updaterCond_.wait_for(lock, sleep, [this]()
+            {
+                return !updaterRunning_;
+            });
         }
     }
 }

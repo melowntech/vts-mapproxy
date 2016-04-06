@@ -81,6 +81,8 @@ vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
     bl.url = prependRoot
         (str(boost::format("{lod}-{x}-{y}.%s") % definition_.format)
          , resource(), root);
+    bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
+                             , resource(), root);
 
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
