@@ -13,6 +13,8 @@
 #include "utility/buildsys.hpp"
 #include "service/service.hpp"
 
+#include "gdal-drivers/register.hpp"
+
 #include "vts-libs/registry/po.hpp"
 
 #include "./error.hpp"
@@ -252,5 +254,6 @@ int Daemon::run()
 
 int main(int argc, char *argv[])
 {
+    gdal_drivers::registerAll();
     return Daemon()(argc, argv);
 }

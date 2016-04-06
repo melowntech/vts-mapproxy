@@ -59,7 +59,11 @@ void parseDefinition(resdef::TmsRaster &def, const Json::Value &value)
     std::string s;
 
     Json::get(def.dataset, value, "dataset");
-    Json::get(def.mask, value, "mask");;
+    if (value.isMember("mask")) {
+        def.mask = boost::in_place();
+        Json::get(*def.mask, value, "mask");
+    }
+
     if (value.isMember("format")) {
         Json::get(s, value, "format");
         try {
@@ -105,7 +109,9 @@ void parseDefinition(Resource &r, const Json::Value &value)
 void buildDefinition(Json::Value &value, const resdef::TmsRaster &def)
 {
     value["dataset"] = def.dataset;
-    value["mask"] = def.mask;
+    if (def.mask) {
+        value["mask"] = *def.mask;
+    }
     value["format"] = boost::lexical_cast<std::string>(def.format);
 }
 
@@ -388,8 +394,10 @@ namespace resdef {
 
 bool TmsRaster::operator==(const TmsRaster &o) const
 {
-    // TODO: implement me
-    (void) o;
+    if (dataset != o.dataset) { return false; }
+    if (mask != o.mask) { return false; }
+
+    // format can change
     return true;
 }
 

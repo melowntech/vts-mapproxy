@@ -89,6 +89,8 @@ protected:
     void mapConfig(std::ostream &os, ResourceRoot root) const;
 
     std::string absoluteDataset(const std::string &path) const;
+    boost::optional<std::string>
+    absoluteDataset(const boost::optional<std::string> &path) const;
 
 private:
     virtual void prepare_impl() = 0;

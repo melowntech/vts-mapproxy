@@ -117,6 +117,13 @@ std::string Generator::absoluteDataset(const std::string &path)
     return absolute(path, config_.resourceRoot).string();
 }
 
+boost::optional<std::string>
+Generator::absoluteDataset(const boost::optional<std::string> &path) const
+{
+    if (!path) { return path; }
+    return absoluteDataset(*path);
+}
+
 namespace {
 
 struct TypeKey {
@@ -467,10 +474,15 @@ Generators::Detail::listGroups(const std::string &referenceFrame
         std::unique_lock<std::mutex> lock(servingLock_);
 
         auto &idx(serving_.get<TypeIdx>());
+        std::string prev;
         for (auto range(idx.equal_range(TypeKey(referenceFrame, type)));
              range.first != range.second; ++range.first)
         {
-            out.push_back((*range.first)->group());
+            const auto &group((*range.first)->group());
+            if (group != prev) {
+                out.push_back(group);
+                prev = group;
+            }
         }
     }
 
