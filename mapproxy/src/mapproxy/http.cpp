@@ -182,6 +182,8 @@ public:
 
     dbglog::module& lm() { return lm_; }
 
+    bool finished() const;
+
 private:
     void startRequest();
     void readRequest();
@@ -369,6 +371,15 @@ void prelogAndProcess(Http::Detail &detail
         << "HTTP \"" << request.method << ' ' << request.uri
         << ' ' << request.version << "\".";
     detail.request(connection, request);
+}
+
+bool Connection::finished() const
+{
+    switch (state_) {
+    case State::ready: case State::busy: return false;
+    case State::busyClose: case State::closed: return true;
+    }
+    return false;
 }
 
 void Connection::process()
@@ -773,21 +784,12 @@ private:
             (request_, response, body->data(), body->size(), true);
     }
 
-    bool finished() const {
-        return false;
-        // return (ri_.state == RequestInfo::State::finished);
-    }
-
     bool checkAborted_impl() const {
-        return finished();
+        return connection_->finished();
     }
 
     bool valid() const {
         return connection_->valid();
-    }
-
-    void enqueue() {
-        // ri_.enqueue(conn_);
     }
 
     Request request_;

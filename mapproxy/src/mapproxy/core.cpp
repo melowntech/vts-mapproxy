@@ -97,7 +97,7 @@ void Core::Detail::stop()
 
 void Core::Detail::worker(std::size_t id)
 {
-    dbglog::thread_id(str(boost::format("worker:%u") % id));
+    dbglog::thread_id(str(boost::format("core:%u") % id));
     LOG(info2) << "Spawned worker id:" << id << ".";
 
     for (;;) {
