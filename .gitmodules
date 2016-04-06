@@ -40,3 +40,6 @@
 [submodule "externals/cvision"]
 	path = externals/cvision
 	url = git@gitlab.citationtech.net:lib/cvision.git
+[submodule "externals/gdal-drivers"]
+	path = externals/gdal-drivers
+	url = git@gitlab.citationtech.net:lib/gdal-drivers.git
