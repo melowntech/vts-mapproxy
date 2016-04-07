@@ -62,7 +62,9 @@
                   , maxZoom: bl.lodRange[1]
                   , attribution: attribution
               });
-              map.addLayer(tl);
+              var layers = {};
+              var overlays = {};
+              layers[name] = tl;
 
               if (bl.maskUrl) {
                   var murl = bl.maskUrl.replace(/{lod}/g, "{z}");
@@ -71,10 +73,14 @@
                       minZoom: bl.lodRange[0]
                       , maxZoom: bl.lodRange[1]
                       , attribution: attribution
-                      , opacity: 0.1
+                      , opacity: 0.25
                   });
-                  map.addLayer(mtl);
+
+                  overlays[name + "/mask"] = mtl;
               }
+
+              L.control.layers(layers, overlays).addTo(map);
+              map.addLayer(tl);
           }
 
           // TODO: set from view mapConfig position
