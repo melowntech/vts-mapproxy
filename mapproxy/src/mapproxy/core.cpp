@@ -18,8 +18,8 @@ namespace vr = vadstena::registry;
 
 class Core::Detail : boost::noncopyable {
 public:
-    Detail(Generators &generators)
-        : generators_(generators)
+    Detail(Generators &generators, GdalWarper &warper)
+        : generators_(generators), warper_(warper)
         , browserEnabled_(generators.config().fileFlags
                           & FileFlags::browserEnabled)
         , work_(ios_)
@@ -58,6 +58,7 @@ private:
               , const Sink::pointer &sink);
 
     Generators &generators_;
+    GdalWarper &warper_;
     bool browserEnabled_;
 
     /** Processing pool stuff.
@@ -122,15 +123,15 @@ void Core::Detail::post(const Generator::Task &task
     ios_.post([=]()
     {
         try {
-            task();
+            task(warper_);
         } catch (...) {
             sink->error();
         }
     });
 }
 
-Core::Core(Generators &generators)
-    : detail_(std::make_shared<Detail>(generators))
+Core::Core(Generators &generators, GdalWarper &warper)
+    : detail_(std::make_shared<Detail>(generators, warper))
 {}
 
 void Core::generate_impl(const std::string &location

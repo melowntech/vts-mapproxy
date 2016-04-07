@@ -22,6 +22,7 @@
 #include "./generator.hpp"
 #include "./http.hpp"
 #include "./core.hpp"
+#include "./gdalsupport.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -84,6 +85,7 @@ private:
     Generators::Config generatorsConfig_;
 
     ResourceBackend::pointer resourceBackend_;
+    boost::optional<GdalWarper> gdalWarper_;
     boost::optional<Generators> generators_;
     boost::optional<Core> core_;
     boost::optional<Http> http_;
@@ -221,8 +223,10 @@ service::Service::Cleanup Daemon::start()
     auto guard(std::make_shared<Stopper>(*this));
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
-    generators_ = boost::in_place(generatorsConfig_, resourceBackend_);
-    core_ = boost::in_place(std::ref(*generators_));
+    gdalWarper_ = boost::in_place(5);
+    generators_ = boost::in_place
+        (generatorsConfig_, resourceBackend_);
+    core_ = boost::in_place(std::ref(*generators_), std::ref(*gdalWarper_));
     http_ = boost::in_place(httpListen_, httpThreadCount_, std::ref(*core_));
 
     return guard;
@@ -233,6 +237,7 @@ void Daemon::cleanup()
     // destroy, in reverse order
     http_ = boost::none;
     core_ = boost::none;
+    gdalWarper_ = boost::none;
     generators_.reset();
     resourceBackend_.reset();
 }

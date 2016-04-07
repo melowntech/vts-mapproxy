@@ -8,7 +8,7 @@ class Core : boost::noncopyable
            , public ContentGenerator
 {
 public:
-    Core(Generators &generators);
+    Core(Generators &generators, GdalWarper &warper);
 
     struct Detail;
 

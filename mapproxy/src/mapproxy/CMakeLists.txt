@@ -26,6 +26,8 @@ set(mapproxy_SOURCES
   fileinfo.hpp fileinfo.cpp
   core.hpp core.cpp
 
+  gdalsupport.hpp gdalsupport/gdalsupport.cpp
+
   main.cpp
   )
 

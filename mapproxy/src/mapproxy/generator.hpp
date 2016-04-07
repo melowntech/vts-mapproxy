@@ -16,6 +16,7 @@
 #include "./resourcebackend.hpp"
 #include "./fileinfo.hpp"
 #include "./contentgenerator.hpp"
+#include "./gdalsupport.hpp"
 
 namespace vts = vadstena::vts;
 
@@ -26,7 +27,7 @@ public:
     typedef std::shared_ptr<Generator> pointer;
     typedef std::vector<pointer> list;
     typedef std::map<Resource::Id, pointer> map;
-    typedef std::function<void()> Task;
+    typedef std::function<void(GdalWarper&)> Task;
 
     /** Configuration
      */

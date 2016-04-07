@@ -135,62 +135,24 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
                          , fi.format, definition_.format));
             return {};
         }
-        return [=]() {
-            generateTileImage(fi.tileId, sink);
+
+        return[=](GdalWarper &warper)  {
+            generateTileImage(fi.tileId, sink, warper);
         };
     }
 
     case TmsFileInfo::Type::mask:
-        return [=]() {
-            generateTileMask(fi.tileId, sink);
+        return [=](GdalWarper &warper) {
+            generateTileMask(fi.tileId, sink, warper);
         };
     }
 
     return {};
 }
 
-namespace {
-
-geo::GeoDataset tileDataSet(const Sink::pointer &sink
-                            , const geo::SrsDefinition &srs
-                            , const math::Extents2 &extents
-                            , const std::string &dataset
-                            , const boost::optional<std::string> &mask)
-{
-    // open source dataset
-    auto srcSet(geo::GeoDataset::open(dataset));
-
-    sink->checkAborted();
-
-    // warp
-    auto tileSet(geo::GeoDataset::deriveInMemory
-                 (srcSet, srs, math::Size2(256, 256)
-                  , extents));
-    srcSet.warpInto(tileSet, geo::GeoDataset::Resampling::cubic);
-
-    sink->checkAborted();
-
-    if (mask) {
-        // open source dataset
-        auto srcMaskSet(geo::GeoDataset::open(*mask));
-
-        sink->checkAborted();
-
-        auto maskSet(geo::GeoDataset::deriveInMemory
-                     (srcMaskSet, srs, math::Size2(256, 256)
-                      , extents));
-        srcMaskSet.warpInto(maskSet, geo::GeoDataset::Resampling::cubic);
-
-        tileSet.applyMask(maskSet.cmask());
-    }
-
-    return tileSet;
-}
-
-} // namespace
-
 void TmsRaster::generateTileImage(const vts::TileId tileId
-                                  , const Sink::pointer &sink) const
+                                  , const Sink::pointer &sink
+                                  , GdalWarper &warper) const
 {
     sink->checkAborted();
 
@@ -201,39 +163,26 @@ void TmsRaster::generateTileImage(const vts::TileId tileId
         return;
     }
 
-    // spatial-division SRS
-    const geo::SrsDefinition sds();
-
-    auto tileSet(tileDataSet(sink
-                             , vr::Registry::srs(nodeInfo.srs()).srsDef
-                             , nodeInfo.extents()
-                             , absoluteDataset(definition_.dataset)
-                             , absoluteDataset(definition_.mask)));
-
-    if (tileSet.cmask().empty()) {
-        // no data -> not found
-        sink->error(utility::makeError<NotFound>
-                    ("Tile has no valid data."));
-        return;
-    }
-
-    sink->checkAborted();
-
-    // export
-    cv::Mat tile;
-    tileSet.exportCvMat(tile, CV_8UC3);
+    auto tile
+        (warper.warpImage(absoluteDataset(definition_.dataset)
+                          , absoluteDataset(definition_.mask)
+                          , vr::Registry::srs(nodeInfo.srs()).srsDef
+                          , nodeInfo.extents()
+                          , math::Size2(256, 256)
+                          , geo::GeoDataset::Resampling::cubic));
 
     // serialize
     std::vector<unsigned char> buf;
     // TODO: configurable quality
-    cv::imencode(".jpg", tile, buf
+    cv::imencode(".jpg", tile.mat, buf
                  , { cv::IMWRITE_JPEG_QUALITY, 75 });
 
     sink->content(buf, Sink::FileInfo(contentType(definition_.format)));
 }
 
 void TmsRaster::generateTileMask(const vts::TileId tileId
-                                 , const Sink::pointer &sink) const
+                                 , const Sink::pointer &sink
+                                 , GdalWarper &warper) const
 {
     sink->checkAborted();
 
@@ -244,32 +193,18 @@ void TmsRaster::generateTileMask(const vts::TileId tileId
         return;
     }
 
-    // spatial-division SRS
-    const geo::SrsDefinition sds();
-
-    auto tileSet(tileDataSet(sink
-                             , vr::Registry::srs(nodeInfo.srs()).srsDef
-                             , nodeInfo.extents()
-                             , absoluteDataset(definition_.dataset)
-                             , absoluteDataset(definition_.mask)));
-
-    if (tileSet.cmask().empty()) {
-        // no data -> not found
-        sink->error(utility::makeError<NotFound>
-                    ("Tile has no valid data."));
-        return;
-    }
-
-    sink->checkAborted();
-
-    // export
-    cv::Mat mask(asCvMat(tileSet.cmask()));
+    auto mask
+        (warper.warpMask(absoluteDataset(definition_.dataset)
+                         , absoluteDataset(definition_.mask)
+                         , vr::Registry::srs(nodeInfo.srs()).srsDef
+                         , nodeInfo.extents()
+                         , math::Size2(256, 256)
+                         , geo::GeoDataset::Resampling::cubic));
 
     // serialize
     std::vector<unsigned char> buf;
-
     // write as png file
-    cv::imencode(".png", mask, buf
+    cv::imencode(".png", mask.mat, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
     sink->content(buf, Sink::FileInfo(contentType(MaskFormat)));
