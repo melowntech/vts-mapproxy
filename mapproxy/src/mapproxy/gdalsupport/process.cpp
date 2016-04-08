@@ -9,12 +9,12 @@
 
 #include "./process.hpp"
 
-Process::ExitCode Process::join()
+Process::ExitCode Process::join(bool justTry)
 {
 
     if (!joinable()) {
         std::system_error e(EINVAL, std::system_category());
-        LOG(err3) << "Cannot join non-joinable thread.";
+        LOG(err3) << "Cannot join non-joinable process.";
         throw e;
     }
 
@@ -27,8 +27,10 @@ Process::ExitCode Process::join()
     LOG(info1) << "Joining process" << id_ << ".";
 
     int status;
+    int options(0);
+    if (justTry) { options |= WNOHANG; }
     for (;;) {
-        auto res(::waitpid(id_, &status, 0x0));
+        auto res(::waitpid(id_, &status, options));
         if (res < 0) {
             if (EINTR == errno) { continue; }
 
@@ -36,6 +38,11 @@ Process::ExitCode Process::join()
             LOG(warn1) << "waitpid(2) failed: <" << e.code()
                        << ", " << e.what() << ">";
             throw e;
+        }
+
+        if (!res) {
+            // process still running -> Alive
+            throw Alive{};
         }
         break;
     }

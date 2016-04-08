@@ -19,6 +19,8 @@ public:
         bool quickExit_;
     };
 
+    struct Alive {};
+
     Process() : id_() {}
     Process(Process &&other);
 
@@ -42,9 +44,11 @@ public:
         std::swap(id_, other.id_);
     }
 
-     /** Joins thread. Can throw system_error, see std::thread documentation.
-     */
-    ExitCode join();
+     /** Joins process. Can throw system_error, see std::thread documentation.
+      *
+      * \param justTry throws Alive when true and process is still running.
+      */
+    ExitCode join(bool justTry = false);
 
 private:
     static Id run(const std::function<void()> &func, const Flags &flags);

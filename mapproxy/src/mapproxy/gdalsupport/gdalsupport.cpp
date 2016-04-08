@@ -6,6 +6,7 @@
 #include <thread>
 
 #include <boost/format.hpp>
+#include <boost/asio.hpp>
 
 #include <boost/interprocess/smart_ptr/shared_ptr.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
@@ -27,6 +28,8 @@
 #include "./process.hpp"
 
 namespace bi = boost::interprocess;
+namespace asio = boost::asio;
+namespace bs = boost::system;
 
 namespace {
 typedef bi::basic_managed_external_buffer<
@@ -298,14 +301,54 @@ GdalWarper::Detail::~Detail()
 
 void GdalWarper::Detail::runManager()
 {
+    dbglog::thread_id("gdal");
     LOG(info3) << "Started GDAL warper manager process.";
+
+    asio::io_service ios;
+    asio::signal_set signals(ios, SIGCHLD);
+
+    // handles signals
+    std::function<void(const bs::error_code &e, int signo)> signalHandler;
+    signalHandler = [&](const bs::error_code&, int signo)
+    {
+        signals.async_wait(signalHandler);
+        if (signo != SIGCHLD) { return; }
+
+        for (auto iworkers(workers_.begin()); iworkers != workers_.end(); ) {
+            try {
+                // try to join this process
+                iworkers->join(true);
+                // process terminated -> remove
+                iworkers = workers_.erase(iworkers);
+            } catch (Process::Alive) {
+                // process is still running, skip
+                ++iworkers;
+            }
+        }
+    };
+
+    signals.async_wait(signalHandler);
+
+    std::size_t idGenerator(0);
+
+    // TODO: bind process with request so we can notify outer world that worker
+    // process has died
     while (running()) {
         if (workers_.size() < processCount_) {
-            workers_.emplace_back(Process::Flags().quickExit(true)
-                                  , &Detail::worker, this, workers_.size());
+            ios.notify_fork(asio::io_service::fork_prepare);
+            auto id(++idGenerator);
+            workers_.emplace_back
+                (Process::Flags().quickExit(true)
+                 , [id,this,&ios]() {
+                    ios.notify_fork(asio::io_service::fork_child);
+                    worker(id);
+                });
+            ios.notify_fork(asio::io_service::fork_parent);
+            ios.poll();
             continue;
         }
 
+        ios.poll();
         sleep(1);
     }
 
@@ -323,6 +366,8 @@ void GdalWarper::Detail::start()
 {
     manager_ = Process(Process::Flags().quickExit(true)
                        , &Detail::runManager, this);
+
+    // TODO: watch for manager process death -> we have to follow it
 }
 
 void GdalWarper::Detail::stop()
@@ -489,5 +534,6 @@ GdalWarper::Detail::warpMask(const std::string &dataset
     auto &cmask(dst.cmask());
     auto *mask(allocateMat(mb_, maskMatSize(cmask), maskMatDataType(cmask)));
     asCvMat(*mask, cmask);
+    abort();
     return mask;
 }
