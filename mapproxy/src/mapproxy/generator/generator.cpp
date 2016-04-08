@@ -287,6 +287,8 @@ void Generators::Detail::stop()
     }
 }
 
+struct Aborted {};
+
 void Generators::Detail::runUpdater()
 {
     dbglog::thread_id("updater");
@@ -297,6 +299,8 @@ void Generators::Detail::runUpdater()
 
         try {
             update(resourceBackend_->load());
+        } catch (Aborted) {
+            // pass
         } catch (const std::exception &e) {
             LOG(err2) << "Resource info update failed: <" << e.what() << ">.";
             sleep = std::chrono::seconds(5);
@@ -350,6 +354,9 @@ void Generators::Detail::update(const Resource::map &resources)
 
     auto add([&](const Resource &res)
     {
+        if (!updaterRunning_) {
+            throw Aborted{};
+        }
         try {
             Generator::Config config(config_);
             config.root = makePath(res.id);

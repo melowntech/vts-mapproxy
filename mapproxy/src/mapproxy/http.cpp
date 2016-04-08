@@ -273,7 +273,7 @@ void Http::Detail::start(std::size_t count)
         ~Guard() { if (func) { func(); } }
         void release() { func = {}; }
         std::function<void()> func;
-    } guard(std::bind(&Detail::stop, this));
+    } guard([this]() { stop(); });
 
     for (std::size_t id(1); id <= count; ++id) {
         workers_.emplace_back(&Detail::worker, this, id);
@@ -286,6 +286,7 @@ void Http::Detail::start(std::size_t count)
 
 void Http::Detail::stop()
 {
+    LOG(info2) << "Stopping HTTP.";
     acceptor_.close();
 
     {
@@ -435,7 +436,8 @@ void Connection::makeReady()
 void Connection::close(const boost::system::error_code &ec)
 {
     if ((ec == asio::error::misc_errors::eof)
-        || (ec == asio::error::operation_aborted))
+        || (ec == asio::error::operation_aborted)
+        || (ec == asio::error::connection_reset))
     {
         LOG(info2, lm_) << "Aborted";
     } else {

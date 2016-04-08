@@ -76,7 +76,7 @@ void Core::Detail::start(std::size_t count)
         ~Guard() { if (func) { func(); } }
         void release() { func = {}; }
         std::function<void()> func;
-    } guard(std::bind(&Detail::stop, this));
+    } guard([this]() { stop(); });
 
     for (std::size_t id(1); id <= count; ++id) {
         workers_.emplace_back(&Detail::worker, this, id);
@@ -87,7 +87,7 @@ void Core::Detail::start(std::size_t count)
 
 void Core::Detail::stop()
 {
-    LOG(info4) << "stopping core";
+    LOG(info2) << "Stopping core.";
     ios_.stop();
 
     while (!workers_.empty()) {
@@ -112,7 +112,6 @@ void Core::Detail::worker(std::size_t id)
                 << ">. Going on.";
         }
     }
-
 }
 
 void Core::Detail::post(const Generator::Task &task

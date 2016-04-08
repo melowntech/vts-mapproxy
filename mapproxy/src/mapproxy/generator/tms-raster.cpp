@@ -163,18 +163,19 @@ void TmsRaster::generateTileImage(const vts::TileId tileId
         return;
     }
 
-    auto tile
-        (warper.warpImage(absoluteDataset(definition_.dataset)
-                          , absoluteDataset(definition_.mask)
-                          , vr::Registry::srs(nodeInfo.srs()).srsDef
-                          , nodeInfo.extents()
-                          , math::Size2(256, 256)
-                          , geo::GeoDataset::Resampling::cubic));
+    auto tile(warper.warp(GdalWarper::RasterRequest
+                          (GdalWarper::RasterRequest::Operation::image
+                           , absoluteDataset(definition_.dataset)
+                           , absoluteDataset(definition_.mask)
+                           , vr::Registry::srs(nodeInfo.srs()).srsDef
+                           , nodeInfo.extents()
+                           , math::Size2(256, 256)
+                           , geo::GeoDataset::Resampling::cubic)));
 
     // serialize
     std::vector<unsigned char> buf;
     // TODO: configurable quality
-    cv::imencode(".jpg", tile.mat, buf
+    cv::imencode(".jpg", *tile, buf
                  , { cv::IMWRITE_JPEG_QUALITY, 75 });
 
     sink->content(buf, Sink::FileInfo(contentType(definition_.format)));
@@ -193,18 +194,19 @@ void TmsRaster::generateTileMask(const vts::TileId tileId
         return;
     }
 
-    auto mask
-        (warper.warpMask(absoluteDataset(definition_.dataset)
-                         , absoluteDataset(definition_.mask)
-                         , vr::Registry::srs(nodeInfo.srs()).srsDef
-                         , nodeInfo.extents()
-                         , math::Size2(256, 256)
-                         , geo::GeoDataset::Resampling::cubic));
+    auto mask(warper.warp(GdalWarper::RasterRequest
+                          (GdalWarper::RasterRequest::Operation::mask
+                           , absoluteDataset(definition_.dataset)
+                           , absoluteDataset(definition_.mask)
+                           , vr::Registry::srs(nodeInfo.srs()).srsDef
+                           , nodeInfo.extents()
+                           , math::Size2(256, 256)
+                           , geo::GeoDataset::Resampling::cubic)));
 
     // serialize
     std::vector<unsigned char> buf;
     // write as png file
-    cv::imencode(".png", mask.mat, buf
+    cv::imencode(".png", *mask, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
     sink->content(buf, Sink::FileInfo(contentType(MaskFormat)));

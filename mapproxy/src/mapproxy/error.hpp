@@ -28,34 +28,55 @@ struct FormatError : Error {
     FormatError(const std::string &message) : Error(message) {}
 };
 
-/** Given URL does not exist.
- */
-struct NotFound : Error {
-    NotFound(const std::string &message) : Error(message) {}
-};
-
-/** Given URL does not exist.
- */
-struct NotAllowed : Error {
-    NotAllowed(const std::string &message) : Error(message) {}
-};
-
-/** Given URL is not available now.
- */
-struct Unavailable : Error {
-    Unavailable(const std::string &message) : Error(message) {}
-};
-
-/** Internal Error
- */
-struct InternalError : Error {
-    InternalError(const std::string &message) : Error(message) {}
-};
-
 /** Request aborted
  */
 struct RequestAborted : Error {
     RequestAborted(const std::string &message) : Error(message) {}
 };
+
+/** Given method is not allowed.
+ */
+struct NotAllowed : Error {
+    NotAllowed(const std::string &message) : Error(message) {}
+};
+
+class GenerateError : public Error {
+public:
+    typedef void(*RaiseError)(const std::string &message);
+
+    GenerateError(const std::string &message, RaiseError raiseError)
+        : Error(message), raiseError_(raiseError)
+    {}
+
+    RaiseError getRaise() const { return raiseError_; }
+
+    static void runtimeError(const std::string &message) {
+        throw std::runtime_error(message);
+    }
+
+private:
+    RaiseError raiseError_;
+};
+
+#define ERROR_GENERATE_ERROR(Type)                          \
+    struct Type : GenerateError {                           \
+        Type(const std::string &message)                    \
+            : GenerateError(message, &Type::raiseImpl) {}   \
+        static void raiseImpl(const std::string &message) { \
+            throw Type(message);                            \
+        }                                                   \
+    }
+
+/** Given URL does not exist.
+ */
+ERROR_GENERATE_ERROR(NotFound);
+
+/** Given URL is not available now.
+ */
+ERROR_GENERATE_ERROR(Unavailable);
+
+/** Internal Error.
+ */
+ERROR_GENERATE_ERROR(InternalError);
 
 #endif // mapproxy_error_hpp_included_
