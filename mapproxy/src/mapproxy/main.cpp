@@ -222,8 +222,10 @@ service::Service::Cleanup Daemon::start()
 {
     auto guard(std::make_shared<Stopper>(*this));
 
-    resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
+    // warper must be first since it uses processes
     gdalWarper_ = boost::in_place(5);
+
+    resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
     generators_ = boost::in_place
         (generatorsConfig_, resourceBackend_);
     core_ = boost::in_place(std::ref(*generators_), std::ref(*gdalWarper_));
@@ -237,9 +239,10 @@ void Daemon::cleanup()
     // destroy, in reverse order
     http_ = boost::none;
     core_ = boost::none;
-    gdalWarper_ = boost::none;
     generators_.reset();
     resourceBackend_.reset();
+
+    gdalWarper_ = boost::none;
 }
 
 void Daemon::stat(std::ostream &os)

@@ -1,3 +1,5 @@
+#include <sys/types.h>
+
 #include <new>
 #include <array>
 #include <atomic>
@@ -22,6 +24,7 @@
 
 #include "../error.hpp"
 #include "../gdalsupport.hpp"
+#include "./process.hpp"
 
 namespace bi = boost::interprocess;
 
@@ -199,12 +202,16 @@ public:
     Raster warp(const RasterRequest &req);
 
 private:
-    void start(std::size_t count);
+    void runManager();
+    void start();
     void stop();
     void worker(std::size_t id);
 
     inline bool running() const { return *running_; }
     inline void running(bool val) { *running_ = val; }
+
+    inline bi::interprocess_mutex& mutex() { return *mutex_; }
+    inline bi::interprocess_condition& cond() { return *cond_; }
 
     Raster rasterFromSharedMat(cv::Mat *mat);
 
@@ -231,11 +238,13 @@ private:
     std::atomic<bool> *running_;
     ShRasterRequest::Deque *queue_;
 
-    bi::interprocess_mutex queueMutex_;
-    bi::interprocess_condition queueCondition_;
+    bi::interprocess_mutex *mutex_;
+    bi::interprocess_condition *cond_;
+
+    Process manager_;
 
     // TODO: rewrite to use processes
-    std::vector<std::thread> workers_;
+    std::vector<Process> workers_;
 };
 
 GdalWarper::GdalWarper(unsigned int processCount)
@@ -274,9 +283,12 @@ GdalWarper::Detail::Detail(unsigned int processCount)
     , queue_(mb_.construct<ShRasterRequest::Deque>
              (bi::anonymous_instance)
              (mb_.get_allocator<ShRasterRequest>()))
+    , mutex_(mb_.construct<bi::interprocess_mutex>
+             (bi::anonymous_instance)())
+    , cond_(mb_.construct<bi::interprocess_condition>
+            (bi::anonymous_instance)())
 {
-    // TODO: make raster queue a smart pointer
-    start(processCount_);
+    start();
 }
 
 GdalWarper::Detail::~Detail()
@@ -284,38 +296,47 @@ GdalWarper::Detail::~Detail()
     stop();
 }
 
-void GdalWarper::Detail::start(std::size_t count)
+void GdalWarper::Detail::runManager()
 {
-    // make sure threads are released when something goes wrong
-    struct Guard {
-        Guard(const std::function<void()> &func) : func(func) {}
-        ~Guard() { if (func) { func(); } }
-        void release() { func = {}; }
-        std::function<void()> func;
-    } guard([this]() { stop(); });
+    LOG(info3) << "Started GDAL warper manager process.";
+    while (running()) {
+        if (workers_.size() < processCount_) {
+            workers_.emplace_back(Process::Flags().quickExit(true)
+                                  , &Detail::worker, this, workers_.size());
+            continue;
+        }
 
-    for (std::size_t id(1); id <= count; ++id) {
-        workers_.emplace_back(&Detail::worker, this, id);
+        sleep(1);
     }
 
-    guard.release();
+    LOG(info3) << "Stopping GDAL warper worker processes.";
+
+    while (!workers_.empty()) {
+        workers_.back().join();
+        workers_.pop_back();
+    }
+
+    LOG(info3) << "Stopped GDAL warper manager process.";
+}
+
+void GdalWarper::Detail::start()
+{
+    manager_ = Process(Process::Flags().quickExit(true)
+                       , &Detail::runManager, this);
 }
 
 void GdalWarper::Detail::stop()
 {
     LOG(info2) << "Stopping GDAL support.";
     {
-        Lock lock(queueMutex_);
+        Lock lock(mutex());
         running(false);
-        queueCondition_.notify_all();
+        cond().notify_all();
     }
 
-    LOG(info2) << "Waiting for threads.";
+    LOG(info2) << "Waiting for processes to terminate.";
 
-    while (!workers_.empty()) {
-        workers_.back().join();
-        workers_.pop_back();
-    }
+    manager_.join();
 }
 
 void GdalWarper::Detail::worker(std::size_t id)
@@ -328,8 +349,8 @@ void GdalWarper::Detail::worker(std::size_t id)
             ShRasterRequest::pointer req;
 
             {
-                Lock lock(queueMutex_);
-                queueCondition_.wait(lock, [&]()
+                Lock lock(mutex());
+                cond().wait(lock, [&]()
                 {
                     return (!running() || !queue_->empty());
                 });
@@ -343,15 +364,13 @@ void GdalWarper::Detail::worker(std::size_t id)
 
             if (req) {
                 try {
-                    LOG(info4) << "warping";
-                    req->set(queueMutex_, warpImpl(*req));
-                    LOG(info4) << "warped";
+                    req->set(mutex(), warpImpl(*req));
                 } catch (const GenerateError &e) {
-                    req->setError(queueMutex_, e);
+                    req->setError(mutex(), e);
                 } catch (const std::exception &e) {
-                    req->setError(queueMutex_, e);
+                    req->setError(mutex(), e);
                 } catch (...) {
-                    req->setError(queueMutex_, "Unknown error.");
+                    req->setError(mutex(), "Unknown error.");
                 }
             }
         } catch (const std::exception &e) {
@@ -375,23 +394,20 @@ GdalWarper::Raster GdalWarper::Detail::rasterFromSharedMat(cv::Mat *mat)
 
 GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req)
 {
-    ShRasterRequest::pointer ptr;
+    ShRasterRequest::pointer shReq;
     {
-        Lock lock(queueMutex_);
-        ptr = ShRasterRequest::pointer(mb_.construct<ShRasterRequest>
-                                       (bi::anonymous_instance)
-                                       (req, mb_)
-                                       , mb_.get_allocator<void>()
-                                       , mb_.get_deleter<void>());
+        Lock lock(mutex());
+        shReq = ShRasterRequest::pointer(mb_.construct<ShRasterRequest>
+                                         (bi::anonymous_instance)
+                                         (req, mb_)
+                                         , mb_.get_allocator<void>()
+                                         , mb_.get_deleter<void>());
 
-        queue_->push_back(ptr);
-        queueCondition_.notify_one();
+        queue_->push_back(shReq);
+        cond().notify_one();
     }
 
-    LOG(info4) << "waiting for response";
-    auto res(ptr->get(queueMutex_));
-    LOG(info4) << "got response";
-    return res;
+    return shReq->get(mutex());
 }
 
 cv::Mat* GdalWarper::Detail::warpImpl(const RasterRequest &req)
