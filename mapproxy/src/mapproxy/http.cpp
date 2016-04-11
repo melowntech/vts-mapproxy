@@ -28,10 +28,10 @@ namespace ubs = utility::buildsys;
 
 namespace {
 
-enum class StatusCode {
+enum class StatusCode : int {
     OK = 200
 
-    , SeeOther = 302
+    , Found = 302
 
     , BadRequest = 400
     , NotFound = 404
@@ -43,7 +43,7 @@ enum class StatusCode {
 
 UTILITY_GENERATE_ENUM_IO(StatusCode,
     ((OK)("OK"))
-    ((SeeOther)("See Other" ))
+    ((Found)("Found" ))
     ((BadRequest)("Bad Request"))
     ((NotFound)("Not Found"))
     ((NotAllowed)("Not Allowed"))
@@ -144,6 +144,8 @@ struct Response {
     Response(StatusCode code = StatusCode::OK)
         : code(code), close(false)
     {}
+
+    int numericCode() const { return static_cast<int>(code); }
 };
 
 class Connection
@@ -372,6 +374,24 @@ void prelogAndProcess(Http::Detail &detail
         << "HTTP \"" << request.method << ' ' << request.uri
         << ' ' << request.version << "\".";
     detail.request(connection, request);
+}
+
+void postLog(const Connection::pointer &connection
+             , const Request &request, const Response &response
+             , std::size_t size)
+{
+    if (response.code == StatusCode::OK) {
+        LOG(info3, connection->lm())
+            << "HTTP \"" << request.method << ' ' << request.uri
+            << ' ' << request.version << "\" " << response.numericCode()
+            << ' ' << size << '.';
+        return;
+    }
+
+    LOG(info3, connection->lm())
+        << "HTTP \"" << request.method << ' ' << request.uri
+        << ' ' << request.version << "\" " << response.numericCode()
+        << ' ' << size << " [" << response.reason << "].";
 }
 
 bool Connection::finished() const
@@ -613,7 +633,7 @@ void Connection::sendResponse(const Request &request, const Response &response
 {
     std::ostream os(&responseData_);
 
-    os << request.version << ' ' << static_cast<int>(response.code) << ' '
+    os << request.version << ' ' << response.numericCode() << ' '
        << response.code << "\r\n";
 
     os << "Date: " << formatHttpDate(-1) << "\r\n";
@@ -647,20 +667,24 @@ void Connection::sendResponse(const Request &request, const Response &response
     }
 
     auto self(shared_from_this());
-    auto writeResponse([self, this](const boost::system::error_code &ec
-                                    , std::size_t bytes)
+    auto responseSent([self, this, request, response]
+                      (const boost::system::error_code &ec, std::size_t bytes)
     {
         if (ec) {
             close(ec);
             return;
         }
 
+        // eat data from response
         responseData_.consume(bytes);
+
+        // log what happened
+        postLog(self, request, response, bytes);
 
         // response sent, not busy for now
         makeReady();
 
-        // response written, try next request immediately
+        // we are not busy so try next request immediately
         process();
     });
 
@@ -671,10 +695,10 @@ void Connection::sendResponse(const Request &request, const Response &response
         };
 
         asio::async_write(socket_, buffers
-                          , strand_.wrap(writeResponse));
+                          , strand_.wrap(responseSent));
     } else {
         asio::async_write(socket_, responseData_.data()
-                          , strand_.wrap(writeResponse));
+                          , strand_.wrap(responseSent));
     }
 }
 
@@ -705,7 +729,7 @@ private:
     {
         if (!valid()) { return; }
 
-        Response response(StatusCode::SeeOther);
+        Response response(StatusCode::Found);
         response.headers.emplace_back("Location", url);
         connection_->sendResponse(request_, response);
     }

@@ -34,6 +34,12 @@ struct RequestAborted : Error {
     RequestAborted(const std::string &message) : Error(message) {}
 };
 
+/** Abandon all operations.
+ */
+struct AbandonAll : Error {
+    AbandonAll(const std::string &message) : Error(message) {}
+};
+
 /** Given method is not allowed.
  */
 struct NotAllowed : Error {

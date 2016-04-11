@@ -252,9 +252,13 @@ void Daemon::stat(std::ostream &os)
 
 int Daemon::run()
 {
-    while (Service::isRunning()) {
-        // TODO: implement me
-        ::sleep(1);
+    try {
+        while (Service::isRunning()) {
+            gdalWarper_->housekeeping();
+            ::usleep(500000);
+        }
+    } catch (AbandonAll) {
+        return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;

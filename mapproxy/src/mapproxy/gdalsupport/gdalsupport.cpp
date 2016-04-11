@@ -8,47 +8,36 @@
 #include <boost/format.hpp>
 #include <boost/asio.hpp>
 
-#include <boost/interprocess/smart_ptr/shared_ptr.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/smart_ptr/deleter.hpp>
-#include <boost/interprocess/managed_external_buffer.hpp>
-#include <boost/interprocess/indexes/flat_map_index.hpp>
-#include <boost/interprocess/anonymous_shared_memory.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/interprocess/containers/deque.hpp>
-#include <boost/interprocess/containers/string.hpp>
-#include <boost/interprocess/sync/interprocess_mutex.hpp>
-#include <boost/interprocess/sync/interprocess_condition.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
-
-#include "imgproc/rastermask/cvmat.hpp"
-
 #include "../error.hpp"
 #include "../gdalsupport.hpp"
 #include "./process.hpp"
+#include "./datasetcache.hpp"
+#include "./types.hpp"
+#include "./operations.hpp"
 
-namespace bi = boost::interprocess;
 namespace asio = boost::asio;
 namespace bs = boost::system;
 
 namespace {
-typedef bi::basic_managed_external_buffer<
-    char
-    , bi::rbtree_best_fit<bi::mutex_family, void*>
-    , bi::flat_map_index> ManagedBuffer;
-typedef ManagedBuffer::segment_manager SegmentManager;
 
-typedef bi::allocator<void, SegmentManager> Allocator;
-typedef bi::deleter<void, SegmentManager> Deleter;
-typedef bi::shared_ptr<cv::Mat, Allocator, Deleter> MatPointer;
-typedef bi::shared_ptr<std::string, Allocator, Deleter> StringPointer;
+typedef boost::posix_time::ptime SystemTime;
 
-typedef bi::basic_string<
-    char, std::char_traits<char>
-    , bi::allocator<char, SegmentManager>
-    > String;
+SystemTime systemTime()
+{
+#if defined(BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK)
+    return boost::date_time::microsec_clock<SystemTime>::universal_time();
+#else // defined(BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK)
+    return boost::date_time::second_clock<SystemTime>::universal_time();
+#endif // defined(BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK)
+}
 
-typedef bi::scoped_lock<bi::interprocess_mutex> Lock;
+template <typename Delta>
+SystemTime absTime(const Delta &delta)
+{
+    return systemTime() + delta;
+}
+
+typedef boost::posix_time::milliseconds milliseconds;
 
 class ShRasterRequest {
 public:
@@ -95,12 +84,25 @@ public:
              , extents_, size_, resampling_);
     }
 
-    void setError(bi::interprocess_mutex &mutex, const char *message);
-    void setError(bi::interprocess_mutex &mutex, const std::exception &e);
-    void setError(bi::interprocess_mutex &mutex, const GenerateError &e);
+    template <typename T>
+    void setError(bi::interprocess_mutex &mutex, const T &what);
 
+    void setError(Lock&, const char *message);
+    void setError(Lock&, const std::exception &e);
+    void setError(Lock&, const GenerateError &e);
+
+    GdalWarper::Raster get(Lock &lock);
     GdalWarper::Raster get(bi::interprocess_mutex &mutex);
     void set(bi::interprocess_mutex &mutex, cv::Mat *response);
+
+    static pointer create(const GdalWarper::RasterRequest &req
+                          , ManagedBuffer &mb)
+    {
+        return pointer(mb.construct<ShRasterRequest>
+                       (bi::anonymous_instance)(req, mb)
+                       , mb.get_allocator<void>()
+                       , mb.get_deleter<void>());
+    }
 
 private:
     std::string asString(const String &str) const {
@@ -135,42 +137,47 @@ private:
     GenerateError::RaiseError raiseError_;
 };
 
-void ShRasterRequest::setError(bi::interprocess_mutex &mutex
-                               , const char *message)
+template <typename T>
+void ShRasterRequest::setError(bi::interprocess_mutex &mutex, const T &what)
 {
     Lock lock(mutex);
+    setError(lock, what);
+}
+
+void ShRasterRequest::setError(Lock&, const char *message)
+{
+    if (!error_.empty()) { return; }
     error_.assign(message);
     raiseError_ = &GenerateError::runtimeError;
     done_ = true;
+    cond_.notify_one();
 }
 
-void ShRasterRequest::setError(bi::interprocess_mutex &mutex
-                               , const GenerateError &e)
+void ShRasterRequest::setError(Lock&, const GenerateError &e)
 {
-    Lock lock(mutex);
+    if (!error_.empty()) { return; }
     error_.assign(e.what());
     raiseError_ = e.getRaise();
     done_ = true;
+    cond_.notify_one();
 }
 
-void ShRasterRequest::setError(bi::interprocess_mutex &mutex
-                               , const std::exception &e)
+void ShRasterRequest::setError(Lock &lock, const std::exception &e)
 {
-    setError(mutex, e.what());
+    setError(lock, e.what());
 }
 
 void ShRasterRequest::set(bi::interprocess_mutex &mutex, cv::Mat *response)
 {
     Lock lock(mutex);
-    // TODO: check for multiple assignments
+    if (response_) { return; }
     response_ = response;
     done_ = true;
     cond_.notify_one();
 }
 
-GdalWarper::Raster ShRasterRequest::get(bi::interprocess_mutex &mutex)
+GdalWarper::Raster ShRasterRequest::get(Lock &lock)
 {
-    Lock lock(mutex);
     cond_.wait(lock, [&]()
     {
         return done_;
@@ -194,6 +201,66 @@ GdalWarper::Raster ShRasterRequest::get(bi::interprocess_mutex &mutex)
     throw std::runtime_error("Unknown exception!");
 }
 
+GdalWarper::Raster ShRasterRequest::get(bi::interprocess_mutex &mutex)
+{
+    Lock lock(mutex);
+    return get(lock);
+}
+
+struct Worker {
+    typedef bi::shared_ptr<Worker, Allocator, Deleter> pointer;
+    typedef std::map<Process::Id, pointer> map;
+
+    Worker() {}
+
+    void attach(Process &&process) { process_ = std::move(process); }
+
+    void join(bool justTry = false) {
+        if (process_.joinable()) {
+            process_.join(justTry);
+        }
+    }
+
+    void kill() {
+        // kill the process, ignore all errors
+        if (process_.joinable()) {
+            try {
+                process_.kill();
+            } catch(...) {}
+        }
+    }
+
+    void associate(const ShRasterRequest::pointer &req) { req_ = req; }
+
+    void disassociate() { req_ = {}; }
+
+    Process::Id id() const { return process_.id(); }
+
+    void internalError(bi::interprocess_mutex &mutex)
+    {
+        Lock lock(mutex);
+        if (req_) {
+            req_->setError(lock, InternalError
+                           ("GDAL warper process unexpectedly terminated"));
+        }
+    }
+
+    static pointer create(ManagedBuffer &mb) {
+        return pointer(mb.construct<Worker>(bi::anonymous_instance)()
+                       , mb.get_allocator<void>()
+                       , mb.get_deleter<void>());
+    }
+
+private:
+    /** Worker process.
+     */
+    Process process_;
+
+    /** Processed request.
+     */
+    ShRasterRequest::pointer req_;
+};
+
 } // namespace
 
 class GdalWarper::Detail
@@ -204,34 +271,21 @@ public:
 
     Raster warp(const RasterRequest &req);
 
+    void housekeeping();
+
 private:
-    void runManager();
+    void runManager(Process::Id parentId);
     void start();
     void stop();
-    void worker(std::size_t id);
+    void worker(std::size_t id, Process::Id parentId, Worker::pointer worker);
+
+    void cleanup(bool join);
 
     inline bool running() const { return *running_; }
     inline void running(bool val) { *running_ = val; }
 
     inline bi::interprocess_mutex& mutex() { return *mutex_; }
     inline bi::interprocess_condition& cond() { return *cond_; }
-
-    Raster rasterFromSharedMat(cv::Mat *mat);
-
-    cv::Mat* warpImpl(const RasterRequest &req);
-    cv::Mat* warpImage(const std::string &dataset
-                       , const boost::optional<std::string> &maskDataset
-                       , const geo::SrsDefinition &srs
-                       , const math::Extents2 &extents
-                       , const math::Size2 &size
-                       , geo::GeoDataset::Resampling resampling);
-
-    cv::Mat* warpMask(const std::string &dataset
-                      , const boost::optional<std::string> &maskDataset
-                      , const geo::SrsDefinition &srs
-                      , const math::Extents2 &extents
-                      , const math::Size2 &size
-                      , geo::GeoDataset::Resampling resampling);
 
     unsigned int processCount_;
 
@@ -247,7 +301,7 @@ private:
     Process manager_;
 
     // TODO: rewrite to use processes
-    std::vector<Process> workers_;
+    Worker::map workers_;
 };
 
 GdalWarper::GdalWarper(unsigned int processCount)
@@ -259,24 +313,10 @@ GdalWarper::Raster GdalWarper::warp(const RasterRequest &req)
     return detail().warp(req);
 }
 
-namespace {
-
-cv::Mat* allocateMat(ManagedBuffer &mb
-                     , const math::Size2 &size, int type)
+void GdalWarper::housekeeping()
 {
-    // calculate sizes
-    const auto dataSize(math::area(size) * CV_ELEM_SIZE(type));
-    const auto matSize(sizeof(cv::Mat) + dataSize);
-
-    // create raw memory to hold matrix and data
-    char *raw(static_cast<char*>(mb.allocate(matSize)));
-
-    // allocate matrix in raw data block
-    return new (raw) cv::Mat(size.height, size.width, type
-                             , raw + sizeof(cv::Mat));
+    return detail().housekeeping();
 }
-
-} // namespace
 
 GdalWarper::Detail::Detail(unsigned int processCount)
     : processCount_(processCount)
@@ -299,11 +339,17 @@ GdalWarper::Detail::~Detail()
     stop();
 }
 
-void GdalWarper::Detail::runManager()
+void GdalWarper::Detail::runManager(Process::Id parentId)
 {
     dbglog::thread_id("gdal");
     LOG(info3) << "Started GDAL warper manager process.";
 
+    auto isRunning([&]()
+    {
+        return running() && (parentId == ThisProcess::parentId());
+    });
+
+    auto thisId(ThisProcess::id());
     asio::io_service ios;
     asio::signal_set signals(ios, SIGCHLD);
 
@@ -315,9 +361,14 @@ void GdalWarper::Detail::runManager()
         if (signo != SIGCHLD) { return; }
 
         for (auto iworkers(workers_.begin()); iworkers != workers_.end(); ) {
+            auto &worker(iworkers->second);
             try {
                 // try to join this process
-                iworkers->join(true);
+                auto id(worker->id());
+                worker->join(true);
+                LOG(warn2) << "Process " << id << " terminated unexpectedly.";
+                worker->internalError(mutex());
+
                 // process terminated -> remove
                 iworkers = workers_.erase(iworkers);
             } catch (Process::Alive) {
@@ -333,41 +384,85 @@ void GdalWarper::Detail::runManager()
 
     // TODO: bind process with request so we can notify outer world that worker
     // process has died
-    while (running()) {
+    while (isRunning()) {
         if (workers_.size() < processCount_) {
             ios.notify_fork(asio::io_service::fork_prepare);
             auto id(++idGenerator);
-            workers_.emplace_back
-                (Process::Flags().quickExit(true)
-                 , [id,this,&ios]() {
-                    ios.notify_fork(asio::io_service::fork_child);
-                    worker(id);
-                });
+
+            // create worker
+            auto worker(Worker::create(mb_));
+            // create process
+            worker->attach(Process
+                           (Process::Flags().quickExit(true)
+                            , [this, id, thisId, worker, &ios]()
+            {
+                ios.notify_fork(asio::io_service::fork_child);
+                this->worker(id, thisId, worker);
+            }));
+
+            // remember worker
+            workers_.insert(Worker::map::value_type(worker->id(), worker));
+
+            // notify fork and poll
             ios.notify_fork(asio::io_service::fork_parent);
             ios.poll();
             continue;
         }
 
+        // poll and sleep a bit
         ios.poll();
-        sleep(1);
+        ::usleep(100000);
     }
 
     LOG(info3) << "Stopping GDAL warper worker processes.";
-
-    while (!workers_.empty()) {
-        workers_.back().join();
-        workers_.pop_back();
-    }
-
+    cleanup(true);
     LOG(info3) << "Stopped GDAL warper manager process.";
 }
 
 void GdalWarper::Detail::start()
 {
     manager_ = Process(Process::Flags().quickExit(true)
-                       , &Detail::runManager, this);
+                       , &Detail::runManager, this, ThisProcess::id());
+}
 
-    // TODO: watch for manager process death -> we have to follow it
+void GdalWarper::Detail::cleanup(bool join)
+{
+    // make not-running
+    {
+        Lock lock(mutex());
+        running(false);
+        cond().notify_all();
+    }
+
+    // cleanup
+    while (!workers_.empty()) {
+        auto head(workers_.begin());
+        auto &worker(head->second);
+
+        if (join) {
+            // join worker
+            worker->join();
+        } else {
+            // cock the gun and shoot
+            worker->kill();
+        }
+
+        // notify any unfinished work
+        worker->internalError(mutex());
+
+        // get rid of this worker
+        workers_.erase(head);
+    }
+}
+
+void GdalWarper::Detail::housekeeping()
+{
+    try {
+        manager_.join(true);
+        LOG(warn3) << "Manager process terminated. Bailing out.";
+        cleanup(false);
+        throw AbandonAll("GDAL warper is screwed up pretty bad.");
+    } catch (Process::Alive) {}
 }
 
 void GdalWarper::Detail::stop()
@@ -381,42 +476,63 @@ void GdalWarper::Detail::stop()
 
     LOG(info2) << "Waiting for processes to terminate.";
 
-    manager_.join();
+    // join manager process
+    if (manager_.joinable()) {
+        manager_.join();
+    }
 }
 
-void GdalWarper::Detail::worker(std::size_t id)
+typedef GdalWarper::RasterRequest RasterRequest;
+
+void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
+                                , Worker::pointer worker)
 {
     dbglog::thread_id(str(boost::format("gdal:%u") % id));
     LOG(info2) << "Spawned GDAL worker id:" << id << ".";
+    DatasetCache cache;
 
-    while (running()) {
+    auto isRunning([&]()
+    {
+        return running() && (parentId == ThisProcess::parentId());
+    });
+
+    while (isRunning()) {
         try {
             ShRasterRequest::pointer req;
 
             {
                 Lock lock(mutex());
-                cond().wait(lock, [&]()
+                cond().timed_wait(lock, absTime(milliseconds(500)), [&]()
                 {
-                    return (!running() || !queue_->empty());
+                    return (!isRunning() || !queue_->empty());
                 });
-                if (!running()) { break; }
+                if (!isRunning()) { break; }
 
-                if (!queue_->empty()) {
-                    req = queue_->back();
-                    queue_->pop_back();
-                }
+                // empty queue -> nothing to do
+                if (queue_->empty()) { continue; }
+
+                // grab request
+                req = queue_->back();
+                queue_->pop_back();
+
+                // associate request to this worker
+                worker->associate(req);
             }
 
-            if (req) {
-                try {
-                    req->set(mutex(), warpImpl(*req));
-                } catch (const GenerateError &e) {
-                    req->setError(mutex(), e);
-                } catch (const std::exception &e) {
-                    req->setError(mutex(), e);
-                } catch (...) {
-                    req->setError(mutex(), "Unknown error.");
-                }
+            try {
+                req->set(mutex(), ::warp(cache, mb_, *req));
+            } catch (const GenerateError &e) {
+                req->setError(mutex(), e);
+            } catch (const std::exception &e) {
+                req->setError(mutex(), e);
+            } catch (...) {
+                req->setError(mutex(), "Unknown error.");
+            }
+
+            {
+                // disassociate request from this worker
+                Lock lock(mutex());
+                worker->disassociate();
             }
         } catch (const std::exception &e) {
             LOG(err3)
@@ -428,112 +544,12 @@ void GdalWarper::Detail::worker(std::size_t id)
     LOG(info2) << "Terminated GDAL worker id:" << id << ".";
 }
 
-GdalWarper::Raster GdalWarper::Detail::rasterFromSharedMat(cv::Mat *mat)
-{
-    return GdalWarper::Raster(mat, [this](cv::Mat *mat)
-    {
-        // deallocate data
-        mb_.deallocate(mat);
-    });
-}
-
 GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req)
 {
-    ShRasterRequest::pointer shReq;
-    {
-        Lock lock(mutex());
-        shReq = ShRasterRequest::pointer(mb_.construct<ShRasterRequest>
-                                         (bi::anonymous_instance)
-                                         (req, mb_)
-                                         , mb_.get_allocator<void>()
-                                         , mb_.get_deleter<void>());
+    Lock lock(mutex());
+    ShRasterRequest::pointer shReq(ShRasterRequest::create(req, mb_));
+    queue_->push_back(shReq);
+    cond().notify_one();
 
-        queue_->push_back(shReq);
-        cond().notify_one();
-    }
-
-    return shReq->get(mutex());
-}
-
-cv::Mat* GdalWarper::Detail::warpImpl(const RasterRequest &req)
-{
-    switch (req.operation) {
-    case RasterRequest::Operation::image:
-        return warpImage
-            (req.dataset, req.mask, req.srs, req.extents, req.size
-             , req.resampling);
-    case RasterRequest::Operation::mask:
-        return warpMask
-            (req.dataset, req.mask, req.srs, req.extents, req.size
-             , req.resampling);
-    }
-    throw;
-}
-
-cv::Mat*
-GdalWarper::Detail::warpImage(const std::string &dataset
-                              , const boost::optional<std::string> &maskDataset
-                              , const geo::SrsDefinition &srs
-                              , const math::Extents2 &extents
-                              , const math::Size2 &size
-                              , geo::GeoDataset::Resampling resampling)
-{
-    auto src(geo::GeoDataset::open(dataset));
-    auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
-    src.warpInto(dst, resampling);
-
-    if (dst.cmask().empty()) {
-        throw NotFound("No valid data.");
-    }
-
-    // apply mask set if defined
-    if (maskDataset) {
-        auto srcMask(geo::GeoDataset::open(*maskDataset));
-        auto dstMask(geo::GeoDataset::deriveInMemory
-                     (srcMask, srs, size, extents));
-        srcMask.warpInto(dstMask, resampling);
-        dst.applyMask(dstMask.cmask());
-    }
-
-    // grab destination
-    auto dstMat(dst.cdata());
-    auto type(CV_MAKETYPE(CV_8U, dstMat.channels()));
-
-    auto *tile(allocateMat(mb_, size, type));
-    dstMat.convertTo(*tile, type);
-    return tile;
-}
-
-cv::Mat*
-GdalWarper::Detail::warpMask(const std::string &dataset
-                             , const boost::optional<std::string> &maskDataset
-                             , const geo::SrsDefinition &srs
-                             , const math::Extents2 &extents
-                             , const math::Size2 &size
-                             , geo::GeoDataset::Resampling resampling)
-{
-    // TODO: execute in external process
-
-    auto src(geo::GeoDataset::open(dataset));
-    auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
-    src.warpInto(dst, resampling);
-
-    if (dst.cmask().empty()) {
-        throw NotFound("No valid data.");
-    }
-
-    // apply mask set if defined
-    if (maskDataset) {
-        auto srcMask(geo::GeoDataset::open(*maskDataset));
-        auto dstMask(geo::GeoDataset::deriveInMemory
-                     (srcMask, srs, size, extents));
-        srcMask.warpInto(dstMask, resampling);
-        dst.applyMask(dstMask.cmask());
-    }
-
-    auto &cmask(dst.cmask());
-    auto *mask(allocateMat(mb_, maskMatSize(cmask), maskMatDataType(cmask)));
-    asCvMat(*mask, cmask);
-    abort();
-    return mask;
+    return shReq->get(lock);
 }

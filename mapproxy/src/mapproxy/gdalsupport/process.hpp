@@ -36,7 +36,7 @@ public:
     Process& operator=(Process &&other);
     Process& operator=(Process &other) = delete;
 
-    Id getId() const { return id_; }
+    Id id() const { return id_; }
 
     inline bool joinable() const { return id_ > 0; }
 
@@ -44,17 +44,28 @@ public:
         std::swap(id_, other.id_);
     }
 
-     /** Joins process. Can throw system_error, see std::thread documentation.
-      *
-      * \param justTry throws Alive when true and process is still running.
-      */
+    /** Joins process. Can throw system_error, see std::thread documentation.
+     *
+     * \param justTry throws Alive when true and process is still running.
+     */
     ExitCode join(bool justTry = false);
+
+    /** Kill the process (hard kill).
+     */
+    void kill();
 
 private:
     static Id run(const std::function<void()> &func, const Flags &flags);
 
     Id id_;
 };
+
+struct ThisProcess {
+    static Process::Id id();
+    static Process::Id parentId();
+};
+
+// inlines
 
 inline Process::Process(Process &&other)
     : id_(other.id_)

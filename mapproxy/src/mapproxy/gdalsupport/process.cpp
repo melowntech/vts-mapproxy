@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <sys/wait.h>
 
 #include <cerrno>
@@ -24,7 +25,8 @@ Process::ExitCode Process::join(bool justTry)
         throw e;
     }
 
-    LOG(info1) << "Joining process" << id_ << ".";
+    LOG(info1) << (justTry ? "Trying to join process " : "Joining process ")
+               << id_ << ".";
 
     int status;
     int options(0);
@@ -60,6 +62,24 @@ Process::ExitCode Process::join(bool justTry)
     return EXIT_FAILURE;
 }
 
+void Process::kill()
+{
+    if (!joinable()) {
+        std::system_error e(EINVAL, std::system_category());
+        LOG(err3) << "Cannot join non-joinable process.";
+        throw e;
+    }
+
+    auto res(::kill(id_, SIGKILL));
+
+    if (res < 0) {
+        std::system_error e(errno, std::system_category());
+        LOG(warn1) << "kill(2) failed: <" << e.code()
+                   << ", " << e.what() << ">";
+        throw e;
+    }
+}
+
 Process::Id Process::run(const std::function<void()> &func
                          , const Flags &flags)
 {
@@ -70,4 +90,14 @@ Process::Id Process::run(const std::function<void()> &func
 
     return utility::spawn([=]() -> int { func(); return EXIT_SUCCESS; }
                           , pflags);
+}
+
+Process::Id ThisProcess::id()
+{
+    return ::getpid();
+}
+
+Process::Id ThisProcess::parentId()
+{
+    return ::getppid();
 }

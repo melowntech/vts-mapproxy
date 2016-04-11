@@ -44,6 +44,11 @@ public:
 
     Raster warp(const RasterRequest &request);
 
+    /** Do housekeeping. Must be called in the process where internals are being
+     * run.
+     */
+     void housekeeping();
+
     struct Detail;
 
 private:
