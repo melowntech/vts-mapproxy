@@ -467,11 +467,15 @@ std::string contentType(RasterFormat format)
     return {};
 }
 
-bool checkRanges(const Resource &resource, const vts::TileId &tileId)
+bool checkRanges(const Resource &resource, const vts::TileId &tileId
+                 , RangeType rangeType)
 {
     if (!in(tileId.lod, resource.lodRange)) {
         return false;
     }
+
+    // LOD is enough
+    if (rangeType == RangeType::lod) { return true; }
 
     // tileId.lod is inside lorRange, so difference is always positive
     auto pTileId(parent(tileId, tileId.lod - resource.lodRange.min));

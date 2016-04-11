@@ -230,6 +230,9 @@ TmsFileInfo::TmsFileInfo(const FileInfo &fi, int flags)
         if (ext == "mask") {
             // mask file
             type = Type::mask;
+        } else if (ext == "meta") {
+            // mask file
+            type = Type::metatile;
         } else {
             // another file -> parse as format
             type = Type::image;
@@ -273,6 +276,8 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
         return { contentType(format), lastModified };
     case Type::mask:
         return { contentType(MaskFormat), lastModified };
+    case Type::metatile:
+        return { contentType(RasterMetatileFormat), lastModified };
     case Type::support:
         return { support->contentType, support->lastModified };
     case Type::unknown:

@@ -20,7 +20,7 @@ public:
 
     class RasterRequest {
     public:
-        enum class Operation { image, mask };
+        enum class Operation { image, mask, detailMask };
 
         Operation operation;
         std::string dataset;
@@ -36,7 +36,8 @@ public:
                       , const geo::SrsDefinition &srs
                       , const math::Extents2 &extents
                       , const math::Size2 &size
-                      , geo::GeoDataset::Resampling resampling)
+                      , geo::GeoDataset::Resampling resampling
+                      = geo::GeoDataset::Resampling::nearest)
             : operation(operation), dataset(dataset), mask(mask)
             , srs(srs), extents(extents), size(size), resampling(resampling)
         {}

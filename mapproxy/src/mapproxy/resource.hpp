@@ -90,6 +90,7 @@ UTILITY_GENERATE_ENUM(RasterFormat,
 )
 
 constexpr RasterFormat MaskFormat = RasterFormat::png;
+constexpr RasterFormat RasterMetatileFormat = RasterFormat::png;
 
 /** What directory is resource root:
  */
@@ -158,7 +159,10 @@ std::string prependRoot(const std::string &path, const Resource &resource
 
 std::string contentType(RasterFormat format);
 
-bool checkRanges(const Resource &resource, const vts::TileId &tileId);
+enum class RangeType { lod, tileId };
+
+bool checkRanges(const Resource &resource, const vts::TileId &tileId
+                 , RangeType rangeType = RangeType::tileId);
 
 // inlines + IO
 

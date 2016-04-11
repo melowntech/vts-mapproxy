@@ -108,6 +108,14 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
         }
         break;
 
+    case TmsFileInfo::Type::metatile:
+        if (!checkRanges(resource(), fi.tileId, RangeType::lod)) {
+            sink->error(utility::makeError<NotFound>
+                        ("TileId outside of configured range."));
+            return {};
+        }
+        break;
+
     default: break;
     }
 
@@ -144,6 +152,11 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
     case TmsFileInfo::Type::mask:
         return [=](GdalWarper &warper) {
             generateTileMask(fi.tileId, sink, warper);
+        };
+
+    case TmsFileInfo::Type::metatile:
+        return [=](GdalWarper &warper) {
+            generateMetatile(fi.tileId, sink, warper);
         };
     }
 
@@ -211,6 +224,119 @@ void TmsRaster::generateTileMask(const vts::TileId tileId
 
     sink->content(buf, Sink::FileInfo(contentType(MaskFormat)));
 
+}
+
+namespace Constants {
+    const unsigned int RasterMetatileBinaryOrder(8);
+    const math::Size2 RasterMetatileSize(1 << RasterMetatileBinaryOrder
+                                         , 1 << RasterMetatileBinaryOrder);
+    const unsigned int RasterMetatileMask(~(RasterMetatileSize.width - 1));
+}
+
+namespace MetaFlags {
+    constexpr std::uint8_t watertight(0xc0);
+    constexpr std::uint8_t nonWatertight(0x80);
+    constexpr std::uint8_t unAvailable(0x00);
+}
+
+#if 0
+    // iterate over input and output pixels and generate content
+    auto imask(srcMask.cdata().begin<double>());
+    for (auto itile(tile->begin<std::uint8_t>())
+             , etile(tile->end<std::uint8_t>());
+         itile != etile; ++itile, ++imask)
+    {
+        if (!*imask) {
+            // black -> not available
+            *itile = unavailable;
+        } else if (*imask >= 255) {
+            // white -> available and watertight
+            *itile = MetaFlags::watertight;
+        } else {
+            // gray -> available but not watetight
+            *itile = MetaFlags::nonWatertight;
+        }
+    }
+
+    return tile;
+#endif
+
+void TmsRaster::generateMetatile(const vts::TileId tileId
+                                 , const Sink::pointer &sink
+                                 , GdalWarper &warper) const
+{
+    sink->checkAborted();
+
+    if (((tileId.x & Constants::RasterMetatileMask) != tileId.x)
+        || ((tileId.y & Constants::RasterMetatileMask) != tileId.y))
+    {
+        sink->error(utility::makeError<NotFound>
+                    ("TileId doesn't point to metatile origin."));
+        return;
+    }
+
+    // generate tile range (inclusive!)
+    vts::TileRange tr(tileId.x, tileId.y, tileId.x, tileId.y);
+    tr.ur(0) += Constants::RasterMetatileSize.width - 1;
+    tr.ur(1) += Constants::RasterMetatileSize.height - 1;
+
+    // get maximum tile index at this lod
+    auto maxIndex(vts::tileCount(tileId.lod) - 1);
+
+    // and clip
+    if (tr.ur(0) > maxIndex) { tr.ur(0) = maxIndex; }
+    if (tr.ur(1) > maxIndex) { tr.ur(1) = maxIndex; }
+
+    // calculate tile range at current LOD from resource definition
+    auto tileRange(vts::childRange(resource().tileRange
+                                   , tileId.lod - resource().lodRange.min));
+
+    // check for overlap with defined tile size
+    if (!overlaps(tileRange, tr)) {
+        sink->error(utility::makeError<NotFound>
+                    ("Metatile completely outside of configured range."));
+        return;
+    }
+
+    // calculate overlap
+    auto view(math::intersect(tileRange, tr));
+
+    // metatile size in tiles/pixels
+    auto mtSize(math::size(view)); ++mtSize.width; ++mtSize.height;
+
+    auto llId(vts::tileId(tileId.lod, view.ll));
+    auto urId(vts::tileId(tileId.lod, view.ur));
+
+    // grab nodes at opposite sides
+    vts::NodeInfo llNode(referenceFrame(), llId);
+    vts::NodeInfo urNode(referenceFrame(), urId);
+
+    // compose extents
+    math::Extents2 extents(llNode.extents().ll(0), urNode.extents().ur(1)
+                           , urNode.extents().ur(0), llNode.extents().ll(1));
+
+    // warp it (returns single-channel double matrix)
+    auto src(warper.warp(GdalWarper::RasterRequest
+                         (GdalWarper::RasterRequest::Operation::detailMask
+                          , absoluteDataset(definition_.dataset)
+                          , absoluteDataset(definition_.mask)
+                          , vr::Registry::srs(llNode.srs()).srsDef
+                          , extents
+                          , math::Size2(mtSize.width, mtSize.height))));
+
+    cv::Mat metatile(Constants::RasterMetatileSize.width
+                     , Constants::RasterMetatileSize.height
+                     , CV_8U, cv::Scalar(0));
+
+    // generate
+    
+
+    // serialize metatile
+    std::vector<unsigned char> buf;
+    // write as png file
+    cv::imencode(".png", metatile, buf
+                 , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+    sink->content(buf, Sink::FileInfo(contentType(RasterMetatileFormat)));
 }
 
 } // namespace generator

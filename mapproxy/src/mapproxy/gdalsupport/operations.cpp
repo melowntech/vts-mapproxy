@@ -30,7 +30,7 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
                    , const math::Size2 &size
                    , geo::GeoDataset::Resampling resampling)
 {
-    auto &src(cache.get(dataset));
+    auto &src(cache.dataset(dataset));
     auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
     src.warpInto(dst, resampling);
 
@@ -40,11 +40,15 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
 
     // apply mask set if defined
     if (maskDataset) {
-        auto &srcMask(cache.get(*maskDataset));
+        auto &srcMask(cache.dataset(*maskDataset));
         auto dstMask(geo::GeoDataset::deriveInMemory
                      (srcMask, srs, size, extents));
         srcMask.warpInto(dstMask, resampling);
         dst.applyMask(dstMask.cmask());
+    }
+
+    if (dst.cmask().empty()) {
+        throw NotFound("No valid data.");
     }
 
     // grab destination
@@ -53,7 +57,6 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
 
     auto *tile(allocateMat(mb, size, type));
     dstMat.convertTo(*tile, type);
-    sleep(2);
     return tile;
 }
 
@@ -65,7 +68,7 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
                   , const math::Size2 &size
                   , geo::GeoDataset::Resampling resampling)
 {
-    auto &src(cache.get(dataset));
+    auto &src(cache.dataset(dataset));
     auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
     src.warpInto(dst, resampling);
 
@@ -75,17 +78,47 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
 
     // apply mask set if defined
     if (maskDataset) {
-        auto &srcMask(cache.get(*maskDataset));
+        auto &srcMask(cache.dataset(*maskDataset));
         auto dstMask(geo::GeoDataset::deriveInMemory
                      (srcMask, srs, size, extents));
         srcMask.warpInto(dstMask, resampling);
         dst.applyMask(dstMask.cmask());
     }
 
+    if (dst.cmask().empty()) {
+        throw NotFound("No valid data.");
+    }
+
     auto &cmask(dst.cmask());
     auto *mask(allocateMat(mb, maskMatSize(cmask), maskMatDataType(cmask)));
     asCvMat(*mask, cmask);
     return mask;
+}
+
+cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
+                        , const std::string &dataset
+                        , const boost::optional<std::string> &maskDataset
+                        , const geo::SrsDefinition &srs
+                        , const math::Extents2 &extents
+                        , const math::Size2 &size)
+{
+    if (!maskDataset) {
+        (void) dataset;
+        throw InternalError
+            ("Unimplemented: TODO: generate metatile from data.");
+    }
+
+    // generate metatile from mask dataset
+    auto &srcMask(cache.mask(*maskDataset));
+    auto dstMask(geo::GeoDataset::deriveInMemory
+                 (srcMask, srs, size, extents));
+    srcMask.warpInto(dstMask, geo::GeoDataset::Resampling::average);
+
+    // mask is guaranteed to have single (double) channel
+    auto &dstMat(dstMask.cdata());
+    auto *tile(allocateMat(mb, size, dstMat.type()));
+    dstMat.copyTo(*tile);
+    return tile;
 }
 
 cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
@@ -100,6 +133,9 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
         return warpMask
             (cache, mb, req.dataset, req.mask, req.srs, req.extents, req.size
              , req.resampling);
+    case GdalWarper::RasterRequest::Operation::detailMask:
+        return warpDetailMask
+            (cache, mb, req.dataset, req.mask, req.srs, req.extents, req.size);
     }
     throw;
 }

@@ -25,6 +25,10 @@ private:
                           , const Sink::pointer &sink
                           , GdalWarper &warper) const;
 
+    void generateMetatile(const vts::TileId tileId
+                          , const Sink::pointer &sink
+                          , GdalWarper &warper) const;
+
     const resdef::TmsRaster &definition_;
 };
 
