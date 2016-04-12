@@ -42,6 +42,9 @@ public:
             = utility::buildsys::installPath("var/mapproxy/store");
         generatorsConfig_.resourceRoot
             = utility::buildsys::installPath("var/mapproxy/datasets");
+        gdalWarperOptions_.processCount = 8;
+        gdalWarperOptions_.tmpRoot
+            = utility::buildsys::installPath("var/mapproxy/tmp");
         generatorsConfig_.resourceUpdatePeriod = 300;
     }
 
@@ -83,6 +86,7 @@ private:
     bool httpEnableBrowser_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
     Generators::Config generatorsConfig_;
+    GdalWarper::Options gdalWarperOptions_;
 
     ResourceBackend::pointer resourceBackend_;
     boost::optional<GdalWarper> gdalWarper_;
@@ -111,6 +115,13 @@ void Daemon::configuration(po::options_description &cmdline
         ("http.enableBrowser", po::value(&httpEnableBrowser_)
          ->default_value(httpEnableBrowser_)->required()
          , "Enables resource browsering functionaly if set to true.")
+
+        ("gdal.processCount"
+         , po::value(&gdalWarperOptions_.processCount)
+         ->default_value(gdalWarperOptions_.processCount)->required())
+        ("gdal.tmpRoot"
+         , po::value(&gdalWarperOptions_.tmpRoot)
+         ->default_value(gdalWarperOptions_.tmpRoot)->required())
 
         ("resource-backend.type"
          , po::value(&resourceBackendConfig_.type)->required()
@@ -223,7 +234,7 @@ service::Service::Cleanup Daemon::start()
     auto guard(std::make_shared<Stopper>(*this));
 
     // warper must be first since it uses processes
-    gdalWarper_ = boost::in_place(5);
+    gdalWarper_ = boost::in_place(gdalWarperOptions_);
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
     generators_ = boost::in_place

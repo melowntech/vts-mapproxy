@@ -186,6 +186,8 @@ public:
 
     bool finished() const;
 
+    void setAborter(const Sink::AbortedCallback &ac);
+
 private:
     void startRequest();
     void readRequest();
@@ -202,6 +204,8 @@ private:
     void close(const boost::system::error_code &ec);
 
     void makeReady();
+
+    void aborted();
 
     static std::atomic<std::size_t> idGenerator_;
 
@@ -220,6 +224,9 @@ private:
 
     enum class State { ready, busy, busyClose, closed };
     State state_;
+
+    std::mutex acMutex_;
+    Sink::AbortedCallback ac_;
 };
 
 std::atomic<std::size_t> Connection::idGenerator_(0);
@@ -394,6 +401,25 @@ void postLog(const Connection::pointer &connection
         << ' ' << size << " [" << response.reason << "].";
 }
 
+void Connection::setAborter(const Sink::AbortedCallback &ac)
+{
+    std::unique_lock<std::mutex> lock(acMutex_);
+    ac_ = ac;
+}
+
+void Connection::aborted()
+{
+    // grab current value of callback
+    auto ac([&]() -> Sink::AbortedCallback
+    {
+        std::unique_lock<std::mutex> lock(acMutex_);
+        return ac_;
+    }());
+
+    // call it without locking
+    if (ac) { ac(); }
+}
+
 bool Connection::finished() const
 {
     switch (state_) {
@@ -468,6 +494,7 @@ void Connection::close(const boost::system::error_code &ec)
 
     // aborted
     state_ = State::closed;
+    aborted();
     owner_.removeConnection(shared_from_this());
 }
 
@@ -810,12 +837,16 @@ private:
             (request_, response, body->data(), body->size(), true);
     }
 
-    bool checkAborted_impl() const {
+    virtual bool checkAborted_impl() const {
         return connection_->finished();
     }
 
     bool valid() const {
         return connection_->valid();
+    }
+
+    virtual void setAborter_impl(const AbortedCallback &ac) {
+        connection_->setAborter(ac);
     }
 
     Request request_;

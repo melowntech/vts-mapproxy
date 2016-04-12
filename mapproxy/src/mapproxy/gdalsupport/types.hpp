@@ -2,6 +2,7 @@
 #define mapproxy_gdalsupport_types_hpp_included_
 
 #include <boost/interprocess/smart_ptr/shared_ptr.hpp>
+#include <boost/interprocess/smart_ptr/weak_ptr.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/smart_ptr/deleter.hpp>
 #include <boost/interprocess/managed_external_buffer.hpp>

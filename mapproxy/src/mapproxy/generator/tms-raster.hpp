@@ -30,6 +30,8 @@ private:
                           , GdalWarper &warper) const;
 
     const resdef::TmsRaster &definition_;
+
+    bool hasMetatiles_;
 };
 
 } // namespace generator

@@ -48,11 +48,18 @@ utility::PreMain Factory::register_([]()
 TmsRaster::TmsRaster(const Config &config, const Resource &resource)
     : Generator(config, resource)
     , definition_(this->resource().definition<resdef::TmsRaster>())
+    , hasMetatiles_(false)
 {
     // try to open datasets
-    geo::GeoDataset::open(absoluteDataset(definition_.dataset));
+    auto dataset(geo::GeoDataset::open(absoluteDataset(definition_.dataset)));
     if (definition_.mask) {
         geo::GeoDataset::open(absoluteDataset(*definition_.mask));
+        // we have mask dataset -> metatiles exist
+        hasMetatiles_ = true;
+    } else {
+        // no external mask available -> metatiles exist only when dataset has
+        // some invalid pixels
+        hasMetatiles_ = !dataset.allValid();
     }
 
     makeReady();
@@ -84,6 +91,11 @@ vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
     bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
                              , resource(), root);
 
+    if (hasMetatiles_) {
+        bl.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
+                                 , resource(), root);
+    }
+
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
     bl.credits = res.credits;
@@ -109,6 +121,11 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
         break;
 
     case TmsFileInfo::Type::metatile:
+        if (!hasMetatiles_) {
+            sink->error(utility::makeError<NotFound>
+                        ("This dataset doesn't provide metatiles."));
+            return {};
+        }
         if (!checkRanges(resource(), fi.tileId, RangeType::lod)) {
             sink->error(utility::makeError<NotFound>
                         ("TileId outside of configured range."));
@@ -183,7 +200,8 @@ void TmsRaster::generateTileImage(const vts::TileId tileId
                            , vr::Registry::srs(nodeInfo.srs()).srsDef
                            , nodeInfo.extents()
                            , math::Size2(256, 256)
-                           , geo::GeoDataset::Resampling::cubic)));
+                           , geo::GeoDataset::Resampling::cubic)
+                          , sink));
 
     // serialize
     std::vector<unsigned char> buf;
@@ -214,7 +232,8 @@ void TmsRaster::generateTileMask(const vts::TileId tileId
                            , vr::Registry::srs(nodeInfo.srs()).srsDef
                            , nodeInfo.extents()
                            , math::Size2(256, 256)
-                           , geo::GeoDataset::Resampling::cubic)));
+                           , geo::GeoDataset::Resampling::cubic)
+                          , sink));
 
     // serialize
     std::vector<unsigned char> buf;
@@ -235,31 +254,9 @@ namespace Constants {
 
 namespace MetaFlags {
     constexpr std::uint8_t watertight(0xc0);
-    constexpr std::uint8_t nonWatertight(0x80);
-    constexpr std::uint8_t unAvailable(0x00);
+    constexpr std::uint8_t available(0x80);
+    constexpr std::uint8_t unavailable(0x00);
 }
-
-#if 0
-    // iterate over input and output pixels and generate content
-    auto imask(srcMask.cdata().begin<double>());
-    for (auto itile(tile->begin<std::uint8_t>())
-             , etile(tile->end<std::uint8_t>());
-         itile != etile; ++itile, ++imask)
-    {
-        if (!*imask) {
-            // black -> not available
-            *itile = unavailable;
-        } else if (*imask >= 255) {
-            // white -> available and watertight
-            *itile = MetaFlags::watertight;
-        } else {
-            // gray -> available but not watetight
-            *itile = MetaFlags::nonWatertight;
-        }
-    }
-
-    return tile;
-#endif
 
 void TmsRaster::generateMetatile(const vts::TileId tileId
                                  , const Sink::pointer &sink
@@ -302,7 +299,7 @@ void TmsRaster::generateMetatile(const vts::TileId tileId
     auto view(math::intersect(tileRange, tr));
 
     // metatile size in tiles/pixels
-    auto mtSize(math::size(view)); ++mtSize.width; ++mtSize.height;
+    math::Size2 mtSize(math::size(view)); ++mtSize.width; ++mtSize.height;
 
     auto llId(vts::tileId(tileId.lod, view.ll));
     auto urId(vts::tileId(tileId.lod, view.ur));
@@ -315,21 +312,57 @@ void TmsRaster::generateMetatile(const vts::TileId tileId
     math::Extents2 extents(llNode.extents().ll(0), urNode.extents().ur(1)
                            , urNode.extents().ur(0), llNode.extents().ll(1));
 
-    // warp it (returns single-channel double matrix)
-    auto src(warper.warp(GdalWarper::RasterRequest
-                         (GdalWarper::RasterRequest::Operation::detailMask
-                          , absoluteDataset(definition_.dataset)
-                          , absoluteDataset(definition_.mask)
-                          , vr::Registry::srs(llNode.srs()).srsDef
-                          , extents
-                          , math::Size2(mtSize.width, mtSize.height))));
+    GdalWarper::Raster src;
+    if (definition_.mask) {
+        // warp detailed mask
+        src = warper.warp(GdalWarper::RasterRequest
+                          (GdalWarper::RasterRequest::Operation::detailMask
+                           , absoluteDataset(*definition_.mask)
+                           , vr::Registry::srs(llNode.srs()).srsDef
+                           , extents, mtSize)
+                          , sink);
+    } else {
+        // warp dataset as mask
+        src = warper.warp(GdalWarper::RasterRequest
+                          (GdalWarper::RasterRequest::Operation::mask
+                           , absoluteDataset(definition_.dataset)
+                           , boost::none // no mask
+                           , vr::Registry::srs(llNode.srs()).srsDef
+                           , extents, mtSize
+                           , geo::GeoDataset::Resampling::cubic)
+                          , sink);
+    }
 
     cv::Mat metatile(Constants::RasterMetatileSize.width
                      , Constants::RasterMetatileSize.height
                      , CV_8U, cv::Scalar(0));
 
-    // generate
-    
+    // bits to set for watertight tile
+    const auto watertightBits
+        (definition_.mask
+         ? MetaFlags::watertight // detailed mask -> watertight supported
+         : MetaFlags::available // no mask -> watertight supported
+         );
+
+    // generate metatile content
+    math::Point2i origin(view.ll(0) - tileId.x, view.ll(1) - tileId.y);
+    math::Point2i end(view.ur(0) - tileId.x, view.ur(1) - tileId.y);
+    for (int j(origin(1)), je(end(1)), jj(0); j <= je; ++j, ++jj) {
+        for (int i(origin(0)), ie(end(0)), ii(0); i <= ie; ++i, ++ii) {
+            const auto &in(src->at<double>(jj, ii));
+            auto &out(metatile.at<std::uint8_t>(j, i));
+            if (!in) {
+                // black -> not available
+                out = MetaFlags::unavailable;
+            } else if (in >= 255) {
+                // white -> available and watertight -> use computed bits above
+                out = watertightBits;
+            } else {
+                // gray -> available but not watetight
+                out = MetaFlags::available;
+            }
+        }
+    }
 
     // serialize metatile
     std::vector<unsigned char> buf;

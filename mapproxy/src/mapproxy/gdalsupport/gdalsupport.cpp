@@ -8,6 +8,8 @@
 #include <boost/format.hpp>
 #include <boost/asio.hpp>
 
+#include "geo/gdal.hpp"
+
 #include "../error.hpp"
 #include "../gdalsupport.hpp"
 #include "./process.hpp"
@@ -42,6 +44,7 @@ typedef boost::posix_time::milliseconds milliseconds;
 class ShRasterRequest {
 public:
     typedef bi::shared_ptr<ShRasterRequest, Allocator, Deleter> pointer;
+    typedef bi::weak_ptr<ShRasterRequest, Allocator, Deleter> wpointer;
 
     typedef bi::deque<pointer, bi::allocator<pointer, SegmentManager>> Deque;
 
@@ -266,10 +269,11 @@ private:
 class GdalWarper::Detail
 {
 public:
-    Detail(unsigned int processCount);
+    Detail(const Options &options);
     ~Detail();
 
-    Raster warp(const RasterRequest &req);
+    Raster warp(const RasterRequest &req
+                , const Sink::pointer &sink);
 
     void housekeeping();
 
@@ -287,7 +291,7 @@ private:
     inline bi::interprocess_mutex& mutex() { return *mutex_; }
     inline bi::interprocess_condition& cond() { return *cond_; }
 
-    unsigned int processCount_;
+    Options options_;
 
     bi::mapped_region mem_;
     ManagedBuffer mb_;
@@ -304,13 +308,14 @@ private:
     Worker::map workers_;
 };
 
-GdalWarper::GdalWarper(unsigned int processCount)
-    : detail_(std::make_shared<Detail>(processCount))
+GdalWarper::GdalWarper(const Options &options)
+    : detail_(std::make_shared<Detail>(options))
 {}
 
-GdalWarper::Raster GdalWarper::warp(const RasterRequest &req)
+GdalWarper::Raster GdalWarper::warp(const RasterRequest &req
+                                    , const Sink::pointer &sink)
 {
-    return detail().warp(req);
+    return detail().warp(req, sink);
 }
 
 void GdalWarper::housekeeping()
@@ -318,8 +323,8 @@ void GdalWarper::housekeeping()
     return detail().housekeeping();
 }
 
-GdalWarper::Detail::Detail(unsigned int processCount)
-    : processCount_(processCount)
+GdalWarper::Detail::Detail(const Options &options)
+    : options_(options)
     , mem_(bi::anonymous_shared_memory(1 << 22))
     , mb_(bi::create_only, mem_.get_address(), mem_.get_size())
     , running_(mb_.construct<std::atomic<bool>>(bi::anonymous_instance)(true))
@@ -385,7 +390,7 @@ void GdalWarper::Detail::runManager(Process::Id parentId)
     // TODO: bind process with request so we can notify outer world that worker
     // process has died
     while (isRunning()) {
-        if (workers_.size() < processCount_) {
+        if (workers_.size() < options_.processCount) {
             ios.notify_fork(asio::io_service::fork_prepare);
             auto id(++idGenerator);
 
@@ -491,6 +496,12 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
     LOG(info2) << "Spawned GDAL worker id:" << id << ".";
     DatasetCache cache;
 
+    geo::Gdal::setOption("GDAL_ERROR_ON_LIBJPEG_WARNING", true);
+    if (!options_.tmpRoot.empty()) {
+        geo::Gdal::setOption("GDAL_DEFAULT_WMS_CACHE_PATH"
+                             , (options_.tmpRoot / "gdalwmscache").string());
+    }
+
     auto isRunning([&]()
     {
         return running() && (parentId == ThisProcess::parentId());
@@ -544,12 +555,25 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
     LOG(info2) << "Terminated GDAL worker id:" << id << ".";
 }
 
-GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req)
+GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
+                                            , const Sink::pointer &sink)
 {
     Lock lock(mutex());
     ShRasterRequest::pointer shReq(ShRasterRequest::create(req, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
+
+    {
+        // set aborter for this request
+        ShRasterRequest::wpointer wreq(shReq);
+        sink->setAborter([wreq, this]()
+        {
+            if (auto r = wreq.lock()) {
+                r->setError
+                    (mutex(), RequestAborted("Request has been aborted"));
+            }
+        });
+    }
 
     return shReq->get(lock);
 }

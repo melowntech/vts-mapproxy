@@ -28,12 +28,6 @@ struct FormatError : Error {
     FormatError(const std::string &message) : Error(message) {}
 };
 
-/** Request aborted
- */
-struct RequestAborted : Error {
-    RequestAborted(const std::string &message) : Error(message) {}
-};
-
 /** Abandon all operations.
  */
 struct AbandonAll : Error {
@@ -84,5 +78,9 @@ ERROR_GENERATE_ERROR(Unavailable);
 /** Internal Error.
  */
 ERROR_GENERATE_ERROR(InternalError);
+
+/** Request aborted
+ */
+ERROR_GENERATE_ERROR(RequestAborted);
 
 #endif // mapproxy_error_hpp_included_

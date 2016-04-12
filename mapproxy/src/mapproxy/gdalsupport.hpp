@@ -4,17 +4,27 @@
 #include <memory>
 
 #include <boost/optional.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include <opencv2/core/core.hpp>
 
 #include "geo/srsdef.hpp"
 #include "geo/geodataset.hpp"
 
+#include "./contentgenerator.hpp"
+
 class GdalWarper {
 public:
     typedef std::shared_ptr<GdalWarper> pointer;
 
-    GdalWarper(unsigned int processCount);
+    struct Options {
+        unsigned int processCount;
+        boost::filesystem::path tmpRoot;
+
+        Options() : processCount(5) {}
+    };
+
+    GdalWarper(const Options &options);
 
     typedef std::shared_ptr<cv::Mat> Raster;
 
@@ -41,9 +51,20 @@ public:
             : operation(operation), dataset(dataset), mask(mask)
             , srs(srs), extents(extents), size(size), resampling(resampling)
         {}
+
+        RasterRequest(Operation operation
+                      , const std::string &dataset
+                      , const geo::SrsDefinition &srs
+                      , const math::Extents2 &extents
+                      , const math::Size2 &size
+                      , geo::GeoDataset::Resampling resampling
+                      = geo::GeoDataset::Resampling::nearest)
+            : operation(operation), dataset(dataset)
+            , srs(srs), extents(extents), size(size), resampling(resampling)
+        {}
     };
 
-    Raster warp(const RasterRequest &request);
+    Raster warp(const RasterRequest &request, const Sink::pointer &sink);
 
     /** Do housekeeping. Must be called in the process where internals are being
      * run.

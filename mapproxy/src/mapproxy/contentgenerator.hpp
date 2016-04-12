@@ -14,6 +14,8 @@ class Sink {
 public:
     typedef std::shared_ptr<Sink> pointer;
 
+    typedef std::function<void()> AbortedCallback;
+
     Sink() {}
     virtual ~Sink() {}
 
@@ -94,6 +96,10 @@ public:
      */
     void checkAborted() const;
 
+    /** Sets aborted callback.
+     */
+    void setAborter(const AbortedCallback &ac);
+
 private:
     virtual void content_impl(const void *data, std::size_t size
                               , const FileInfo &stat, bool needCopy) = 0;
@@ -101,6 +107,7 @@ private:
     virtual void listing_impl(const Listing &list) = 0;
     virtual void error_impl(const std::exception_ptr &exc) = 0;
     virtual bool checkAborted_impl() const = 0;
+    virtual void setAborter_impl(const AbortedCallback &ac) = 0;
 };
 
 class ContentGenerator {
@@ -133,15 +140,9 @@ inline void Sink::content(const std::vector<T> &data, const FileInfo &stat)
     content_impl(data.data(), data.size() * sizeof(T), stat, true);
 }
 
-inline void Sink::seeOther(const std::string &url)
-{
-    seeOther_impl(url);
-}
+inline void Sink::seeOther(const std::string &url) { seeOther_impl(url); }
 
-inline void Sink::error(const std::exception_ptr &exc)
-{
-    error_impl(exc);
-}
+inline void Sink::error(const std::exception_ptr &exc) { error_impl(exc); }
 
 template <typename T>
 inline void Sink::error(const T &exc)
@@ -153,9 +154,10 @@ inline void Sink::error(const T &exc)
     }
 }
 
-inline void Sink::listing(const Listing &list)
-{
-    listing_impl(list);
+inline void Sink::listing(const Listing &list) { listing_impl(list); }
+
+inline void Sink::setAborter(const AbortedCallback &ac) {
+    setAborter_impl(ac);
 }
 
 inline void ContentGenerator::generate(const std::string &location

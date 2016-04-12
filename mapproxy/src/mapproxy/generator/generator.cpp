@@ -124,6 +124,12 @@ Generator::absoluteDataset(const boost::optional<std::string> &path) const
     return absoluteDataset(*path);
 }
 
+void Generator::checkReady() const
+{
+    if (ready_) { return; }
+    throw Unavailable("Generator not ready.");
+}
+
 namespace {
 
 struct TypeKey {
@@ -181,8 +187,10 @@ public:
     Detail(const Generators::Config &config
            , const ResourceBackend::pointer &resourceBackend)
         : config_(config), resourceBackend_(resourceBackend)
-        , updaterRunning_(false)
+        , updaterRunning_(false), ready_(false)
     {}
+
+    void checkReady() const;
 
     Generator::pointer generator(const FileInfo &fileInfo) const;
 
@@ -260,10 +268,18 @@ private:
     mutable std::mutex servingLock_;
     GeneratorMap serving_;
 
+    std::atomic<bool> ready_;
+
     std::mutex preparingLock_;
     Generator::list preparing_;
     std::condition_variable preparingCond_;
 };
+
+void Generators::Detail::checkReady() const
+{
+    if (ready_) { return; }
+    throw Unavailable("Server not ready.");
+}
 
 fs::path Generators::Detail::makePath(const Resource::Id &id)
 {
@@ -422,6 +438,7 @@ void Generators::Detail::update(const Resource::map &resources)
         }
     }
 
+    ready_ = true;
     LOG(info2) << "Resources updated.";
 }
 
@@ -429,6 +446,8 @@ Generator::list
 Generators::Detail::referenceFrame(const std::string &referenceFrame)
     const
 {
+    checkReady();
+
     Generator::list out;
 
     // use only ready generators that handle datasets for given reference frame
@@ -448,6 +467,8 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
 Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
     const
 {
+    checkReady();
+
     // find generator (under lock)
     auto generator([&]() -> Generator::pointer
     {
@@ -479,6 +500,8 @@ Generators::Detail::listGroups(const std::string &referenceFrame
                                , Resource::Generator::Type type)
     const
 {
+    checkReady();
+
     std::vector<std::string> out;
     {
         std::unique_lock<std::mutex> lock(servingLock_);
@@ -505,6 +528,8 @@ Generators::Detail::listIds(const std::string &referenceFrame
                             , const std::string &group)
     const
 {
+    checkReady();
+
     std::vector<std::string> out;
     {
         std::unique_lock<std::mutex> lock(servingLock_);

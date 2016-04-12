@@ -53,6 +53,10 @@ public:
      */
     bool ready() const { return ready_; }
 
+    /** Throws Unavailable if generator is not ready yet.
+     */
+    void checkReady() const;
+
     /** Prepares generator for serving.
      */
     void prepare();
