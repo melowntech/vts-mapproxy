@@ -8,6 +8,7 @@
 #include <boost/noncopyable.hpp>
 #include <boost/format.hpp>
 #include <boost/asio.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "geo/gdal.hpp"
 
@@ -27,11 +28,8 @@ typedef boost::posix_time::ptime SystemTime;
 
 SystemTime systemTime()
 {
-#ifdef OOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK
+    // we must have miscrosec clock to work properly
     return boost::date_time::microsec_clock<SystemTime>::universal_time();
-#else // BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK
-    return boost::date_time::second_clock<SystemTime>::universal_time();
-#endif // BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK
 }
 
 template <typename Delta>
