@@ -196,11 +196,11 @@ void TmsRaster::generateTileImage(const vts::TileId tileId
     auto tile(warper.warp(GdalWarper::RasterRequest
                           (GdalWarper::RasterRequest::Operation::image
                            , absoluteDataset(definition_.dataset)
-                           , absoluteDataset(definition_.mask)
                            , vr::Registry::srs(nodeInfo.srs()).srsDef
                            , nodeInfo.extents()
                            , math::Size2(256, 256)
-                           , geo::GeoDataset::Resampling::cubic)
+                           , geo::GeoDataset::Resampling::cubic
+                           , absoluteDataset(definition_.mask))
                           , sink));
 
     // serialize
@@ -227,8 +227,8 @@ void TmsRaster::generateTileMask(const vts::TileId tileId
 
     auto mask(warper.warp(GdalWarper::RasterRequest
                           (GdalWarper::RasterRequest::Operation::mask
-                           , absoluteDataset(definition_.dataset)
-                           , absoluteDataset(definition_.mask)
+                           , absoluteDataset(definition_.dataset
+                                             , definition_.mask)
                            , vr::Registry::srs(nodeInfo.srs()).srsDef
                            , nodeInfo.extents()
                            , math::Size2(256, 256)
@@ -328,7 +328,6 @@ void TmsRaster::generateMetatile(const vts::TileId tileId
         src = warper.warp(GdalWarper::RasterRequest
                           (GdalWarper::RasterRequest::Operation::mask
                            , absoluteDataset(definition_.dataset)
-                           , boost::none // no mask
                            , vr::Registry::srs(llNode.srs()).srsDef
                            , extents, mtSize
                            , geo::GeoDataset::Resampling::cubic)

@@ -124,6 +124,14 @@ Generator::absoluteDataset(const boost::optional<std::string> &path) const
     return absoluteDataset(*path);
 }
 
+std::string Generator
+::absoluteDataset(const std::string &path
+                  , const boost::optional<std::string> &override) const
+{
+    if (override) { return absoluteDataset(*override); }
+    return absoluteDataset(path);
+}
+
 void Generator::checkReady() const
 {
     if (ready_) { return; }

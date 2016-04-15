@@ -24,11 +24,11 @@ cv::Mat* allocateMat(ManagedBuffer &mb
 
 cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
                    , const std::string &dataset
-                   , const boost::optional<std::string> &maskDataset
                    , const geo::SrsDefinition &srs
                    , const math::Extents2 &extents
                    , const math::Size2 &size
-                   , geo::GeoDataset::Resampling resampling)
+                   , geo::GeoDataset::Resampling resampling
+                   , const boost::optional<std::string> &maskDataset)
 {
     auto &src(cache(dataset));
     auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
@@ -45,10 +45,10 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
                      (srcMask, srs, size, extents));
         srcMask.warpInto(dstMask, resampling);
         dst.applyMask(dstMask.cmask());
-    }
 
-    if (dst.cmask().empty()) {
-        throw NotFound("No valid data.");
+        if (dst.cmask().empty()) {
+            throw NotFound("No valid data.");
+        }
     }
 
     // grab destination
@@ -62,7 +62,6 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
 
 cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
                   , const std::string &dataset
-                  , const boost::optional<std::string> &maskDataset
                   , const geo::SrsDefinition &srs
                   , const math::Extents2 &extents
                   , const math::Size2 &size
@@ -71,19 +70,6 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
     auto &src(cache(dataset));
     auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
     src.warpInto(dst, resampling);
-
-    if (dst.cmask().empty()) {
-        throw NotFound("No valid data.");
-    }
-
-    // apply mask set if defined
-    if (maskDataset) {
-        auto &srcMask(cache(*maskDataset));
-        auto dstMask(geo::GeoDataset::deriveInMemory
-                     (srcMask, srs, size, extents));
-        srcMask.warpInto(dstMask, resampling);
-        dst.applyMask(dstMask.cmask());
-    }
 
     if (dst.cmask().empty()) {
         throw NotFound("No valid data.");
@@ -124,11 +110,11 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
     switch (req.operation) {
     case GdalWarper::RasterRequest::Operation::image:
         return warpImage
-            (cache, mb, req.dataset, req.mask, req.srs, req.extents, req.size
-             , req.resampling);
+            (cache, mb, req.dataset, req.srs, req.extents, req.size
+             , req.resampling, req.mask);
     case GdalWarper::RasterRequest::Operation::mask:
         return warpMask
-            (cache, mb, req.dataset, req.mask, req.srs, req.extents, req.size
+            (cache, mb, req.dataset, req.srs, req.extents, req.size
              , req.resampling);
     case GdalWarper::RasterRequest::Operation::detailMask:
         return warpDetailMask

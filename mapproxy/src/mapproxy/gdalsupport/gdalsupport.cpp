@@ -57,7 +57,6 @@ public:
         , dataset_(other.dataset.data()
                  , other.dataset.size()
                  , sm.get_allocator<char>())
-        , mask_(sm.get_allocator<char>())
         , srs_(other.srs.srs.data()
                , other.srs.srs.size()
                , sm.get_allocator<char>())
@@ -65,6 +64,7 @@ public:
         , extents_(other.extents)
         , size_(other.size)
         , resampling_(other.resampling)
+        , mask_(sm.get_allocator<char>())
         , done_(false)
         , response_()
         , error_(sm.get_allocator<char>())
@@ -84,9 +84,9 @@ public:
         return GdalWarper::RasterRequest
             (operation_
              , std::string(dataset_.data(), dataset_.size())
-             , asOptional(mask_)
              , geo::SrsDefinition(asString(srs_), srsType_)
-             , extents_, size_, resampling_);
+             , extents_, size_, resampling_
+             , asOptional(mask_));
     }
 
     template <typename T>
@@ -123,12 +123,12 @@ private:
 
     GdalWarper::RasterRequest::Operation operation_;
     String dataset_;
-    String mask_;
     String srs_;
     geo::SrsDefinition::Type srsType_;
     math::Extents2 extents_;
     math::Size2 size_;
     geo::GeoDataset::Resampling resampling_;
+    String mask_;
 
     // response condition and flag
     bi::interprocess_condition cond_;

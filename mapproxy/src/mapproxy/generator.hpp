@@ -97,6 +97,10 @@ protected:
     boost::optional<std::string>
     absoluteDataset(const boost::optional<std::string> &path) const;
 
+    std::string absoluteDataset(const std::string &path
+                                , const boost::optional<std::string> &override)
+        const;
+
 private:
     virtual void prepare_impl() = 0;
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;

@@ -34,33 +34,24 @@ public:
 
         Operation operation;
         std::string dataset;
-        boost::optional<std::string> mask;
         geo::SrsDefinition srs;
         math::Extents2 extents;
         math::Size2 size;
         geo::GeoDataset::Resampling resampling;
+        boost::optional<std::string> mask;
 
         RasterRequest(Operation operation
                       , const std::string &dataset
+                      , const geo::SrsDefinition &srs
+                      , const math::Extents2 &extents
+                      , const math::Size2 &size
+                      , geo::GeoDataset::Resampling resampling
+                      = geo::GeoDataset::Resampling::nearest
                       , const boost::optional<std::string> &mask
-                      , const geo::SrsDefinition &srs
-                      , const math::Extents2 &extents
-                      , const math::Size2 &size
-                      , geo::GeoDataset::Resampling resampling
-                      = geo::GeoDataset::Resampling::nearest)
-            : operation(operation), dataset(dataset), mask(mask)
-            , srs(srs), extents(extents), size(size), resampling(resampling)
-        {}
-
-        RasterRequest(Operation operation
-                      , const std::string &dataset
-                      , const geo::SrsDefinition &srs
-                      , const math::Extents2 &extents
-                      , const math::Size2 &size
-                      , geo::GeoDataset::Resampling resampling
-                      = geo::GeoDataset::Resampling::nearest)
+                      = boost::none)
             : operation(operation), dataset(dataset)
             , srs(srs), extents(extents), size(size), resampling(resampling)
+            , mask(mask)
         {}
     };
 
