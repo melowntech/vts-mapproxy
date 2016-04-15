@@ -5,6 +5,7 @@
 #include <atomic>
 #include <thread>
 
+#include <boost/noncopyable.hpp>
 #include <boost/format.hpp>
 #include <boost/asio.hpp>
 
@@ -26,11 +27,11 @@ typedef boost::posix_time::ptime SystemTime;
 
 SystemTime systemTime()
 {
-#if defined(BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK)
+#ifdef OOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK
     return boost::date_time::microsec_clock<SystemTime>::universal_time();
-#else // defined(BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK)
+#else // BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK
     return boost::date_time::second_clock<SystemTime>::universal_time();
-#endif // defined(BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK)
+#endif // BOOST_DATE_TIME_HAS_HIGH_PRECISION_CLOCK
 }
 
 template <typename Delta>
@@ -41,8 +42,9 @@ SystemTime absTime(const Delta &delta)
 
 typedef boost::posix_time::milliseconds milliseconds;
 
-class ShRasterRequest {
+class ShRasterRequest : boost::noncopyable {
 public:
+    typedef bi::deleter<ShRasterRequest, SegmentManager> Deleter;
     typedef bi::shared_ptr<ShRasterRequest, Allocator, Deleter> pointer;
     typedef bi::weak_ptr<ShRasterRequest, Allocator, Deleter> wpointer;
 
@@ -104,7 +106,7 @@ public:
         return pointer(mb.construct<ShRasterRequest>
                        (bi::anonymous_instance)(req, mb)
                        , mb.get_allocator<void>()
-                       , mb.get_deleter<void>());
+                       , mb.get_deleter<ShRasterRequest>());
     }
 
 private:
@@ -211,6 +213,7 @@ GdalWarper::Raster ShRasterRequest::get(bi::interprocess_mutex &mutex)
 }
 
 struct Worker {
+    typedef bi::deleter<Worker, SegmentManager> Deleter;
     typedef bi::shared_ptr<Worker, Allocator, Deleter> pointer;
     typedef std::map<Process::Id, pointer> map;
 
@@ -251,7 +254,7 @@ struct Worker {
     static pointer create(ManagedBuffer &mb) {
         return pointer(mb.construct<Worker>(bi::anonymous_instance)()
                        , mb.get_allocator<void>()
-                       , mb.get_deleter<void>());
+                       , mb.get_deleter<Worker>());
     }
 
 private:

@@ -28,8 +28,6 @@ typedef bi::basic_managed_external_buffer<
 typedef ManagedBuffer::segment_manager SegmentManager;
 
 typedef bi::allocator<void, SegmentManager> Allocator;
-typedef bi::deleter<void, SegmentManager> Deleter;
-typedef bi::shared_ptr<cv::Mat, Allocator, Deleter> MatPointer;
 
 typedef bi::basic_string<
     char, std::char_traits<char>
