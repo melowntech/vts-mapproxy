@@ -291,17 +291,17 @@ void TmsRaster::generateMetatile(const vts::TileId tileId
     // TODO: fix empty ranges overlap
 
     // check for overlap with defined tile size
-    if (!overlaps(tileRange, tr)) {
+    if (!vts::tileRangesOverlap(tileRange, tr)) {
         sink->error(utility::makeError<NotFound>
                     ("Metatile completely outside of configured range."));
         return;
     }
 
     // calculate overlap
-    auto view(math::intersect(tileRange, tr));
+    auto view(vts::tileRangesIntersect(tileRange, tr));
 
     // metatile size in tiles/pixels
-    math::Size2 mtSize(math::size(view)); ++mtSize.width; ++mtSize.height;
+    math::Size2 mtSize(vts::tileRangesSize(view));
 
     auto llId(vts::tileId(tileId.lod, view.ll));
     auto urId(vts::tileId(tileId.lod, view.ur));
