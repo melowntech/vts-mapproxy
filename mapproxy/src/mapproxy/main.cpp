@@ -99,7 +99,7 @@ void Daemon::configuration(po::options_description &cmdline
                             , po::options_description &config
                             , po::positional_options_description &pd)
 {
-    vr::registryConfiguration(cmdline, vr::defaultPath());
+    vr::registryConfiguration(config, vr::defaultPath());
 
     config.add_options()
         ("store.path", po::value(&generatorsConfig_.root)

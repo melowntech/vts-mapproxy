@@ -35,13 +35,18 @@ set(mapproxy_SOURCES
   main.cpp
   )
 
-# old tilestorage browser files
 set(mapproxy_BROWSER_SOURCES
   browser2d.hpp browser2d.cpp
   )
 file_to_cpp(mapproxy_BROWSER_SOURCES
   browser2d::index_html
   browser2d/index.html)
+file_to_cpp(mapproxy_BROWSER_SOURCES
+  browser2d::leaflet_js
+  browser2d/leaflet.js)
+file_to_cpp(mapproxy_BROWSER_SOURCES
+  browser2d::leaflet_css
+  browser2d/leaflet.css)
 
 add_executable(mapproxy ${mapproxy_SOURCES} ${mapproxy_BROWSER_SOURCES})
 target_link_libraries(mapproxy ${MODULE_LIBRARIES})
