@@ -288,6 +288,8 @@ void TmsRaster::generateMetatile(const vts::TileId tileId
     auto tileRange(vts::childRange(resource().tileRange
                                    , tileId.lod - resource().lodRange.min));
 
+    // TODO: fix empty ranges overlap
+
     // check for overlap with defined tile size
     if (!overlaps(tileRange, tr)) {
         sink->error(utility::makeError<NotFound>
@@ -309,8 +311,8 @@ void TmsRaster::generateMetatile(const vts::TileId tileId
     vts::NodeInfo urNode(referenceFrame(), urId);
 
     // compose extents
-    math::Extents2 extents(llNode.extents().ll(0), urNode.extents().ur(1)
-                           , urNode.extents().ur(0), llNode.extents().ll(1));
+    math::Extents2 extents(llNode.extents().ll(0), urNode.extents().ll(1)
+                           , urNode.extents().ur(0), llNode.extents().ur(1));
 
     GdalWarper::Raster src;
     if (definition_.mask) {
