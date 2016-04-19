@@ -1,8 +1,11 @@
 #include <thread>
 #include <condition_variable>
 #include <sstream>
+#include <deque>
 
 #include <boost/filesystem.hpp>
+#include <boost/format.hpp>
+#include <boost/asio.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>
@@ -16,6 +19,7 @@
 #include "./factory.hpp"
 
 namespace fs = boost::filesystem;
+namespace asio = boost::asio;
 namespace bmi = boost::multi_index;
 
 namespace {
@@ -195,7 +199,8 @@ public:
     Detail(const Generators::Config &config
            , const ResourceBackend::pointer &resourceBackend)
         : config_(config), resourceBackend_(resourceBackend)
-        , updaterRunning_(false), ready_(false)
+        , running_(false), ready_(false)
+        , work_(ios_)
     {}
 
     void checkReady() const;
@@ -220,16 +225,16 @@ public:
 private:
     void update(const Resource::map &resources);
 
-    fs::path makePath(const Resource::Id &id);
-
-    void runUpdater();
+    void updater();
+    void worker(std::size_t id);
+    void prepare(const Generator::pointer &generator);
 
     const Config config_;
     ResourceBackend::pointer resourceBackend_;
 
     // resource updater stuff
     std::thread updater_;
-    std::atomic<bool> updaterRunning_;
+    std::atomic<bool> running_;
     std::mutex updaterLock_;
     std::condition_variable updaterCond_;
 
@@ -273,14 +278,15 @@ private:
 
 
         // internals
-    mutable std::mutex servingLock_;
+    mutable std::mutex lock_;
     GeneratorMap serving_;
 
     std::atomic<bool> ready_;
 
-    std::mutex preparingLock_;
-    Generator::list preparing_;
-    std::condition_variable preparingCond_;
+    // prepare stuff
+    asio::io_service ios_;
+    asio::io_service::work work_;
+    std::vector<std::thread> workers_;
 };
 
 void Generators::Detail::checkReady() const
@@ -289,36 +295,55 @@ void Generators::Detail::checkReady() const
     throw Unavailable("Server not ready.");
 }
 
-fs::path Generators::Detail::makePath(const Resource::Id &id)
-{
-    return (config_.root / id.group / id.id);
-}
-
 void Generators::Detail::start()
 {
+    // make sure threads are released when something goes wrong
+    struct Guard {
+        Guard(const std::function<void()> &func) : func(func) {}
+        ~Guard() { if (func) { func(); } }
+        void release() { func = {}; }
+        std::function<void()> func;
+    } guard([this]() { stop(); });
+
     // start updater
-    updaterRunning_ = true;
-    std::thread updater(&Detail::runUpdater, this);
+    running_ = true;
+    std::thread updater(&Detail::updater, this);
     updater_.swap(updater);
+
+    // TODO: make configurable
+    std::size_t count(5);
+    // start workers
+    for (std::size_t id(1); id <= count; ++id) {
+        workers_.emplace_back(&Detail::worker, this, id);
+    }
+
+    guard.release();
 }
 
 void Generators::Detail::stop()
 {
-    if (updaterRunning_) {
-        updaterRunning_ = false;
-        updaterCond_.notify_all();
-        updater_.join();
+    if (!running_) { return; }
+
+    running_ = false;
+    ios_.stop();
+
+    updaterCond_.notify_all();
+    updater_.join();
+
+    while (!workers_.empty()) {
+        workers_.back().join();
+        workers_.pop_back();
     }
 }
 
 struct Aborted {};
 
-void Generators::Detail::runUpdater()
+void Generators::Detail::updater()
 {
     dbglog::thread_id("updater");
 
 
-    while (updaterRunning_) {
+    while (running_) {
         std::chrono::seconds sleep(config_.resourceUpdatePeriod);
 
         try {
@@ -335,10 +360,47 @@ void Generators::Detail::runUpdater()
             std::unique_lock<std::mutex> lock(updaterLock_);
             updaterCond_.wait_for(lock, sleep, [this]()
             {
-                return !updaterRunning_;
+                return !running_;
             });
         }
     }
+}
+
+void Generators::Detail::worker(std::size_t id)
+{
+    dbglog::thread_id(str(boost::format("prepare:%u") % id));
+    LOG(info2) << "Spawned prepare worker id:" << id << ".";
+
+    for (;;) {
+        try {
+            ios_.run();
+            LOG(info2) << "Terminated prepare worker id:" << id << ".";
+            return;
+        } catch (const std::exception &e) {
+            LOG(err3)
+                << "Uncaught exception in worker: <" << e.what()
+                << ">. Going on.";
+        }
+    }
+}
+
+void Generators::Detail::prepare(const Generator::pointer &generator)
+{
+    ios_.post([=]()
+    {
+        try {
+            generator->prepare();
+        } catch (const std::exception &e) {
+            LOG(warn2)
+                << "Failed to prepare generator for <"
+                << generator->resource().id
+                << ">; removing from set of known generators.";
+
+            // erease from map (under lock)
+            std::unique_lock<std::mutex> lock(lock_);
+            serving_.erase(generator);
+        }
+    });
 }
 
 Generators::Generators(const Config &config
@@ -378,12 +440,12 @@ void Generators::Detail::update(const Resource::map &resources)
 
     auto add([&](const Resource &res)
     {
-        if (!updaterRunning_) {
+        if (!running_) {
             throw Aborted{};
         }
         try {
             Generator::Config config(config_);
-            config.root = makePath(res.id);
+            config.root = config_.root;
             toAdd.push_back(Generator::create(config, res.generator, res));
         } catch (const std::exception &e) {
             LOG(err2) << "Failed to create generator for resource <"
@@ -423,27 +485,23 @@ void Generators::Detail::update(const Resource::map &resources)
     // add stuff
     for (const auto &generator : toAdd) {
         {
-            std::unique_lock<std::mutex> lock(servingLock_);
+            std::unique_lock<std::mutex> lock(lock_);
             serving_.insert(generator);
         }
 
-        // TODO: better prepare set; probably multi-index container: sequence
-        // with additional resource index map
         if (!generator->ready()) {
-            std::unique_lock<std::mutex> lock(preparingLock_);
-            preparing_.push_back(generator);
-            preparingCond_.notify_one();
+            prepare(generator);
         }
     }
 
     // remove stuff
     for (const auto &generator : toRemove) {
-        // TODO: remove from prepare set (should be m-i container as mentioned
-        // above)
         {
-            std::unique_lock<std::mutex> lock(servingLock_);
+            std::unique_lock<std::mutex> lock(lock_);
             serving_.erase(generator);
         }
+
+        // TODO: mark as to be removed for prepare workers
     }
 
     ready_ = true;
@@ -459,7 +517,7 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
     Generator::list out;
 
     // use only ready generators that handle datasets for given reference frame
-    std::unique_lock<std::mutex> lock(servingLock_);
+    std::unique_lock<std::mutex> lock(lock_);
     auto &idx(serving_.get<ReferenceFrameIdx>());
     for (auto range(idx.equal_range(referenceFrame));
          range.first != range.second; ++range.first)
@@ -480,7 +538,7 @@ Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
     // find generator (under lock)
     auto generator([&]() -> Generator::pointer
     {
-        std::unique_lock<std::mutex> lock(servingLock_);
+        std::unique_lock<std::mutex> lock(lock_);
         auto &idx(serving_.get<ResourceIdIdx>());
         auto fserving(idx.find(fileInfo.resourceId));
         if (fserving == idx.end()) { return {}; }
@@ -512,7 +570,7 @@ Generators::Detail::listGroups(const std::string &referenceFrame
 
     std::vector<std::string> out;
     {
-        std::unique_lock<std::mutex> lock(servingLock_);
+        std::unique_lock<std::mutex> lock(lock_);
 
         auto &idx(serving_.get<TypeIdx>());
         std::string prev;
@@ -540,7 +598,7 @@ Generators::Detail::listIds(const std::string &referenceFrame
 
     std::vector<std::string> out;
     {
-        std::unique_lock<std::mutex> lock(servingLock_);
+        std::unique_lock<std::mutex> lock(lock_);
         auto &idx(serving_.get<GroupIdx>());
         for (auto range(idx.equal_range
                         (GroupKey(referenceFrame, type, group)));

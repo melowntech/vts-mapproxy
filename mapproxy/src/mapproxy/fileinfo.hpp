@@ -3,6 +3,7 @@
 
 #include "vts-libs/storage/support.hpp"
 #include "vts-libs/vts/basetypes.hpp"
+#include "vts-libs/vts/tileop.hpp"
 
 #include "./resource.hpp"
 #include "./contentgenerator.hpp"
@@ -82,6 +83,53 @@ struct TmsFileInfo {
     /** Valid only when type == Type::support;
      */
     const vs::SupportFile *support;
+};
+
+/** Parsed surface file information.
+ */
+struct SurfaceFileInfo {
+    SurfaceFileInfo(const FileInfo &fi, int flags = FileFlags::none);
+
+    Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
+
+    /** Parent information.
+     */
+    FileInfo fileInfo;
+
+    enum class Type { unknown, file, tile, support, registry };
+
+    /** File type.
+     */
+    Type type;
+
+    /** Valid only when type in Type::file
+     */
+    vts::File fileType;
+
+    /** Valid only when type in Type::tile
+     */
+    vts::TileFile tileType;
+
+    /** Valid only when type in Type::tile
+     */
+    vts::TileId tileId;
+
+    /** Valid only when type in Type::tile
+     */
+    unsigned int subTileIndex;
+
+    /** Distinguishes raw file from interpreted (i.e. tileset.conf from
+     *  mapConfig.json)
+     */
+    bool raw;
+
+    /** Valid only when type == Type::support;
+     */
+    const vs::SupportFile *support;
+
+    /** Valid only when type == Type::registry;
+     */
+    const vr::DataFile *registry;
 };
 
 #endif // mapproxy_fileinfo_hpp_included_

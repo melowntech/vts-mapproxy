@@ -12,6 +12,7 @@
 
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
+#include "vts-libs/vts/tileset/config.hpp"
 
 #include "../error.hpp"
 
@@ -53,8 +54,11 @@ SurfaceSpheroid::SurfaceSpheroid(const Config &config
 {
     try {
         auto indexPath(root() / "tileset.index");
-        if (fs::exists(indexPath)) {
+        auto propertiesPath(root() / "tileset.conf");
+        if (fs::exists(indexPath) && fs::exists(propertiesPath)) {
+            // both paths exist -> ok
             vts::tileset::loadTileSetIndex(index_, indexPath);
+            properties_ = vts::tileset::loadConfig(propertiesPath);
             makeReady();
             return;
         }
@@ -67,39 +71,54 @@ SurfaceSpheroid::SurfaceSpheroid(const Config &config
 void SurfaceSpheroid::prepare_impl()
 {
     LOG(info2) << "Preparing <" << resource().id << ">.";
+
+    const auto &r(resource());
+
+    // build properties
+    properties_ = {};
+    properties_.id = r.id.fullId();
+    properties_.referenceFrame = r.referenceFrame->id;
+    properties_.credits = asIntSet(r.credits);
+    if (definition_.textureLayerId) {
+        properties_.boundLayers.insert(definition_.textureLayerId);
+    }
+    // position ???
+    // keep driverOptions empty -> no driver
+    properties_.lodRange = r.lodRange;
+    properties_.tileRange = r.tileRange;
+
+    // TODO: spatialDivisionExtents
+
+    // grab and reset tile index
+    auto &ti(index_.tileIndex);
+    ti = {};
+
+    // build tile index
+    for (vts::Lod lod(0); lod <= r.lodRange.max; ++lod) {
+        // metatiles everywhere
+        vts::TileIndex::Flag::value_type flags
+            (vts::TileIndex::Flag::meta);
+        if (in(lod, r.lodRange)) {
+            // watertight tiles and navtiles everywhere
+            flags |= (vts::TileIndex::Flag::mesh
+                      | vts::TileIndex::Flag::watertight
+                      | vts::TileIndex::Flag::navtile);
+        }
+        // set whole LOD to given value
+        ti.set(lod, flags);
+    }
+
+    // save it all
+    vts::tileset::saveConfig(root() / "tileset.conf", properties_);
+    vts::tileset::saveTileSetIndex(index_, root() / "tileset.index");
 }
 
 vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
     const
 {
-    const auto &res(resource());
-
-    vts::MapConfig mapConfig;
-    mapConfig.referenceFrame = *res.referenceFrame;
-
-    (void) root;
-    (void) res;
-
-#if 0
-    // this is Tiled service: we have bound layer only
-    vr::BoundLayer bl;
-    bl.id = res.id.fullId();
-    bl.numericId = 0; // no numeric ID
-    bl.type = vr::BoundLayer::Type::spheroid;
-
-    // build url
-    bl.url = prependRoot
-        (str(boost::format("{lod}-{x}-{y}.%s") % definition_.format)
-         , resource(), root);
-    bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
-                             , resource(), root);
-
-    bl.lodRange = res.lodRange;
-    bl.tileRange = res.tileRange;
-    bl.credits = res.credits;
-    mapConfig.boundLayers.add(bl);
-#endif
-    return mapConfig;
+    return vts::mapConfig
+        (properties_, vts::ExtraTileSetProperties()
+         , prependRoot(fs::path(), resource(), root));
 }
 
 Generator::Task SurfaceSpheroid
@@ -130,7 +149,38 @@ Generator::Task SurfaceSpheroid
                         ("Unsupported file"));
             break;
         }
+        break;
     }
+
+    case SurfaceFileInfo::Type::tile: {
+        switch (fi.tileType) {
+        case vts::TileFile::meta:
+            return[=](GdalWarper &warper)  {
+                generateMetatile(fi.tileId, sink, warper);
+            };
+
+        case vts::TileFile::mesh:
+            sink->error(utility::makeError<InternalError>
+                        ("No mesh generated yet."));
+            break;
+
+        case vts::TileFile::atlas:
+            sink->error(utility::makeError<NotFound>
+                        ("No internal texture present."));
+            break;
+
+        case vts::TileFile::navtile:
+            sink->error(utility::makeError<InternalError>
+                        ("No navtile generated yet."));
+            break;
+        }
+        break;
+    }
+
+    case SurfaceFileInfo::Type::support:
+        sink->content(fi.support->data, fi.support->size
+                      , fi.sinkFileInfo(), false);
+        break;
 
     default:
         sink->error(utility::makeError<InternalError>
@@ -138,6 +188,17 @@ Generator::Task SurfaceSpheroid
     }
 
     return {};
+}
+
+void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
+                                       , const Sink::pointer &sink
+                                       , GdalWarper &warper) const
+{
+    (void) tileId;
+    (void) warper;
+
+    sink->error(utility::makeError<InternalError>
+                ("Not implemented yet."));
 }
 
 } // namespace generator

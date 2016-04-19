@@ -98,7 +98,7 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
     srcMask.warpInto(dstMask, geo::GeoDataset::Resampling::average, wo);
 
     // mask is guaranteed to have single (double) channel
-    auto &dstMat(dstMask.cdata());
+    auto &dstMat(dstMask.data());
     auto *tile(allocateMat(mb, size, dstMat.type()));
     dstMat.copyTo(*tile);
     return tile;

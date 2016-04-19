@@ -21,7 +21,7 @@ namespace resdef {
 Resource::Generator TmsRaster::generator
     (Resource::Generator::Type::tms, "tms-raster");
 Resource::Generator SurfaceSpheroid::generator
-    (Resource::Generator::Type::surface, "surface-sphereoid");
+    (Resource::Generator::Type::surface, "surface-spheroid");
 Resource::Generator SurfaceDem::generator
     (Resource::Generator::Type::surface, "surface-dem");
 
@@ -29,7 +29,7 @@ Resource::Generator SurfaceDem::generator
 
 namespace detail {
 
-void parseCredits(vr::StringIdSet &ids, const Json::Value &object
+void parseCredits(DualId::set &ids, const Json::Value &object
                   , const char *name)
 {
     const Json::Value &value(object[name]);
@@ -50,7 +50,7 @@ void parseCredits(vr::StringIdSet &ids, const Json::Value &object
             return vr::Registry::credit(element.asString());
         }());
 
-        ids.insert(credit.id);
+        ids.insert(DualId(credit.id, credit.numericId));
     }
 }
 
@@ -77,8 +77,14 @@ void parseDefinition(resdef::TmsRaster &def, const Json::Value &value)
 
 void parseDefinition(resdef::SurfaceSpheroid &def, const Json::Value &value)
 {
-    (void) def;
-    (void) value;
+    if (value.isMember("textureLayerId")) {
+        Json::get(def.textureLayerId, value, "textureLayerId");
+    }
+    if (value.isMember("geoidGrid")) {
+        std::string s;
+        Json::get(s, value, "geoidGrid");
+        def.geoidGrid = s;
+    }
 }
 
 void parseDefinition(resdef::SurfaceDem &def, const Json::Value &value)
@@ -117,8 +123,12 @@ void buildDefinition(Json::Value &value, const resdef::TmsRaster &def)
 
 void buildDefinition(Json::Value &value, const resdef::SurfaceSpheroid &def)
 {
-    (void) value;
-    (void) def;
+    if (def.textureLayerId) {
+        value["textureLayerId"] = def.textureLayerId;
+    }
+    if (def.geoidGrid) {
+        value["geoidGrid"] = *def.geoidGrid;
+    }
 }
 
 void buildDefinition(Json::Value &value, const resdef::SurfaceDem &def)
@@ -275,7 +285,7 @@ void buildResource(Json::Value &value, const Resource &r)
     value["driver"] = r.generator.driver;
 
     auto &credits(value["credits"] = Json::arrayValue);
-    for (auto cid : r.credits) { credits.append(cid); }
+    for (auto cid : r.credits) { credits.append(cid.id); }
 
     Json::Value &referenceFrames(value["referenceFrames"]);
     auto &content(referenceFrames[r.id.referenceFrame] = Json::objectValue);
@@ -403,8 +413,8 @@ bool TmsRaster::operator==(const TmsRaster &o) const
 
 bool SurfaceSpheroid::operator==(const SurfaceSpheroid &o) const
 {
-    // TODO: implement me
-    (void) o;
+    if (textureLayerId != o.textureLayerId) { return false; }
+    if (geoidGrid != o.geoidGrid) { return false; }
     return true;
 }
 

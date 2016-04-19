@@ -1,5 +1,5 @@
-#ifndef mapproxy_generator_tms_factory_hpp_included_
-#define mapproxy_generator_tms_factory_hpp_included_
+#ifndef mapproxy_generator_tms_raster_hpp_included_
+#define mapproxy_generator_tms_raster_hpp_included_
 
 #include "../generator.hpp"
 
@@ -17,15 +17,15 @@ private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , const Sink::pointer &sink) const;
 
-    void generateTileImage(const vts::TileId tileId
+    void generateTileImage(const vts::TileId &tileId
                            , const Sink::pointer &sink
                            , GdalWarper &warper) const;
 
-    void generateTileMask(const vts::TileId tileId
+    void generateTileMask(const vts::TileId &tileId
                           , const Sink::pointer &sink
                           , GdalWarper &warper) const;
 
-    void generateMetatile(const vts::TileId tileId
+    void generateMetatile(const vts::TileId &tileId
                           , const Sink::pointer &sink
                           , GdalWarper &warper) const;
 
@@ -36,4 +36,4 @@ private:
 
 } // namespace generator
 
-#endif // mapproxy_generator_tms_factory_hpp_included_
+#endif // mapproxy_generator_tms_raster_hpp_included_

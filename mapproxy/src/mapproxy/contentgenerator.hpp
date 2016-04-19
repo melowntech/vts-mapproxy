@@ -8,6 +8,8 @@
 
 #include "vts-libs/storage/streams.hpp"
 
+namespace vs = vadstena::storage;
+
 /** Sink for sending data to the client.
  */
 class Sink {
@@ -71,6 +73,11 @@ public:
     void content(const void *data, std::size_t size
                  , const FileInfo &stat, bool needCopy);
 
+    /** Sends content to client.
+     * \param stream stream to send
+     */
+    void content(const vs::IStream::pointer &stream);
+
     /** Tell client to look somewhere else.
      */
     void seeOther(const std::string &url);
@@ -103,6 +110,7 @@ public:
 private:
     virtual void content_impl(const void *data, std::size_t size
                               , const FileInfo &stat, bool needCopy) = 0;
+    virtual void content_impl(const vs::IStream::pointer &stream) = 0;
     virtual void seeOther_impl(const std::string &url) = 0;
     virtual void listing_impl(const Listing &list) = 0;
     virtual void error_impl(const std::exception_ptr &exc) = 0;
@@ -138,6 +146,11 @@ template <typename T>
 inline void Sink::content(const std::vector<T> &data, const FileInfo &stat)
 {
     content_impl(data.data(), data.size() * sizeof(T), stat, true);
+}
+
+inline void Sink::content(const vs::IStream::pointer &stream)
+{
+    content_impl(stream);
 }
 
 inline void Sink::seeOther(const std::string &url) { seeOther_impl(url); }

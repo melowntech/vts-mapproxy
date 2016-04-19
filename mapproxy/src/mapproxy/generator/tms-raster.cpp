@@ -14,6 +14,7 @@
 #include "vts-libs/vts/nodeinfo.hpp"
 
 #include "../error.hpp"
+#include "../metatile.hpp"
 
 #include "./tms-raster.hpp"
 #include "./factory.hpp"
@@ -98,7 +99,7 @@ vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
 
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
-    bl.credits = res.credits;
+    bl.credits = asStringSet(res.credits);
     mapConfig.boundLayers.add(bl);
 
     return mapConfig;
@@ -146,7 +147,7 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
         mapConfig(os, ResourceRoot::none);
         sink->content(os.str(), fi.sinkFileInfo());
         break;
-    };
+    }
 
     case TmsFileInfo::Type::support:
         sink->content(fi.support->data, fi.support->size
@@ -180,7 +181,7 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
     return {};
 }
 
-void TmsRaster::generateTileImage(const vts::TileId tileId
+void TmsRaster::generateTileImage(const vts::TileId &tileId
                                   , const Sink::pointer &sink
                                   , GdalWarper &warper) const
 {
@@ -212,7 +213,7 @@ void TmsRaster::generateTileImage(const vts::TileId tileId
     sink->content(buf, Sink::FileInfo(contentType(definition_.format)));
 }
 
-void TmsRaster::generateTileMask(const vts::TileId tileId
+void TmsRaster::generateTileMask(const vts::TileId &tileId
                                  , const Sink::pointer &sink
                                  , GdalWarper &warper) const
 {
@@ -249,7 +250,6 @@ namespace Constants {
     const unsigned int RasterMetatileBinaryOrder(8);
     const math::Size2 RasterMetatileSize(1 << RasterMetatileBinaryOrder
                                          , 1 << RasterMetatileBinaryOrder);
-    const unsigned int RasterMetatileMask(~(RasterMetatileSize.width - 1));
 }
 
 namespace MetaFlags {
@@ -258,80 +258,19 @@ namespace MetaFlags {
     constexpr std::uint8_t unavailable(0x00);
 }
 
-void TmsRaster::generateMetatile(const vts::TileId tileId
+void TmsRaster::generateMetatile(const vts::TileId &tileId
                                  , const Sink::pointer &sink
                                  , GdalWarper &warper) const
 {
     sink->checkAborted();
 
-    if (((tileId.x & Constants::RasterMetatileMask) != tileId.x)
-        || ((tileId.y & Constants::RasterMetatileMask) != tileId.y))
-    {
-        sink->error(utility::makeError<NotFound>
-                    ("TileId doesn't point to metatile origin."));
-        return;
-    }
+    auto blocks(metatileBlocks
+                (resource(), tileId, Constants::RasterMetatileBinaryOrder));
 
-    // generate tile range (inclusive!)
-    vts::TileRange tr(tileId.x, tileId.y, tileId.x, tileId.y);
-    tr.ur(0) += Constants::RasterMetatileSize.width - 1;
-    tr.ur(1) += Constants::RasterMetatileSize.height - 1;
-
-    // get maximum tile index at this lod
-    auto maxIndex(vts::tileCount(tileId.lod) - 1);
-
-    // and clip
-    if (tr.ur(0) > maxIndex) { tr.ur(0) = maxIndex; }
-    if (tr.ur(1) > maxIndex) { tr.ur(1) = maxIndex; }
-
-    // calculate tile range at current LOD from resource definition
-    auto tileRange(vts::childRange(resource().tileRange
-                                   , tileId.lod - resource().lodRange.min));
-
-    // TODO: fix empty ranges overlap
-
-    // check for overlap with defined tile size
-    if (!vts::tileRangesOverlap(tileRange, tr)) {
+    if (blocks.empty()) {
         sink->error(utility::makeError<NotFound>
                     ("Metatile completely outside of configured range."));
         return;
-    }
-
-    // calculate overlap
-    auto view(vts::tileRangesIntersect(tileRange, tr));
-
-    // metatile size in tiles/pixels
-    math::Size2 mtSize(vts::tileRangesSize(view));
-
-    auto llId(vts::tileId(tileId.lod, view.ll));
-    auto urId(vts::tileId(tileId.lod, view.ur));
-
-    // grab nodes at opposite sides
-    vts::NodeInfo llNode(referenceFrame(), llId);
-    vts::NodeInfo urNode(referenceFrame(), urId);
-
-    // compose extents
-    math::Extents2 extents(llNode.extents().ll(0), urNode.extents().ll(1)
-                           , urNode.extents().ur(0), llNode.extents().ur(1));
-
-    GdalWarper::Raster src;
-    if (definition_.mask) {
-        // warp detailed mask
-        src = warper.warp(GdalWarper::RasterRequest
-                          (GdalWarper::RasterRequest::Operation::detailMask
-                           , absoluteDataset(*definition_.mask)
-                           , vr::Registry::srs(llNode.srs()).srsDef
-                           , extents, mtSize)
-                          , sink);
-    } else {
-        // warp dataset as mask
-        src = warper.warp(GdalWarper::RasterRequest
-                          (GdalWarper::RasterRequest::Operation::mask
-                           , absoluteDataset(definition_.dataset)
-                           , vr::Registry::srs(llNode.srs()).srsDef
-                           , extents, mtSize
-                           , geo::GeoDataset::Resampling::cubic)
-                          , sink);
     }
 
     cv::Mat metatile(Constants::RasterMetatileSize.width
@@ -345,22 +284,48 @@ void TmsRaster::generateMetatile(const vts::TileId tileId
          : MetaFlags::available // no mask -> watertight supported
          );
 
-    // generate metatile content
-    math::Point2i origin(view.ll(0) - tileId.x, view.ll(1) - tileId.y);
-    math::Point2i end(view.ur(0) - tileId.x, view.ur(1) - tileId.y);
-    for (int j(origin(1)), je(end(1)), jj(0); j <= je; ++j, ++jj) {
-        for (int i(origin(0)), ie(end(0)), ii(0); i <= ie; ++i, ++ii) {
-            const auto &in(src->at<double>(jj, ii));
-            auto &out(metatile.at<std::uint8_t>(j, i));
-            if (!in) {
-                // black -> not available
-                out = MetaFlags::unavailable;
-            } else if (in >= 255) {
-                // white -> available and watertight -> use computed bits above
-                out = watertightBits;
-            } else {
-                // gray -> available but not watetight
-                out = MetaFlags::available;
+    for (const auto &block : blocks) {
+        const auto &view(block.view);
+        math::Size2 bSize(vts::tileRangesSize(view));
+
+        GdalWarper::Raster src;
+        if (definition_.mask) {
+            // warp detailed mask
+            src = warper.warp(GdalWarper::RasterRequest
+                              (GdalWarper::RasterRequest::Operation::detailMask
+                               , absoluteDataset(*definition_.mask)
+                               , vr::Registry::srs(block.srs).srsDef
+                               , block.extents, bSize)
+                              , sink);
+        } else {
+            // warp dataset as mask
+            src = warper.warp(GdalWarper::RasterRequest
+                              (GdalWarper::RasterRequest::Operation::mask
+                               , absoluteDataset(definition_.dataset)
+                               , vr::Registry::srs(block.srs).srsDef
+                               , block.extents, bSize
+                               , geo::GeoDataset::Resampling::cubic)
+                              , sink);
+        }
+
+        // generate metatile content for current block
+        math::Point2i origin(view.ll(0) - tileId.x, view.ll(1) - tileId.y);
+        math::Point2i end(view.ur(0) - tileId.x, view.ur(1) - tileId.y);
+        for (int j(origin(1)), je(end(1)), jj(0); j <= je; ++j, ++jj) {
+            for (int i(origin(0)), ie(end(0)), ii(0); i <= ie; ++i, ++ii) {
+                const auto &in(src->at<double>(jj, ii));
+                auto &out(metatile.at<std::uint8_t>(j, i));
+                if (!in) {
+                    // black -> not available
+                    out = MetaFlags::unavailable;
+                } else if (in >= 255) {
+                    // white -> available and watertight
+                    // -> use computed bits above
+                    out = watertightBits;
+                } else {
+                    // gray -> available but not watetight
+                    out = MetaFlags::available;
+                }
             }
         }
     }

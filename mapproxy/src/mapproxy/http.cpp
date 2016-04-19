@@ -176,6 +176,9 @@ public:
                       , const void *data = nullptr, const size_t size = 0
                       , bool persistent = false);
 
+    void sendResponse(const Request &request, const Response &response
+                      , const vs::IStream::pointer &stream);
+
     void start();
 
     bool valid() const;
@@ -729,6 +732,103 @@ void Connection::sendResponse(const Request &request, const Response &response
     }
 }
 
+/** FIXME: probably broken, to be revisited
+ *
+ *  TODO: replace chain of lambdas with one class holding the stuff together
+ */
+void Connection::sendResponse(const Request &request, const Response &response
+                              , const vs::IStream::pointer &stream)
+{
+    std::ostream os(&responseData_);
+
+    os << request.version << ' ' << response.numericCode() << ' '
+       << response.code << "\r\n";
+
+    os << "Date: " << formatHttpDate(-1) << "\r\n";
+    os << "Server: " << ubs::TargetName << '/' << ubs::TargetVersion << "\r\n";
+    for (const auto &hdr : response.headers) {
+        os << hdr.name << ": "  << hdr.value << "\r\n";
+    }
+
+    // size
+    auto stat(stream->stat());
+    os << "Content-Type: " << stat.contentType << "\r\n";
+    os << "Last-Modified: " << formatHttpDate(stat.lastModified) << "\r\n";
+
+    // optional data
+    os << "Content-Length: " << stat.size << "\r\n";
+    if (response.close) { os << "Connection: close\r\n"; }
+
+    os << "\r\n";
+
+    // mark as busy/close
+    if (response.close) {
+        state_ = State::busyClose;
+    }
+
+    // send body only if not a head request
+    std::size_t bytesLeft((request.method == "HEAD") ? 0 : stat.size);
+    std::size_t off(0);
+    std::vector<char> buf(1 << 16, 0);
+    std::size_t total(bytesLeft + responseData_.size());
+
+    auto self(shared_from_this());
+    std::function<void(const boost::system::error_code &ec, std::size_t bytes)>
+        responseSent;
+
+    auto sendBody([self, this, off, buf, stream, responseSent
+                   , request, response, total]
+                  (std::size_t bytesLeft) mutable
+    {
+        if (bytesLeft) {
+            auto s(stream->read(buf.data(), buf.size(), off));
+            off += s;
+            asio::async_write(socket_, asio::buffer(buf.data(), s)
+                              , strand_.wrap(responseSent));
+            return;
+        }
+
+        // log what happened
+        postLog(self, request, response, total);
+
+        // response sent, not busy for now
+        makeReady();
+
+        // we are not busy so try next request immediately
+        process();
+    });
+
+    responseSent = [self, this, request, response, bytesLeft, stream, sendBody]
+        (const boost::system::error_code &ec, std::size_t bytes) mutable
+    {
+        if (ec) {
+            close(ec);
+            return;
+        }
+
+        bytesLeft -= bytes;
+        sendBody(bytesLeft);
+    };
+
+    auto headersSent([self, this, sendBody, bytesLeft]
+                     (const boost::system::error_code &ec, std::size_t bytes)
+                     mutable
+    {
+        if (ec) {
+            close(ec);
+            return;
+        }
+
+        // consume header data
+        responseData_.consume(bytes);
+
+        sendBody(bytesLeft);
+    });
+
+    asio::async_write(socket_, responseData_.data()
+                      , strand_.wrap(headersSent));
+}
+
 namespace {
 
 class HttpSink : public Sink {
@@ -750,6 +850,14 @@ private:
             ("Last-Modified", formatHttpDate(stat.lastModified));
 
         connection_->sendResponse(request_, response, data, size, !needCopy);
+    }
+
+    virtual void content_impl(const vs::IStream::pointer &stream)
+    {
+        if (!valid()) { return; }
+
+        Response response;
+        connection_->sendResponse(request_, response, stream);
     }
 
     virtual void seeOther_impl(const std::string &url)

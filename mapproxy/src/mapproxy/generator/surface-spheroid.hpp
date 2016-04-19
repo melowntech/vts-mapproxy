@@ -2,6 +2,7 @@
 #define mapproxy_generator_surface_spheroid_hpp_included_
 
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
+#include "vts-libs/vts/tileset/properties.hpp"
 
 #include "../generator.hpp"
 
@@ -21,9 +22,14 @@ private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , const Sink::pointer &sink) const;
 
+    void generateMetatile(const vts::TileId &tileId
+                          , const Sink::pointer &sink
+                          , GdalWarper &warper) const;
+
     const resdef::SurfaceSpheroid &definition_;
 
     vts::tileset::Index index_;
+    vts::FullTileSetProperties properties_;
 };
 
 } // namespace generator

@@ -163,7 +163,12 @@ private:
 
 inline void Generator::prepare()
 {
+    // prepare only when ready
+    if (ready_) { return; }
+
+    // prepare and make ready
     prepare_impl();
+    makeReady();
 }
 
 inline vts::MapConfig Generator::mapConfig(ResourceRoot root) const

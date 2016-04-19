@@ -15,6 +15,34 @@
 namespace vr = vadstena::registry;
 namespace vts = vadstena::vts;
 
+struct DualId {
+    std::string id;
+    int numId;
+
+    DualId(const std::string &id = "", int numId = 0)
+        : id(id), numId(numId)
+    {}
+
+    operator std::string() const { return id; }
+    operator int() const { return numId; }
+
+    bool operator<(const DualId &o) const {
+        return (id < o.id);
+    }
+
+    typedef std::set<DualId> set;
+};
+
+inline vr::StringIdSet asStringSet(const DualId::set &set)
+{
+    return vr::StringIdSet(set.begin(), set.end());
+}
+
+inline vr::IdSet asIntSet(const DualId::set &set)
+{
+    return vr::IdSet(set.begin(), set.end());
+}
+
 struct Resource {
     struct Id {
         std::string referenceFrame;
@@ -50,7 +78,7 @@ struct Resource {
      */
     boost::filesystem::path root;
 
-    vr::StringIdSet credits;
+    DualId::set credits;
 
     const vr::ReferenceFrame *referenceFrame;
     vr::LodRange lodRange;
@@ -118,11 +146,10 @@ struct TmsRaster {
 struct SurfaceSpheroid {
     static Resource::Generator generator;
 
-    double a;
-    double b;
     unsigned int textureLayerId;
+    boost::optional<std::string> geoidGrid;
 
-    SurfaceSpheroid() : a(), b(), textureLayerId() {}
+    SurfaceSpheroid() : textureLayerId() {}
     bool operator==(const SurfaceSpheroid &o) const;
 };
 
@@ -199,7 +226,7 @@ inline bool Resource::Id::operator==(const Id &o) const {
 
 inline bool Resource::Generator::operator<(const Generator &o) const {
     if (type < o.type) { return true; }
-    else if (o.type < type) { return true; }
+    else if (o.type < type) { return false; }
     return driver < o.driver;
 }
 

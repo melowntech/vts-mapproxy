@@ -6,6 +6,7 @@
 
 #include "vts-libs/registry.hpp"
 #include "vts-libs/vts/tileop.hpp"
+#include "vts-libs/vts/support.hpp"
 
 #include "./error.hpp"
 #include "./fileinfo.hpp"
@@ -18,7 +19,12 @@ namespace constants {
     const std::string Config("mapConfig.json");
     const std::string Self("");
     const std::string Index("index.html");
-}
+
+    namespace tileset {
+        const std::string Config("tileset.conf");
+        const std::string Index("tileset.index");
+    } // namespace tileset
+} // namesapce constants
 
 namespace {
 
@@ -280,6 +286,106 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
         return { contentType(RasterMetatileFormat), lastModified };
     case Type::support:
         return { support->contentType, support->lastModified };
+    case Type::unknown:
+        return {};
+    }
+
+    return {};
+}
+
+SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
+    : fileInfo(fi), type(Type::unknown), fileType(vs::File::config)
+    , tileType(vts::TileFile::meta), support(), registry()
+{
+    if (vts::fromFilename(tileId, tileType, subTileIndex
+                          , fi.filename, 0, &raw))
+    {
+        type = Type::tile;
+        return;
+    }
+
+    // non-tile files
+    if (constants::Config == fi.filename) {
+        type = Type::file;
+        fileType = vs::File::config;
+        return;
+    }
+
+    if (constants::tileset::Config == fi.filename) {
+        type = Type::file;
+        fileType = vs::File::config;
+        // this is raw file
+        raw = true;
+        return;
+    }
+
+    if (constants::tileset::Index == fi.filename) {
+        type = Type::file;
+        fileType = vs::File::tileIndex;
+        return;
+    }
+
+    if (flags & FileFlags::browserEnabled) {
+        LOG(debug) << "Browser enabled, checking browser files.";
+
+        auto path(fi.filename);
+        if (constants::Self == path) { path = constants::Index; }
+
+        // support files
+        auto fsupport(vts::supportFiles.find(path));
+        if (fsupport != vts::supportFiles.end()) {
+            type = Type::support;
+            support = &fsupport->second;
+            return;
+        }
+    } else {
+        LOG(debug) << "Browser disabled, skipping browser files.";
+    }
+
+    // extra files, unknown to common machinery
+    registry = vr::Registry::dataFile
+        (fi.filename, vr::Registry::DataFileKey::filename, std::nothrow);
+    if (registry) {
+        type = Type::registry;
+        return;
+    }
+}
+
+Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
+{
+    switch (type) {
+    case Type::file:
+        switch (fileType) {
+        case vts::File::config:
+            return { "application/json", lastModified };
+
+        case vts::File::tileIndex:
+            return { "application/octet-stream", lastModified };
+
+        default:
+            return {};
+        }
+        break;
+
+    case Type::tile:
+        switch (tileType) {
+        case vts::TileFile::meta:
+            return { "application/octet-stream", lastModified };
+        case vts::TileFile::mesh:
+            return { "application/octet-stream", lastModified };
+        case vts::TileFile::atlas:
+            return { "image/jpeg", lastModified };
+        case vts::TileFile::navtile:
+            return { "image/jpeg", lastModified };
+        }
+        break;
+
+    case Type::support:
+        return { support->contentType, support->lastModified };
+
+    case Type::registry:
+        return { registry->contentType, lastModified };
+
     case Type::unknown:
         return {};
     }

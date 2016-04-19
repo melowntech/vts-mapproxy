@@ -35,7 +35,7 @@
         "referenceFrames": {
             "melown2015": {
                 "lodRange": [15,19],
-                "tileRange": [[17260,11252],[17951, 11627]]
+                "tileRange": [[8630,5625],[8975,5813]]
             },
             "webmerc-projected": {
                 "lodRange": [14,18],
@@ -77,7 +77,7 @@
         "credits": ["citationtech"],
         "definition": {
            "dataset": "melown/trueplanet",
-           "mask": "melown/czmask",
+           "mask": "melown/cz.qm",
            "format":"jpg"
         }
     },
@@ -91,7 +91,7 @@
         "referenceFrames": {
             "melown2015": {
                 "lodRange": [15,18],
-                "tileRange": [[17192,11010],[17675,11529]]
+                "tileRange": [[8596,5505],[8837,5764]]
             },
             "webmerc-projected": {
                 "lodRange": [14,17],
@@ -106,6 +106,32 @@
         "definition": {
            "dataset": "lvg-by/lvg-by-dop80.xml",
            "format":"jpg"
+        }
+    },
+
+    {
+        "comment": "WGS84 ellipsoid",
+        "group": "melown",
+        "id": "wgs84",
+        "type": "surface",
+        "driver": "surface-spheroid",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0,21],
+                "tileRange": [[0,0],[0,0]]
+            },
+            "webmerc-projected": {
+                "lodRange": [0,20],
+                "tileRange": [[0,0],[0,0]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [0,20],
+                "tileRange": [[0,0],[0,0]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "textureLayerId": 120
         }
     }
 ]

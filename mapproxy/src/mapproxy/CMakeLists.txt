@@ -8,6 +8,7 @@ define_module(BINARY mapproxy
 set(mapproxy_SOURCES
   error.hpp
   resource.hpp resource.cpp
+  metatile.hpp metatile.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp
@@ -19,6 +20,7 @@ set(mapproxy_SOURCES
   generator/generator.cpp
   generator/factory.hpp
   generator/tms-raster.hpp generator/tms-raster.cpp
+  generator/surface-spheroid.hpp generator/surface-spheroid.cpp
 
   http.hpp http.cpp
   contentgenerator.hpp contentgenerator.cpp
