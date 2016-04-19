@@ -10,11 +10,14 @@
 
 #include "imgproc/rastermask/cvmat.hpp"
 
+#include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/tileset/config.hpp"
+#include "vts-libs/vts/metatile.hpp"
 
 #include "../error.hpp"
+#include "../metatile.hpp"
 
 #include "./surface-spheroid.hpp"
 #include "./factory.hpp"
@@ -23,6 +26,7 @@
 
 namespace fs = boost::filesystem;
 namespace vr = vadstena::registry;
+namespace vs = vadstena::storage;
 
 namespace generator {
 
@@ -47,14 +51,27 @@ utility::PreMain Factory::register_([]()
 
 } // namespace
 
+fs::path SurfaceSpheroid::filePath(vts::File fileType) const
+{
+    switch (fileType) {
+    case vts::File::config:
+        return root() / "tileset.conf";
+    case vts::File::tileIndex:
+        return root() / "tileset.index";
+    default: break;
+    }
+
+    throw utility::makeError<InternalError>("Unsupported file");
+}
+
 SurfaceSpheroid::SurfaceSpheroid(const Config &config
                                  , const Resource &resource)
     : Generator(config, resource)
     , definition_(this->resource().definition<resdef::SurfaceSpheroid>())
 {
     try {
-        auto indexPath(root() / "tileset.index");
-        auto propertiesPath(root() / "tileset.conf");
+        auto indexPath(filePath(vts::File::tileIndex));
+        auto propertiesPath(filePath(vts::File::config));
         if (fs::exists(indexPath) && fs::exists(propertiesPath)) {
             // both paths exist -> ok
             vts::tileset::loadTileSetIndex(index_, indexPath);
@@ -109,8 +126,8 @@ void SurfaceSpheroid::prepare_impl()
     }
 
     // save it all
-    vts::tileset::saveConfig(root() / "tileset.conf", properties_);
-    vts::tileset::saveTileSetIndex(index_, root() / "tileset.index");
+    vts::tileset::saveConfig(filePath(vts::File::config), properties_);
+    vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
 }
 
 vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
@@ -134,14 +151,19 @@ Generator::Task SurfaceSpheroid
     case SurfaceFileInfo::Type::file: {
         switch (fi.fileType) {
         case vts::File::config: {
-            std::ostringstream os;
-            mapConfig(os, ResourceRoot::none);
-            sink->content(os.str(), fi.sinkFileInfo());
+            if (fi.raw) {
+                sink->content(vs::fileIStream
+                              (fi.fileType, filePath(vts::File::config)));
+            } else {
+                std::ostringstream os;
+                mapConfig(os, ResourceRoot::none);
+                sink->content(os.str(), fi.sinkFileInfo());
+            }
             break;
         }
         case vts::File::tileIndex:
-            sink->error(utility::makeError<InternalError>
-                        ("Not implemented yet."));
+            sink->content(vs::fileIStream
+                          (fi.fileType, filePath(vts::File::tileIndex)));
             break;
 
         default:
@@ -156,7 +178,7 @@ Generator::Task SurfaceSpheroid
         switch (fi.tileType) {
         case vts::TileFile::meta:
             return[=](GdalWarper &warper)  {
-                generateMetatile(fi.tileId, sink, warper);
+                generateMetatile(fi.tileId, sink, fi, warper);
             };
 
         case vts::TileFile::mesh:
@@ -192,13 +214,25 @@ Generator::Task SurfaceSpheroid
 
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                                        , const Sink::pointer &sink
-                                       , GdalWarper &warper) const
+                                       , const SurfaceFileInfo &fi
+                                       , GdalWarper&) const
 {
-    (void) tileId;
-    (void) warper;
+    sink->checkAborted();
 
-    sink->error(utility::makeError<InternalError>
-                ("Not implemented yet."));
+    auto blocks(metatileBlocks(resource(), tileId));
+
+    if (blocks.empty()) {
+        sink->error(utility::makeError<NotFound>
+                    ("Metatile completely outside of configured range."));
+        return;
+    }
+
+    vts::MetaTile metatile(tileId, referenceFrame().metaBinaryOrder);
+
+    // write metatile to stream
+    std::ostringstream os;
+    metatile.save(os);
+    sink->content(os.str(), fi.sinkFileInfo());
 }
 
 } // namespace generator

@@ -766,67 +766,144 @@ void Connection::sendResponse(const Request &request, const Response &response
         state_ = State::busyClose;
     }
 
-    // send body only if not a head request
-    std::size_t bytesLeft((request.method == "HEAD") ? 0 : stat.size);
-    std::size_t off(0);
-    std::vector<char> buf(1 << 16, 0);
-    std::size_t total(bytesLeft + responseData_.size());
+    // if we have no body or this is reply to HEAD request -> just headers
+    if (!stat.size || (request.method == "HEAD")) {
+        // just send headers
+        auto self(shared_from_this());
+        auto headersSent([self, this, request, response]
+                         (const boost::system::error_code &ec
+                          , std::size_t bytes)
+        {
+            if (ec) {
+                close(ec);
+                return;
+            }
 
-    auto self(shared_from_this());
-    std::function<void(const boost::system::error_code &ec, std::size_t bytes)>
-        responseSent;
+            // consume header data
+            responseData_.consume(bytes);
 
-    auto sendBody([self, this, off, buf, stream, responseSent
-                   , request, response, total]
-                  (std::size_t bytesLeft) mutable
-    {
-        if (bytesLeft) {
-            auto s(stream->read(buf.data(), buf.size(), off));
-            off += s;
-            asio::async_write(socket_, asio::buffer(buf.data(), s)
-                              , strand_.wrap(responseSent));
-            return;
+            // log what happened
+            postLog(self, request, response, bytes);
+
+            // response sent, not busy for now
+            makeReady();
+
+            // we are not busy so try next request immediately
+            process();
+        });
+
+        asio::async_write(socket_, responseData_.data()
+                          , strand_.wrap(headersSent));
+        return;
+    }
+
+    struct Sender : std::enable_shared_from_this<Sender> {
+        Sender(const Connection::pointer &conn
+               , const Request &request, const Response &response
+               , const vs::IStream::pointer &stream
+               , const vs::FileStat &stat)
+            : conn(conn), request(request), response(response)
+            , stream(stream), total(), bytesLeft(stat.size), off()
+            , buf(1 << 16)
+        {
+            // do not fail on eof
+            stream->get().exceptions(std::ios::badbit);
         }
 
-        // log what happened
-        postLog(self, request, response, total);
-
-        // response sent, not busy for now
-        makeReady();
-
-        // we are not busy so try next request immediately
-        process();
-    });
-
-    responseSent = [self, this, request, response, bytesLeft, stream, sendBody]
-        (const boost::system::error_code &ec, std::size_t bytes) mutable
-    {
-        if (ec) {
-            close(ec);
-            return;
+        void start() {
+            auto self(shared_from_this());
+            asio::async_write
+                (conn->socket_, conn->responseData_.data()
+                 , conn->strand_.wrap
+                 ([self, this](const boost::system::error_code &ec
+                               , std::size_t bytes)
+            {
+                headersSent(ec, bytes);
+            }));
         }
 
-        bytesLeft -= bytes;
-        sendBody(bytesLeft);
+        void headersSent(const boost::system::error_code &ec
+                         , std::size_t bytes)
+        {
+            if (ec) {
+                conn->close(ec);
+                return;
+            }
+
+            // consume header data
+            conn->responseData_.consume(bytes);
+            total += bytes;
+
+            sendBody();
+        }
+
+        void sendBody() {
+            if (bytesLeft) {
+                std::size_t s(0);
+                try {
+                    s = stream->read(buf.data(), buf.size(), off);
+                } catch (const std::exception &e) {
+                    // force close
+                    LOG(err2) << "Error while reading from istream \""
+                              << stream->name() << "\": <"
+                              << e.what() << ">.";
+                    stream->close();
+                    conn->close();
+                    return;
+                }
+
+                off += s;
+                bytesLeft -= s;
+                auto self(shared_from_this());
+                asio::async_write
+                    (conn->socket_, asio::buffer(buf.data(), s)
+                     , conn->strand_.wrap
+                     ([self, this](const boost::system::error_code &ec
+                                   , std::size_t bytes)
+                {
+                    bodySent(ec, bytes);
+                }));
+                return;
+            }
+
+            done();
+        }
+
+        void bodySent(const boost::system::error_code &ec, std::size_t bytes)
+        {
+            if (ec) {
+                conn->close(ec);
+                return;
+            }
+            total += bytes;
+            sendBody();
+        }
+
+        void done() {
+            // done with the stream
+            stream->close();
+
+            // log what happened
+            postLog(conn, request, response, total);
+            // response sent, not busy for now
+            conn->makeReady();
+            // we are not busy so try next request immediately
+            conn->process();
+        }
+
+        Connection::pointer conn;
+        Request request;
+        Response response;
+        vs::IStream::pointer stream;
+        std::size_t total;
+        std::size_t bytesLeft;
+        std::size_t off;
+        std::vector<char> buf;
     };
 
-    auto headersSent([self, this, sendBody, bytesLeft]
-                     (const boost::system::error_code &ec, std::size_t bytes)
-                     mutable
-    {
-        if (ec) {
-            close(ec);
-            return;
-        }
-
-        // consume header data
-        responseData_.consume(bytes);
-
-        sendBody(bytesLeft);
-    });
-
-    asio::async_write(socket_, responseData_.data()
-                      , strand_.wrap(headersSent));
+    // run the machine
+    std::make_shared<Sender>(shared_from_this(), request, response
+                             , stream, stat)->start();
 }
 
 namespace {
