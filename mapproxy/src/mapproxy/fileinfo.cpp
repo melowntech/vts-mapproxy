@@ -1,6 +1,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
+#include <boost/range/iterator.hpp>
 
 #include "utility/streams.hpp"
 
@@ -64,9 +65,19 @@ const std::string& checkReferenceFrame(const std::string &referenceFrame)
 FileInfo::FileInfo(const std::string &url)
     : url(url), type(Type::resourceFile)
 {
+    auto end(url.end());
+    auto qm(url.find('?'));
+    if (qm != std::string::npos) {
+        end = url.begin() + qm;
+        query = url.substr(qm);
+    }
+
     std::vector<std::string> components;
-    ba::split(components, url, ba::is_any_of("/")
-              , ba::token_compress_on);
+    {
+        auto range(boost::make_iterator_range(url.begin(), end));
+        ba::split(components, range, ba::is_any_of("/")
+                  , ba::token_compress_on);
+    }
 
     switch (components.size() - 1) {
     case 1:
@@ -297,6 +308,7 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
     : fileInfo(fi), type(Type::unknown), fileType(vs::File::config)
     , tileType(vts::TileFile::meta), support(), registry()
 {
+    LOG(info4) << "filename: <" << fi.filename << ">.";
     if (vts::fromFilename(tileId, tileType, subTileIndex
                           , fi.filename, 0, &raw))
     {

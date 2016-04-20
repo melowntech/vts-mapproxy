@@ -105,6 +105,7 @@
         "credits": ["lvg-by"],
         "definition": {
            "dataset": "lvg-by/lvg-by-dop80.xml",
+           "mask": "lvg-by/de-by.qm",
            "format":"jpg"
         }
     },

@@ -504,8 +504,11 @@ void Generators::Detail::update(const Resource::map &resources)
         // TODO: mark as to be removed for prepare workers
     }
 
-    ready_ = true;
     LOG(info2) << "Resources updated.";
+    if (!ready_) {
+        ready_ = true;
+        LOG(info3) << "Ready to serve.";
+    }
 }
 
 Generator::list

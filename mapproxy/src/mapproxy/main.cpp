@@ -181,6 +181,9 @@ void Daemon::configure(const po::variables_map &vars)
         << "\n\tstore.path = " << generatorsConfig_.root
         << "\n\thttp.listen = " << httpListen_
         << "\n\thttp.threadCount = " << httpThreadCount_
+        << "\n\thttp.enableBrowser = " << std::boolalpha << httpEnableBrowser_
+        << "\n\tgdal.processCount = " << gdalWarperOptions_.processCount
+        << "\n\tgdal.tmpRoot = " << gdalWarperOptions_.tmpRoot
         << "\n\tresource-backend.updatePeriod = "
         << generatorsConfig_.resourceUpdatePeriod
         << "\n\tresource-backend.root = "

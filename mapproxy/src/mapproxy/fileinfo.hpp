@@ -53,6 +53,10 @@ struct FileInfo {
      *  Valid only if type == Type::resourceFile.
      */
     std::string filename;
+
+    /** Query party of URL (?query)
+     */
+    std::string query;
 };
 
 /** Parsed TMS file information.

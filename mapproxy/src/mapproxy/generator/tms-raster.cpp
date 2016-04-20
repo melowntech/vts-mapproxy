@@ -51,6 +51,13 @@ TmsRaster::TmsRaster(const Config &config, const Resource &resource)
     , definition_(this->resource().definition<resdef::TmsRaster>())
     , hasMetatiles_(false)
 {
+    LOG(info1) << "Generator for <" << resource.id << "> not ready.";
+}
+
+void TmsRaster::prepare_impl()
+{
+    LOG(info2) << "Preparing <" << resource().id << ">.";
+
     // try to open datasets
     auto dataset(geo::GeoDataset::open(absoluteDataset(definition_.dataset)));
     if (definition_.mask) {
@@ -64,11 +71,6 @@ TmsRaster::TmsRaster(const Config &config, const Resource &resource)
     }
 
     makeReady();
-}
-
-void TmsRaster::prepare_impl()
-{
-    LOG(info2) << "No need to prepare.";
 }
 
 vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)

@@ -348,7 +348,7 @@ GdalWarper::Detail::~Detail()
 void GdalWarper::Detail::runManager(Process::Id parentId)
 {
     dbglog::thread_id("gdal");
-    LOG(info3) << "Started GDAL warper manager process.";
+    LOG(info2) << "Started GDAL warper manager process.";
 
     auto isRunning([&]()
     {
