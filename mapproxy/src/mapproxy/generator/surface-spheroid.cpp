@@ -168,9 +168,15 @@ void SurfaceSpheroid::prepare_impl()
 vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
     const
 {
-    return vts::mapConfig
-        (properties_, vts::ExtraTileSetProperties()
-         , prependRoot(fs::path(), resource(), root));
+    auto mc(vts::mapConfig
+            (properties_, vts::ExtraTileSetProperties()
+             , prependRoot(fs::path(), resource(), root)));
+
+    mc.position.orientation = { 0.0, -90.0, 0.0 };
+    mc.position.verticalExtent = 1000;
+    mc.position.verticalFov = 90;
+
+    return mc;
 }
 
 Generator::Task SurfaceSpheroid
@@ -577,8 +583,8 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
     for (int j(0), je(samplesPerSide); j < je; ++j) {
         for (int i(0), ie(samplesPerSide); i < ie; ++i) {
             auto v00(getVertex(i, j));
-            auto v01(getVertex(i, j + 1));
-            auto v10(getVertex(i + 1, j));
+            auto v01(getVertex(i + 1, j));
+            auto v10(getVertex(i, j + 1));
             auto v11(getVertex(i + 1, j + 1));
 
             // lower
@@ -629,7 +635,10 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
                        .maxEdgeLength(maxEdgeLength));
     }
 
-    LOG(info2)
+    // fake texture coordinate, needed by skirt
+    lm.tCoords.emplace_back();
+
+    LOG(info1)
         << "Simplified mesh to " << lm.faces.size()
         << " faces (should be " << faceCount
         << ", difference: " << (int(lm.faces.size()) - int(faceCount))
@@ -651,6 +660,11 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
     mesh.submeshes.emplace_back();
     auto &sm(mesh.submeshes.back());
 
+    sm.textureMode = vts::SubMesh::external;
+    if (definition_.textureLayerId) {
+        sm.textureLayer = definition_.textureLayerId;
+    }
+
     for (const auto &v : lm.vertices) {
         // convert v from local coordinates to division SRS then to physical SRS
         sm.vertices.push_back(conv(transform(l2g, v)));
@@ -659,6 +673,10 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
         if (generateEtc) {
             sm.etc.push_back(tn(v));
         }
+    }
+
+    for (const auto &f : lm.faces) {
+        sm.faces.emplace_back(f.a, f.b, f.c);
     }
 
     if (fi.raw) {

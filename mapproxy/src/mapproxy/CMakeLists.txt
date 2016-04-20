@@ -1,6 +1,6 @@
 # test program
 define_module(BINARY mapproxy
-  DEPENDS vts-libs service gdal-drivers
+  DEPENDS vts-libs service gdal-drivers geometry
   MHD
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS)
@@ -52,6 +52,7 @@ file_to_cpp(mapproxy_BROWSER_SOURCES
 
 add_executable(mapproxy ${mapproxy_SOURCES} ${mapproxy_BROWSER_SOURCES})
 target_link_libraries(mapproxy ${MODULE_LIBRARIES})
+buildsys_target_compile_definitions(mapproxy ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy)
 set_target_version(mapproxy ${mapproxy_VERSION})
 
