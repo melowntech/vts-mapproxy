@@ -27,6 +27,11 @@ private:
                           , const SurfaceFileInfo &fileInfo
                           , GdalWarper &warper) const;
 
+    void generateMesh(const vts::TileId &tileId
+                      , const Sink::pointer &sink
+                      , const SurfaceFileInfo &fileInfo
+                      , GdalWarper &warper) const;
+
     boost::filesystem::path filePath(vts::File fileType) const;
 
     const resdef::SurfaceSpheroid &definition_;

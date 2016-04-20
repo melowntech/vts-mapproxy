@@ -308,9 +308,8 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
     : fileInfo(fi), type(Type::unknown), fileType(vs::File::config)
     , tileType(vts::TileFile::meta), support(), registry()
 {
-    LOG(info4) << "filename: <" << fi.filename << ">.";
-    if (vts::fromFilename(tileId, tileType, subTileIndex
-                          , fi.filename, 0, &raw))
+    if (vts::fromFilename
+        (tileId, tileType, subTileIndex, fi.filename, 0, &raw))
     {
         type = Type::tile;
         return;

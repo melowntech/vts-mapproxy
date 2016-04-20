@@ -32,6 +32,10 @@ find_package(MHD REQUIRED)
 add_definitions(${MHD_DEFINITIONS})
 include_directories(${MHD_INCLUDE_DIR})
 
+find_package(OpenMesh 2.3.1 REQUIRED)
+include_directories(${OPENMESH_INCLUDE_DIR})
+link_directories(${OPENMESH_LIBRARY_DIR})
+
 # dependencies
 add_subdirectory(src/dbglog)
 add_subdirectory(src/utility)

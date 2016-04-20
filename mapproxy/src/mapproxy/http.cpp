@@ -488,7 +488,7 @@ void Connection::close(const boost::system::error_code &ec)
         || (ec == asio::error::operation_aborted)
         || (ec == asio::error::connection_reset))
     {
-        LOG(info2, lm_) << "Aborted";
+        LOG(info1, lm_) << "Connection closed.";
     } else {
         LOG(err2, lm_) << "Error: " << ec;
         boost::system::error_code cec;
