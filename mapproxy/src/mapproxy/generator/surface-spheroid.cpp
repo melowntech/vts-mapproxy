@@ -588,9 +588,9 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
             auto v11(getVertex(i + 1, j + 1));
 
             // lower
-            if (v10 && v11) {
+            if (v10 && v00) {
                 // try both diagonals
-                if (v00) {
+                if (v11) {
                     lm.addFace(*v10, *v11, *v00);
                 } else if (v01) {
                     lm.addFace(*v00, *v10, *v01);
@@ -602,7 +602,7 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
                 // try both diagonals
                 if (v00) {
                     lm.addFace(*v11, *v01, *v00);
-                } else if (v11) {
+                } else if (v10) {
                     lm.addFace(*v10, *v11, *v01);
                 }
             }
