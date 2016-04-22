@@ -13,21 +13,21 @@ const vadstena::storage::SupportFile::Files supportFiles =
             index_html
             , sizeof(index_html)
             , index_html_attr_lastModified
-            , "text/html"
+            , "text/html; charset=utf-8"
         }
     }, { "leaflet.js"
          , {
             leaflet_js
             , sizeof(leaflet_js)
             , leaflet_js_attr_lastModified
-            , "text/html"
+            , "application/javascript;  charset=utf-8"
         }
     }, { "leaflet.css"
          , {
             leaflet_css
             , sizeof(leaflet_css)
             , leaflet_css_attr_lastModified
-            , "text/css"
+            , "text/css; charset=utf-8"
         }
     }
 };

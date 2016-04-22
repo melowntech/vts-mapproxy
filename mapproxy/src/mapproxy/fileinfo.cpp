@@ -8,6 +8,7 @@
 #include "vts-libs/registry.hpp"
 #include "vts-libs/vts/tileop.hpp"
 #include "vts-libs/vts/support.hpp"
+#include "vts-libs/vts/mapconfig.hpp"
 
 #include "./error.hpp"
 #include "./fileinfo.hpp"
@@ -288,7 +289,7 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
 {
     switch (type) {
     case Type::config:
-        return { "application/json", lastModified };
+        return { vts::MapConfig::contentType, lastModified };
     case Type::image:
         return { contentType(format), lastModified };
     case Type::mask:
@@ -368,7 +369,7 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
     case Type::file:
         switch (fileType) {
         case vts::File::config:
-            return { "application/json", lastModified };
+            return { "vts::MapConfig::contentType", lastModified };
 
         case vts::File::tileIndex:
             return { "application/octet-stream", lastModified };

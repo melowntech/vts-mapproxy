@@ -652,7 +652,7 @@ void Connection::badRequest()
 
     LOG(debug) << "About to send http error: <" << response.code << ">.";
 
-    response.headers.emplace_back("Content-Type", "text/html");
+    response.headers.emplace_back("Content-Type", "text/html; charset=utf-8");
 
     sendResponse({}, response, error400, true);
 }
@@ -981,7 +981,7 @@ private:
 </html>
 )RAW";
 
-        content(os.str(), { "text/html" });
+        content(os.str(), { "text/html; charset=utf-8" });
     }
 
     virtual void error_impl(const std::exception_ptr &exc)
@@ -1016,7 +1016,8 @@ private:
 
         LOG(debug) << "About to send http error: <" << response.code << ">.";
 
-        response.headers.emplace_back("Content-Type", "text/html");
+        response.headers.emplace_back
+            ("Content-Type", "text/html; charset=utf-8");
 
         connection_->sendResponse
             (request_, response, body->data(), body->size(), true);

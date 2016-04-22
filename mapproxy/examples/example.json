@@ -7,16 +7,16 @@
         "driver": "tms-raster",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [1,14],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [1, 14],
+                "tileRange": [[0, 0], [0, 0]]
             },
             "webmerc-projected": {
-                "lodRange": [0,13],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [0, 13],
+                "tileRange": [[0, 0], [0, 0]]
             },
             "webmerc-unprojected": {
-                "lodRange": [0,13],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [0, 13],
+                "tileRange": [[0, 0], [0, 0]]
             }
         },
         "credits": ["citationtech"],
@@ -34,16 +34,16 @@
         "driver": "tms-raster",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [15,19],
-                "tileRange": [[8630,5625],[8975,5813]]
+                "lodRange": [15, 19],
+                "tileRange": [[8630, 5625], [8975, 5813]]
             },
             "webmerc-projected": {
-                "lodRange": [14,18],
-                "tileRange": [[8630,5625],[8975,5813]]
+                "lodRange": [14, 18],
+                "tileRange": [[8630, 5625], [8975, 5813]]
             },
             "webmerc-unprojected": {
-                "lodRange": [14,18],
-                "tileRange": [[8630,5625],[8975,5813]]
+                "lodRange": [14, 18],
+                "tileRange": [[8630, 5625], [8975, 5813]]
             }
         },
         "credits": ["basemap-at"],
@@ -62,16 +62,16 @@
         "driver": "tms-raster",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [1,14],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [1, 14],
+                "tileRange": [[0, 0], [0, 0]]
             },
             "webmerc-projected": {
-                "lodRange": [0,13],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [0, 13],
+                "tileRange": [[0, 0], [0, 0]]
             },
             "webmerc-unprojected": {
-                "lodRange": [0,13],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [0, 13],
+                "tileRange": [[0, 0], [0, 0]]
             }
         },
         "credits": ["citationtech"],
@@ -90,16 +90,16 @@
         "driver": "tms-raster",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [15,18],
-                "tileRange": [[8596,5505],[8837,5764]]
+                "lodRange": [15, 18],
+                "tileRange": [[8596, 5505], [8837, 5764]]
             },
             "webmerc-projected": {
-                "lodRange": [14,17],
-                "tileRange": [[8596,5505],[8837,5764]]
+                "lodRange": [14, 17],
+                "tileRange": [[8596, 5505], [8837, 5764]]
             },
             "webmerc-unprojected": {
-                "lodRange": [14,17],
-                "tileRange": [[8596,5505],[8837,5764]]
+                "lodRange": [14, 17],
+                "tileRange": [[8596, 5505], [8837, 5764]]
             }
         },
         "credits": ["lvg-by"],
@@ -118,21 +118,77 @@
         "driver": "surface-spheroid",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [0,21],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [0, 21],
+                "tileRange": [[0, 0], [0, 0]]
             },
             "webmerc-projected": {
                 "lodRange": [0,20],
-                "tileRange": [[0,0],[0,0]]
+                "tileRange": [[0, 0], [0, 0]]
             },
             "webmerc-unprojected": {
                 "lodRange": [0,20],
-                "tileRange": [[0,0],[0,0]]
+                "tileRange": [[0, 0], [0, 0]]
             }
         },
         "credits": [],
         "definition": {
             "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Mapy.cz, latest 12.5cm orthophoto (Czech)",
+        "group": "mapycz",
+        "id": "ophoto-czech",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [10, 20],
+                "tileRange": [[273, 171], [282, 176]]
+            },
+            "webmerc-projected": {
+                "lodRange": [9, 20],
+                "tileRange": [[273, 171], [282, 176]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [9, 20],
+                "tileRange": [[273, 171], [282, 176]]
+            }
+        },
+        "credits": ["seznamcz"],
+        "definition": {
+           "dataset": "mapycz/mapycz-ophoto.xml",
+           "mask": "mapycz/cz.qm",
+           "format": "jpg"
+        }
+    },
+
+    {
+        "comment": "Mapy.cz, latest 12.5cm orthophoto (Slovak)",
+        "group": "mapycz",
+        "id": "ophoto-slovak",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [10, 20],
+                "tileRange": [[279, 174], [288, 178]]
+            },
+            "webmerc-projected": {
+                "lodRange": [9, 19],
+                "tileRange": [[279, 174], [288, 178]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [9, 19],
+                "tileRange": [[279, 174], [288, 178]]
+            }
+        },
+        "credits": ["seznamcz"],
+        "definition": {
+           "dataset": "mapycz/mapycz-ophoto.xml",
+           "mask": "mapycz/sk.qm",
+           "format": "jpg"
         }
     }
 ]
