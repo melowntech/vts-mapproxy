@@ -144,7 +144,7 @@
         "driver": "tms-raster",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [10, 20],
+                "lodRange": [10, 21],
                 "tileRange": [[273, 171], [282, 176]]
             },
             "webmerc-projected": {
@@ -184,7 +184,7 @@
                 "tileRange": [[279, 174], [288, 178]]
             }
         },
-        "credits": ["seznamcz"],
+        "credits": ["eurosense"],
         "definition": {
            "dataset": "mapycz/mapycz-ophoto.xml",
            "mask": "mapycz/sk.qm",
