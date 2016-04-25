@@ -113,6 +113,33 @@
     {
         "comment": "WGS84 ellipsoid",
         "group": "melown",
+        "id": "wgs84-egm96",
+        "type": "surface",
+        "driver": "surface-spheroid",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0, 21],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-projected": {
+                "lodRange": [0,20],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [0,20],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "WGS84 ellipsoid",
+        "group": "melown",
         "id": "wgs84",
         "type": "surface",
         "driver": "surface-spheroid",
