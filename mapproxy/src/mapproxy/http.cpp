@@ -9,6 +9,8 @@
 #include <boost/asio.hpp>
 #include <boost/format.hpp>
 
+#include <opencv2/highgui/highgui.hpp>
+
 #include <arpa/inet.h>
 
 #include "dbglog/dbglog.hpp"
@@ -80,6 +82,17 @@ const std::string error405(R"RAW(<html>
 <body bgcolor="white">
 <center><h1>405 Method Not Allowed</h1></center>
 )RAW");
+
+const std::vector<unsigned char> emptyImage([]() -> std::vector<unsigned char>
+{
+    cv::Mat dot(4, 4, CV_8U, cv::Scalar(0));
+    std::vector<unsigned char> buf;
+    cv::imencode(".png", dot, buf
+                 , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+    return buf;
+}());
+
+const Sink::FileInfo emptyImageInfo("image/png");
 
 const char *weekDays[7] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
@@ -524,6 +537,7 @@ bool Connection::valid() const
 
 void Connection::start()
 {
+    LOG(info1, lm_) << "Connection opened.";
     requests_.emplace_back();
     readRequest();
 }
@@ -988,39 +1002,40 @@ private:
     {
         if (!valid()) { return; }
 
-        const std::string *body;
-        Response response;
+        auto sendError([&](StatusCode statusCode
+                           , const std::string &reason
+                           , const std::string &body)
+        {
+            LOG(debug)
+                << "About to send http error: <" << statusCode << ">.";
+
+            Response response(statusCode);
+            response.reason = reason;
+            response.headers.emplace_back
+                ("Content-Type", "text/html; charset=utf-8");
+
+            connection_->sendResponse
+                (request_, response, body.data(), body.size(), true);
+        });
 
         try {
             std::rethrow_exception(exc);
         } catch (const NotFound &e) {
-            response.code = StatusCode::NotFound;
-            response.reason = e.what();
-            body = &error404;
+            sendError(StatusCode::NotFound, error404, e.what());
         } catch (const NotAllowed &e) {
-            response.code = StatusCode::NotAllowed;
-            response.reason = e.what();
-            body = &error405;
+            sendError(StatusCode::NotAllowed, error405, e.what());
         } catch (const Unavailable &e) {
-            response.code = StatusCode::ServiceUnavailable;
-            response.reason = e.what();
-            body = &error503;
+            sendError(StatusCode::ServiceUnavailable, error503, e.what());
+        } catch (const EmptyImage &e) {
+            // special "error" -> send "empty" image
+            content_impl(emptyImage.data(), emptyImage.size()
+                         , emptyImageInfo, false);
+            return;
         } catch (const std::exception &e) {
-            response.code = StatusCode::InternalServerError;
-            response.reason = e.what();
-            body = &error500;
+            sendError(StatusCode::InternalServerError, error500, e.what());
         } catch (...) {
-            response.code = StatusCode::InternalServerError;
-            response.reason = "Uknonw";
+            sendError(StatusCode::InternalServerError, error500, "Uknonw");
         }
-
-        LOG(debug) << "About to send http error: <" << response.code << ">.";
-
-        response.headers.emplace_back
-            ("Content-Type", "text/html; charset=utf-8");
-
-        connection_->sendResponse
-            (request_, response, body->data(), body->size(), true);
     }
 
     virtual bool checkAborted_impl() const {

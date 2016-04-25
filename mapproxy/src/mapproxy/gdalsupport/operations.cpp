@@ -35,7 +35,7 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
     src.warpInto(dst, resampling);
 
     if (dst.cmask().empty()) {
-        throw NotFound("No valid data.");
+        throw EmptyImage("No valid data.");
     }
 
     // apply mask set if defined
@@ -47,7 +47,7 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
         dst.applyMask(dstMask.cmask());
 
         if (dst.cmask().empty()) {
-            throw NotFound("No valid data.");
+            throw EmptyImage("No valid data.");
         }
     }
 
@@ -72,7 +72,7 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
     src.warpInto(dst, resampling);
 
     if (dst.cmask().empty()) {
-        throw NotFound("No valid data.");
+        throw EmptyImage("No valid data.");
     }
 
     auto &cmask(dst.cmask());
@@ -87,6 +87,12 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
                         , const math::Extents2 &extents
                         , const math::Size2 &size)
 {
+    // LOG(info4) << std::fixed << "-te "
+    //            << extents.ll(0) << ' ' << extents.ll(1)
+    //            << ' ' << extents.ur(0) << ' ' << extents.ur(1)
+    //            << " -ts " << size.width << ' ' << size.height
+    //            << " -t_srs \"" << srs.srs << "\"";
+
     // generate metatile from mask dataset
     auto &srcMask(cache(dataset));
     auto dstMask(geo::GeoDataset::deriveInMemory

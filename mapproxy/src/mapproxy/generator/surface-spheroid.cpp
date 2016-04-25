@@ -286,6 +286,56 @@ MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
     return meta;
 }
 
+::OGRSpatialReference setGeoid(const ::OGRSpatialReference &srs
+                               , const std::string &geoid)
+{
+    if (!(srs.IsProjected() || srs.IsGeographic())) {
+        LOGTHROW(err1, std::runtime_error)
+            << "SRS set geoid: SRS is neither projected nor "
+            "geographic coordinate system";
+    }
+
+    std::string wkt("VERT_CS[\"geoid height\","
+                    "VERT_DATUM[\"geoid\",2005,EXTENSION[\"PROJ4_GRIDS\""
+                    ",\"" + geoid + "\"]],UNIT[\"metre\",1]]");
+    std::vector<char> tmp(wkt.c_str(), wkt.c_str() + wkt.size() + 1);
+    ::OGRSpatialReference vert;
+    char *data(tmp.data());
+    auto err(vert.importFromWkt(&data));
+    if (err != OGRERR_NONE) {
+        LOGTHROW(err1, std::runtime_error)
+            << "Error parsing wkt definition: <" << err << "> (input = "
+            << wkt << ").";
+    }
+
+    OGRSpatialReference out;
+    out.SetCompoundCS("", &srs, &vert);
+    return out;
+}
+
+geo::SrsDefinition setGeoid(const std::string &srs
+                            , const std::string &geoidGrid)
+{
+    auto def(vr::Registry::srs(srs).srsDef);
+    auto out(geo::SrsDefinition::fromReference
+             (setGeoid(def.reference(), geoidGrid)));
+    LOG(info4) << "Setting geoid <" << geoidGrid << "> to <" << def << ">: "
+               << out;
+    return out;
+}
+
+vts::CsConvertor sds2phys(const std::string &sds
+                          , const vr::ReferenceFrame &rf
+                          , const boost::optional<std::string> &geoidGrid)
+{
+    if (!geoidGrid) {
+        return vts::CsConvertor(sds, rf.model.physicalSrs);
+    }
+
+    // force given geoid
+    return vts::CsConvertor(setGeoid(sds, *geoidGrid), rf.model.physicalSrs);
+}
+
 } // namespace
 
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
@@ -327,8 +377,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
         math::Size2f ts(es.width / bSize.width
                         , es.height / bSize.height);
 
-        // TODO: add geoid to srs
-        vts::CsConvertor conv(block.srs, rf.model.physicalSrs);
+        auto conv(sds2phys(block.srs, rf, definition_.geoidGrid));
 
         // fill in matrix
         for (int j(0), je(gridSize.height); j < je; ++j) {
@@ -649,9 +698,6 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
 
     vts::Mesh mesh;
 
-    // TODO: add geoid to srs
-    vts::CsConvertor conv(nodeInfo.srs(), rf.model.physicalSrs);
-
     // create submesh from local mesh
     auto l2g(geo::local2geo(extents));
 
@@ -665,6 +711,7 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
         sm.textureLayer = definition_.textureLayerId;
     }
 
+    auto conv(sds2phys(nodeInfo.srs(), rf, definition_.geoidGrid));
     for (const auto &v : lm.vertices) {
         // convert v from local coordinates to division SRS then to physical SRS
         sm.vertices.push_back(conv(transform(l2g, v)));

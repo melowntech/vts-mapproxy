@@ -83,4 +83,8 @@ ERROR_GENERATE_ERROR(InternalError);
  */
 ERROR_GENERATE_ERROR(RequestAborted);
 
+/** Image to be sent is empty. Translated to some defined content.
+ */
+ERROR_GENERATE_ERROR(EmptyImage);
+
 #endif // mapproxy_error_hpp_included_
