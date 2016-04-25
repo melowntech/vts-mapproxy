@@ -24,6 +24,7 @@
 #include "vts-libs/vts/csconvertor.hpp"
 #include "vts-libs/vts/math.hpp"
 #include "vts-libs/vts/mesh.hpp"
+#include "vts-libs/vts/opencv/navtile.hpp"
 
 #include "../error.hpp"
 #include "../metatile.hpp"
@@ -36,6 +37,7 @@
 namespace fs = boost::filesystem;
 namespace vr = vadstena::registry;
 namespace vs = vadstena::storage;
+namespace vts = vadstena::vts;
 
 namespace cv {
 
@@ -233,8 +235,9 @@ Generator::Task SurfaceSpheroid
             break;
 
         case vts::TileFile::navtile:
-            sink->error(utility::makeError<InternalError>
-                        ("No navtile generated yet."));
+            return[=](GdalWarper &warper)  {
+                generateNavtile(fi.tileId, sink, fi, warper);
+            };
             break;
         }
         break;
@@ -273,7 +276,7 @@ inline const math::Point3& asPoint(const math::Point3 &p)
 typedef vts::MetaNode::Flag MetaFlag;
 typedef vts::TileIndex::Flag TiFlag;
 
-MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
+inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
 {
     MetaFlag::value_type meta(MetaFlag::allChildren);
     if (ti & TiFlag::mesh) {
@@ -286,42 +289,10 @@ MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
     return meta;
 }
 
-::OGRSpatialReference setGeoid(const ::OGRSpatialReference &srs
-                               , const std::string &geoid)
+inline geo::SrsDefinition setGeoid(const std::string &srs
+                                   , const std::string &geoidGrid)
 {
-    if (!(srs.IsProjected() || srs.IsGeographic())) {
-        LOGTHROW(err1, std::runtime_error)
-            << "SRS set geoid: SRS is neither projected nor "
-            "geographic coordinate system";
-    }
-
-    std::string wkt("VERT_CS[\"geoid height\","
-                    "VERT_DATUM[\"geoid\",2005,EXTENSION[\"PROJ4_GRIDS\""
-                    ",\"" + geoid + "\"]],UNIT[\"metre\",1]]");
-    std::vector<char> tmp(wkt.c_str(), wkt.c_str() + wkt.size() + 1);
-    ::OGRSpatialReference vert;
-    char *data(tmp.data());
-    auto err(vert.importFromWkt(&data));
-    if (err != OGRERR_NONE) {
-        LOGTHROW(err1, std::runtime_error)
-            << "Error parsing wkt definition: <" << err << "> (input = "
-            << wkt << ").";
-    }
-
-    OGRSpatialReference out;
-    out.SetCompoundCS("", &srs, &vert);
-    return out;
-}
-
-geo::SrsDefinition setGeoid(const std::string &srs
-                            , const std::string &geoidGrid)
-{
-    auto def(vr::Registry::srs(srs).srsDef);
-    auto out(geo::SrsDefinition::fromReference
-             (setGeoid(def.reference(), geoidGrid)));
-    LOG(info4) << "Setting geoid <" << geoidGrid << "> to <" << def << ">: "
-               << out;
-    return out;
+    return geo::setGeoid(vr::Registry::srs(srs).srsDef, geoidGrid);
 }
 
 vts::CsConvertor sds2phys(const std::string &sds
@@ -333,8 +304,24 @@ vts::CsConvertor sds2phys(const std::string &sds
     }
 
     // force given geoid
-    return vts::CsConvertor(setGeoid(sds, *geoidGrid), rf.model.physicalSrs);
+    return vts::CsConvertor
+        (setGeoid(sds, *geoidGrid), rf.model.physicalSrs);
 }
+
+vts::CsConvertor sds2nav(const std::string &sds
+                         , const vr::ReferenceFrame &rf
+                         , const boost::optional<std::string> &geoidGrid)
+{
+    if (!geoidGrid) {
+        return vts::CsConvertor(sds, rf.model.navigationSrs);
+    }
+
+    // force given geoid
+    return vts::CsConvertor
+        (setGeoid(sds, *geoidGrid), rf.model.navigationSrs);
+}
+
+const int metatileSamplesPerTile(8);
 
 } // namespace
 
@@ -355,8 +342,6 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
     const auto &rf(referenceFrame());
 
-    int samplesPerTile(8);
-
     vts::MetaTile metatile(tileId, rf.metaBinaryOrder);
 
     for (const auto &block : blocks) {
@@ -365,19 +350,22 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
         const auto es(math::size(extents));
         const math::Size2 bSize(vts::tileRangesSize(view));
 
-        const math::Size2 gridSize(bSize.width * samplesPerTile + 1
-                                   , bSize.height * samplesPerTile + 1);
+        const math::Size2 gridSize
+            (bSize.width * metatileSamplesPerTile + 1
+             , bSize.height * metatileSamplesPerTile + 1);
 
         // grid (in grid coordinates)
         cv::Mat_<math::Point3> grid(gridSize.height, gridSize.width);
 
         // tile size in grid and in real SDS
-        math::Size2f gts(es.width / (samplesPerTile * bSize.width)
-                         , es.height / (samplesPerTile * bSize.height));
+        math::Size2f gts
+            (es.width / (metatileSamplesPerTile * bSize.width)
+             , es.height / (metatileSamplesPerTile * bSize.height));
         math::Size2f ts(es.width / bSize.width
                         , es.height / bSize.height);
 
         auto conv(sds2phys(block.srs, rf, definition_.geoidGrid));
+        auto navConv(sds2nav(block.srs, rf, definition_.geoidGrid));
 
         // fill in matrix
         for (int j(0), je(gridSize.height); j < je; ++j) {
@@ -403,14 +391,16 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                 vts::MetaNode node;
                 node.flags(ti2metaFlags(index_.tileIndex.get(nodeId)));
                 bool geometry(node.geometry());
+                bool navtile(node.navtile());
 
-                // compute tile extents
+                // compute tile extents and height range
+                auto heightRange(vs::Range<double>::emptyRange());
                 math::Extents3 te(math::InvalidExtents{});
                 double area(0);
-                for (int jj(0); jj <= samplesPerTile; ++jj) {
-                    auto yy(j * samplesPerTile + jj);
-                    for (int ii(0); ii <= samplesPerTile; ++ii) {
-                        auto xx(i * samplesPerTile + ii);
+                for (int jj(0); jj <= metatileSamplesPerTile; ++jj) {
+                    auto yy(j * metatileSamplesPerTile + jj);
+                    for (int ii(0); ii <= metatileSamplesPerTile; ++ii) {
+                        auto xx(i * metatileSamplesPerTile + ii);
                         const auto &p(grid(yy, xx));
 
                         // update tile extents
@@ -427,12 +417,24 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                             area += vts::triangleArea(p1, p2, p4);
                             area += vts::triangleArea(p2, p, p4);
                         }
+
+                        if (navtile) {
+                            // sample height in navtile
+                            auto z(navConv
+                                   (math::Point3
+                                    (extents.ll(0) + xx * gts.width
+                                     , yy, 0.0))(2));
+                            update(heightRange, z);
+                        }
                     }
                 }
 
                 // set extents
                 node.extents = vr::normalizedExtents(rf, te);
-                // TODO: build height range
+
+                // build height range
+                node.heightRange.min = std::floor(heightRange.min);
+                node.heightRange.max = std::ceil(heightRange.max);
 
                 // set credits
                 node.updateCredits(resource().credits);
@@ -737,6 +739,95 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
         vts::saveMesh(os, mesh);
     } else {
         vts::saveMeshProper(os, mesh);
+    }
+
+    sink->content(os.str(), fi.sinkFileInfo());
+}
+
+void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
+                                      , const Sink::pointer &sink
+                                      , const SurfaceFileInfo &fi
+                                      , GdalWarper&) const
+{
+    sink->checkAborted();
+
+    const auto &rf(referenceFrame());
+
+    if (!index_.tileIndex.navtile(tileId)) {
+        sink->error(utility::makeError<NotFound>("No navtile for this tile."));
+        return;
+    }
+
+    vts::NodeInfo nodeInfo(rf, tileId);
+    if (!nodeInfo.valid()) {
+        sink->error(utility::makeError<NotFound>
+                    ("TileId outside of valid reference frame tree."));
+        return;
+    }
+
+    const auto &extents(nodeInfo.extents());
+    const auto ts(math::size(extents));
+
+    // sds -> navigation SRS convertor
+    auto navConv(sds2nav(nodeInfo.srs(), rf, definition_.geoidGrid));
+
+    // first, calculate height range in the same way as is done in metatile
+    auto heightRange(vs::Range<double>::emptyRange());
+    {
+        // create node doverage
+        const auto coverage(nodeInfo.coverageMask
+                            (vts::NodeInfo::CoverageType::grid
+                             , math::Size2(metatileSamplesPerTile + 1
+                                           , metatileSamplesPerTile + 1), 1));
+        // grid pixel size
+        math::Size2f gpx
+            (ts.width / (metatileSamplesPerTile + 1)
+             , ts.height / (metatileSamplesPerTile) + 1);
+        for (int j(0); j <= metatileSamplesPerTile; ++j) {
+            auto y(extents.ll(1) + j * gpx.height);
+            for (int i(0); i <= metatileSamplesPerTile; ++i) {
+                if (!coverage.get(i, j)) { continue; }
+                auto z(navConv
+                   (math::Point3
+                    (extents.ll(0) + i * gpx.width, y, 0.0))(2));
+                update(heightRange, z);
+            }
+        }
+    }
+
+    // calculate navtile values
+    vts::opencv::NavTile nt;
+    auto ntd(nt.data());
+    // generate coverage mask in grid coordinates
+    auto &coverage(nt.coverageMask() = nodeInfo.coverageMask
+                   (vts::NodeInfo::CoverageType::grid
+                    , math::Size2(ntd.cols, ntd.rows), 1));
+
+    // set height range
+    nt.heightRange(vts::NavTile::HeightRange
+                   (std::floor(heightRange.min), std::ceil(heightRange.max)));
+    math::Size2f npx(ts.width / ntd.cols, ts.height / ntd.rows);
+    for (int j(0); j < ntd.rows; ++j) {
+        auto y(extents.ll(1) + j * npx.height);
+        for (int i(0); i < ntd.cols; ++i) {
+            // mask with node's mask
+            if (!coverage.get(i, j)) { continue; }
+            auto z(navConv
+                   (math::Point3
+                    (extents.ll(0) + i * npx.width, y, 0.0))(2));
+            // write
+            ntd.at<vts::opencv::NavTile::DataType>(j, i) = z;
+        }
+    }
+
+    // done
+    std::ostringstream os;
+    if (fi.raw) {
+        // raw navtile -> serialize to on-disk format
+        nt.serialize(os);
+    } else {
+        // just navtile itself
+        nt.serializeNavtileProper(os);
     }
 
     sink->content(os.str(), fi.sinkFileInfo());

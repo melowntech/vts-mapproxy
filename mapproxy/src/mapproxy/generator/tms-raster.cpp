@@ -245,7 +245,6 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
     sink->content(buf, Sink::FileInfo(contentType(MaskFormat)));
-
 }
 
 namespace Constants {

@@ -1003,8 +1003,8 @@ private:
         if (!valid()) { return; }
 
         auto sendError([&](StatusCode statusCode
-                           , const std::string &reason
-                           , const std::string &body)
+                           , const std::string &body
+                           , const std::string &reason)
         {
             LOG(debug)
                 << "About to send http error: <" << statusCode << ">.";
