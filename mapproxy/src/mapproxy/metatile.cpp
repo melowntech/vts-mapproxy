@@ -62,7 +62,6 @@ MetatileBlock::list metatileBlocks(const Resource &resource
 
     if (llNode.subtree() == urNode.subtree()) {
         // whole range resides under same subtree
-
         // compose extents
         math::Extents2 extents
             (llNode.extents().ll(0), urNode.extents().ll(1)
@@ -80,8 +79,11 @@ MetatileBlock::list metatileBlocks(const Resource &resource
     auto push([&](unsigned int x, unsigned int y)
     {
         if ((x <= view.ur(0)) && (y <= view.ur(1))) {
-            vts::NodeInfo ni(referenceFrame, vts::TileId(tileId.lod, x, y));
-            if (ni.valid()) { queue.push_back(ni); }
+            // push node, masked node is not invalidated
+            vts::NodeInfo ni(referenceFrame, vts::TileId(tileId.lod, x, y)
+                             , false);
+            // LOG(info4) << "push(" << x << ", " << y << ")";
+            queue.push_back(ni);
         }
     });
 
@@ -90,26 +92,27 @@ MetatileBlock::list metatileBlocks(const Resource &resource
         // pop
         const auto node(queue.front());
         queue.pop_front();
-        LOG(info4) << "Processing " << node.nodeId() << ".";
+        // LOG(info4) << "Processing " << node.nodeId() << ".";
 
         // grab stuff
         const auto &rootId(node.subtree().id());
-        LOG(info4) << "rootId " << rootId << ".";
 
-        LOG(info4) << "rootId.lod: " << rootId.lod;
-        LOG(info4) << "tileId.lod: " << tileId.lod;
+        // LOG(info4) << "rootId " << rootId << ".";
+        // LOG(info4) << "rootId.lod: " << rootId.lod;
+        // LOG(info4) << "tileId.lod: " << tileId.lod;
 
         // compute tile range covered by root at current lod
         auto blockRange(vts::childRange
                         (vts::TileRange(rootId.x, rootId.y, rootId.x, rootId.y)
                          , tileId.lod - rootId.lod));
-        LOG(info4) << "blockRange: " << blockRange;
+        // LOG(info4) << "blockRange: " << blockRange;
 
         // now, clip it by view
         auto blockView(vts::tileRangesIntersect(view, blockRange));
 
         auto blockUrId(vts::tileId(tileId.lod, blockView.ur));
-        vts::NodeInfo blockUrNode(referenceFrame, blockUrId);
+        vts::NodeInfo blockUrNode(referenceFrame, blockUrId
+                                  , false);
 
         // compose extents
         math::Extents2 blockExtents
@@ -117,13 +120,15 @@ MetatileBlock::list metatileBlocks(const Resource &resource
              , blockUrNode.extents().ur(0), node.extents().ur(1));
 
         // new block
-        blocks.emplace_back
-            (referenceFrame, node.srs(), blockView, blockExtents);
+        if (node.valid()) {
+            blocks.emplace_back
+                (referenceFrame, node.srs(), blockView, blockExtents);
+        }
 
         // remember 3 new nodes to check
         push(blockView.ll(0), blockView.ur(1) + 1); // left/bottom
         push(blockView.ur(0) + 1, blockView.ll(1)); // right/top
-        push(blockView.ur(0) + 1, blockView.ur(1)); // right/bottom
+        push(blockView.ur(0) + 1, blockView.ur(1) + 1); // right/bottom
     }
 
     // done
