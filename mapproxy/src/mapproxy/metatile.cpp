@@ -125,10 +125,9 @@ MetatileBlock::list metatileBlocks(const Resource &resource
                 (referenceFrame, node.srs(), blockView, blockExtents);
         }
 
-        // remember 3 new nodes to check
+        // remember 2 new nodes to check
         push(blockView.ll(0), blockView.ur(1) + 1); // left/bottom
         push(blockView.ur(0) + 1, blockView.ll(1)); // right/top
-        push(blockView.ur(0) + 1, blockView.ur(1) + 1); // right/bottom
     }
 
     // done
