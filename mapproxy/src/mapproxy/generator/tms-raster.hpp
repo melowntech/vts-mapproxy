@@ -29,6 +29,8 @@ private:
                           , const Sink::pointer &sink
                           , GdalWarper &warper) const;
 
+    vr::BoundLayer boundLayer(ResourceRoot root) const;
+
     const resdef::TmsRaster &definition_;
 
     bool hasMetatiles_;

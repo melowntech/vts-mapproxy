@@ -19,6 +19,7 @@ namespace vr = vadstena::registry;
 
 namespace constants {
     const std::string Config("mapConfig.json");
+    const std::string BoundLayerDefinition("boundlayer.json");
     const std::string Self("");
     const std::string Index("index.html");
 
@@ -267,6 +268,11 @@ TmsFileInfo::TmsFileInfo(const FileInfo &fi, int flags)
         return;
     }
 
+    if (constants::BoundLayerDefinition == fi.filename) {
+        type = Type::definition;
+        return;
+    }
+
     if (flags & FileFlags::browserEnabled) {
         LOG(debug) << "Browser enabled, checking browser files.";
 
@@ -298,6 +304,8 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
         return { contentType(RasterMetatileFormat), lastModified };
     case Type::support:
         return { support->contentType, support->lastModified };
+    case Type::definition:
+        return { "application/json", lastModified };
     case Type::unknown:
         return {};
     }
@@ -369,7 +377,7 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
     case Type::file:
         switch (fileType) {
         case vts::File::config:
-            return { "vts::MapConfig::contentType", lastModified };
+            return { vts::MapConfig::contentType, lastModified };
 
         case vts::File::tileIndex:
             return { "application/octet-stream", lastModified };

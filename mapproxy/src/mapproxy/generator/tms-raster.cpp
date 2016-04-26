@@ -73,15 +73,10 @@ void TmsRaster::prepare_impl()
     makeReady();
 }
 
-vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
-    const
+vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
 {
     const auto &res(resource());
 
-    vts::MapConfig mapConfig;
-    mapConfig.referenceFrame = *res.referenceFrame;
-
-    // this is Tiled service: we have bound layer only
     vr::BoundLayer bl;
     bl.id = res.id.fullId();
     bl.numericId = 0; // no numeric ID
@@ -102,7 +97,21 @@ vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
     bl.credits = asStringSet(res.credits);
-    mapConfig.boundLayers.add(bl);
+
+    // done
+    return bl;
+}
+
+vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
+    const
+{
+    const auto &res(resource());
+
+    vts::MapConfig mapConfig;
+    mapConfig.referenceFrame = *res.referenceFrame;
+
+    // this is Tiled service: we have bound layer only
+    mapConfig.boundLayers.add(boundLayer(root));
 
     return mapConfig;
 }
@@ -147,6 +156,13 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
     case TmsFileInfo::Type::config: {
         std::ostringstream os;
         mapConfig(os, ResourceRoot::none);
+        sink->content(os.str(), fi.sinkFileInfo());
+        break;
+    }
+
+    case TmsFileInfo::Type::definition: {
+        std::ostringstream os;
+        vr::saveBoundLayer(os, boundLayer(ResourceRoot::none));
         sink->content(os.str(), fi.sinkFileInfo());
         break;
     }
