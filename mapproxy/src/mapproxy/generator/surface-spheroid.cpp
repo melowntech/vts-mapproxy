@@ -39,32 +39,6 @@ namespace vr = vadstena::registry;
 namespace vs = vadstena::storage;
 namespace vts = vadstena::vts;
 
-namespace cv {
-
-/** OpenCV  traits for  math::Point3  data type.
- *
- * Simulates math::Point3 as N 64-bit channels where
- *     sizeof(math::Point3) <= channels * 8
- *
- * NB: matrix elemetns must be initialized by placement new!
- *
- * NB: there is no need * to call destructor because destructor of math::Points3
- *     is no-op
- */
-template<> class DataType<math::Point3>
-{
-public:
-    typedef math::Point3 value_type;
-    typedef value_type work_type;
-    typedef int channel_type;
-    enum { generic_type = 0, depth = CV_64F // 8 bytes
-           , channels = ((sizeof(math::Point3) + 7) / 8)
-           , type = CV_MAKETYPE(depth, channels) };
-    typedef Vec<channel_type, channels> vec_type;
-};
-
-} // namespace cv
-
 namespace generator {
 
 namespace {
@@ -323,6 +297,43 @@ vts::CsConvertor sds2nav(const std::string &sds
 
 const int metatileSamplesPerTile(8);
 
+template <typename T>
+class Grid {
+public:
+    typedef T value_type;
+
+    Grid(const math::Size2 &size)
+        : size_(size)
+        , grid_(math::area(size), T())
+    {}
+
+    T& operator()(int x, int y) {
+        return grid_[index(x, y)];
+    }
+
+    const T& operator()(int x, int y) const {
+        return grid_[index(x, y)];
+    }
+
+private:
+    inline int index(int x, int y) const {
+#ifndef aNDEBUG
+        // this is compiled in only in debug mode
+        if ((x < 0) || (x >= size_.width)
+            || (y < 0) || (y >= size_.height))
+        {
+            LOGTHROW(err3, Error)
+                << "Invalid index [" << x << ", " << y << "] in grid of size "
+                << size_ << ". Go and fix your code,";
+        }
+#endif // NDEBUG
+        return y * size_.width + x;
+    }
+
+    math::Size2 size_;
+    std::vector<T> grid_;
+};
+
 } // namespace
 
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
@@ -355,7 +366,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
              , bSize.height * metatileSamplesPerTile + 1);
 
         // grid (in grid coordinates)
-        cv::Mat_<math::Point3> grid(gridSize.height, gridSize.width);
+        Grid<math::Point3> grid(gridSize);
 
         // tile size in grid and in real SDS
         math::Size2f gts
@@ -371,12 +382,9 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
-                // convert point in SDS to world coordinates and store in the
-                // grid
-                // NB: we need to initialize the data -> placement new
-                new (&grid(j, i)) math::Point3
-                    (conv(math::Point3
-                          (extents.ll(0) + i * gts.width, y, 0.0)));
+                grid(i, j)
+                    = conv(math::Point3
+                           (extents.ll(0) + i * gts.width, y, 0.0));
             }
         }
 
@@ -401,7 +409,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                     auto yy(j * metatileSamplesPerTile + jj);
                     for (int ii(0); ii <= metatileSamplesPerTile; ++ii) {
                         auto xx(i * metatileSamplesPerTile + ii);
-                        const auto &p(grid(yy, xx));
+                        const auto &p(grid(xx, yy));
 
                         // update tile extents
                         math::update(te, p);
@@ -409,10 +417,10 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                         // TODO: use node mask!
                         if (geometry && ii && jj) {
                             // compute area of two triangles
-                            const auto &p1(grid(yy - 1, xx - 1));
-                            const auto &p2(grid(yy - 1, xx));
+                            const auto &p1(grid(xx - 1, yy - 1));
+                            const auto &p2(grid(xx, yy - 1));
                             // p3 = p
-                            const auto &p4(grid(yy, xx - 1));
+                            const auto &p4(grid(xx - 1, yy));
 
                             area += vts::triangleArea(p1, p2, p4);
                             area += vts::triangleArea(p2, p, p4);
@@ -782,7 +790,7 @@ void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
         // grid pixel size
         math::Size2f gpx
             (ts.width / (metatileSamplesPerTile + 1)
-             , ts.height / (metatileSamplesPerTile) + 1);
+             , ts.height / (metatileSamplesPerTile + 1));
         for (int j(0); j <= metatileSamplesPerTile; ++j) {
             auto y(extents.ll(1) + j * gpx.height);
             for (int i(0); i <= metatileSamplesPerTile; ++i) {
