@@ -9,6 +9,17 @@
 #include "./error.hpp"
 #include "./metatile.hpp"
 
+MetatileBlock::MetatileBlock(vts::Lod lod
+                             , const vr::ReferenceFrame &referenceFrame
+                             , const std::string &srs
+                             , const vts::TileRange &view
+                             , const math::Extents2 &extents)
+    : srs(srs), view(view), extents(extents)
+    , commonAncestor(referenceFrame, vts::commonAncestor(lod, view))
+    , offset(vts::local(commonAncestor.nodeId().lod
+                        , vts::tileId(lod, view.ll)))
+{}
+
 MetatileBlock::list metatileBlocks(const Resource &resource
                                    , const vts::TileId &tileId
                                    , unsigned int metaBinaryOrder)
@@ -68,7 +79,10 @@ MetatileBlock::list metatileBlocks(const Resource &resource
              , urNode.extents().ur(0), llNode.extents().ur(1));
 
         // done
-        return { MetatileBlock(referenceFrame, llNode.srs(), view, extents) };
+        return {
+            MetatileBlock
+                (tileId.lod, referenceFrame, llNode.srs(), view, extents)
+        };
     }
 
     MetatileBlock::list blocks;
@@ -121,8 +135,9 @@ MetatileBlock::list metatileBlocks(const Resource &resource
 
         // new block
         if (node.valid()) {
-            blocks.emplace_back
-                (referenceFrame, node.srs(), blockView, blockExtents);
+            // remember block
+            blocks.emplace_back (tileId.lod, referenceFrame, node.srs()
+                                 , blockView, blockExtents);
         }
 
         // remember 2 new nodes to check

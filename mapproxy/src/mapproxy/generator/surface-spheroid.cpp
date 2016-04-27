@@ -13,7 +13,6 @@
 
 #include "geo/coordinates.hpp"
 
-#include "imgproc/rastermask/cvmat.hpp"
 #include "imgproc/scanconversion.hpp"
 
 #include "vts-libs/storage/fstreams.hpp"
@@ -127,6 +126,7 @@ void SurfaceSpheroid::prepare_impl()
         vts::TileIndex::Flag::value_type flags
             (vts::TileIndex::Flag::meta);
         if (in(lod, r.lodRange)) {
+            // TODO: what about polar caps in melown2015?
             // watertight tiles and navtiles everywhere
             flags |= (vts::TileIndex::Flag::mesh
                       | vts::TileIndex::Flag::watertight
@@ -302,9 +302,9 @@ class Grid {
 public:
     typedef T value_type;
 
-    Grid(const math::Size2 &size)
+    Grid(const math::Size2 &size, const T &fill = T())
         : size_(size)
-        , grid_(math::area(size), T())
+        , grid_(math::area(size), fill)
     {}
 
     T& operator()(int x, int y) {
@@ -315,9 +315,17 @@ public:
         return grid_[index(x, y)];
     }
 
+    /** Returns pointer to pixel of non if pixel is invalid
+     */
+    template <typename Mask>
+    const T* operator()(const Mask &mask, int x, int y) const {
+        if (!mask(x, y)) { return nullptr; }
+        return &grid_[index(x, y)];
+    }
+
 private:
     inline int index(int x, int y) const {
-#ifndef aNDEBUG
+#ifndef NDEBUG
         // this is compiled in only in debug mode
         if ((x < 0) || (x >= size_.width)
             || (y < 0) || (y >= size_.height))
@@ -333,6 +341,54 @@ private:
     math::Size2 size_;
     std::vector<T> grid_;
 };
+
+class ShiftMask {
+public:
+    ShiftMask(const MetatileBlock &block, int samplesPerTile)
+        : offset_(block.offset)
+        , size_((1 << offset_.lod) * samplesPerTile + 1
+                , (1 << offset_.lod) * samplesPerTile + 1)
+        , mask_(block.commonAncestor.coverageMask
+                (vts::NodeInfo::CoverageType::grid, size_, 0))
+    {}
+
+    bool operator()(int x, int y) const {
+        return mask_.get(x + offset_.x, y + offset_.y);
+    }
+
+private:
+    const vts::TileId offset_;
+    const math::Size2 size_;
+    const vts::NodeInfo::CoverageMask mask_;
+};
+
+double quadArea(const math::Point3 *v00, const math::Point3 *v01
+                , const math::Point3 *v10, const math::Point3 *v11)
+{
+    double area(0);
+
+    // lower
+    if (v10 && v00) {
+        // try both diagonals
+        if (v11) {
+            area += vts::triangleArea(*v10, *v11, *v00);
+        } else if (v01) {
+            area += vts::triangleArea(*v00, *v10, *v01);
+        }
+    }
+
+    // upper
+    if (v11 && v01) {
+        // try both diagonals
+        if (v00) {
+            area += vts::triangleArea(*v11, *v01, *v00);
+        } else if (v10) {
+            area += vts::triangleArea(*v10, *v11, *v01);
+        }
+    }
+
+    return area;
+}
 
 } // namespace
 
@@ -365,8 +421,18 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
             (bSize.width * metatileSamplesPerTile + 1
              , bSize.height * metatileSamplesPerTile + 1);
 
-        // grid (in grid coordinates)
-        Grid<math::Point3> grid(gridSize);
+        LOG(info1) << "Processing metatile block ["
+                   << vts::tileId(tileId.lod, block.view.ll)
+                   << ", " << vts::tileId(tileId.lod, block.view.ur)
+                   << "], ancestor: " << block.commonAncestor.nodeId()
+                   << ", tile offset: " << block.offset;
+
+        // grid (in grid coordinates); fill in with invalid numbers
+        Grid<math::Point3> grid
+            (gridSize, math::Point3(std::numeric_limits<double>::quiet_NaN()));
+
+        // grid mask
+        const ShiftMask mask(block, metatileSamplesPerTile);
 
         // tile size in grid and in real SDS
         math::Size2f gts
@@ -382,9 +448,12 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
-                grid(i, j)
-                    = conv(math::Point3
-                           (extents.ll(0) + i * gts.width, y, 0.0));
+                // work only with non-masked pixels
+                if (mask(j, i)) {
+                    grid(i, j)
+                        = conv(math::Point3
+                               (extents.ll(0) + i * gts.width, y, 0.0));
+                }
             }
         }
 
@@ -409,24 +478,21 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                     auto yy(j * metatileSamplesPerTile + jj);
                     for (int ii(0); ii <= metatileSamplesPerTile; ++ii) {
                         auto xx(i * metatileSamplesPerTile + ii);
-                        const auto &p(grid(xx, yy));
+                        const auto *p(grid(mask, xx, yy));
 
-                        // update tile extents
-                        math::update(te, p);
+                        // update tile extents (if point valid)
+                        if (p) { math::update(te, *p); }
 
-                        // TODO: use node mask!
                         if (geometry && ii && jj) {
-                            // compute area of two triangles
-                            const auto &p1(grid(xx - 1, yy - 1));
-                            const auto &p2(grid(xx, yy - 1));
-                            // p3 = p
-                            const auto &p4(grid(xx - 1, yy));
-
-                            area += vts::triangleArea(p1, p2, p4);
-                            area += vts::triangleArea(p2, p, p4);
+                            // compute area of the quad composed of 1 or 2
+                            // triangles
+                            area += quadArea(grid(mask, xx - 1, yy - 1)
+                                             , p
+                                             , grid(mask, xx - 1, yy)
+                                             , grid(mask, xx, yy - 1));
                         }
 
-                        if (navtile) {
+                        if (p && navtile) {
                             // sample height in navtile
                             auto z(navConv
                                    (math::Point3
@@ -435,6 +501,11 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                             update(heightRange, z);
                         }
                     }
+                }
+
+                if (!area) {
+                    // well, empty tile, no children
+                    continue;
                 }
 
                 // set extents
@@ -450,9 +521,38 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                 // mesh is (almost) flat -> use tile area
                 if (geometry) {
                     node.applyTexelSize(true);
-                    // TODO: use node mask area ratio
-                    node.texelSize = std::sqrt
-                        (area / vr::BoundLayer::tileArea());
+
+                    // calculate texture size using node mask
+                    auto textureArea([&]() -> std::size_t
+                    {
+                        // ancestor is full -> we are full as well
+                        if (!block.commonAncestor.partial()) {
+                            return vr::BoundLayer::tileArea();
+                        }
+
+                        vts::NodeInfo ni(rf, nodeId);
+                        if (!ni.partial()) {
+                            // node is full
+                            return vr::BoundLayer::tileArea();
+                        }
+                        if (!ni.valid()) {
+                            // mask is empty
+                            return 0;
+                        }
+
+                        // partial node -> create mask in pixel coordinates and
+                        // calculate covered area in pixels
+                        return ni.coverageMask
+                            (vts::NodeInfo::CoverageType::pixel
+                             , vr::BoundLayer::tileSize(), 0)
+                            .count();
+                    }());
+
+                    // well, empty tile as well
+                    if (!textureArea) { continue; }
+
+                    // calculate texel size
+                    node.texelSize = std::sqrt(area / textureArea);
                 }
 
                 // store metata node

@@ -16,18 +16,17 @@ struct MetatileBlock {
     vts::TileRange view;
     math::Extents2 extents;
 
-    /** Common parent of nodes in this block
+    /** Common ancestor of nodes in this block
      */
-    vts::NodeInfo commonParent;
+    vts::NodeInfo commonAncestor;
+
+    vts::TileId offset;
 
     typedef std::vector<MetatileBlock> list;
 
-    MetatileBlock(const vr::ReferenceFrame &referenceFrame
+    MetatileBlock(vts::Lod lod, const vr::ReferenceFrame &referenceFrame
                   , const std::string &srs, const vts::TileRange &view
-                  , const math::Extents2 &extents)
-        : srs(srs), view(view), extents(extents)
-        , commonParent(referenceFrame)
-    {}
+                  , const math::Extents2 &extents);
 };
 
 /** Generate metatile blocks for given metatile id in given reference frame
