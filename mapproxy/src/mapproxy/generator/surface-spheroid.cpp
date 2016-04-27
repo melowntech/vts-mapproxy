@@ -349,7 +349,7 @@ public:
         , size_((1 << offset_.lod) * samplesPerTile + 1
                 , (1 << offset_.lod) * samplesPerTile + 1)
         , mask_(block.commonAncestor.coverageMask
-                (vts::NodeInfo::CoverageType::grid, size_, 0))
+                (vts::NodeInfo::CoverageType::grid, size_, 1))
     {}
 
     bool operator()(int x, int y) const {
@@ -362,18 +362,26 @@ private:
     const vts::NodeInfo::CoverageMask mask_;
 };
 
-double quadArea(const math::Point3 *v00, const math::Point3 *v01
-                , const math::Point3 *v10, const math::Point3 *v11)
+/** Calculates area of a quad (tries both diagonals)
+ *
+ *  Returns computed area and number of triangles that make up the area
+ */
+std::tuple<double, int> quadArea(const math::Point3 *v00
+                                 , const math::Point3 *v01
+                                 , const math::Point3 *v10
+                                 , const math::Point3 *v11)
 {
-    double area(0);
+    std::tuple<double, int> qa;
 
     // lower
     if (v10 && v00) {
         // try both diagonals
         if (v11) {
-            area += vts::triangleArea(*v10, *v11, *v00);
+            std::get<0>(qa) += vts::triangleArea(*v10, *v11, *v00);
+            ++std::get<1>(qa);
         } else if (v01) {
-            area += vts::triangleArea(*v00, *v10, *v01);
+            std::get<0>(qa) += vts::triangleArea(*v00, *v10, *v01);
+            ++std::get<1>(qa);
         }
     }
 
@@ -381,13 +389,15 @@ double quadArea(const math::Point3 *v00, const math::Point3 *v01
     if (v11 && v01) {
         // try both diagonals
         if (v00) {
-            area += vts::triangleArea(*v11, *v01, *v00);
+            std::get<0>(qa) += vts::triangleArea(*v11, *v01, *v00);
+            ++std::get<1>(qa);
         } else if (v10) {
-            area += vts::triangleArea(*v10, *v11, *v01);
+            std::get<0>(qa) += vts::triangleArea(*v10, *v11, *v01);
+            ++std::get<1>(qa);
         }
     }
 
-    return area;
+    return qa;
 }
 
 } // namespace
@@ -449,7 +459,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
                 // work only with non-masked pixels
-                if (mask(j, i)) {
+                if (mask(i, j)) {
                     grid(i, j)
                         = conv(math::Point3
                                (extents.ll(0) + i * gts.width, y, 0.0));
@@ -474,6 +484,8 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                 auto heightRange(vs::Range<double>::emptyRange());
                 math::Extents3 te(math::InvalidExtents{});
                 double area(0);
+                int triangleCount(0);
+
                 for (int jj(0); jj <= metatileSamplesPerTile; ++jj) {
                     auto yy(j * metatileSamplesPerTile + jj);
                     for (int ii(0); ii <= metatileSamplesPerTile; ++ii) {
@@ -486,10 +498,12 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                         if (geometry && ii && jj) {
                             // compute area of the quad composed of 1 or 2
                             // triangles
-                            area += quadArea(grid(mask, xx - 1, yy - 1)
+                            auto qa(quadArea(grid(mask, xx - 1, yy - 1)
                                              , p
                                              , grid(mask, xx - 1, yy)
-                                             , grid(mask, xx, yy - 1));
+                                             , grid(mask, xx, yy - 1)));
+                            area += std::get<0>(qa);
+                            triangleCount += std::get<1>(qa);
                         }
 
                         if (p && navtile) {
@@ -523,33 +537,31 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                     node.applyTexelSize(true);
 
                     // calculate texture size using node mask
-                    auto textureArea([&]() -> std::size_t
+                    auto textureArea([&]() -> double
                     {
                         // ancestor is full -> we are full as well
                         if (!block.commonAncestor.partial()) {
                             return vr::BoundLayer::tileArea();
                         }
 
-                        vts::NodeInfo ni(rf, nodeId);
-                        if (!ni.partial()) {
-                            // node is full
-                            return vr::BoundLayer::tileArea();
-                        }
-                        if (!ni.valid()) {
-                            // mask is empty
-                            return 0;
-                        }
+                        // partial node: use triangle count to calculate
+                        // percentage of texture
+                        math::Size2 size(metatileSamplesPerTile
+                                         , metatileSamplesPerTile);
 
-                        // partial node -> create mask in pixel coordinates and
-                        // calculate covered area in pixels
-                        return ni.coverageMask
-                            (vts::NodeInfo::CoverageType::pixel
-                             , vr::BoundLayer::tileSize(), 0)
-                            .count();
+                        // return scaled coverage; NB: triangle covers hald of
+                        // pixel so real area is in pixels is half of number of
+                        // pixels
+                        return ((triangleCount * vr::BoundLayer::tileArea())
+                                / (2.0 * math::area(size)));
                     }());
 
                     // well, empty tile as well
                     if (!textureArea) { continue; }
+                    // LOG(info4)
+                    //     << std::fixed << nodeId << " meshArea: " << area;
+                    // LOG(info4)
+                    //     << nodeId << " textureArea: " << textureArea;
 
                     // calculate texel size
                     node.texelSize = std::sqrt(area / textureArea);
