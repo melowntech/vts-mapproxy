@@ -6,7 +6,7 @@
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/tileop.hpp"
 
-#include "./error.hpp"
+#include "../error.hpp"
 #include "./metatile.hpp"
 
 MetatileBlock::MetatileBlock(vts::Lod lod

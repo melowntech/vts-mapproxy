@@ -8,7 +8,8 @@ define_module(BINARY mapproxy
 set(mapproxy_SOURCES
   error.hpp
   resource.hpp resource.cpp
-  metatile.hpp metatile.cpp
+  support/metatile.hpp support/metatile.cpp
+  support/mesh.hpp support/mesh.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp

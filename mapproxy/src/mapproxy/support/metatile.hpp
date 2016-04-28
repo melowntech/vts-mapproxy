@@ -4,7 +4,7 @@
 #include "vts-libs/registry.hpp"
 #include "vts-libs/vts/basetypes.hpp"
 
-#include "./resource.hpp"
+#include "../resource.hpp"
 
 namespace vts = vadstena::vts;
 namespace vr = vadstena::registry;

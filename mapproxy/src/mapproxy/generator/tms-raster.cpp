@@ -14,7 +14,7 @@
 #include "vts-libs/vts/nodeinfo.hpp"
 
 #include "../error.hpp"
-#include "../metatile.hpp"
+#include "../support/metatile.hpp"
 
 #include "./tms-raster.hpp"
 #include "./factory.hpp"
