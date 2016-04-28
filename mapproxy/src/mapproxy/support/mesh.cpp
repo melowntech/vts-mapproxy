@@ -1,17 +1,20 @@
 #include "math/math.hpp"
-
 #include "geometry/meshop.hpp"
-
+#include "imgproc/scanconversion.hpp"
 #include "geo/coordinates.hpp"
 
 #include "vts-libs/vts/math.hpp"
+#include "vts-libs/vts/csconvertor.hpp"
 
 #include "./mesh.hpp"
 
-std::tuple<geometry::Mesh, vts::NodeInfo::CoverageMask>
+namespace vr = vadstena::registry;
+
+std::tuple<geometry::Mesh, bool>
 meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges)
 {
-    std::tuple<geometry::Mesh, vts::NodeInfo::CoverageMask> res;
+    std::tuple<geometry::Mesh, bool> res;
+    std::get<1>(res) = false;
 
     const auto extents(nodeInfo.extents());
     const auto ts(math::size(extents));
@@ -25,12 +28,13 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges)
     auto g2l(geo::geo2local(extents));
 
     // get node coverage
-    auto &coverage(std::get<1>(res) = nodeInfo.coverageMask
-                   (vts::NodeInfo::CoverageType::grid
-                    , math::Size2(edges.width + 1, edges.height + 1)
-                    , 1));
+    auto coverage(nodeInfo.coverageMask
+                  (vts::NodeInfo::CoverageType::grid
+                   , math::Size2(edges.width + 1, edges.height + 1)
+                   , 1));
 
     if (coverage.empty()) { return res; }
+    std::get<1>(res) = coverage.full();
 
     // fill grid and remember indices
     auto &lm(std::get<0>(res));
@@ -155,3 +159,138 @@ void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
         << ").";
 }
 
+void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
+                      , const math::Extents2 &extents, bool fullyCovered)
+{
+    const auto size(vts::Mesh::coverageSize());
+    if (fullyCovered) {
+        mask = vts::Mesh::CoverageMask(size, vts::Mesh::CoverageMask::FULL);
+        return;
+    }
+
+    // mesh trafo
+    math::Matrix4 trafo(boost::numeric::ublas::identity_matrix<double>(4));
+    {
+
+        const auto gridSize(vts::Mesh::coverageSize());
+        const auto es(math::size(extents));
+        math::Size2f scale(gridSize.width / es.width
+                           , gridSize.height / es.height);
+
+        // scale (NB: vertical flip)
+        trafo(0, 0) = scale.width;
+        trafo(1, 1) = -scale.height;
+
+        // shift (by half grid and also by half pixel to move pixel centers at
+        // integer indices)
+        trafo(0, 3) = gridSize.width / 2.0 - 0.5;
+        trafo(1, 3) = gridSize.height / 2.0 - 0.5;
+    }
+
+    mask = vts::Mesh::CoverageMask(size, vts::Mesh::CoverageMask::EMPTY);
+    std::vector<imgproc::Scanline> scanlines;
+    cv::Point3f tri[3];
+    for (const auto &face : mesh.faces) {
+        int i(0);
+        for (auto v : { face.a, face.b, face.c }) {
+            auto p(transform(trafo, mesh.vertices[v]));
+            tri[i].x = p(0);
+            tri[i].y = p(1);
+            tri[i].z = p(2);
+            ++i;
+        }
+
+        scanlines.clear();
+        imgproc::scanConvertTriangle(tri, 0, size.height, scanlines);
+
+        for (const auto &sl : scanlines) {
+            imgproc::processScanline(sl, 0, size.width
+                                     , [&](int x, int y, float)
+            {
+                mask.set(x, y);
+            });
+        }
+    }
+}
+
+vts::CsConvertor sds2srs(const std::string &sds, const std::string &dst
+                         , const boost::optional<std::string> &geoidGrid)
+{
+    if (!geoidGrid) {
+        return vts::CsConvertor(sds, dst);
+    }
+
+    // force given geoid
+    return vts::CsConvertor
+        (geo::setGeoid(vr::Registry::srs(sds).srsDef, *geoidGrid)
+         , dst);
+}
+
+vts::CsConvertor sds2phys(const vts::NodeInfo &nodeInfo
+                          , const boost::optional<std::string> &geoidGrid)
+{
+    return sds2srs(nodeInfo.srs()
+                   , nodeInfo.referenceFrame().model.physicalSrs
+                   , geoidGrid);
+}
+
+vts::CsConvertor sds2nav(const vts::NodeInfo &nodeInfo
+                         , const boost::optional<std::string> &geoidGrid)
+{
+    return sds2srs(nodeInfo.srs()
+                   , nodeInfo.referenceFrame().model.navigationSrs
+                   , geoidGrid);
+}
+
+namespace {
+
+class TextureNormalizer {
+public:
+    TextureNormalizer(const math::Extents2 &divisionExtents)
+        : size_(size(divisionExtents))
+        , origin_(divisionExtents.ll - center(divisionExtents))
+    {}
+
+    math::Point2 operator()(const math::Point3 &p) const {
+        return math::Point2((p(0) - origin_(0)) / size_.width
+                            , (p(1) - origin_(1)) / size_.height);
+    };
+
+private:
+    math::Size2f size_;
+    math::Point2 origin_;
+};
+
+} // namespace
+
+vts::SubMesh& addSubMesh(vts::Mesh &mesh, const geometry::Mesh &gmesh
+                         , const vts::NodeInfo &nodeInfo
+                         , const boost::optional<std::string> &geoidGrid)
+{
+    const auto extents(nodeInfo.extents());
+    const auto l2g(geo::local2geo(extents));
+
+    mesh.submeshes.emplace_back();
+    auto &sm(mesh.submeshes.back());
+    sm.textureMode = vts::SubMesh::external;
+
+    TextureNormalizer tn(extents);
+    const auto conv(sds2phys(nodeInfo, geoidGrid));
+
+    bool generateEtc(nodeInfo.node().externalTexture);
+    for (const auto &v : gmesh.vertices) {
+        // convert v from local coordinates to division SRS then to physical SRS
+        sm.vertices.push_back(conv(transform(l2g, v)));
+
+        // generate external texture coordinates if instructed
+        if (generateEtc) {
+            sm.etc.push_back(tn(v));
+        }
+    }
+
+    for (const auto &f : gmesh.faces) {
+        sm.faces.emplace_back(f.a, f.b, f.c);
+    }
+
+    return sm;
+}

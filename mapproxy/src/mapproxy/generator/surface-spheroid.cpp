@@ -12,8 +12,6 @@
 
 #include "geo/coordinates.hpp"
 
-#include "imgproc/scanconversion.hpp"
-
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
@@ -27,6 +25,7 @@
 #include "../error.hpp"
 #include "../support/metatile.hpp"
 #include "../support/mesh.hpp"
+#include "../support/srs.hpp"
 
 #include "./surface-spheroid.hpp"
 #include "./factory.hpp"
@@ -148,8 +147,14 @@ vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
             (properties_, vts::ExtraTileSetProperties()
              , prependRoot(fs::path(), resource(), root)));
 
+    // look down
     mc.position.orientation = { 0.0, -90.0, 0.0 };
-    mc.position.verticalExtent = 1000;
+
+    // take Y size of reference frame's 3D extents extents
+    mc.position.verticalExtent
+        = math::size(referenceFrame().division.extents).height;
+
+    // quite wide angle camera
     mc.position.verticalFov = 90;
 
     return mc;
@@ -262,39 +267,6 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
 
     return meta;
 }
-
-inline geo::SrsDefinition setGeoid(const std::string &srs
-                                   , const std::string &geoidGrid)
-{
-    return geo::setGeoid(vr::Registry::srs(srs).srsDef, geoidGrid);
-}
-
-vts::CsConvertor sds2phys(const std::string &sds
-                          , const vr::ReferenceFrame &rf
-                          , const boost::optional<std::string> &geoidGrid)
-{
-    if (!geoidGrid) {
-        return vts::CsConvertor(sds, rf.model.physicalSrs);
-    }
-
-    // force given geoid
-    return vts::CsConvertor
-        (setGeoid(sds, *geoidGrid), rf.model.physicalSrs);
-}
-
-vts::CsConvertor sds2nav(const std::string &sds
-                         , const vr::ReferenceFrame &rf
-                         , const boost::optional<std::string> &geoidGrid)
-{
-    if (!geoidGrid) {
-        return vts::CsConvertor(sds, rf.model.navigationSrs);
-    }
-
-    // force given geoid
-    return vts::CsConvertor
-        (setGeoid(sds, *geoidGrid), rf.model.navigationSrs);
-}
-
 const int metatileSamplesPerTile(8);
 
 template <typename T>
@@ -451,8 +423,8 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
         math::Size2f ts(es.width / bSize.width
                         , es.height / bSize.height);
 
-        auto conv(sds2phys(block.srs, rf, definition_.geoidGrid));
-        auto navConv(sds2nav(block.srs, rf, definition_.geoidGrid));
+        auto conv(sds2phys(block.commonAncestor, definition_.geoidGrid));
+        auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
 
         // fill in matrix
         for (int j(0), je(gridSize.height); j < je; ++j) {
@@ -579,81 +551,6 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
-namespace {
-
-class TextureNormalizer {
-public:
-    TextureNormalizer(const math::Extents2 &divisionExtents)
-        : size_(size(divisionExtents))
-        , origin_(divisionExtents.ll - center(divisionExtents))
-    {}
-
-    math::Point2 operator()(const math::Point3 &p) const {
-        return math::Point2((p(0) - origin_(0)) / size_.width
-                            , (p(1) - origin_(1)) / size_.height);
-    };
-
-private:
-    math::Size2f size_;
-    math::Point2 origin_;
-};
-
-void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
-                      , const math::Extents2 &extents, bool fullyCovered)
-{
-    const auto size(vts::Mesh::coverageSize());
-    if (fullyCovered) {
-        mask = vts::Mesh::CoverageMask(size, vts::Mesh::CoverageMask::FULL);
-        return;
-    }
-
-    // mesh trafo
-    math::Matrix4 trafo(boost::numeric::ublas::identity_matrix<double>(4));
-    {
-
-        const auto gridSize(vts::Mesh::coverageSize());
-        const auto es(math::size(extents));
-        math::Size2f scale(gridSize.width / es.width
-                           , gridSize.height / es.height);
-
-        // scale (NB: vertical flip)
-        trafo(0, 0) = scale.width;
-        trafo(1, 1) = -scale.height;
-
-        // shift (by half grid and also by half pixel to move pixel centers at
-        // integer indices)
-        trafo(0, 3) = gridSize.width / 2.0 - 0.5;
-        trafo(1, 3) = gridSize.height / 2.0 - 0.5;
-    }
-
-    mask = vts::Mesh::CoverageMask(size, vts::Mesh::CoverageMask::EMPTY);
-    std::vector<imgproc::Scanline> scanlines;
-    cv::Point3f tri[3];
-    for (const auto &face : mesh.faces) {
-        int i(0);
-        for (auto v : { face.a, face.b, face.c }) {
-            auto p(transform(trafo, mesh.vertices[v]));
-            tri[i].x = p(0);
-            tri[i].y = p(1);
-            tri[i].z = p(2);
-            ++i;
-        }
-
-        scanlines.clear();
-        imgproc::scanConvertTriangle(tri, 0, size.height, scanlines);
-
-        for (const auto &sl : scanlines) {
-            imgproc::processScanline(sl, 0, size.width
-                                     , [&](int x, int y, float)
-            {
-                mask.set(x, y);
-            });
-        }
-    }
-}
-
-} // namespace
-
 void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
                                    , const Sink::pointer &sink
                                    , const SurfaceFileInfo &fi
@@ -683,9 +580,9 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
     const auto ts(math::size(nodeInfo.extents()));
 
     // generate mesh
-    auto meshWithCoverage
+    auto meshInfo
         (meshFromNode(nodeInfo, math::Size2(samplesPerSide, samplesPerSide)));
-    auto &lm(std::get<0>(meshWithCoverage));
+    auto &lm(std::get<0>(meshInfo));
 
     // simplify
     simplifyMesh(lm, nodeInfo, facesPerTile);
@@ -696,40 +593,17 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
     // skirt (use just tile-size width)
     lm.skirt(math::Point3(0.0, 0.0, - 0.01 * ts.width));
 
+    // generate VTS mesh
     vts::Mesh mesh;
-
-    // create submesh from local mesh
-    auto l2g(geo::local2geo(extents));
-
-    TextureNormalizer tn(extents);
-    mesh.submeshes.emplace_back();
-    auto &sm(mesh.submeshes.back());
-
-    sm.textureMode = vts::SubMesh::external;
+    auto &sm(addSubMesh(mesh, lm, nodeInfo, definition_.geoidGrid));
     if (definition_.textureLayerId) {
         sm.textureLayer = definition_.textureLayerId;
     }
 
-    bool generateEtc(nodeInfo.node().externalTexture);
-    auto conv(sds2phys(nodeInfo.srs(), rf, definition_.geoidGrid));
-    for (const auto &v : lm.vertices) {
-        // convert v from local coordinates to division SRS then to physical SRS
-        sm.vertices.push_back(conv(transform(l2g, v)));
-
-        // generate external texture coordinates if instructed
-        if (generateEtc) {
-            sm.etc.push_back(tn(v));
-        }
-    }
-
-    for (const auto &f : lm.faces) {
-        sm.faces.emplace_back(f.a, f.b, f.c);
-    }
-
     if (fi.raw) {
-        // generate coverage mask
-        meshCoverageMask(mesh.coverageMask, lm, extents
-                         , std::get<1>(meshWithCoverage).full());
+        // we are returning full mesh file -> generate coverage mask
+        meshCoverageMask
+            (mesh.coverageMask, lm, extents, std::get<1>(meshInfo));
     }
 
     // write mesh (only mesh!) to stream
@@ -768,7 +642,7 @@ void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
     const auto ts(math::size(extents));
 
     // sds -> navigation SRS convertor
-    auto navConv(sds2nav(nodeInfo.srs(), rf, definition_.geoidGrid));
+    auto navConv(sds2nav(nodeInfo, definition_.geoidGrid));
 
     // first, calculate height range in the same way as is done in metatile
     auto heightRange(vs::Range<double>::emptyRange());
