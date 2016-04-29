@@ -305,3 +305,37 @@ vts::SubMesh& addSubMesh(vts::Mesh &mesh, const geometry::Mesh &gmesh
 
     return sm;
 }
+
+std::tuple<double, int> quadArea(const math::Point3 *v00
+                                 , const math::Point3 *v01
+                                 , const math::Point3 *v10
+                                 , const math::Point3 *v11)
+{
+    std::tuple<double, int> qa;
+
+    // lower
+    if (v10 && v00) {
+        // try both diagonals
+        if (v11) {
+            std::get<0>(qa) += vts::triangleArea(*v10, *v11, *v00);
+            ++std::get<1>(qa);
+        } else if (v01) {
+            std::get<0>(qa) += vts::triangleArea(*v00, *v10, *v01);
+            ++std::get<1>(qa);
+        }
+    }
+
+    // upper
+    if (v11 && v01) {
+        // try both diagonals
+        if (v00) {
+            std::get<0>(qa) += vts::triangleArea(*v11, *v01, *v00);
+            ++std::get<1>(qa);
+        } else if (v10) {
+            std::get<0>(qa) += vts::triangleArea(*v10, *v11, *v01);
+            ++std::get<1>(qa);
+        }
+    }
+
+    return qa;
+}

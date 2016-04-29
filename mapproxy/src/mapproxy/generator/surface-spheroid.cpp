@@ -26,6 +26,7 @@
 #include "../support/metatile.hpp"
 #include "../support/mesh.hpp"
 #include "../support/srs.hpp"
+#include "../support/grid.hpp"
 
 #include "./surface-spheroid.hpp"
 #include "./factory.hpp"
@@ -267,110 +268,12 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
 
     return meta;
 }
-const int metatileSamplesPerTile(8);
-
-template <typename T>
-class Grid {
-public:
-    typedef T value_type;
-
-    Grid(const math::Size2 &size, const T &fill = T())
-        : size_(size)
-        , grid_(math::area(size), fill)
-    {}
-
-    T& operator()(int x, int y) {
-        return grid_[index(x, y)];
-    }
-
-    const T& operator()(int x, int y) const {
-        return grid_[index(x, y)];
-    }
-
-    /** Returns pointer to pixel of non if pixel is invalid
-     */
-    template <typename Mask>
-    const T* operator()(const Mask &mask, int x, int y) const {
-        if (!mask(x, y)) { return nullptr; }
-        return &grid_[index(x, y)];
-    }
-
-private:
-    inline int index(int x, int y) const {
-#ifndef NDEBUG
-        // this is compiled in only in debug mode
-        if ((x < 0) || (x >= size_.width)
-            || (y < 0) || (y >= size_.height))
-        {
-            LOGTHROW(err3, Error)
-                << "Invalid index [" << x << ", " << y << "] in grid of size "
-                << size_ << ". Go and fix your code,";
-        }
-#endif // NDEBUG
-        return y * size_.width + x;
-    }
-
-    math::Size2 size_;
-    std::vector<T> grid_;
-};
-
-class ShiftMask {
-public:
-    ShiftMask(const MetatileBlock &block, int samplesPerTile)
-        : offset_(block.offset)
-        , size_((1 << offset_.lod) * samplesPerTile + 1
-                , (1 << offset_.lod) * samplesPerTile + 1)
-        , mask_(block.commonAncestor.coverageMask
-                (vts::NodeInfo::CoverageType::grid, size_, 1))
-    {}
-
-    bool operator()(int x, int y) const {
-        return mask_.get(x + offset_.x, y + offset_.y);
-    }
-
-private:
-    const vts::TileId offset_;
-    const math::Size2 size_;
-    const vts::NodeInfo::CoverageMask mask_;
-};
-
-/** Calculates area of a quad (tries both diagonals)
+/** NB: Do Not Change!
  *
- *  Returns computed area and number of triangles that make up the area
+ * This constant has huge impact on dataset stability. Changing this value break
+ * data already served to the outer world.
  */
-std::tuple<double, int> quadArea(const math::Point3 *v00
-                                 , const math::Point3 *v01
-                                 , const math::Point3 *v10
-                                 , const math::Point3 *v11)
-{
-    std::tuple<double, int> qa;
-
-    // lower
-    if (v10 && v00) {
-        // try both diagonals
-        if (v11) {
-            std::get<0>(qa) += vts::triangleArea(*v10, *v11, *v00);
-            ++std::get<1>(qa);
-        } else if (v01) {
-            std::get<0>(qa) += vts::triangleArea(*v00, *v10, *v01);
-            ++std::get<1>(qa);
-        }
-    }
-
-    // upper
-    if (v11 && v01) {
-        // try both diagonals
-        if (v00) {
-            std::get<0>(qa) += vts::triangleArea(*v11, *v01, *v00);
-            ++std::get<1>(qa);
-        } else if (v10) {
-            std::get<0>(qa) += vts::triangleArea(*v10, *v11, *v01);
-            ++std::get<1>(qa);
-        }
-    }
-
-    return qa;
-}
+const int metatileSamplesPerTile(8);
 
 } // namespace
 
