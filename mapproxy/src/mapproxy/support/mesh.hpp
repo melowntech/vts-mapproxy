@@ -19,7 +19,9 @@ void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
                   , int facesPerTile);
 
 void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
-                      , const math::Extents2 &extents, bool fullyCovered);
+                      , const vts::NodeInfo &nodeInfo, bool fullyCovered);
+
+void addSkirt(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo);
 
 vts::SubMesh& addSubMesh(vts::Mesh &mesh, const geometry::Mesh &gmesh
                          , const vts::NodeInfo &nodeInfo

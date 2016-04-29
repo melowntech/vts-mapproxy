@@ -576,22 +576,17 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
         return;
     }
 
-    const auto extents(nodeInfo.extents());
-    const auto ts(math::size(nodeInfo.extents()));
-
     // generate mesh
     auto meshInfo
-        (meshFromNode(nodeInfo, math::Size2(samplesPerSide, samplesPerSide)));
+        (meshFromNode
+         (nodeInfo, math::Size2(samplesPerSide, samplesPerSide)));
     auto &lm(std::get<0>(meshInfo));
 
     // simplify
     simplifyMesh(lm, nodeInfo, facesPerTile);
 
-    // fake texture coordinate, needed by skirt
-    lm.tCoords.emplace_back();
-
-    // skirt (use just tile-size width)
-    lm.skirt(math::Point3(0.0, 0.0, - 0.01 * ts.width));
+    // and add skirt
+    addSkirt(lm, nodeInfo);
 
     // generate VTS mesh
     vts::Mesh mesh;
@@ -603,7 +598,7 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
     if (fi.raw) {
         // we are returning full mesh file -> generate coverage mask
         meshCoverageMask
-            (mesh.coverageMask, lm, extents, std::get<1>(meshInfo));
+            (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
     }
 
     // write mesh (only mesh!) to stream

@@ -160,7 +160,7 @@ void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
 }
 
 void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
-                      , const math::Extents2 &extents, bool fullyCovered)
+                      , const vts::NodeInfo &nodeInfo, bool fullyCovered)
 {
     const auto size(vts::Mesh::coverageSize());
     if (fullyCovered) {
@@ -173,7 +173,7 @@ void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
     {
 
         const auto gridSize(vts::Mesh::coverageSize());
-        const auto es(math::size(extents));
+        const auto es(math::size(nodeInfo.extents()));
         math::Size2f scale(gridSize.width / es.width
                            , gridSize.height / es.height);
 
@@ -211,6 +211,17 @@ void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
             });
         }
     }
+}
+
+void addSkirt(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo)
+{
+    const auto skirtHeight(math::size(nodeInfo.extents()).width * 0.01);
+
+    // fake texture coordinate, needed by skirt
+    mesh.tCoords.emplace_back();
+
+    // skirt (use just tile-size width)
+    mesh.skirt(math::Point3(0.0, 0.0, -skirtHeight));
 }
 
 vts::CsConvertor sds2srs(const std::string &sds, const std::string &dst
