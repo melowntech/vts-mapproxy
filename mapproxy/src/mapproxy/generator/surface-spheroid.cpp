@@ -121,19 +121,42 @@ void SurfaceSpheroid::prepare_impl()
     ti = {};
 
     // build tile index
+    // metatiles are distributed everywhere
     for (vts::Lod lod(0); lod <= r.lodRange.max; ++lod) {
-        // metatiles everywhere
-        vts::TileIndex::Flag::value_type flags
-            (vts::TileIndex::Flag::meta);
-        if (in(lod, r.lodRange)) {
-            // TODO: what about polar caps in melown2015?
-            // watertight tiles and navtiles everywhere
-            flags |= (vts::TileIndex::Flag::mesh
-                      | vts::TileIndex::Flag::watertight
-                      | vts::TileIndex::Flag::navtile);
+        // treat whole lod as a huge metatile and process each block
+        // independently; metatiles are set in all (even invalid) nodes
+        for (const auto &block
+                 : metatileBlocks(*resource().referenceFrame
+                                  , vts::TileId(lod), lod, true))
+        {
+            LOG(info1) << "Generating tile index LOD <" << lod
+                       << ">: ancestor: "
+                       << block.commonAncestor.nodeId()
+                       << "block: " << block.view << ".";
+
+            // this is not that orrect since metatiles have different spatial
+            // distribution that subtrees
+            vts::TileIndex::Flag::value_type flags
+                (vts::TileIndex::Flag::meta);
+
+            if (block.valid() && in(lod, r.lodRange)) {
+                // mesh and navtile in valid area (If there are non-existent
+                // tiles we'll get empty meshes and navtiles with empty masks.
+                // This is lesser evil than to construct gargantuan tileindex
+                // that would not fit in any imaginable memory)
+                flags |= (vts::TileIndex::Flag::mesh
+                          | vts::TileIndex::Flag::navtile);
+
+                if (!block.partial()) {
+                    // fully covered block -> watertight tiles
+                    flags |= vts::TileIndex::Flag::watertight;
+                }
+
+            }
+
+            // set current block to computed value
+            ti.set(lod, block.view, flags);
         }
-        // set whole LOD to given value
-        ti.set(lod, flags);
     }
 
     // save it all
@@ -361,6 +384,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                 double area(0);
                 int triangleCount(0);
 
+                // process all node's vertices in grid
                 for (int jj(0); jj <= metatileSamplesPerTile; ++jj) {
                     auto yy(j * metatileSamplesPerTile + jj);
                     for (int ii(0); ii <= metatileSamplesPerTile; ++ii) {
@@ -392,7 +416,15 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                     }
                 }
 
-                if (!area) {
+                if (block.commonAncestor.partial()) {
+                    // partial node, update children flags
+                    for (const auto &child : vts::children(nodeId)) {
+                        node.setChildFromId
+                            (child, vts::NodeInfo(rf, child).valid());
+                    }
+                }
+
+                if (geometry && !area) {
                     // well, empty tile, no children
                     continue;
                 }

@@ -27,6 +27,9 @@ struct MetatileBlock {
     MetatileBlock(vts::Lod lod, const vr::ReferenceFrame &referenceFrame
                   , const std::string &srs, const vts::TileRange &view
                   , const math::Extents2 &extents);
+
+    bool valid() const { return commonAncestor.valid(); }
+    bool partial() const { return commonAncestor.partial(); }
 };
 
 /** Generate metatile blocks for given metatile id in given reference frame
@@ -37,7 +40,15 @@ struct MetatileBlock {
  */
 MetatileBlock::list metatileBlocks(const Resource &resource
                                    , const vts::TileId &tileId
-                                   , unsigned int metaBinaryOrder = 0);
+                                   , unsigned int metaBinaryOrder = 0
+                                   , bool includeInvalid = false);
+
+/** Same as above but without any limits
+ */
+MetatileBlock::list metatileBlocks(const vr::ReferenceFrame &referenceFrame
+                                   , const vts::TileId &tileId
+                                   , unsigned int metaBinaryOrder = 0
+                                   , bool includeInvalid = false);
 
 class ShiftMask {
 public:

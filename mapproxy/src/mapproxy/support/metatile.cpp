@@ -20,11 +20,12 @@ MetatileBlock::MetatileBlock(vts::Lod lod
                         , vts::tileId(lod, view.ll)))
 {}
 
-MetatileBlock::list metatileBlocks(const Resource &resource
-                                   , const vts::TileId &tileId
-                                   , unsigned int metaBinaryOrder)
+MetatileBlock::list metatileBlocksImpl(const vr::ReferenceFrame &referenceFrame
+                                       , const vts::TileId &tileId
+                                       , unsigned int metaBinaryOrder
+                                       , bool includeInvalid
+                                       , const vts::TileRange &tileRange)
 {
-    const auto &referenceFrame(*resource.referenceFrame);
     if (!metaBinaryOrder) {
         // no override, use order from reference frame
         metaBinaryOrder = referenceFrame.metaBinaryOrder;
@@ -51,10 +52,6 @@ MetatileBlock::list metatileBlocks(const Resource &resource
     // and clip
     if (tr.ur(0) > maxIndex) { tr.ur(0) = maxIndex; }
     if (tr.ur(1) > maxIndex) { tr.ur(1) = maxIndex; }
-
-    // calculate tile range at current LOD from resource definition
-    auto tileRange(vts::childRange(resource.tileRange
-                                   , tileId.lod - resource.lodRange.min));
 
     // check for overlap with defined tile size
     if (!vts::tileRangesOverlap(tileRange, tr)) {
@@ -134,10 +131,10 @@ MetatileBlock::list metatileBlocks(const Resource &resource
              , blockUrNode.extents().ur(0), node.extents().ur(1));
 
         // new block
-        if (node.valid()) {
+        if (node.valid() || includeInvalid) {
             // remember block
-            blocks.emplace_back (tileId.lod, referenceFrame, node.srs()
-                                 , blockView, blockExtents);
+            blocks.emplace_back(tileId.lod, referenceFrame, node.srs()
+                                , blockView, blockExtents);
         }
 
         // remember 2 new nodes to check
@@ -147,4 +144,26 @@ MetatileBlock::list metatileBlocks(const Resource &resource
 
     // done
     return blocks;
+}
+
+MetatileBlock::list metatileBlocks(const Resource &resource
+                                   , const vts::TileId &tileId
+                                   , unsigned int metaBinaryOrder
+                                   , bool includeInvalid)
+{
+    return metatileBlocksImpl
+        (*resource.referenceFrame, tileId, metaBinaryOrder, includeInvalid
+         , vts::childRange
+         (resource.tileRange, tileId.lod - resource.lodRange.min));
+}
+
+MetatileBlock::list metatileBlocks(const vr::ReferenceFrame &referenceFrame
+                                   , const vts::TileId &tileId
+                                   , unsigned int metaBinaryOrder
+                                   , bool includeInvalid)
+{
+    auto maxIndex(vts::tileCount(tileId.lod) - 1);
+    return metatileBlocksImpl
+        (referenceFrame, tileId, metaBinaryOrder, includeInvalid
+         , vts::TileRange(0, 0, maxIndex, maxIndex));
 }
