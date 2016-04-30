@@ -298,6 +298,22 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
  */
 const int metatileSamplesPerTile(8);
 
+bool special(const vr::ReferenceFrame &referenceFrame
+             , const vts::TileId &tileId)
+{
+    if (const auto *node
+        = referenceFrame.find(vts::rfNodeId(tileId), std::nothrow))
+    {
+        switch (node->partitioning.mode) {
+        case vr::PartitioningMode::manual:
+            return true;
+        default:
+            return false;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
@@ -416,7 +432,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                     }
                 }
 
-                if (block.commonAncestor.partial()) {
+                if (block.commonAncestor.partial() || special(rf, nodeId)) {
                     // partial node, update children flags
                     for (const auto &child : vts::children(nodeId)) {
                         node.setChildFromId
@@ -465,10 +481,6 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
                     // well, empty tile as well
                     if (!textureArea) { continue; }
-                    // LOG(info4)
-                    //     << std::fixed << nodeId << " meshArea: " << area;
-                    // LOG(info4)
-                    //     << nodeId << " textureArea: " << textureArea;
 
                     // calculate texel size
                     node.texelSize = std::sqrt(area / textureArea);
