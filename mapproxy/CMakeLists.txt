@@ -52,6 +52,8 @@ add_subdirectory(src/gdal-drivers)
 
 # vts libraries
 add_subdirectory(src/vts-libs)
+# force build of vts tool
+add_custom_target(.vts ALL DEPENDS vts)
 
 # project
 add_subdirectory(src/mapproxy)
