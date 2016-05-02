@@ -7,6 +7,7 @@
 #include <boost/utility/in_place_factory.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/thread.hpp>
 
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
@@ -36,13 +37,17 @@ public:
         : service::Service("mapproxy", BUILD_TARGET_VERSION
                            , service::ENABLE_CONFIG_UNRECOGNIZED_OPTIONS
                            | service::ENABLE_UNRECOGNIZED_OPTIONS)
-        , httpListen_(3070), httpThreadCount_(5), httpEnableBrowser_(false)
+        , httpListen_(3070)
+        , httpThreadCount_(boost::thread::hardware_concurrency())
+        , coreThreadCount_(boost::thread::hardware_concurrency())
+        , httpEnableBrowser_(false)
     {
         generatorsConfig_.root
             = utility::buildsys::installPath("var/mapproxy/store");
         generatorsConfig_.resourceRoot
             = utility::buildsys::installPath("var/mapproxy/datasets");
-        gdalWarperOptions_.processCount = 8;
+        gdalWarperOptions_.processCount
+            = boost::thread::hardware_concurrency();
         gdalWarperOptions_.tmpRoot
             = utility::buildsys::installPath("var/mapproxy/tmp");
         generatorsConfig_.resourceUpdatePeriod = 300;
@@ -83,6 +88,7 @@ private:
 
     utility::TcpEndpoint httpListen_;
     unsigned int httpThreadCount_;
+    unsigned int coreThreadCount_;
     bool httpEnableBrowser_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
     Generators::Config generatorsConfig_;
@@ -111,12 +117,16 @@ void Daemon::configuration(po::options_description &cmdline
          , "TCP endpoint where to listen at.")
         ("http.threadCount", po::value(&httpThreadCount_)
          ->default_value(httpThreadCount_)->required()
-         , "Number of processing threads.")
+         , "Number of HTTP threads.")
         ("http.enableBrowser", po::value(&httpEnableBrowser_)
          ->default_value(httpEnableBrowser_)->required()
          , "Enables resource browsering functionaly if set to true.")
 
-        ("gdal.processCount"
+        ("core.threadCount", po::value(&coreThreadCount_)
+         ->default_value(coreThreadCount_)->required()
+         , "Number of processing threads.")
+
+         ("gdal.processCount"
          , po::value(&gdalWarperOptions_.processCount)
          ->default_value(gdalWarperOptions_.processCount)->required())
         ("gdal.tmpRoot"
@@ -182,6 +192,7 @@ void Daemon::configure(const po::variables_map &vars)
         << "\n\thttp.listen = " << httpListen_
         << "\n\thttp.threadCount = " << httpThreadCount_
         << "\n\thttp.enableBrowser = " << std::boolalpha << httpEnableBrowser_
+        << "\n\tcore.threadCount = " << coreThreadCount_
         << "\n\tgdal.processCount = " << gdalWarperOptions_.processCount
         << "\n\tgdal.tmpRoot = " << gdalWarperOptions_.tmpRoot
         << "\n\tresource-backend.updatePeriod = "
@@ -242,7 +253,8 @@ service::Service::Cleanup Daemon::start()
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
     generators_ = boost::in_place
         (generatorsConfig_, resourceBackend_);
-    core_ = boost::in_place(std::ref(*generators_), std::ref(*gdalWarper_));
+    core_ = boost::in_place(std::ref(*generators_), std::ref(*gdalWarper_)
+                            , coreThreadCount_);
     http_ = boost::in_place(httpListen_, httpThreadCount_, std::ref(*core_));
 
     return guard;

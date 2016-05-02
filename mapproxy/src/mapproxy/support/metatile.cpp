@@ -53,13 +53,11 @@ MetatileBlock::list metatileBlocksImpl(const vr::ReferenceFrame &referenceFrame
     if (tr.ur(0) > maxIndex) { tr.ur(0) = maxIndex; }
     if (tr.ur(1) > maxIndex) { tr.ur(1) = maxIndex; }
 
-    // check for overlap with defined tile size
-    if (!vts::tileRangesOverlap(tileRange, tr)) {
-        return {};
-    }
-
     // calculate overlap
-    auto view(vts::tileRangesIntersect(tileRange, tr));
+    auto view(vts::tileRangesIntersect(tileRange, tr, std::nothrow));
+
+    // no overlap -> bail out
+    if (!math::valid(view)) { return {}; }
 
     auto llId(vts::tileId(tileId.lod, view.ll));
     auto urId(vts::tileId(tileId.lod, view.ur));
@@ -153,8 +151,8 @@ MetatileBlock::list metatileBlocks(const Resource &resource
 {
     return metatileBlocksImpl
         (*resource.referenceFrame, tileId, metaBinaryOrder, includeInvalid
-         , vts::childRange
-         (resource.tileRange, tileId.lod - resource.lodRange.min));
+         , vts::shiftRange
+         (resource.lodRange.min, resource.tileRange, tileId.lod));
 }
 
 MetatileBlock::list metatileBlocks(const vr::ReferenceFrame &referenceFrame

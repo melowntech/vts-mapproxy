@@ -28,7 +28,7 @@
 #include "../support/srs.hpp"
 #include "../support/grid.hpp"
 
-#include "./surface-spheroid.hpp"
+#include "./surface-dem.hpp"
 #include "./factory.hpp"
 
 namespace fs = boost::filesystem;
@@ -44,7 +44,7 @@ struct Factory : Generator::Factory {
     virtual Generator::pointer create(const Generator::Config &config
                                       , const Resource &resource)
     {
-        return std::make_shared<SurfaceSpheroid>(config, resource);
+        return std::make_shared<SurfaceDem>(config, resource);
     }
 
 private:
@@ -54,12 +54,12 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        (resdef::SurfaceSpheroid::generator, std::make_shared<Factory>());
+        (resdef::SurfaceDem::generator, std::make_shared<Factory>());
 });
 
 } // namespace
 
-fs::path SurfaceSpheroid::filePath(vts::File fileType) const
+fs::path SurfaceDem::filePath(vts::File fileType) const
 {
     switch (fileType) {
     case vts::File::config:
@@ -72,10 +72,13 @@ fs::path SurfaceSpheroid::filePath(vts::File fileType) const
     throw utility::makeError<InternalError>("Unsupported file");
 }
 
-SurfaceSpheroid::SurfaceSpheroid(const Config &config
-                                 , const Resource &resource)
+SurfaceDem::SurfaceDem(const Config &config
+                       , const Resource &resource)
     : Generator(config, resource)
-    , definition_(this->resource().definition<resdef::SurfaceSpheroid>())
+    , definition_(this->resource().definition<resdef::SurfaceDem>())
+    , dataset_(absoluteDataset(definition_.dataset + "/dem"))
+    , datasetMin_(dataset_ + ".min")
+    , datasetMax_(dataset_ + ".max")
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));
@@ -93,11 +96,16 @@ SurfaceSpheroid::SurfaceSpheroid(const Config &config
     LOG(info1) << "Generator for <" << resource.id << "> not ready.";
 }
 
-void SurfaceSpheroid::prepare_impl()
+void SurfaceDem::prepare_impl()
 {
     LOG(info2) << "Preparing <" << resource().id << ">.";
 
     const auto &r(resource());
+
+    // try to open datasets
+    auto dataset(geo::GeoDataset::open(dataset_));
+    auto datasetMin(geo::GeoDataset::open(datasetMin_));
+    auto datasetMax(geo::GeoDataset::open(datasetMax_));
 
     // build properties
     properties_ = {};
@@ -107,23 +115,10 @@ void SurfaceSpheroid::prepare_impl()
     if (definition_.textureLayerId) {
         properties_.boundLayers.insert(definition_.textureLayerId);
     }
+    // position ???
     // keep driverOptions empty -> no driver
     properties_.lodRange = r.lodRange;
     properties_.tileRange = r.tileRange;
-
-    // create default position:
-    // place to zero in navigation space
-    // TODO: make center/barycenter of mask/dataset
-    properties_.position.position = { 0.0, 0.0, 0.0 };
-    // look down
-    properties_.position.orientation = { 0.0, -90.0, 0.0 };
-    // take Y size of reference frame's 3D extents extents
-    properties_.position.verticalExtent
-        = math::size(referenceFrame().division.extents).height;
-    // quite wide angle camera
-    properties_.position.verticalFov = 90;
-
-    // TODO: spatialDivisionExtents
 
     // grab and reset tile index
     auto &ti(index_.tileIndex);
@@ -135,7 +130,8 @@ void SurfaceSpheroid::prepare_impl()
         // treat whole lod as a huge metatile and process each block
         // independently; metatiles are set in all (even invalid) nodes
         for (const auto &block
-                 : metatileBlocks(resource(), vts::TileId(lod), lod, true))
+                 : metatileBlocks(*resource().referenceFrame
+                                  , vts::TileId(lod), lod, true))
         {
             LOG(info1) << "Generating tile index LOD <" << lod
                        << ">: ancestor: "
@@ -172,17 +168,27 @@ void SurfaceSpheroid::prepare_impl()
     vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
 }
 
-vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
+vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root)
     const
 {
     auto mc(vts::mapConfig
             (properties_, vts::ExtraTileSetProperties()
              , prependRoot(fs::path(), resource(), root)));
 
+    // look down
+    mc.position.orientation = { 0.0, -90.0, 0.0 };
+
+    // take Y size of reference frame's 3D extents extents
+    mc.position.verticalExtent
+        = math::size(referenceFrame().division.extents).height;
+
+    // quite wide angle camera
+    mc.position.verticalFov = 90;
+
     return mc;
 }
 
-Generator::Task SurfaceSpheroid
+Generator::Task SurfaceDem
 ::generateFile_impl(const FileInfo &fileInfo, const Sink::pointer &sink) const
 {
     SurfaceFileInfo fi(fileInfo, config().fileFlags);
@@ -314,7 +320,7 @@ bool special(const vr::ReferenceFrame &referenceFrame
 
 } // namespace
 
-void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
+void SurfaceDem::generateMetatile(const vts::TileId &tileId
                                        , const Sink::pointer &sink
                                        , const SurfaceFileInfo &fi
                                        , GdalWarper&) const
@@ -496,7 +502,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
-void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
+void SurfaceDem::generateMesh(const vts::TileId &tileId
                                    , const Sink::pointer &sink
                                    , const SurfaceFileInfo &fi
                                    , GdalWarper&) const
@@ -557,7 +563,7 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
-void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
+void SurfaceDem::generateNavtile(const vts::TileId &tileId
                                       , const Sink::pointer &sink
                                       , const SurfaceFileInfo &fi
                                       , GdalWarper&) const

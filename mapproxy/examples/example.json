@@ -217,5 +217,33 @@
            "mask": "mapycz/sk.qm",
            "format": "jpg"
         }
+    },
+
+    {
+        "comment": "Aster 1 degree tile at 50 N/15 E",
+        "group": "melown",
+        "id": "ASTGTM-N50E014",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [10, 14],
+                "tileRange": [[275, 171], [278, 174]]
+            },
+            "webmerc-projected": {
+                "lodRange": [9,13],
+                "tileRange": [[275, 171], [278, 174]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [9,13],
+                "tileRange": [[275, 171], [278, 174]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "aster/ASTGTM2_N50E014",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
     }
 ]

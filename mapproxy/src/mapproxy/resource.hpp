@@ -157,7 +157,9 @@ struct SurfaceDem {
     static Resource::Generator generator;
 
     std::string dataset;
+    boost::optional<std::string> mask;
     unsigned int textureLayerId;
+    boost::optional<std::string> geoidGrid;
 
     SurfaceDem() : textureLayerId() {}
     bool operator==(const SurfaceDem &o) const;
@@ -231,11 +233,13 @@ inline bool Resource::Generator::operator<(const Generator &o) const {
 }
 
 inline bool Resource::Generator::operator==(const Generator &o) const {
-    return ((type == o.type) || (driver == o.driver));
+    return ((type == o.type)
+            && (driver == o.driver));
 }
 
 inline bool Resource::operator!=(const Resource &o) const
 {
-    return !(*this == o);
+    return !operator==(o);
 }
+
 #endif // mapproxy_resource_hpp_included_

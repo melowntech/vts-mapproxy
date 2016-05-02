@@ -8,7 +8,8 @@ class Core : boost::noncopyable
            , public ContentGenerator
 {
 public:
-    Core(Generators &generators, GdalWarper &warper);
+    Core(Generators &generators, GdalWarper &warper
+         , unsigned int threadCount);
 
     struct Detail;
 

@@ -89,8 +89,21 @@ void parseDefinition(resdef::SurfaceSpheroid &def, const Json::Value &value)
 
 void parseDefinition(resdef::SurfaceDem &def, const Json::Value &value)
 {
-    (void) def;
-    (void) value;
+    Json::get(def.dataset, value, "dataset");
+    if (value.isMember("mask")) {
+        def.mask = boost::in_place();
+        Json::get(*def.mask, value, "mask");
+    }
+
+    if (value.isMember("textureLayerId")) {
+        Json::get(def.textureLayerId, value, "textureLayerId");
+    }
+
+    if (value.isMember("geoidGrid")) {
+        std::string s;
+        Json::get(s, value, "geoidGrid");
+        def.geoidGrid = s;
+    }
 }
 
 void parseDefinition(Resource &r, const Json::Value &value)
@@ -133,8 +146,17 @@ void buildDefinition(Json::Value &value, const resdef::SurfaceSpheroid &def)
 
 void buildDefinition(Json::Value &value, const resdef::SurfaceDem &def)
 {
-    (void) value;
-    (void) def;
+    value["dataset"] = def.dataset;
+    if (def.mask) {
+        value["mask"] = *def.mask;
+    }
+
+    if (def.textureLayerId) {
+        value["textureLayerId"] = def.textureLayerId;
+    }
+    if (def.geoidGrid) {
+        value["geoidGrid"] = *def.geoidGrid;
+    }
 }
 
 void buildDefinition(Json::Value &value, const Resource &r)
@@ -420,8 +442,11 @@ bool SurfaceSpheroid::operator==(const SurfaceSpheroid &o) const
 
 bool SurfaceDem::operator==(const SurfaceDem &o) const
 {
-    // TODO: implement me
-    (void) o;
+    if (dataset != o.dataset) { return false; }
+    if (mask != o.mask) { return false; }
+    if (textureLayerId != o.textureLayerId) { return false; }
+    if (geoidGrid != o.geoidGrid) { return false; }
+
     return true;
 }
 
