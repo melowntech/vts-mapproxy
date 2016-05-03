@@ -4,13 +4,13 @@
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
 
-#include "../generator.hpp"
+#include "./surface.hpp"
 
 namespace vts = vadstena::vts;
 
 namespace generator {
 
-class SurfaceDem : public Generator {
+class SurfaceDem : public SurfaceBase {
 public:
     SurfaceDem(const Config &config, const Resource &resource);
 
@@ -18,9 +18,6 @@ private:
     virtual void prepare_impl();
     virtual vts::MapConfig
     mapConfig_impl(ResourceRoot root) const;
-
-    virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , const Sink::pointer &sink) const;
 
     void generateMetatile(const vts::TileId &tileId
                           , const Sink::pointer &sink

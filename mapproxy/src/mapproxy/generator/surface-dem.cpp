@@ -59,22 +59,9 @@ utility::PreMain Factory::register_([]()
 
 } // namespace
 
-fs::path SurfaceDem::filePath(vts::File fileType) const
-{
-    switch (fileType) {
-    case vts::File::config:
-        return root() / "tileset.conf";
-    case vts::File::tileIndex:
-        return root() / "tileset.index";
-    default: break;
-    }
-
-    throw utility::makeError<InternalError>("Unsupported file");
-}
-
 SurfaceDem::SurfaceDem(const Config &config
                        , const Resource &resource)
-    : Generator(config, resource)
+    : SurfaceBase(config, resource)
     , definition_(this->resource().definition<resdef::SurfaceDem>())
     , dataset_(absoluteDataset(definition_.dataset + "/dem"))
     , datasetMin_(dataset_ + ".min")
@@ -138,8 +125,9 @@ void SurfaceDem::prepare_impl()
                        << block.commonAncestor.nodeId()
                        << "block: " << block.view << ".";
 
-            // this is not that orrect since metatiles have different spatial
-            // distribution that subtrees
+            // this is not that correct since metatiles have different spatial
+            // distribution than subtrees but it is OK since we always use
+            // proper metatile ID when accessing metatile
             vts::TileIndex::Flag::value_type flags
                 (vts::TileIndex::Flag::meta);
 
@@ -155,7 +143,6 @@ void SurfaceDem::prepare_impl()
                     // fully covered block -> watertight tiles
                     flags |= vts::TileIndex::Flag::watertight;
                 }
-
             }
 
             // set current block to computed value
@@ -188,97 +175,7 @@ vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root)
     return mc;
 }
 
-Generator::Task SurfaceDem
-::generateFile_impl(const FileInfo &fileInfo, const Sink::pointer &sink) const
-{
-    SurfaceFileInfo fi(fileInfo, config().fileFlags);
-
-    switch (fi.type) {
-    case SurfaceFileInfo::Type::unknown:
-        sink->error(utility::makeError<NotFound>("Unrecognized filename."));
-        break;
-
-    case SurfaceFileInfo::Type::file: {
-        switch (fi.fileType) {
-        case vts::File::config: {
-            if (fi.raw) {
-                sink->content(vs::fileIStream
-                              (fi.fileType, filePath(vts::File::config)));
-            } else {
-                std::ostringstream os;
-                mapConfig(os, ResourceRoot::none);
-                sink->content(os.str(), fi.sinkFileInfo());
-            }
-            break;
-        }
-        case vts::File::tileIndex:
-            sink->content(vs::fileIStream
-                          (fi.fileType, filePath(vts::File::tileIndex)));
-            break;
-
-        default:
-            sink->error(utility::makeError<InternalError>
-                        ("Unsupported file"));
-            break;
-        }
-        break;
-    }
-
-    case SurfaceFileInfo::Type::tile: {
-        switch (fi.tileType) {
-        case vts::TileFile::meta:
-            return[=](GdalWarper &warper)  {
-                generateMetatile(fi.tileId, sink, fi, warper);
-            };
-
-        case vts::TileFile::mesh:
-            return[=](GdalWarper &warper)  {
-                generateMesh(fi.tileId, sink, fi, warper);
-            };
-
-        case vts::TileFile::atlas:
-            sink->error(utility::makeError<NotFound>
-                        ("No internal texture present."));
-            break;
-
-        case vts::TileFile::navtile:
-            return[=](GdalWarper &warper)  {
-                generateNavtile(fi.tileId, sink, fi, warper);
-            };
-            break;
-        }
-        break;
-    }
-
-    case SurfaceFileInfo::Type::support:
-        sink->content(fi.support->data, fi.support->size
-                      , fi.sinkFileInfo(), false);
-        break;
-
-    default:
-        sink->error(utility::makeError<InternalError>
-                    ("Not implemented yet."));
-    }
-
-    return {};
-}
-
 namespace {
-
-inline cv::Vec3d asVec(const math::Point3 &p)
-{
-    return { p(0), p(1), p(2) };
-}
-
-inline math::Point3 asPoint(const cv::Vec3d &v)
-{
-    return { v(0), v(1), v(2) };
-}
-
-inline const math::Point3& asPoint(const math::Point3 &p)
-{
-    return p;
-}
 
 typedef vts::MetaNode::Flag MetaFlag;
 typedef vts::TileIndex::Flag TiFlag;

@@ -4,23 +4,19 @@
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
 
-#include "../generator.hpp"
+#include "./surface.hpp"
 
 namespace vts = vadstena::vts;
 
 namespace generator {
 
-class SurfaceSpheroid : public Generator {
+class SurfaceSpheroid : public SurfaceBase {
 public:
     SurfaceSpheroid(const Config &config, const Resource &resource);
 
 private:
     virtual void prepare_impl();
-    virtual vts::MapConfig
-    mapConfig_impl(ResourceRoot root) const;
-
-    virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , const Sink::pointer &sink) const;
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
     void generateMetatile(const vts::TileId &tileId
                           , const Sink::pointer &sink
@@ -36,8 +32,6 @@ private:
                          , const Sink::pointer &sink
                          , const SurfaceFileInfo &fileInfo
                          , GdalWarper &warper) const;
-
-    boost::filesystem::path filePath(vts::File fileType) const;
 
     const resdef::SurfaceSpheroid &definition_;
 

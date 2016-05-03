@@ -59,22 +59,9 @@ utility::PreMain Factory::register_([]()
 
 } // namespace
 
-fs::path SurfaceSpheroid::filePath(vts::File fileType) const
-{
-    switch (fileType) {
-    case vts::File::config:
-        return root() / "tileset.conf";
-    case vts::File::tileIndex:
-        return root() / "tileset.index";
-    default: break;
-    }
-
-    throw utility::makeError<InternalError>("Unsupported file");
-}
-
 SurfaceSpheroid::SurfaceSpheroid(const Config &config
                                  , const Resource &resource)
-    : Generator(config, resource)
+    : SurfaceBase(config, resource)
     , definition_(this->resource().definition<resdef::SurfaceSpheroid>())
 {
     try {
@@ -182,97 +169,7 @@ vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
     return mc;
 }
 
-Generator::Task SurfaceSpheroid
-::generateFile_impl(const FileInfo &fileInfo, const Sink::pointer &sink) const
-{
-    SurfaceFileInfo fi(fileInfo, config().fileFlags);
-
-    switch (fi.type) {
-    case SurfaceFileInfo::Type::unknown:
-        sink->error(utility::makeError<NotFound>("Unrecognized filename."));
-        break;
-
-    case SurfaceFileInfo::Type::file: {
-        switch (fi.fileType) {
-        case vts::File::config: {
-            if (fi.raw) {
-                sink->content(vs::fileIStream
-                              (fi.fileType, filePath(vts::File::config)));
-            } else {
-                std::ostringstream os;
-                mapConfig(os, ResourceRoot::none);
-                sink->content(os.str(), fi.sinkFileInfo());
-            }
-            break;
-        }
-        case vts::File::tileIndex:
-            sink->content(vs::fileIStream
-                          (fi.fileType, filePath(vts::File::tileIndex)));
-            break;
-
-        default:
-            sink->error(utility::makeError<InternalError>
-                        ("Unsupported file"));
-            break;
-        }
-        break;
-    }
-
-    case SurfaceFileInfo::Type::tile: {
-        switch (fi.tileType) {
-        case vts::TileFile::meta:
-            return[=](GdalWarper &warper)  {
-                generateMetatile(fi.tileId, sink, fi, warper);
-            };
-
-        case vts::TileFile::mesh:
-            return[=](GdalWarper &warper)  {
-                generateMesh(fi.tileId, sink, fi, warper);
-            };
-
-        case vts::TileFile::atlas:
-            sink->error(utility::makeError<NotFound>
-                        ("No internal texture present."));
-            break;
-
-        case vts::TileFile::navtile:
-            return[=](GdalWarper &warper)  {
-                generateNavtile(fi.tileId, sink, fi, warper);
-            };
-            break;
-        }
-        break;
-    }
-
-    case SurfaceFileInfo::Type::support:
-        sink->content(fi.support->data, fi.support->size
-                      , fi.sinkFileInfo(), false);
-        break;
-
-    default:
-        sink->error(utility::makeError<InternalError>
-                    ("Not implemented yet."));
-    }
-
-    return {};
-}
-
 namespace {
-
-inline cv::Vec3d asVec(const math::Point3 &p)
-{
-    return { p(0), p(1), p(2) };
-}
-
-inline math::Point3 asPoint(const cv::Vec3d &v)
-{
-    return { v(0), v(1), v(2) };
-}
-
-inline const math::Point3& asPoint(const math::Point3 &p)
-{
-    return p;
-}
 
 typedef vts::MetaNode::Flag MetaFlag;
 typedef vts::TileIndex::Flag TiFlag;
@@ -289,6 +186,7 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
 
     return meta;
 }
+
 /** NB: Do Not Change!
  *
  * This constant has huge impact on dataset stability. Changing this value break
