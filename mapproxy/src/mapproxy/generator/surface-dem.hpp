@@ -34,8 +34,6 @@ private:
                          , const SurfaceFileInfo &fileInfo
                          , GdalWarper &warper) const;
 
-    boost::filesystem::path filePath(vts::File fileType) const;
-
     const resdef::SurfaceDem &definition_;
 
     /** Path to original dataset (must contain overviews)
