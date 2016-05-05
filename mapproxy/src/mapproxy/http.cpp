@@ -746,10 +746,6 @@ void Connection::sendResponse(const Request &request, const Response &response
     }
 }
 
-/** FIXME: probably broken, to be revisited
- *
- *  TODO: replace chain of lambdas with one class holding the stuff together
- */
 void Connection::sendResponse(const Request &request, const Response &response
                               , const vs::IStream::pointer &stream)
 {

@@ -7,10 +7,13 @@
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/path.hpp"
 
 #include "geometry/mesh.hpp"
 
 #include "geo/coordinates.hpp"
+
+#include "imgproc/rastermask/mappedqtree.hpp"
 
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
@@ -93,6 +96,10 @@ void SurfaceDem::prepare_impl()
     auto dataset(geo::GeoDataset::open(dataset_));
     auto datasetMin(geo::GeoDataset::open(datasetMin_));
     auto datasetMax(geo::GeoDataset::open(datasetMax_));
+
+    // load definition
+    vts::TileIndex datasetTiles;
+    datasetTiles.load(dataset_ + "/tiles." + r.id.referenceFrame);
 
     // build properties
     properties_ = {};

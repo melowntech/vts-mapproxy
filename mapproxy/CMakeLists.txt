@@ -57,3 +57,4 @@ add_custom_target(.vts ALL DEPENDS vts)
 
 # project
 add_subdirectory(src/mapproxy)
+add_subdirectory(src/dem-tiling)

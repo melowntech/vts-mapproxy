@@ -450,7 +450,6 @@ bool SurfaceDem::operator==(const SurfaceDem &o) const
     return true;
 }
 
-
 } // namespace resdef
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
@@ -513,7 +512,7 @@ bool checkRanges(const Resource &resource, const vts::TileId &tileId
     if (rangeType == RangeType::lod) { return true; }
 
     // tileId.lod is inside lorRange, so difference is always positive
-    auto pTileId(parent(tileId, tileId.lod - resource.lodRange.min));
+    auto pTileId(vts::parent(tileId, tileId.lod - resource.lodRange.min));
     if (!inside(resource.tileRange, pTileId.x, pTileId.y)) {
         return false;
     }

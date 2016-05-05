@@ -393,8 +393,8 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
         } catch (const std::exception &e) {
             LOG(warn2)
                 << "Failed to prepare generator for <"
-                << generator->resource().id
-                << ">; removing from set of known generators.";
+                << generator->resource().id << "> (" << e.what()
+                << "); removing from set of known generators.";
 
             // erease from map (under lock)
             std::unique_lock<std::mutex> lock(lock_);
