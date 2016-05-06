@@ -30,7 +30,27 @@ public:
 
     class RasterRequest {
     public:
-        enum class Operation { image, mask, detailMask };
+        /** Operations:
+         *  * image:
+         *        warps image from dataset, uses optional mask
+         *        returns N channel 8bit image
+         *  * mask:
+         *        warps dataset and return its mask
+         *        returns single channel 8bit mask
+         *
+         *  * detailMask:
+         *        warps dataset with agerage filter and no nodata values
+         *        returns grayscale where value > 0 and < 255 marks partially
+         *        covered pixels
+         *
+         * * valueMinMax:
+         *       warps dataset using given filter, dataset.min by minimum filter
+         *       and dataset.max by maximum filter
+
+         *       returns 3-channel double matrix with current value, minimum
+         *       value and maximum value in each pixel
+         */
+        enum class Operation { image, mask, detailMask, valueMinMax };
 
         Operation operation;
         std::string dataset;

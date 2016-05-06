@@ -199,14 +199,36 @@ bool special(const vr::ReferenceFrame &referenceFrame
     return false;
 }
 
+struct Sample {
+    math::Point3 value;
+    math::Point3 min;
+    math::Point3 max;
+
+    Sample() {}
+    Sample(const math::Point3 &value, const math::Point3 &min
+           , const math::Point3 max)
+        : value(value), min(min), max(max)
+    {}
+};
+
+const math::Point3* getValue(const Sample *sample)
+{
+    return (sample ? &sample->value : nullptr);
+}
+
 } // namespace
 
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
                                        , const Sink::pointer &sink
                                        , const SurfaceFileInfo &fi
-                                       , GdalWarper&) const
+                                       , GdalWarper &warper) const
 {
     sink->checkAborted();
+
+    if (!index_.meta(tileId)) {
+        sink->error(utility::makeError<NotFound>("Metatile not found."));
+        return;
+    }
 
     auto blocks(metatileBlocks(resource(), tileId));
 
@@ -236,9 +258,17 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                    << "], ancestor: " << block.commonAncestor.nodeId()
                    << ", tile offset: " << block.offset;
 
-        // grid (in grid coordinates); fill in with invalid numbers
-        Grid<math::Point3> grid
-            (gridSize, math::Point3(std::numeric_limits<double>::quiet_NaN()));
+        auto dem(warper.warp
+                 (GdalWarper::RasterRequest
+                  (GdalWarper::RasterRequest::Operation::valueMinMax
+                   , dataset_
+                   , vr::Registry::srs(block.srs).srsDef
+                   , block.commonAncestor.extents()
+                   , gridSize)
+                  , sink));
+
+        Grid<Sample> grid(gridSize);
+
 
         // grid mask
         const ShiftMask mask(block, metatileSamplesPerTile);
@@ -253,15 +283,20 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         auto conv(sds2phys(block.commonAncestor, definition_.geoidGrid));
         auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
 
-        // fill in matrix
+        // fill in grids
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
-                // work only with non-masked pixels
+                // work only with non-masekd pixels
                 if (mask(i, j)) {
-                    grid(i, j)
-                        = conv(math::Point3
-                               (extents.ll(0) + i * gts.width, y, 0.0));
+                    const auto &value(dem->at<cv::Vec3d>(j, i));
+                    auto x(extents.ll(0) + i * gts.width);
+
+                    grid(i, j) = {
+                        conv(math::Point3(x, y, value[0]))
+                        , conv(math::Point3(x, y, value[1]))
+                        , conv(math::Point3(x, y, value[2]))
+                    };
                 }
             }
         }
@@ -292,42 +327,35 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                         auto xx(i * metatileSamplesPerTile + ii);
                         const auto *p(grid(mask, xx, yy));
 
-                        // update tile extents (if point valid)
-                        if (p) { math::update(te, *p); }
+                        // update tile extents (if sample valid)
+                        if (p) {
+                            // update by both minimum and maximuma
+                            math::update(te, p->min);
+                            math::update(te, p->max);
+                        }
 
                         if (geometry && ii && jj) {
                             // compute area of the quad composed of 1 or 2
                             // triangles
-                            auto qa(quadArea(grid(mask, xx - 1, yy - 1)
-                                             , p
-                                             , grid(mask, xx - 1, yy)
-                                             , grid(mask, xx, yy - 1)));
+                            auto qa(quadArea
+                                    (getValue(grid(mask, xx - 1, yy - 1))
+                                     , getValue(p)
+                                     , getValue(grid(mask, xx - 1, yy))
+                                     , getValue(grid(mask, xx, yy - 1))));
                             area += std::get<0>(qa);
                             triangleCount += std::get<1>(qa);
                         }
 
                         if (p && navtile) {
-                            // sample height in navtile
-                            auto z(navConv
-                                   (math::Point3
-                                    (extents.ll(0) + xx * gts.width
-                                     , yy, 0.0))(2));
-                            update(heightRange, z);
+                            // TODO: implement me
                         }
                     }
                 }
 
-                if (block.commonAncestor.partial() || special(rf, nodeId)) {
-                    // partial node, update children flags
-                    for (const auto &child : vts::children(nodeId)) {
-                        node.setChildFromId
-                            (child, vts::NodeInfo(rf, child).valid());
-                    }
-                }
-
-                if (geometry && !area) {
-                    // well, empty tile, no children
-                    continue;
+                // build children from tile index
+                for (const auto &child : vts::children(nodeId)) {
+                    node.setChildFromId
+                        (child, index_.tileIndex.validSubtree(child));
                 }
 
                 // set extents

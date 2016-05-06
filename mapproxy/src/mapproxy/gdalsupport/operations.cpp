@@ -110,6 +110,40 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
     return tile;
 }
 
+cv::Mat* warpMinMax(DatasetCache &cache, ManagedBuffer &mb
+                    , const std::string &dataset
+                    , const geo::SrsDefinition &srs
+                    , const math::Extents2 &extents
+                    , const math::Size2 &size
+                    , geo::GeoDataset::Resampling resampling)
+{
+    auto &src(cache(dataset));
+    auto &minSrc(cache(dataset + ".min"));
+    auto &maxSrc(cache(dataset + ".max"));
+
+    auto dst(geo::GeoDataset::deriveInMemory
+                (src, srs, size, extents));
+    auto minDst(geo::GeoDataset::deriveInMemory
+                (minSrc, srs, size, extents));
+    auto maxDst(geo::GeoDataset::deriveInMemory
+                (maxSrc, srs, size, extents));
+
+    src.warpInto(dst, resampling);
+    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum);
+    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum);
+
+    // merge first channel from each matrix into one 3-channel matrix
+    const auto &d(dst.cdata());
+    const auto &dmin(minDst.cdata());
+    const auto &dmax(maxDst.cdata());
+    std::vector<cv::Mat> mats{ d, dmin, dmax };
+    int pairs[] = { 0, 0, d.channels(), 1, d.channels() + dmin.channels(), 2 };
+
+    auto *tile(allocateMat(mb, size, CV_64FC3));
+    cv::mixChannels(mats.data(), 3, tile, 1, pairs, 3);
+    return tile;
+}
+
 cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
               , const GdalWarper::RasterRequest &req)
 {
@@ -125,6 +159,10 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
     case GdalWarper::RasterRequest::Operation::detailMask:
         return warpDetailMask
             (cache, mb, req.dataset, req.srs, req.extents, req.size);
+    case GdalWarper::RasterRequest::Operation::valueMinMax:
+        return warpMinMax
+            (cache, mb, req.dataset, req.srs, req.extents, req.size
+             , req.resampling);
     }
     throw;
 }
