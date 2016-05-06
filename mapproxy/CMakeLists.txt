@@ -5,6 +5,8 @@ include(buildsys/cmake/buildsys.cmake)
 # project
 setup_project(mapproxy "${BUILDSYS_PACKAGE_VERSION}")
 
+enable_OpenMP()
+
 find_package(Boost 1.46 REQUIRED
   COMPONENTS thread program_options filesystem system date_time
              serialization regex chrono iostreams)

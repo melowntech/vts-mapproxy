@@ -22,7 +22,6 @@
 #include "vts-libs/registry/po.hpp"
 #include "vts-libs/vts/tileop.hpp"
 #include "vts-libs/vts/io.hpp"
-#include "vts-libs/vts/subtrees.hpp"
 #include "vts-libs/vts/tileindex.hpp"
 
 namespace po = boost::program_options;
@@ -135,11 +134,10 @@ class TreeWalker {
 public:
     TreeWalker(vts::TileIndex &ti, const std::string &dataset
                , const vts::NodeInfo &root
-               , vts::LodRange lodRange, const vts::TileRange &tileRange
-               , int tileSampling);
+               , vts::LodRange lodRange, int tileSampling);
 
 private:
-    void process(const vts::NodeInfo &node);
+    void process(const vts::NodeInfo &node, bool upscaling = false);
 
     const geo::GeoDataset& dataset() {
         if (!gds_.get()) {
@@ -155,66 +153,51 @@ private:
     geo::SrsDefinition srs_;
 
     boost::thread_specific_ptr<geo::GeoDataset> gds_;
-
-    std::vector<vts::TileRange> ranges_;
 };
 
 
 TreeWalker::TreeWalker(vts::TileIndex &ti, const std::string &dataset
-                       , const vts::NodeInfo &root
-                       , vts::LodRange lodRange
-                       , const vts::TileRange &tileRange
+                       , const vts::NodeInfo &root, vts::LodRange lodRange
                        , int tileSampling)
     : dataset_(dataset), ti_(ti), lodRange_(lodRange)
     , tileSampling_(tileSampling), srs_(root.srsDef())
-    , ranges_(lodRange_.max + 1)
 {
-    LOG(info3)
-        << "Processing subtree under node "
-        << root.nodeId()
-        << ", tile range at bottom LOD " << lodRange_.min
-        << " is " << tileRange << ".";
-
-    // seed with given range
-    ranges_[lodRange_.max] = tileRange;
-    // generated ranges in lods up to root
-    for (auto l(lodRange_.max), el(root.nodeId().lod); l > el; --l) {
-        ranges_[l - 1] = vts::parent(ranges_[l], 1);
-    }
-
     UTILITY_OMP(parallel)
-    UTILITY_OMP(single)
-    {
+        UTILITY_OMP(single)
         process(root);
-    }
 }
 
-void TreeWalker::process(const vts::NodeInfo &node)
+void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 {
     const auto tileId(node.nodeId());
-    if (!node.valid()
-        || !math::inside(ranges_[tileId.lod], tileId.x, tileId.y))
-    {
+    if (!node.valid() || (tileId.lod > lodRange_.max)) {
         // invalid node
         return;
     }
 
     LOG(info2) << "Processing tile " << tileId << ".";
 
-    math::Size2 size(tileSampling_ + 1, tileSampling_ + 1);
+    int samples(upscaling ? 8 : tileSampling_);
+
+    math::Size2 size(samples + 1, samples + 1);
 
     if (tileId.lod >= lodRange_.min) {
         // warp input dataset into tile
         const auto& ds(dataset());
         auto tileDs(geo::GeoDataset::deriveInMemory
                     (ds, node.srsDef(), size
-                     , extentsPlusHalfPixel(node.extents(), tileSampling_)));
+                     , extentsPlusHalfPixel(node.extents(), samples)));
         geo::GeoDataset::WarpOptions wo;
 
         // set some output nodata value to force mask generation
         wo.dstNodataValue = std::numeric_limits<double>::lowest();
         auto wri(ds.warpInto(tileDs, geo::GeoDataset::Resampling::lanczos
                              , wo));
+
+        TiFlag::value_type baseFlags(TiFlag::mesh);
+        if (!upscaling) {
+            baseFlags |= TiFlag::navtile;
+        }
 
         // grab mask of warped dataset
         const auto mask(tileDs.cmask());
@@ -239,7 +222,7 @@ void TreeWalker::process(const vts::NodeInfo &node)
             }
 
             UTILITY_OMP(critical)
-                ti_.set(tileId, (TiFlag::mesh | TiFlag::watertight));
+                ti_.set(tileId, (baseFlags | TiFlag::watertight));
             LOG(info3)
                 << "Processed tile " << tileId
                 << " (extents: " << std::fixed << node.extents()
@@ -247,7 +230,7 @@ void TreeWalker::process(const vts::NodeInfo &node)
         } else if (!mask.empty()) {
             // partially covered
             UTILITY_OMP(critical)
-                ti_.set(tileId, (TiFlag::mesh));
+                ti_.set(tileId, baseFlags);
             LOG(info3)
                 << "Processed tile " << tileId
                 << " (extents: " << std::fixed << node.extents()
@@ -260,6 +243,14 @@ void TreeWalker::process(const vts::NodeInfo &node)
                 << ") [empty].";
             return;
         }
+
+        // update upscaling flag
+        upscaling = (upscaling || !wri.overview);
+    }
+
+    if (tileId.lod == lodRange_.max) {
+        // no children down there
+        return;
     }
 
     // we can proces children -> go down
@@ -268,7 +259,7 @@ void TreeWalker::process(const vts::NodeInfo &node)
         auto childNode(node.child(child));
 
         UTILITY_OMP(task)
-        process(childNode);
+            process(childNode, upscaling);
     }
 
     // done
@@ -280,14 +271,9 @@ int DemTiling::run()
 
     auto ds(geo::GeoDataset::open(dataset_));
 
-    auto st(vts::findSubtrees(rf, lodRange_.max, ds.srs(), ds.extents()
-                              , extentsSampling_));
-
     vts::TileIndex ti;
-    for (const auto &range : st.ranges) {
-        TreeWalker(ti, dataset_, vts::NodeInfo(rf, range.first)
-                   , lodRange_, range.second, tileSampling_);
-    }
+
+    TreeWalker(ti, dataset_, vts::NodeInfo(rf), lodRange_, tileSampling_);
 
     LOG(info3) << "Saving generated tile index into " << output_ << ".";
     ti.save(output_);

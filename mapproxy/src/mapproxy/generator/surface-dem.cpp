@@ -60,6 +60,10 @@ utility::PreMain Factory::register_([]()
         (resdef::SurfaceDem::generator, std::make_shared<Factory>());
 });
 
+
+typedef vts::MetaNode::Flag MetaFlag;
+typedef vts::TileIndex::Flag TiFlag;
+
 } // namespace
 
 SurfaceDem::SurfaceDem(const Config &config
@@ -99,7 +103,8 @@ void SurfaceDem::prepare_impl()
 
     // load definition
     vts::TileIndex datasetTiles;
-    datasetTiles.load(dataset_ + "/tiles." + r.id.referenceFrame);
+    datasetTiles.load(absoluteDataset(definition_.dataset)
+                      + "/tiling." + r.id.referenceFrame);
 
     // build properties
     properties_ = {};
@@ -118,43 +123,17 @@ void SurfaceDem::prepare_impl()
     auto &ti(index_.tileIndex);
     ti = {};
 
-    // build tile index
-    // metatiles are distributed everywhere
-    for (vts::Lod lod(0); lod <= r.lodRange.max; ++lod) {
-        // treat whole lod as a huge metatile and process each block
-        // independently; metatiles are set in all (even invalid) nodes
-        for (const auto &block
-                 : metatileBlocks(*resource().referenceFrame
-                                  , vts::TileId(lod), lod, true))
+    {
+        // TODO: apply mask here (somehow)
+        auto combiner([&](TiFlag::value_type o, TiFlag::value_type n)
+                      -> TiFlag::value_type
         {
-            LOG(info1) << "Generating tile index LOD <" << lod
-                       << ">: ancestor: "
-                       << block.commonAncestor.nodeId()
-                       << "block: " << block.view << ".";
+            // just copy for now
+            (void) o;
+            return n;
+        });
 
-            // this is not that correct since metatiles have different spatial
-            // distribution than subtrees but it is OK since we always use
-            // proper metatile ID when accessing metatile
-            vts::TileIndex::Flag::value_type flags
-                (vts::TileIndex::Flag::meta);
-
-            if (block.valid() && in(lod, r.lodRange)) {
-                // mesh and navtile in valid area (If there are non-existent
-                // tiles we'll get empty meshes and navtiles with empty masks.
-                // This is lesser evil than to construct gargantuan tileindex
-                // that would not fit in any imaginable memory)
-                flags |= (vts::TileIndex::Flag::mesh
-                          | vts::TileIndex::Flag::navtile);
-
-                if (!block.partial()) {
-                    // fully covered block -> watertight tiles
-                    flags |= vts::TileIndex::Flag::watertight;
-                }
-            }
-
-            // set current block to computed value
-            ti.set(lod, block.view, flags);
-        }
+        ti.combine(datasetTiles, combiner);
     }
 
     // save it all
@@ -184,9 +163,6 @@ vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root)
 
 namespace {
 
-typedef vts::MetaNode::Flag MetaFlag;
-typedef vts::TileIndex::Flag TiFlag;
-
 inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
 {
     MetaFlag::value_type meta(MetaFlag::allChildren);
@@ -199,6 +175,7 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
 
     return meta;
 }
+
 /** NB: Do Not Change!
  *
  * This constant has huge impact on dataset stability. Changing this value break
