@@ -40,14 +40,6 @@ private:
      */
     const std::string dataset_;
 
-    /** Path to special dataset with overviews created with minimum filter
-     */
-    const std::string datasetMin_;
-
-    /** Path to special dataset with overviews created with maximum filter
-     */
-    const std::string datasetMax_;
-
     vts::tileset::Index index_;
     vts::FullTileSetProperties properties_;
 };

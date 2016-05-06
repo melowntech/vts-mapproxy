@@ -71,8 +71,7 @@ SurfaceDem::SurfaceDem(const Config &config
     : SurfaceBase(config, resource)
     , definition_(this->resource().definition<resdef::SurfaceDem>())
     , dataset_(absoluteDataset(definition_.dataset + "/dem"))
-    , datasetMin_(dataset_ + ".min")
-    , datasetMax_(dataset_ + ".max")
+    , index_(resource.referenceFrame->metaBinaryOrder)
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));
@@ -98,8 +97,8 @@ void SurfaceDem::prepare_impl()
 
     // try to open datasets
     auto dataset(geo::GeoDataset::open(dataset_));
-    auto datasetMin(geo::GeoDataset::open(datasetMin_));
-    auto datasetMax(geo::GeoDataset::open(datasetMax_));
+    auto datasetMin(geo::GeoDataset::open(dataset_ + ".min"));
+    auto datasetMax(geo::GeoDataset::open(dataset_ + ".max"));
 
     // load definition
     vts::TileIndex datasetTiles;

@@ -63,6 +63,7 @@ SurfaceSpheroid::SurfaceSpheroid(const Config &config
                                  , const Resource &resource)
     : SurfaceBase(config, resource)
     , definition_(this->resource().definition<resdef::SurfaceSpheroid>())
+    , index_(resource.referenceFrame->metaBinaryOrder)
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));
