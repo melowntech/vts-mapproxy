@@ -10,6 +10,7 @@ set(mapproxy_SOURCES
   resource.hpp resource.cpp
   support/metatile.hpp support/metatile.cpp
   support/mesh.hpp support/mesh.cpp
+  support/geo.hpp support/geo.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp

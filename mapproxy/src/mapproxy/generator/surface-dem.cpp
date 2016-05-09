@@ -310,7 +310,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                    , extentsPlusHalfPixel
                    (extents, { gridSize.width - 1, gridSize.height - 1 })
                    , gridSize
-                   , geo::GeoDataset::Resampling::minimum)
+                   , geo::GeoDataset::Resampling::dem)
                   , sink));
 
         Grid<Sample> grid(gridSize);
@@ -385,13 +385,13 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
 
                 auto x(extents.ll(0) + i * gts.width);
 
-                if ((value[0] < value[1]) || (value[0] > value[2])) {
-                    LOG(info4) << "Out of bounds ("
-                               << i << ", " << j
-                               << "): " << value[1]
-                               << " - " << value[0]
-                               << " - " << value[2] << ".";
-                }
+                // if ((value[0] < value[1]) || (value[0] > value[2])) {
+                //     LOG(info4) << "Out of bounds ("
+                //                << i << ", " << j
+                //                << "): " << value[1]
+                //                << " - " << value[0]
+                //                << " - " << value[2] << ".";
+                // }
                 // compute all 3 world points (value, min, max)
                 grid(i, j) = {
                     conv(math::Point3(x, y, value[0]))
@@ -525,9 +525,7 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
                                    , const SurfaceFileInfo &fi
                                    , GdalWarper &warper) const
 {
-    // TODO: calculate tile sampling
     const int samplesPerSide(128);
-    // const int samplesPerSide(8);
     const int facesPerTile(1500);
 
     sink->checkAborted();
@@ -546,6 +544,7 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
         return;
     }
 
+    // warp input dataset as a DEM
     auto dem(warper.warp
              (GdalWarper::RasterRequest
               (GdalWarper::RasterRequest::Operation::dem
@@ -553,10 +552,13 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
                , nodeInfo.srsDef()
                , extentsPlusHalfPixel
                (nodeInfo.extents(), { samplesPerSide, samplesPerSide })
-               , math::Size2(samplesPerSide + 1, samplesPerSide + 1)
-               , geo::GeoDataset::Resampling::lanczos)
+               , math::Size2(samplesPerSide + 1, samplesPerSide + 1))
               , sink));
 
+    // grab size of computed matrix, minus one to get number of edges
+    math::Size2 size(dem->cols - 1, dem->rows - 1);
+
+    // height sampler
     auto hs([&](int i, int j, double &h) -> bool
     {
         h = dem->at<double>(j, i);
@@ -591,9 +593,7 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
     });
 
     // generate mesh
-    auto meshInfo
-        (meshFromNode
-         (nodeInfo, math::Size2(samplesPerSide, samplesPerSide), hs));
+    auto meshInfo(meshFromNode(nodeInfo, size, hs));
     auto &lm(std::get<0>(meshInfo));
 
     // simplify

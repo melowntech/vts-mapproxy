@@ -1,6 +1,7 @@
 #include "imgproc/rastermask/cvmat.hpp"
 
 #include "../error.hpp"
+#include "../support/geo.hpp"
 #include "./operations.hpp"
 
 namespace {
@@ -87,12 +88,6 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
                         , const math::Extents2 &extents
                         , const math::Size2 &size)
 {
-    // LOG(info4) << std::fixed << "-te "
-    //            << extents.ll(0) << ' ' << extents.ll(1)
-    //            << ' ' << extents.ur(0) << ' ' << extents.ur(1)
-    //            << " -ts " << size.width << ' ' << size.height
-    //            << " -t_srs \"" << srs.srs << "\"";
-
     // generate metatile from mask dataset
     auto &srcMask(cache(dataset));
     auto dstMask(geo::GeoDataset::deriveInMemory
@@ -105,31 +100,6 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
 
     // mask is guaranteed to have single (double) channel
     auto &dstMat(dstMask.cdata());
-    auto *tile(allocateMat(mb, size, dstMat.type()));
-    dstMat.copyTo(*tile);
-    return tile;
-}
-
-cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
-                 , const std::string &dataset
-                 , const geo::SrsDefinition &srs
-                 , const math::Extents2 &extents
-                 , const math::Size2 &size
-                 , geo::GeoDataset::Resampling resampling)
-{
-    auto &src(cache(dataset));
-    auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
-
-    geo::GeoDataset::WarpOptions wo;
-    wo.dstNodataValue = std::numeric_limits<double>::lowest();
-    src.warpInto(dst, resampling, wo);
-
-    if (dst.cmask().empty()) {
-        throw EmptyImage("No valid data.");
-    }
-
-    // mask is guaranteed to have single (double) channel
-    auto &dstMat(dst.cdata());
     auto *tile(allocateMat(mb, size, dstMat.type()));
     dstMat.copyTo(*tile);
     return tile;
@@ -171,6 +141,45 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
     return tile;
 }
 
+cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
+                 , const std::string &dataset
+                 , const geo::SrsDefinition &srs
+                 , const math::Extents2 &extents
+                 , const math::Size2 &maxSize)
+{
+    auto &src(cache(dataset));
+
+    // calculate size of dataset
+    auto size([&]() -> math::Size2
+    {
+        auto pxc(tileCircumference(extents, srs, src));
+        // 1) divide circumference by 4 to get (average) length of one side
+        // 2) use 12 samples per one souce pixel
+        // 3) add 1 to cover grid
+        int samples(std::round(12.0 * pxc / 4.0 + 1));
+        return math::Size2(std::max(std::min(samples, maxSize.width), 2)
+                           , std::max(std::min(samples, maxSize.height), 2));
+    }());
+
+    auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
+
+    geo::GeoDataset::WarpOptions wo;
+    wo.dstNodataValue = std::numeric_limits<double>::lowest();
+    auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem, wo));
+    LOG(info2) << "Warp result: scale=" << wri.scale
+               << ", resampling=" << wri.resampling << ".";
+
+    if (dst.cmask().empty()) {
+        throw EmptyImage("No valid data.");
+    }
+
+    // mask is guaranteed to have single (double) channel
+    auto &dstMat(dst.cdata());
+    auto *tile(allocateMat(mb, size, dstMat.type()));
+    dstMat.copyTo(*tile);
+    return tile;
+}
+
 cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
               , const GdalWarper::RasterRequest &req)
 {
@@ -191,8 +200,7 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
 
     case GdalWarper::RasterRequest::Operation::dem:
         return warpDem
-            (cache, mb, req.dataset, req.srs, req.extents, req.size
-             , req.resampling);
+            (cache, mb, req.dataset, req.srs, req.extents, req.size);
 
     case GdalWarper::RasterRequest::Operation::valueMinMax:
         return warpValueMinMax

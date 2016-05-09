@@ -45,7 +45,8 @@ public:
          *
          * * dem:
          *       warps dataset as a DEM using provided filter
-         *       retunrs single channel double matrix
+         *       returns single channel double matrix
+         *       size parameter is upper limit to raster dimensions
          *
          * * valueMinMax:
          *       warps dataset using given filter, dataset.min by minimum filter
@@ -54,7 +55,9 @@ public:
          *       returns 3-channel double matrix with current value, minimum
          *       value and maximum value in each pixel
          */
-        enum class Operation { image, mask, detailMask, dem, valueMinMax };
+        enum class Operation {
+            image, mask, detailMask, dem, valueMinMax
+        };
 
         Operation operation;
         std::string dataset;
