@@ -326,7 +326,7 @@ void GdalWarper::housekeeping()
 
 GdalWarper::Detail::Detail(const Options &options)
     : options_(options)
-    , mem_(bi::anonymous_shared_memory(1 << 22))
+    , mem_(bi::anonymous_shared_memory(std::size_t(1) << 30))
     , mb_(bi::create_only, mem_.get_address(), mem_.get_size())
     , running_(mb_.construct<std::atomic<bool>>(bi::anonymous_instance)(true))
     , queue_(mb_.construct<ShRasterRequest::Deque>

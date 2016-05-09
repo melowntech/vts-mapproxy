@@ -209,9 +209,11 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 // holes -> set whole subtree to watertight mesh
 
                 UTILITY_OMP(critical)
+                {
                     ti_.set(vts::LodRange(tileId.lod, lodRange_.max)
                             , vts::tileRange(tileId)
                             , (TiFlag::mesh | TiFlag::watertight));
+                }
 
                 // stop descent here
                 LOG(info3)

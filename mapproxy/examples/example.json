@@ -227,15 +227,15 @@
         "driver": "surface-dem",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [10, 14],
+                "lodRange": [10, 21],
                 "tileRange": [[275, 171], [278, 174]]
             },
             "webmerc-projected": {
-                "lodRange": [9,13],
+                "lodRange": [9,20],
                 "tileRange": [[275, 171], [278, 174]]
             },
             "webmerc-unprojected": {
-                "lodRange": [9,13],
+                "lodRange": [9,20],
                 "tileRange": [[275, 171], [278, 174]]
             }
         },

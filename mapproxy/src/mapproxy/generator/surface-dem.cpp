@@ -120,19 +120,51 @@ void SurfaceDem::prepare_impl()
 
     // grab and reset tile index
     auto &ti(index_.tileIndex);
+
+    // clean tile index
     ti = {};
 
+    // generate tile index from lod/tile ranges (and TODO: mask)
+    for (auto lod : r.lodRange) {
+        // treat whole lod as a huge metatile and process each block
+        // independently
+        for (const auto &block
+                 : metatileBlocks(resource(), vts::TileId(lod), lod, true))
+        {
+            LOG(info1) << "Generating tile index LOD <" << lod
+                       << ">: ancestor: "
+                       << block.commonAncestor.nodeId()
+                       << "block: " << block.view << ".";
+
+            if (block.valid() && in(lod, r.lodRange)) {
+                TiFlag::value_type flags(TiFlag::mesh);
+
+                if (lod == r.lodRange.min) {
+                    // force navtile in topmost lod
+                    flags |= TiFlag::navtile;
+                }
+
+                // set current block to computed value
+                ti.set(lod, block.view, flags);
+            }
+        }
+    }
+
+    // and clip with dataset tiles
     {
-        // TODO: apply mask here (somehow)
         auto combiner([&](TiFlag::value_type o, TiFlag::value_type n)
                       -> TiFlag::value_type
         {
-            // just copy for now
-            (void) o;
-            return n;
+            if (!o || !n) {
+                // no intersection -> nothing
+                return 0;
+            }
+
+            // intersectin -> merge flags
+            return o | n;
         });
 
-        ti.combine(datasetTiles, combiner);
+        ti.combine(datasetTiles, combiner, r.lodRange);
     }
 
     // save it all
@@ -177,8 +209,8 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
 
 /** NB: Do Not Change!
  *
- * This constant has huge impact on dataset stability. Changing this value break
- * data already served to the outer world.
+ * This constant has huge impact on dataset stability. Changing this value may
+ * break data already served to the outer world.
  */
 const int metatileSamplesPerTile(8);
 
@@ -199,20 +231,21 @@ bool special(const vr::ReferenceFrame &referenceFrame
 }
 
 struct Sample {
+    bool valid;
     math::Point3 value;
     math::Point3 min;
     math::Point3 max;
 
-    Sample() {}
+    Sample() : valid(false) {}
     Sample(const math::Point3 &value, const math::Point3 &min
-           , const math::Point3 max)
-        : value(value), min(min), max(max)
+           , const math::Point3 &max)
+        : valid(true), value(value), min(min), max(max)
     {}
 };
 
 const math::Point3* getValue(const Sample *sample)
 {
-    return (sample ? &sample->value : nullptr);
+    return ((sample && sample->valid) ? &sample->value : nullptr);
 }
 
 } // namespace
@@ -251,23 +284,25 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
             (bSize.width * metatileSamplesPerTile + 1
              , bSize.height * metatileSamplesPerTile + 1);
 
-        LOG(info1) << "Processing metatile block ["
-                   << vts::tileId(tileId.lod, block.view.ll)
-                   << ", " << vts::tileId(tileId.lod, block.view.ur)
-                   << "], ancestor: " << block.commonAncestor.nodeId()
-                   << ", tile offset: " << block.offset;
+       LOG(info1) << "Processing metatile block ["
+                  << vts::tileId(tileId.lod, block.view.ll)
+                  << ", " << vts::tileId(tileId.lod, block.view.ur)
+                  << "], ancestor: " << block.commonAncestor.nodeId()
+                  << ", tile offset: " << block.offset
+                  << ", size in tiles: " << vts::tileRangesSize(block.view)
+                  << ".";
 
         auto dem(warper.warp
                  (GdalWarper::RasterRequest
                   (GdalWarper::RasterRequest::Operation::valueMinMax
                    , dataset_
                    , vr::Registry::srs(block.srs).srsDef
-                   , block.commonAncestor.extents()
-                   , gridSize)
+                   , block.extents
+                   , gridSize
+                   , geo::GeoDataset::Resampling::minimum)
                   , sink));
 
         Grid<Sample> grid(gridSize);
-
 
         // grid mask
         const ShiftMask mask(block, metatileSamplesPerTile);
@@ -282,21 +317,76 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         auto conv(sds2phys(block.commonAncestor, definition_.geoidGrid));
         auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
 
-        // fill in grids
+        auto sample([&](int i, int j) -> cv::Vec3d
+        {
+            // first, try exact value
+            const auto &v(dem->at<cv::Vec3d>(j, i));
+            if (v[0] >= -1e6) { return v; }
+
+            // output vector and count of valid samples
+            cv::Vec3d out(0, std::numeric_limits<double>::max()
+                          , std::numeric_limits<double>::lowest());
+            int count(0);
+
+            for (int jj(-1); jj <= +1; ++jj) {
+                for (int ii(-1); ii <= +1; ++ii) {
+                    // ignore current point
+                    if (!(ii || jj)) { continue; }
+
+                    auto x(i + ii), y(j + jj);
+                    // check bounds
+                    if ((x < 0) || (x >= dem->cols)
+                        || (y < 0) || (y >= dem->rows))
+                        { continue; }
+
+                    const auto &v(dem->at<cv::Vec3d>(y, x));
+                    if (v[0] >= -1e6) {
+                        out[0] += v[0];
+                        out[1] = std::min(out[1], v[1]);
+                        out[2] = std::max(out[2], v[2]);
+                        ++count;
+                    }
+                }
+            }
+
+            if (!count) {
+                return { std::numeric_limits<double>::lowest()
+                        , std::numeric_limits<double>::lowest()
+                        , std::numeric_limits<double>::lowest() };
+            }
+
+            out[0] /= count;
+            return out;
+        });
+
+        // fill in grid
+        // TODO: use mask
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
-                // work only with non-masekd pixels
-                if (mask(i, j)) {
-                    const auto &value(dem->at<cv::Vec3d>(j, i));
-                    auto x(extents.ll(0) + i * gts.width);
+                // work only with non-masked pixels
+                if (!mask(i, j)) { continue; }
 
-                    grid(i, j) = {
-                        conv(math::Point3(x, y, value[0]))
-                        , conv(math::Point3(x, y, value[1]))
-                        , conv(math::Point3(x, y, value[2]))
-                    };
+                auto value(sample(i, j));
+
+                // skip out invalid data
+                if (value[0] < -1e6) { continue; }
+
+                auto x(extents.ll(0) + i * gts.width);
+
+                if ((value[0] < value[1]) || (value[0] > value[2])) {
+                    LOG(info4) << "Out of bounds ("
+                               << i << ", " << j
+                               << "): " << value[1]
+                               << " - " << value[0]
+                               << " - " << value[2] << ".";
                 }
+                // compute all 3 world points (value, min, max)
+                grid(i, j) = {
+                    conv(math::Point3(x, y, value[0]))
+                    , conv(math::Point3(x, y, value[1]))
+                    , conv(math::Point3(x, y, value[2]))
+                };
             }
         }
 
@@ -327,8 +417,8 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                         const auto *p(grid(mask, xx, yy));
 
                         // update tile extents (if sample valid)
-                        if (p) {
-                            // update by both minimum and maximuma
+                        if (p && p->valid) {
+                            // update by both minimum and maximum
                             math::update(te, p->min);
                             math::update(te, p->max);
                         }
@@ -352,6 +442,9 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                 }
 
                 // build children from tile index
+                //
+                // TODO: let tileindex generate validity flag for all children
+                // in this block
                 for (const auto &child : vts::children(nodeId)) {
                     node.setChildFromId
                         (child, index_.tileIndex.validSubtree(child));
@@ -364,11 +457,17 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                 node.heightRange.min = std::floor(heightRange.min);
                 node.heightRange.max = std::ceil(heightRange.max);
 
-                // set credits
-                node.updateCredits(resource().credits);
+                if (!triangleCount) {
+                    // reset content flags
+                    node.geometry(geometry = false);
+                    node.navtile(navtile = false);
+                }
 
-                // mesh is (almost) flat -> use tile area
+                // calculate texel size
                 if (geometry) {
+                    // set credits
+                    node.updateCredits(resource().credits);
+
                     node.applyTexelSize(true);
 
                     // calculate texture size using node mask
@@ -410,13 +509,27 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
+namespace {
+
+math::Extents2 extentsPlusHalfPixel(const math::Extents2 &extents
+                                    , int pixels)
+{
+    auto es(math::size(extents));
+    const math::Size2f px(es.width / pixels, es.height / pixels);
+    const math::Point2 hpx(px.width / 2, px.height / 2);
+    return math::Extents2(extents.ll - hpx, extents.ur + hpx);
+}
+
+} // namespace
+
 void SurfaceDem::generateMesh(const vts::TileId &tileId
                                    , const Sink::pointer &sink
                                    , const SurfaceFileInfo &fi
-                                   , GdalWarper&) const
+                                   , GdalWarper &warper) const
 {
     // TODO: calculate tile sampling
     const int samplesPerSide(128);
+    // const int samplesPerSide(8);
     const int facesPerTile(1500);
 
     sink->checkAborted();
@@ -435,10 +548,53 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
         return;
     }
 
+    auto dem(warper.warp
+             (GdalWarper::RasterRequest
+              (GdalWarper::RasterRequest::Operation::dem
+               , dataset_
+               , nodeInfo.srsDef()
+               , extentsPlusHalfPixel(nodeInfo.extents(), samplesPerSide)
+               , math::Size2(samplesPerSide + 1, samplesPerSide + 1)
+               , geo::GeoDataset::Resampling::lanczos)
+              , sink));
+
+    auto hs([&](int i, int j, double &h) -> bool
+    {
+        h = dem->at<double>(j, i);
+        if (h >= -1e6) { return true; }
+
+        h = 0;
+        int count(0);
+
+        for (int jj(-1); jj <= +1; ++jj) {
+            for (int ii(-1); ii <= +1; ++ii) {
+                // ignore current point
+                if (!(ii || jj)) { continue; }
+
+                auto x(i + ii), y(j + jj);
+                // check bounds
+                if ((x < 0) || (x >= dem->cols)
+                    || (y < 0) || (y >= dem->rows))
+                    { continue; }
+
+                auto v(dem->at<double>(y, x));
+                if (v >= -1e6) {
+                    h += v;
+                    ++count;
+                }
+            }
+        }
+
+        if (!count) { return false; }
+        h /= count;
+
+        return true;
+    });
+
     // generate mesh
     auto meshInfo
         (meshFromNode
-         (nodeInfo, math::Size2(samplesPerSide, samplesPerSide)));
+         (nodeInfo, math::Size2(samplesPerSide, samplesPerSide), hs));
     auto &lm(std::get<0>(meshInfo));
 
     // simplify

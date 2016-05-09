@@ -154,14 +154,3 @@ MetatileBlock::list metatileBlocks(const Resource &resource
          , vts::shiftRange
          (resource.lodRange.min, resource.tileRange, tileId.lod));
 }
-
-MetatileBlock::list metatileBlocks(const vr::ReferenceFrame &referenceFrame
-                                   , const vts::TileId &tileId
-                                   , unsigned int metaBinaryOrder
-                                   , bool includeInvalid)
-{
-    auto maxIndex(vts::tileCount(tileId.lod) - 1);
-    return metatileBlocksImpl
-        (referenceFrame, tileId, metaBinaryOrder, includeInvalid
-         , vts::TileRange(0, 0, maxIndex, maxIndex));
-}

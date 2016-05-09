@@ -12,8 +12,11 @@
 
 namespace vts = vadstena::vts;
 
+typedef std::function<bool(int, int, double&)> HeightSampler;
+
 std::tuple<geometry::Mesh, bool>
-meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges);
+meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
+             , const HeightSampler &heights = HeightSampler());
 
 void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
                   , int facesPerTile);

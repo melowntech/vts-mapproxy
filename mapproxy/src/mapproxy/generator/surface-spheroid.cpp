@@ -121,7 +121,7 @@ void SurfaceSpheroid::prepare_impl()
     // metatiles are distributed everywhere
     for (auto lod : r.lodRange) {
         // treat whole lod as a huge metatile and process each block
-        // independently; metatiles are set in all (even invalid) nodes
+        // independently
         for (const auto &block
                  : metatileBlocks(resource(), vts::TileId(lod), lod, true))
         {

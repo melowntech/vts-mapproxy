@@ -43,13 +43,6 @@ MetatileBlock::list metatileBlocks(const Resource &resource
                                    , unsigned int metaBinaryOrder = 0
                                    , bool includeInvalid = false);
 
-/** Same as above but without any limits
- */
-MetatileBlock::list metatileBlocks(const vr::ReferenceFrame &referenceFrame
-                                   , const vts::TileId &tileId
-                                   , unsigned int metaBinaryOrder = 0
-                                   , bool includeInvalid = false);
-
 class ShiftMask {
 public:
     ShiftMask(const MetatileBlock &block, int samplesPerTile)

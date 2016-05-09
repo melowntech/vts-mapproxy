@@ -11,7 +11,8 @@
 namespace vr = vadstena::registry;
 
 std::tuple<geometry::Mesh, bool>
-meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges)
+meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
+             , const HeightSampler &heights)
 {
     std::tuple<geometry::Mesh, bool> res;
     std::get<1>(res) = false;
@@ -22,8 +23,7 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges)
     // one tile pixel
     math::Size2f px(ts.width / edges.width, ts.height / edges.height);
 
-    cv::Mat_<int> indices(edges.width + 1, edges.height + 1
-                          , -1);
+    cv::Mat_<int> indices(edges.width + 1, edges.height + 1, -1);
 
     auto g2l(geo::geo2local(extents));
 
@@ -43,21 +43,26 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges)
         for (int i(0), ie(edges.width); i <= ie; ++i) {
             if (!coverage.get(i, j)) { continue; }
 
+            // sample height
+            double height(0.0);
+            if (heights && !heights(i, j, height)) { continue; }
+
             // remember vertex index
             indices(j, i) = lm.vertices.size();
 
             // create vertex in SDS (local to extents center)
             lm.vertices.push_back
                 (math::transform
-                 (g2l, math::Point3(extents.ll(0) + i * px.width, y, 0.0)));
+                 (g2l, math::Point3(extents.ll(0) + i * px.width, y
+                                    , height)));
         }
     }
 
-    auto getVertex([&](int i, int j) -> boost::optional<int>
+    auto getVertex([&](int i, int j) -> const int*
     {
-        auto index(indices(j, i));
-        if (index < 0) { return boost::none; }
-        return index;
+        const auto &index(indices(j, i));
+        if (index < 0) { return nullptr; }
+        return &index;
     });
 
     // mesh the grid
