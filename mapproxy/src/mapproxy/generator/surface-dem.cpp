@@ -248,6 +248,15 @@ const math::Point3* getValue(const Sample *sample)
     return ((sample && sample->valid) ? &sample->value : nullptr);
 }
 
+math::Extents2 extentsPlusHalfPixel(const math::Extents2 &extents
+                                    , const math::Size2 &pixels)
+{
+    auto es(math::size(extents));
+    const math::Size2f px(es.width / pixels.width, es.height / pixels.height);
+    const math::Point2 hpx(px.width / 2, px.height / 2);
+    return math::Extents2(extents.ll - hpx, extents.ur + hpx);
+}
+
 } // namespace
 
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
@@ -276,7 +285,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
 
     for (const auto &block : blocks) {
         const auto &view(block.view);
-        const auto &extents(block.extents);
+        auto extents = block.extents;
         const auto es(math::size(extents));
         const math::Size2 bSize(vts::tileRangesSize(view));
 
@@ -297,7 +306,9 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                   (GdalWarper::RasterRequest::Operation::valueMinMax
                    , dataset_
                    , vr::Registry::srs(block.srs).srsDef
-                   , block.extents
+                   // add half pixel to warp in grid coordinates
+                   , extentsPlusHalfPixel
+                   (extents, { gridSize.width - 1, gridSize.height - 1 })
                    , gridSize
                    , geo::GeoDataset::Resampling::minimum)
                   , sink));
@@ -509,19 +520,6 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
-namespace {
-
-math::Extents2 extentsPlusHalfPixel(const math::Extents2 &extents
-                                    , int pixels)
-{
-    auto es(math::size(extents));
-    const math::Size2f px(es.width / pixels, es.height / pixels);
-    const math::Point2 hpx(px.width / 2, px.height / 2);
-    return math::Extents2(extents.ll - hpx, extents.ur + hpx);
-}
-
-} // namespace
-
 void SurfaceDem::generateMesh(const vts::TileId &tileId
                                    , const Sink::pointer &sink
                                    , const SurfaceFileInfo &fi
@@ -553,7 +551,8 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
               (GdalWarper::RasterRequest::Operation::dem
                , dataset_
                , nodeInfo.srsDef()
-               , extentsPlusHalfPixel(nodeInfo.extents(), samplesPerSide)
+               , extentsPlusHalfPixel
+               (nodeInfo.extents(), { samplesPerSide, samplesPerSide })
                , math::Size2(samplesPerSide + 1, samplesPerSide + 1)
                , geo::GeoDataset::Resampling::lanczos)
               , sink));
