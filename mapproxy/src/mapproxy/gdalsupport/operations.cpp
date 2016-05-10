@@ -105,6 +105,36 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
     return tile;
 }
 
+cv::Mat* warpMinMax(DatasetCache &cache, ManagedBuffer &mb
+                         , const std::string &dataset
+                         , const geo::SrsDefinition &srs
+                         , const math::Extents2 &extents
+                         , const math::Size2 &size)
+{
+    auto &minSrc(cache(dataset + ".min"));
+    auto &maxSrc(cache(dataset + ".max"));
+
+    auto minDst(geo::GeoDataset::deriveInMemory
+                (minSrc, srs, size, extents, GDT_Float64));
+    auto maxDst(geo::GeoDataset::deriveInMemory
+                (maxSrc, srs, size, extents, GDT_Float64));
+
+    geo::GeoDataset::WarpOptions wo;
+    wo.dstNodataValue = std::numeric_limits<double>::lowest();
+    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum, wo);
+    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum, wo);
+
+    // merge first channel from each matrix into one 3-channel matrix
+    const auto &dmin(minDst.cdata());
+    const auto &dmax(maxDst.cdata());
+    const cv::Mat mats[] = { dmin, dmax };
+    int pairs[] = { 0, 0, dmin.channels(), 1 };
+
+    auto *tile(allocateMat(mb, size, CV_64FC2));
+    cv::mixChannels(mats, 2, tile, 1, pairs, 2);
+    return tile;
+}
+
 cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
                          , const std::string &dataset
                          , const geo::SrsDefinition &srs
@@ -112,6 +142,7 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
                          , const math::Size2 &size
                          , geo::GeoDataset::Resampling resampling)
 {
+    // combined result of warped dataset and result of warpMinMax
     auto &src(cache(dataset));
     auto &minSrc(cache(dataset + ".min"));
     auto &maxSrc(cache(dataset + ".max"));
@@ -145,20 +176,25 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
                  , const std::string &dataset
                  , const geo::SrsDefinition &srs
                  , const math::Extents2 &extents
-                 , const math::Size2 &maxSize)
+                 , const math::Size2 &requestedSize
+                 , bool optimize)
 {
     auto &src(cache(dataset));
 
     // calculate size of dataset
     auto size([&]() -> math::Size2
     {
+        if (!optimize) { return requestedSize; }
+
         auto pxc(tileCircumference(extents, srs, src));
         // 1) divide circumference by 4 to get (average) length of one side
         // 2) use 12 samples per one souce pixel
         // 3) add 1 to cover grid
+        // 4) clip result to requesed size and 2
         int samples(std::round(12.0 * pxc / 4.0 + 1));
-        return math::Size2(std::max(std::min(samples, maxSize.width), 2)
-                           , std::max(std::min(samples, maxSize.height), 2));
+        return math::Size2
+            (std::max(std::min(samples, requestedSize.width), 2)
+             , std::max(std::min(samples, requestedSize.height), 2));
     }());
 
     auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
@@ -183,26 +219,34 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
 cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
               , const GdalWarper::RasterRequest &req)
 {
+    typedef GdalWarper::RasterRequest::Operation Operation;
+
     switch (req.operation) {
-    case GdalWarper::RasterRequest::Operation::image:
+    case Operation::image:
         return warpImage
             (cache, mb, req.dataset, req.srs, req.extents, req.size
              , req.resampling, req.mask);
 
-    case GdalWarper::RasterRequest::Operation::mask:
+    case Operation::mask:
         return warpMask
             (cache, mb, req.dataset, req.srs, req.extents, req.size
              , req.resampling);
 
-    case GdalWarper::RasterRequest::Operation::detailMask:
+    case Operation::detailMask:
         return warpDetailMask
             (cache, mb, req.dataset, req.srs, req.extents, req.size);
 
-    case GdalWarper::RasterRequest::Operation::dem:
+    case Operation::dem:
+    case Operation::demOptimal:
         return warpDem
+            (cache, mb, req.dataset, req.srs, req.extents, req.size
+             , (req.operation == Operation::demOptimal));
+
+    case Operation::minMax:
+        return warpMinMax
             (cache, mb, req.dataset, req.srs, req.extents, req.size);
 
-    case GdalWarper::RasterRequest::Operation::valueMinMax:
+    case Operation::valueMinMax:
         return warpValueMinMax
             (cache, mb, req.dataset, req.srs, req.extents, req.size
              , req.resampling);

@@ -44,9 +44,22 @@ public:
          *        covered pixels
          *
          * * dem:
-         *       warps dataset as a DEM using provided filter
+         *       warps dataset as a DEM using Resampling::dem filter
          *       returns single channel double matrix
-         *       size parameter is upper limit to raster dimensions
+         *
+         * * demOptimal:
+         *       warps dataset as a DEM using Resampling::dem filter
+         *       returns single channel double matrix
+         *
+         *       result size is optimized, provided parameter is just upper
+         *       limit
+         *
+         * * minMax:
+         *       dataset.min by minimum filter
+         *       and dataset.max by maximum filter
+         *
+         *       returns 2-channel double matrix with minimum value and maximum
+         *       value in each pixel
          *
          * * valueMinMax:
          *       warps dataset using given filter, dataset.min by minimum filter
@@ -56,7 +69,7 @@ public:
          *       value and maximum value in each pixel
          */
         enum class Operation {
-            image, mask, detailMask, dem, valueMinMax
+            image, mask, detailMask, dem, demOptimal, minMax, valueMinMax
         };
 
         Operation operation;

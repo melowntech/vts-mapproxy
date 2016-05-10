@@ -518,7 +518,8 @@ void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
     // set height range
     nt.heightRange(vts::NavTile::HeightRange
                    (std::floor(heightRange.min), std::ceil(heightRange.max)));
-    math::Size2f npx(ts.width / ntd.cols, ts.height / ntd.rows);
+    math::Size2f npx(ts.width / (ntd.cols - 1)
+                     , ts.height / (ntd.rows - 1));
     for (int j(0); j < ntd.rows; ++j) {
         auto y(extents.ll(1) + j * npx.height);
         for (int i(0); i < ntd.cols; ++i) {
