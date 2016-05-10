@@ -15,7 +15,7 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
              , const HeightSampler &heights)
 {
     std::tuple<geometry::Mesh, bool> res;
-    std::get<1>(res) = false;
+    auto &fullyCovered(std::get<1>(res) = false);
 
     const auto extents(nodeInfo.extents());
     const auto ts(math::size(extents));
@@ -34,7 +34,7 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
                    , 1));
 
     if (coverage.empty()) { return res; }
-    std::get<1>(res) = coverage.full();
+    fullyCovered = coverage.full();
 
     // fill grid and remember indices
     auto &lm(std::get<0>(res));
@@ -45,7 +45,10 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
 
             // sample height
             double height(0.0);
-            if (heights && !heights(i, j, height)) { continue; }
+            if (heights && !heights(i, j, height)) {
+                fullyCovered = false;
+                continue;
+            }
 
             // remember vertex index
             indices(j, i) = lm.vertices.size();

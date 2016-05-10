@@ -186,12 +186,13 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         const auto& ds(dataset());
         auto tileDs(geo::GeoDataset::deriveInMemory
                     (ds, node.srsDef(), size
-                     , extentsPlusHalfPixel(node.extents(), samples)));
+                     , extentsPlusHalfPixel(node.extents(), samples)
+                     , GDT_Float64));
         geo::GeoDataset::WarpOptions wo;
 
         // set some output nodata value to force mask generation
         wo.dstNodataValue = std::numeric_limits<double>::lowest();
-        auto wri(ds.warpInto(tileDs, geo::GeoDataset::Resampling::lanczos
+        auto wri(ds.warpInto(tileDs, geo::GeoDataset::Resampling::cubicspline
                              , wo));
 
         TiFlag::value_type baseFlags(TiFlag::mesh);
@@ -219,6 +220,7 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 LOG(info3)
                     << "Processed tile " << tileId
                     << " (extents: " << std::fixed << node.extents()
+                    << ", srs: " << node.srs()
                     << ") [watertight subtree].";
                 return;
             }
@@ -228,6 +230,7 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
             LOG(info3)
                 << "Processed tile " << tileId
                 << " (extents: " << std::fixed << node.extents()
+                << ", srs: " << node.srs()
                 << ") [watertight].";
         } else if (!mask.empty()) {
             // partially covered
@@ -236,12 +239,14 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
             LOG(info3)
                 << "Processed tile " << tileId
                 << " (extents: " << std::fixed << node.extents()
+                << ", srs: " << node.srs()
                 << ") [partial].";
         } else {
             // empty -> no children
             LOG(info3)
                 << "Processed tile " << tileId
                 << " (extents: " << std::fixed << node.extents()
+                << ", srs: " << node.srs()
                 << ") [empty].";
             return;
         }
@@ -279,6 +284,7 @@ int DemTiling::run()
 
     LOG(info3) << "Saving generated tile index into " << output_ << ".";
     ti.save(output_);
+    LOG(info3) << "Tile index saved.";
 
     return EXIT_SUCCESS;
 }

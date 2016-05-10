@@ -156,9 +156,23 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
 
     geo::GeoDataset::WarpOptions wo;
     wo.dstNodataValue = std::numeric_limits<double>::lowest();
-    src.warpInto(dst, resampling, wo);
+    auto wri(src.warpInto(dst, resampling, wo));
     minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum, wo);
     maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum, wo);
+
+    // std::string ovr("None");
+    // if (wri.overview) {
+    //     ovr = boost::lexical_cast<std::string>(*wri.overview);
+    // }
+    // LOG(info4)
+    //     << std::fixed
+    //     << "gdalwarp -ts " << size.width << " " << size.height
+    //     << " -te " << extents.ll(0) << " "  << extents.ll(1)
+    //     << " " << extents.ur(0) << " " << extents.ur(1)
+    //     << " -r " << wri.resampling
+    //     << " -dstnodata " << **wo.dstNodataValue
+    //     << " -ovr " << ovr
+    //     << " " << dataset;
 
     // merge first channel from each matrix into one 3-channel matrix
     const auto &d(dst.cdata());
@@ -202,7 +216,7 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
     geo::GeoDataset::WarpOptions wo;
     wo.dstNodataValue = std::numeric_limits<double>::lowest();
     auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem, wo));
-    LOG(info2) << "Warp result: scale=" << wri.scale
+    LOG(info1) << "Warp result: scale=" << wri.scale
                << ", resampling=" << wri.resampling << ".";
 
     if (dst.cmask().empty()) {

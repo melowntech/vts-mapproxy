@@ -134,7 +134,7 @@ void SurfaceDem::prepare_impl()
             LOG(info1) << "Generating tile index LOD <" << lod
                        << ">: ancestor: "
                        << block.commonAncestor.nodeId()
-                       << "block: " << block.view << ".";
+                       << ", block: " << block.view << ".";
 
             if (block.valid() && in(lod, r.lodRange)) {
                 TiFlag::value_type flags(TiFlag::mesh);
@@ -314,7 +314,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                    , extentsPlusHalfPixel
                    (extents, { gridSize.width - 1, gridSize.height - 1 })
                    , gridSize
-                   , geo::GeoDataset::Resampling::minimum)
+                   , geo::GeoDataset::Resampling::average)
                   , sink));
 
         Grid<Sample> grid(gridSize);
@@ -632,7 +632,7 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
 
     // generate mesh
     auto meshInfo(meshFromNode(nodeInfo, size
-                               , [&](int i, int j, double &h)
+                               , [&](int i, int j, double &h) -> bool
     {
         return ds(i, j, h);
     }));
