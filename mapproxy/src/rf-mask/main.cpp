@@ -15,6 +15,7 @@
 #include "utility/buildsys.hpp"
 #include "utility/openmp.hpp"
 #include "utility/progress.hpp"
+#include "utility/path.hpp"
 #include "service/cmdline.hpp"
 
 #include "imgproc/rastermask/mappedqtree.hpp"
@@ -27,6 +28,8 @@
 #include "vts-libs/vts/tileindex.hpp"
 
 #include "./ogrsupport.hpp"
+
+#include "gdal-drivers/mask.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -41,6 +44,7 @@ public:
         : service::Cmdline("rf-mask", BUILD_TARGET_VERSION)
         , dilate_(10.), segments_(30)
         , tileSizeOrder_(8), workBlock_(5)
+        , generateGdalDatasets_(false)
     {
     }
 
@@ -69,6 +73,7 @@ private:
     int tileSizeOrder_;
     math::Size2 tileSize_;
     int workBlock_;
+    bool generateGdalDatasets_;
 };
 
 void RfMask::configuration(po::options_description &cmdline
@@ -77,7 +82,7 @@ void RfMask::configuration(po::options_description &cmdline
 {
     vr::registryConfiguration(config, vr::defaultPath());
 
-    config.add_options()
+    cmdline.add_options()
         ("dataset", po::value(&dataset_)->required()
          , "Path to ORG dataset to proces.")
         ("output", po::value(&output_)->required()
@@ -106,13 +111,19 @@ void RfMask::configuration(po::options_description &cmdline
          , "Block of tiles to process at once. Specified in binary exponent. "
          "Used blocks size is (1 << workBlock, 1 << workBlock)."
          )
+
+        ("generateGdalDatasets"
+         , po::value(&generateGdalDatasets_)->required()
+         ->default_value(false)->implicit_value(true)
+         , "Generates gdal dataset per reference frame node."
+         )
         ;
 
     pd.add("dataset", 1)
         .add("output", 1)
         ;
 
-    (void) cmdline;
+    (void) config;
 }
 
 void RfMask::configure(const po::variables_map &vars)
@@ -131,6 +142,7 @@ void RfMask::configure(const po::variables_map &vars)
         << "\n\tsegments = " << segments_
         << "\n\ttileSize = " << tileSize_
         << "\n\tworkBlock = " << workBlock_
+        << "\n\tgenerateGdalDatasets = " << generateGdalDatasets_
         << "\n"
         ;
 }
@@ -316,12 +328,13 @@ Tiling::Tiling(const math::Extents2 &rootExtents, int lod
     blocks_.width = ((tileCount_.width + block_.width - 1) / block_.width);
     blocks_.height = ((tileCount_.height + block_.height - 1) / block_.height);
 
-    blockOrigin_ = ul(tiles_);
+    blockOrigin_ = ll(tiles_);
     blockOrigin_(0) >>= block;
     blockOrigin_(1) >>= block;
 
     LOG(info3) << std::fixed << "Input extents: " << extents;
-    LOG(info3) << std::fixed << "Tiled extents: " << extents_;
+    LOG(info3) << std::fixed << "Blocked extents: " << extents_;
+    LOG(info3) << std::fixed << "Origin: " << origin_;
     LOG(info3) << "Tiles: " << tiles_;
     LOG(info3) << "Tile count: " << tileCount_;
     LOG(info3) << "Block origin: " << blockOrigin_;
@@ -332,7 +345,7 @@ math::Extents2 Tiling::blockExtents(const math::Point2i &pos) const
 {
     math::Point2 ul
         (origin_(0) + (blockOrigin_(0) + pos(0)) * blockSize_.width
-         , origin_(1) - (blockOrigin_(1) - pos(1)) * blockSize_.height);
+         , origin_(1) - (blockOrigin_(1) + pos(1)) * blockSize_.height);
     return { ul(0), ul(1) - blockSize_.height
             , ul(0) + blockSize_.width, ul(1) };
 }
@@ -376,7 +389,8 @@ void rasterizeBlock(const math::Point2i &block
     LOG(info2)
         << std::fixed << "Rasterizing block (" << block(0) << ", "
         << block(1) << ") (extents: " << extents
-        << ", tiles: " << tiles << ").";
+        << ", tiles: " << tiles
+        << ", blockId: " << blockId << ").";
 
     // single byte channel dataset in memory without no-data value
     auto ds(geo::GeoDataset::create
@@ -452,8 +466,10 @@ void RfMask::rasterize(imgproc::quadtree::RasterMask &mask
         ((1 << workBlock_) * tileSize_.width
          , (1 << workBlock_) * tileSize_.height);
 
-    Tiling tiling(node.extents(), lod_, workBlock_, ge);
+    // NB: local lod!
+    Tiling tiling(node.extents(), lod_ - node.nodeId().lod, workBlock_, ge);
 
+    // reference tile in grid
     auto reference
         (vts::lowestChild(node.nodeId()
                           , (lod_ - workBlock_ - node.nodeId().lod)));
@@ -521,16 +537,26 @@ int RfMask::run()
             }
         }
 
-        if (leaf) {
-            rasterize(mask, node, inLayer);
+        if (!leaf) { continue; }
+
+        rasterize(mask, node, inLayer);
+
+        if (generateGdalDatasets_) {
+            const auto ext(str(boost::format(".%s.mask") % id));
+            auto path(utility::addExtension(output_, ext));
+            LOG(info4)
+                << "Saving subtree " << id << " (" << node.srs()
+                << ") into file " << path << ".";
+
+            // save generated subtree as gdal dataset
+            gdal_drivers::MaskDataset::create
+                (path, mask, node.extents(), node.srsDef()
+                 , id.lod, id.x, id.y);
         }
     }
 
-    {
-        // write mask into mmaped on-disk format
-        utility::ofstreambuf f(output_.string());
-        imgproc::mappedqtree::RasterMask::write(f, mask);
-        f.close();
+    if (rf.division.nodes.size() == 1) {
+        vts::NodeInfo node(rf);
     }
 
     return EXIT_SUCCESS;
