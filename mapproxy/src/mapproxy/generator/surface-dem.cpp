@@ -29,6 +29,7 @@
 #include "../support/metatile.hpp"
 #include "../support/mesh.hpp"
 #include "../support/srs.hpp"
+#include "../support/geo.hpp"
 #include "../support/grid.hpp"
 
 #include "./surface-dem.hpp"
@@ -252,15 +253,6 @@ const math::Point3* getValue(const Sample *sample)
     return ((sample && sample->valid) ? &sample->value : nullptr);
 }
 
-math::Extents2 extentsPlusHalfPixel(const math::Extents2 &extents
-                                    , const math::Size2 &pixels)
-{
-    auto es(math::size(extents));
-    const math::Size2f px(es.width / pixels.width, es.height / pixels.height);
-    const math::Point2 hpx(px.width / 2, px.height / 2);
-    return math::Extents2(extents.ll - hpx, extents.ur + hpx);
-}
-
 } // namespace
 
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
@@ -297,14 +289,15 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
             (bSize.width * metatileSamplesPerTile + 1
              , bSize.height * metatileSamplesPerTile + 1);
 
-       LOG(info1) << "Processing metatile block ["
-                  << vts::tileId(tileId.lod, block.view.ll)
-                  << ", " << vts::tileId(tileId.lod, block.view.ur)
-                  << "], ancestor: " << block.commonAncestor.nodeId()
-                  << ", tile offset: " << block.offset
-                  << ", size in tiles: " << vts::tileRangesSize(block.view)
-                  << ".";
+        LOG(info1) << "Processing metatile block ["
+                   << vts::tileId(tileId.lod, block.view.ll)
+                   << ", " << vts::tileId(tileId.lod, block.view.ur)
+                   << "], ancestor: " << block.commonAncestor.nodeId()
+                   << ", tile offset: " << block.offset
+                   << ", size in tiles: " << vts::tileRangesSize(block.view)
+                   << ".";
 
+        // warp intentionally by average filter
         auto dem(warper.warp
                  (GdalWarper::RasterRequest
                   (GdalWarper::RasterRequest::Operation::valueMinMax
@@ -608,15 +601,14 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
         return;
     }
 
-    // warp input dataset as a DEM
+    /** warp input dataset as a DEM, with optimized size
+     */
     auto dem(warper.warp
              (GdalWarper::RasterRequest
               (GdalWarper::RasterRequest::Operation::demOptimal
                , dataset_
-               , nodeInfo.srsDef()
-               , extentsPlusHalfPixel
-               (nodeInfo.extents(), { samplesPerSide, samplesPerSide })
-               , math::Size2(samplesPerSide + 1, samplesPerSide + 1))
+               , nodeInfo.srsDef(), nodeInfo.extents()
+               , math::Size2(samplesPerSide, samplesPerSide))
               , sink));
 
     // grab size of computed matrix, minus one to get number of edges
@@ -792,10 +784,8 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
              (GdalWarper::RasterRequest
               (GdalWarper::RasterRequest::Operation::dem
                , dataset_
-               , node.srsDef()
-               , extentsPlusHalfPixel
-               (node.extents(), { ntd.cols - 1, ntd.cols - 1 })
-               , math::Size2(ntd.cols, ntd.rows))
+               , node.srsDef(), node.extents()
+               , math::Size2(ntd.cols - 1, ntd.rows -1))
               , sink));
 
     // TODO: intersect coverage with mask

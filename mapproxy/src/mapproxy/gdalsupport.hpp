@@ -47,12 +47,20 @@ public:
          *       warps dataset as a DEM using Resampling::dem filter
          *       returns single channel double matrix
          *
+         *       warp is done in grid registration (i.e. provided extents are
+         *       inflated by half pixel in each direction and raster size is
+         *       incremented by one.
+         *
          * * demOptimal:
          *       warps dataset as a DEM using Resampling::dem filter
          *       returns single channel double matrix
          *
-         *       result size is optimized, provided parameter is just upper
-         *       limit
+         *       result raster size is computed from scaling factor, provided
+         *       size is upper limit (lower limit is 2x2)
+         *
+         *       warp is done in grid registration (i.e. provided extents are
+         *       inflated by half pixel in each direction and raster size is
+         *       incremented by one.
          *
          * * minMax:
          *       dataset.min by minimum filter

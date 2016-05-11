@@ -21,8 +21,6 @@ cv::Mat* allocateMat(ManagedBuffer &mb
                              , raw + sizeof(cv::Mat));
 }
 
-} // namespace
-
 cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
                    , const std::string &dataset
                    , const geo::SrsDefinition &srs
@@ -203,15 +201,19 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
         auto pxc(tileCircumference(extents, srs, src));
         // 1) divide circumference by 4 to get (average) length of one side
         // 2) use 12 samples per one souce pixel
-        // 3) add 1 to cover grid
         // 4) clip result to requesed size and 2
-        int samples(std::round(12.0 * pxc / 4.0 + 1));
+        int samples(std::round(12.0 * pxc / 4.0));
         return math::Size2
             (std::max(std::min(samples, requestedSize.width), 2)
              , std::max(std::min(samples, requestedSize.height), 2));
     }());
 
-    auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
+    // simulate grid registration
+    math::Size2 gridSize(size.width + 1, size.height + 1);
+    auto gridExtents(extentsPlusHalfPixel(extents, size));
+
+    auto dst(geo::GeoDataset::deriveInMemory
+             (src, srs, gridSize, gridExtents));
 
     geo::GeoDataset::WarpOptions wo;
     wo.dstNodataValue = std::numeric_limits<double>::lowest();
@@ -225,10 +227,12 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
 
     // mask is guaranteed to have single (double) channel
     auto &dstMat(dst.cdata());
-    auto *tile(allocateMat(mb, size, dstMat.type()));
+    auto *tile(allocateMat(mb, gridSize, dstMat.type()));
     dstMat.copyTo(*tile);
     return tile;
 }
+
+} // namespace
 
 cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
               , const GdalWarper::RasterRequest &req)

@@ -52,3 +52,13 @@ double tileCircumference(const math::Extents2 &extents
 
     return length;
 }
+
+
+math::Extents2 extentsPlusHalfPixel(const math::Extents2 &extents
+                                    , const math::Size2 &pixels)
+{
+    auto es(math::size(extents));
+    const math::Size2f px(es.width / pixels.width, es.height / pixels.height);
+    const math::Point2 hpx(px.width / 2, px.height / 2);
+    return math::Extents2(extents.ll - hpx, extents.ur + hpx);
+}
