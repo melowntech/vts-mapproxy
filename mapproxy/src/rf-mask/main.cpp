@@ -544,7 +544,7 @@ int RfMask::run()
         if (generateGdalDatasets_) {
             const auto ext(str(boost::format(".%s.mask") % id));
             auto path(utility::addExtension(output_, ext));
-            LOG(info4)
+            LOG(info3)
                 << "Saving subtree " << id << " (" << node.srs()
                 << ") into file " << path << ".";
 
@@ -555,8 +555,12 @@ int RfMask::run()
         }
     }
 
-    if (rf.division.nodes.size() == 1) {
-        vts::NodeInfo node(rf);
+    {
+        LOG(info3)
+            << "Saving output to " << output_ << ".";
+        utility::ofstreambuf f(output_.string());
+        imgproc::mappedqtree::RasterMask::write(f, mask);
+        f.close();
     }
 
     return EXIT_SUCCESS;
