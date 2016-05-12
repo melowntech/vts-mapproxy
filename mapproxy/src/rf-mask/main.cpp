@@ -267,8 +267,7 @@ public:
             {
                 TIDGuard tid(str(boost::format("Block [%d, %d]") % i % j));
                 math::Point2i block(i, j);
-                op(blockOrigin_ + block
-                   , blockExtents(block), blockTiles(block));
+                op(blockOrigin_ + block, blockExtents(block));
             }
 
             ++progress;
@@ -379,22 +378,24 @@ math::Extents2 geometryExtents(const geo::Geometries &geometries)
 
 void rasterizeBlock(const math::Point2i &block
                     , const math::Extents2 &extents
-                    , const math::Extents2i &tiles
                     , imgproc::quadtree::RasterMask &mask
                     , const vts::TileId &blockId
+                    , const vts::TileId &tileReference
                     , const geo::SrsDefinition &srs
                     , const geo::Geometries &geometries
-                    , const math::Size2 &blockRasterSize)
+                    , const math::Size2 &blockSize
+                    , const math::Size2 &tileSize)
 {
     LOG(info2)
         << std::fixed << "Rasterizing block (" << block(0) << ", "
         << block(1) << ") (extents: " << extents
-        << ", tiles: " << tiles
         << ", blockId: " << blockId << ").";
 
     // single byte channel dataset in memory without no-data value
     auto ds(geo::GeoDataset::create
-            ("", srs, extents, blockRasterSize
+            ("", srs, extents
+             , { blockSize.width * tileSize.width
+                    , blockSize.height * tileSize.height}
              , geo::GeoDataset::Format::coverage
              (geo::GeoDataset::Format::Storage::memory)
              , 0));
@@ -434,9 +435,67 @@ void rasterizeBlock(const math::Point2i &block
         return;
     }
 
-    // partial coverage: get mask from gdal dataset and set it as a subtree
-    // under proper index
-    // NB: generate mask outside of critical section!
+    // fetch mask layer from dataset
+    auto maskLayer(ds.fetchMask());
+    auto tileArea(math::area(tileSize));
+    for (int j(0), je(blockSize.height); j != je; ++j) {
+        for (int i(0), ie(blockSize.width); i != ie; ++i) {
+            // get tile from mask layer
+            cv::Rect rect(i * tileSize.width, j * tileSize.height
+                          , tileSize.height, tileSize.height);
+            cv::Mat tile(maskLayer, rect);
+
+            auto nz(countNonZero(tile));
+            if (!nz) {
+                // empty
+                continue;
+            }
+
+            vts::TileId tileId(tileReference.lod, tileReference.x + i
+                               , tileReference.y + j);
+
+            if (nz == tileArea) {
+                // full
+                UTILITY_OMP(critical)
+                    mask.setQuad(tileId.lod, tileId.x, tileId.y);
+                continue;
+            }
+
+            // partial, need to generate mask
+            const auto *d(tile.data);
+            if (nz > (tileArea / 2)) {
+                // at least half is set, start with full and remove unset pixels
+                imgproc::quadtree::RasterMask m
+                    (tileSize.width, tileSize.height
+                     , imgproc::quadtree::RasterMask::FULL);
+                for (int jj = 0; jj < tileSize.height; ++jj) {
+                    for (int ii = 0; ii < tileSize.width; ++ii) {
+                        if (!*d++) {
+                            m.set(ii, jj, false);
+                        }
+                    }
+                }
+
+                UTILITY_OMP(critical)
+                    mask.setSubtree(tileId.lod, tileId.x, tileId.y, m);
+            } else {
+                // less than half is set, start with empty and set pixels
+                imgproc::quadtree::RasterMask m
+                    (tileSize.width, tileSize.height
+                     , imgproc::quadtree::RasterMask::EMPTY);
+                for (int jj = 0; jj < tileSize.height; ++jj) {
+                    for (int ii = 0; ii < tileSize.width; ++ii) {
+                        if (*d++) {
+                            m.set(ii, jj, true);
+                        }
+                    }
+                }
+
+                UTILITY_OMP(critical)
+                    mask.setSubtree(tileId.lod, tileId.x, tileId.y, m);
+            }
+        }
+    }
     const auto &cm(ds.cmask(true));
     UTILITY_OMP(critical)
         mask.setSubtree(blockId.lod, blockId.x, blockId.y, cm);
@@ -462,9 +521,7 @@ void RfMask::rasterize(imgproc::quadtree::RasterMask &mask
                << " geometries into <" << node.srs() << "> and dilated by "
                << dilate_ << " units.";
 
-    const math::Size2 blockRasterSize
-        ((1 << workBlock_) * tileSize_.width
-         , (1 << workBlock_) * tileSize_.height);
+    const math::Size2 blockSize((1 << workBlock_), (1 << workBlock_));
 
     // NB: local lod!
     Tiling tiling(node.extents(), lod_ - node.nodeId().lod, workBlock_, ge);
@@ -475,14 +532,14 @@ void RfMask::rasterize(imgproc::quadtree::RasterMask &mask
                           , (lod_ - workBlock_ - node.nodeId().lod)));
 
     tiling.forEachBlock([&](const math::Point2i &block
-                            , const math::Extents2 &extents
-                            , const math::Extents2i &tiles)
+                            , const math::Extents2 &extents)
     {
-        rasterizeBlock(block, extents, tiles
-                       , mask, vts::TileId(reference.lod
-                                           , reference.x + block(0)
-                                           , reference.x + block(1))
-                       , srs, geometries, blockRasterSize);
+        vts::TileId blockId(reference.lod, reference.x + block(0)
+                            , reference.x + block(1));
+        auto tileReference(vts::lowestChild(blockId, tileSizeOrder_));
+
+        rasterizeBlock(block, extents, mask, blockId, tileReference
+                       , srs, geometries, blockSize, tileSize_);
     });
 }
 
