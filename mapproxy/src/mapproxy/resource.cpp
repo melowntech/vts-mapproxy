@@ -91,8 +91,9 @@ void parseDefinition(resdef::SurfaceDem &def, const Json::Value &value)
 {
     Json::get(def.dataset, value, "dataset");
     if (value.isMember("mask")) {
-        def.mask = boost::in_place();
-        Json::get(*def.mask, value, "mask");
+        std::string s;
+        Json::get(s, value, "mask");
+        def.mask = s;;
     }
 
     if (value.isMember("textureLayerId")) {
@@ -148,7 +149,7 @@ void buildDefinition(Json::Value &value, const resdef::SurfaceDem &def)
 {
     value["dataset"] = def.dataset;
     if (def.mask) {
-        value["mask"] = *def.mask;
+        value["mask"] = def.mask->string();
     }
 
     if (def.textureLayerId) {

@@ -13,6 +13,7 @@
 #include <boost/multi_index/mem_fun.hpp>
 
 #include "dbglog/dbglog.hpp"
+#include "utility/path.hpp"
 
 #include "../error.hpp"
 #include "../generator.hpp"
@@ -121,6 +122,13 @@ std::string Generator::absoluteDataset(const std::string &path)
     return absolute(path, config_.resourceRoot).string();
 }
 
+boost::filesystem::path
+Generator::absoluteDataset(const boost::filesystem::path &path)
+    const
+{
+    return absolute(path, config_.resourceRoot);
+}
+
 boost::optional<std::string>
 Generator::absoluteDataset(const boost::optional<std::string> &path) const
 {
@@ -134,6 +142,16 @@ std::string Generator
 {
     if (override) { return absoluteDataset(*override); }
     return absoluteDataset(path);
+}
+
+boost::optional<boost::filesystem::path>
+Generator
+::absoluteDatasetRf(const boost::optional<boost::filesystem::path> &path)
+    const
+{
+    if (!path) { return path; }
+    return absoluteDataset
+        (utility::addExtension(*path, "." + referenceFrameId()));
 }
 
 void Generator::checkReady() const

@@ -2,6 +2,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
+#include <boost/logic/tribool_io.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -73,6 +74,7 @@ SurfaceDem::SurfaceDem(const Config &config
     , definition_(this->resource().definition<resdef::SurfaceDem>())
     , dataset_(absoluteDataset(definition_.dataset + "/dem"))
     , index_(resource.referenceFrame->metaBinaryOrder)
+    , maskTree_(absoluteDatasetRf(definition_.mask))
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));
@@ -125,7 +127,7 @@ void SurfaceDem::prepare_impl()
     // clean tile index
     ti = {};
 
-    // generate tile index from lod/tile ranges (and TODO: mask)
+    // generate tile index from lod/tile ranges
     for (auto lod : r.lodRange) {
         // treat whole lod as a huge metatile and process each block
         // independently
@@ -161,11 +163,48 @@ void SurfaceDem::prepare_impl()
                 return 0;
             }
 
-            // intersectin -> merge flags
+            // intersection -> merge flags
             return o | n;
         });
 
         ti.combine(datasetTiles, combiner, r.lodRange);
+    }
+
+    // finally clip everything by mask tree if present
+    if (maskTree_) {
+        const auto treeDepth(maskTree_.depth());
+        for (const auto lod : r.lodRange) {
+            auto filterByMask([&](MaskTree::Node node, boost::tribool value)
+            {
+                // valid -> nothing to done
+                if (value) { return; }
+
+                // update node to match lod grid
+                node.shift(treeDepth - lod);
+
+                vts::TileRange tileRange
+                    (node.x, node.y
+                     , node.x + node.size - 1, node.y + node.size - 1);
+
+                if (!value) {
+                    // invalid: unset whole quad
+                    ti.set(lod, tileRange, TiFlag::none);
+                    return;
+                }
+
+                // partially covered tile: unset watertight node; tells the
+                // implementation that we are removing some values therefore it
+                // is not needed to generate tree for lods that do not exist
+                ti.update(lod, tileRange
+                          , [&](TiFlag::value_type value)
+                {
+                    // remove watertight flag
+                    return (value & ~TiFlag::watertight);
+                }, false);
+            });
+
+            maskTree_.forEachQuad(filterByMask, MaskTree::Constraints(lod));
+        }
     }
 
     // save it all

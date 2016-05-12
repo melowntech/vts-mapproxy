@@ -242,6 +242,7 @@
         "credits": [],
         "definition": {
             "dataset": "aster/ASTGTM2_N50E014",
+            "mask": "masks/cz.mask",
             "geoidGrid": "egm96_15.gtx",
             "textureLayerId": 120
         }

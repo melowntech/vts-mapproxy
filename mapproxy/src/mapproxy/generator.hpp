@@ -94,11 +94,21 @@ protected:
     void mapConfig(std::ostream &os, ResourceRoot root) const;
 
     std::string absoluteDataset(const std::string &path) const;
+    boost::filesystem::path
+    absoluteDataset(const boost::filesystem::path &path) const;
+
     boost::optional<std::string>
     absoluteDataset(const boost::optional<std::string> &path) const;
 
     std::string absoluteDataset(const std::string &path
                                 , const boost::optional<std::string> &override)
+        const;
+
+    /** Same as absoluteDataset but adds reference frame as an extension to the
+     *  filename.
+     */
+    boost::optional<boost::filesystem::path>
+    absoluteDatasetRf(const boost::optional<boost::filesystem::path> &path)
         const;
 
 private:

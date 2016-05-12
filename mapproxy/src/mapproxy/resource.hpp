@@ -157,7 +157,7 @@ struct SurfaceDem {
     static Resource::Generator generator;
 
     std::string dataset;
-    boost::optional<std::string> mask;
+    boost::optional<boost::filesystem::path> mask;
     unsigned int textureLayerId;
     boost::optional<std::string> geoidGrid;
 
