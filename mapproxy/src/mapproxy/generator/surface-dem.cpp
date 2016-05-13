@@ -252,26 +252,15 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
  * This constant has huge impact on dataset stability. Changing this value may
  * break data already served to the outer world.
  */
-const int metatileSamplesPerTile(8);
+const int metatileSamplesPerTileBinLog(3);
 
-bool special(const vr::ReferenceFrame &referenceFrame
-             , const vts::TileId &tileId)
-{
-    if (const auto *node
-        = referenceFrame.find(vts::rfNodeId(tileId), std::nothrow))
-    {
-        switch (node->partitioning.mode) {
-        case vr::PartitioningMode::manual:
-            return true;
-        default:
-            return false;
-        }
-    }
-    return false;
-}
+// real size computed from binary logarithm above
+const int metatileSamplesPerTile(1 << metatileSamplesPerTileBinLog);
 
 typedef vs::Range<double> HeightRange;
 
+/** One sample in metatile.
+ */
 struct Sample {
     bool valid;
     math::Point3 value;
@@ -287,9 +276,19 @@ struct Sample {
     {}
 };
 
+const Sample* getSample(const Sample &sample)
+{
+    return (sample.valid ? &sample : nullptr);
+}
+
 const math::Point3* getValue(const Sample *sample)
 {
     return ((sample && sample->valid) ? &sample->value : nullptr);
+}
+
+const math::Point3* getValue(const Sample &sample)
+{
+    return (sample.valid ? &sample.value : nullptr);
 }
 
 } // namespace
@@ -351,9 +350,6 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
 
         Grid<Sample> grid(gridSize);
 
-        // grid mask
-        const ShiftMask mask(block, metatileSamplesPerTile);
-
         // tile size in grid and in real SDS
         math::Size2f gts
             (es.width / (metatileSamplesPerTile * bSize.width)
@@ -406,13 +402,16 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
             return out;
         });
 
+        // grid mask
+        const ShiftMask rfmask(block, metatileSamplesPerTile);
+
         // fill in grid
         // TODO: use mask
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
-                // work only with non-masked pixels
-                if (!mask(i, j)) { continue; }
+                // work only with pixels not masked by reference frame's mask
+                if (!rfmask(i, j)) { continue; }
 
                 auto value(sample(i, j));
 
@@ -470,7 +469,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                     auto yy(j * metatileSamplesPerTile + jj);
                     for (int ii(0); ii <= metatileSamplesPerTile; ++ii) {
                         auto xx(i * metatileSamplesPerTile + ii);
-                        const auto *p(grid(mask, xx, yy));
+                        const auto *p(getSample(grid(xx, yy)));
 
                         // update tile extents (if sample valid)
                         if (p && p->valid) {
@@ -483,10 +482,10 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                             // compute area of the quad composed of 1 or 2
                             // triangles
                             auto qa(quadArea
-                                    (getValue(grid(mask, xx - 1, yy - 1))
+                                    (getValue(grid(xx - 1, yy - 1))
                                      , getValue(p)
-                                     , getValue(grid(mask, xx - 1, yy))
-                                     , getValue(grid(mask, xx, yy - 1))));
+                                     , getValue(grid(xx - 1, yy))
+                                     , getValue(grid(xx, yy - 1))));
                             area += std::get<0>(qa);
                             triangleCount += std::get<1>(qa);
                         }

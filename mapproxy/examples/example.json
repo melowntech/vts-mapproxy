@@ -246,5 +246,23 @@
             "geoidGrid": "egm96_15.gtx",
             "textureLayerId": 120
         }
+    },
+
+    {
+        "comment": "Mercury ellipsoid",
+        "group": "melown",
+        "id": "mercury",
+        "type": "surface",
+        "driver": "surface-spheroid",
+        "referenceFrames": {
+            "mercury-provisional": {
+                "lodRange": [0, 10],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "textureLayerId": 120
+        }
     }
 ]
