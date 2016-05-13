@@ -1,0 +1,6 @@
+*debhelper*
+*.substvars
+ctt-vts-mapproxy
+ctt-vts-mapproxy-dbg
+*.debhelper
+files
