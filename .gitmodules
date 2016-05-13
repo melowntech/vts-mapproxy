@@ -3,43 +3,43 @@
 	url = ../../lib/dbglog
 [submodule "externals/buildsys/common"]
 	path = externals/buildsys/common
-	url = git@gitlab.citationtech.net:buildsys/common.git
+	url = ../../buildsys/common.git
 [submodule "externals/buildsys/cmake"]
 	path = externals/buildsys/cmake
-	url = git@gitlab.citationtech.net:buildsys/cmake.git
+	url = ../../buildsys/cmake.git
 [submodule "externals/geo"]
 	path = externals/geo
-	url = git@gitlab.citationtech.net:lib/geo.git
+	url = ../../lib/geo.git
 [submodule "externals/geometry"]
 	path = externals/geometry
-	url = git@gitlab.citationtech.net:lib/geometry.git
+	url = ../../lib/geometry.git
 [submodule "externals/half"]
 	path = externals/half
-	url = git@gitlab.citationtech.net:3rdparty/half.git
+	url = ../../3rdparty/half.git
 [submodule "externals/imgproc"]
 	path = externals/imgproc
-	url = git@gitlab.citationtech.net:lib/imgproc.git
+	url = ../../lib/imgproc.git
 [submodule "externals/jsoncpp"]
 	path = externals/jsoncpp
-	url = git@gitlab.citationtech.net:3rdparty/jsoncpp.git
+	url = ../../3rdparty/jsoncpp.git
 [submodule "externals/math"]
 	path = externals/math
-	url = git@gitlab.citationtech.net:lib/math.git
+	url = ../../lib/math.git
 [submodule "externals/service"]
 	path = externals/service
-	url = git@gitlab.citationtech.net:lib/service.git
+	url = ../../lib/service.git
 [submodule "externals/utility"]
 	path = externals/utility
-	url = git@gitlab.citationtech.net:lib/utility.git
+	url = ../../lib/utility.git
 [submodule "externals/vts-libs"]
 	path = externals/vts-libs
-	url = git@gitlab.citationtech.net:vts/vts-libs.git
+	url = ../../vts/vts-libs.git
 [submodule "externals/optics"]
 	path = externals/optics
-	url = git@gitlab.citationtech.net:lib/optics.git
+	url = ../../lib/optics.git
 [submodule "externals/cvision"]
 	path = externals/cvision
-	url = git@gitlab.citationtech.net:lib/cvision.git
+	url = ../../lib/cvision.git
 [submodule "externals/gdal-drivers"]
 	path = externals/gdal-drivers
-	url = git@gitlab.citationtech.net:lib/gdal-drivers.git
+	url = ../../lib/gdal-drivers.git
