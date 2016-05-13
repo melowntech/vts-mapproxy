@@ -8,7 +8,7 @@ PACKAGES=MAPPROXY
 
 # package names
 DEB_PACKAGE_MAPPROXY=ctt-vts-mapproxy
-DEB_PACKAGE_DEBUG=ctt-vts-mapproxy
+DEB_PACKAGE_DEBUG=ctt-vts-mapproxy-dbg
 
 PREFIX=/opt/vts
 
