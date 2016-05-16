@@ -10,16 +10,16 @@ set(rf-mask_SOURCES
   ogrsupport.hpp ogrsupport.cpp
   )
 
-add_executable(rf-mask ${rf-mask_SOURCES})
-target_link_libraries(rf-mask ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(rf-mask ${MODULE_DEFINITIONS})
-buildsys_binary(rf-mask)
-set_target_version(rf-mask ${mapproxy_VERSION})
+add_executable(mapproxy-rf-mask ${rf-mask_SOURCES})
+target_link_libraries(mapproxy-rf-mask ${MODULE_LIBRARIES})
+buildsys_target_compile_definitions(mapproxy-rf-mask ${MODULE_DEFINITIONS})
+buildsys_binary(mapproxy-rf-mask)
+set_target_version(mapproxy-rf-mask ${mapproxy_VERSION})
 
 # ------------------------------------------------------------------------
 # --- installation
 # ------------------------------------------------------------------------
 
 # binaries
-install(TARGETS rf-mask RUNTIME DESTINATION bin
+install(TARGETS mapproxy-rf-mask RUNTIME DESTINATION bin
   COMPONENT main)

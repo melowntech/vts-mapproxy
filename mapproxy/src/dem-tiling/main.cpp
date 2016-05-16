@@ -62,9 +62,9 @@ void DemTiling::configuration(po::options_description &cmdline
                             , po::options_description &config
                             , po::positional_options_description &pd)
 {
-    vr::registryConfiguration(config, vr::defaultPath());
+    vr::registryConfiguration(cmdline, vr::defaultPath());
 
-    config.add_options()
+    cmdline.add_options()
         ("dataset", po::value(&dataset_)->required()
          , "Path to dataset to proces.")
         ("output", po::value(&output_)->required()
@@ -86,7 +86,7 @@ void DemTiling::configuration(po::options_description &cmdline
         .add("output", 1)
         ;
 
-    (void) cmdline;
+    (void) config;
 }
 
 void DemTiling::configure(const po::variables_map &vars)
