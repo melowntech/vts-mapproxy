@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.2) citationtech-wheezy; urgency=low
+
+  * Fixies. 
+
+ -- Tomas Kavan <tomas.kavan@citationtech.net>  Wed, 18 May 2016 13:29:08 +0200
+
 ctt-vts-mapproxy (0.1) citationtech-wheezy; urgency=low
 
   * Initial build.
