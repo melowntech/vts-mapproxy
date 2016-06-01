@@ -146,11 +146,11 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
     auto &maxSrc(cache(dataset + ".max"));
 
     auto dst(geo::GeoDataset::deriveInMemory
-             (src, srs, size, extents, GDT_Float64));
+             (src, srs, size, extents, GDT_Float32));
     auto minDst(geo::GeoDataset::deriveInMemory
-                (minSrc, srs, size, extents, GDT_Float64));
+                (minSrc, srs, size, extents, GDT_Float32));
     auto maxDst(geo::GeoDataset::deriveInMemory
-                (maxSrc, srs, size, extents, GDT_Float64));
+                (maxSrc, srs, size, extents, GDT_Float32));
 
     geo::GeoDataset::WarpOptions wo;
     wo.dstNodataValue = std::numeric_limits<double>::lowest();
@@ -212,8 +212,9 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
     math::Size2 gridSize(size.width + 1, size.height + 1);
     auto gridExtents(extentsPlusHalfPixel(extents, size));
 
+    // warp in floats
     auto dst(geo::GeoDataset::deriveInMemory
-             (src, srs, gridSize, gridExtents));
+             (src, srs, gridSize, gridExtents, ::GDT_Float32));
 
     geo::GeoDataset::WarpOptions wo;
     wo.dstNodataValue = std::numeric_limits<double>::lowest();

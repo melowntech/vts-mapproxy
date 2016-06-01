@@ -613,12 +613,106 @@ private:
     const vts::NodeInfo::CoverageMask &mask_;
 };
 
+template <typename T>
+T applyShift(T value, int shift)
+{
+    if (shift >= 0) {
+        return value << shift;
+    }
+    return value >> -shift;
+}
+
+typedef imgproc::mappedqtree::RasterMask MaskTree;
+
+vts::NodeInfo::CoverageMask
+generateCoverage(const int size, const vts::NodeInfo &nodeInfo
+                 , const MaskTree &maskTree)
+{
+    // get coverage mask from rf node
+    // size is in pixels, we are generating grid -> +1
+    // dilate by one pixel to make mask sane
+    auto coverage(nodeInfo.coverageMask
+                  (vts::NodeInfo::CoverageType::grid
+                   , math::Size2(size + 1, size + 1), 1));
+
+    if (!maskTree) {
+        // no mask to apply
+        return coverage;
+    }
+
+    // number of bits of detail derived from maximal dimension
+    const int detail(int(std::ceil(std::log2(size))));
+    // margin added around mask
+    const int margin(2);
+    // tile size in pixels
+    const int ts((1 << detail) + 2 * margin);
+
+    // rasterize mask tree that it covers current tile and half of neighbours
+    // get get tile ID
+    auto tileId(nodeInfo.nodeId());
+
+    // make detailed tile ID
+    tileId.lod += detail;
+    tileId.x <<= detail;
+    tileId.y <<= detail;
+
+    // apply margin
+    tileId.x -= margin;
+    tileId.y -= margin;
+
+    // clip sampling depth
+    int depth(std::min(int(tileId.lod), int(maskTree.depth())));
+
+    // bit shift; NB: can be negative!
+    int shift(maskTree.depth() - depth);
+
+    // setup constraints
+    MaskTree::Constraints con(depth);
+    con.extents.ll(0) = applyShift(tileId.x, shift);
+    con.extents.ll(1) = applyShift(tileId.y, shift);
+    con.extents.ur(0) = applyShift(tileId.x + ts, shift);
+    con.extents.ur(1) = applyShift(tileId.y + ts, shift);
+
+    cv::Mat tile(ts, ts, CV_8UC1, cv::Scalar(0x00));
+    cv::Rect tileBounds(0, 0, ts, ts);
+
+    cv::Scalar white(0xff);
+    auto draw([&](MaskTree::Node node, boost::tribool value)
+    {
+        // black -> nothing
+        if (!value) { return; }
+
+        // update to match level grid
+        node.shift(shift);
+
+        node.x -= tileId.x;
+        node.y -= tileId.y;
+
+        // construct rectangle and intersect it with bounds
+        cv::Rect r(node.x, node.y, node.size, node.size);
+        auto rr(r & tileBounds);
+        cv::rectangle(tile, rr, white, CV_FILLED, 4);
+    });
+
+    maskTree.forEachQuad(draw, con);
+
+    auto fname(str(boost::format("coverage.%s.png") % nodeInfo.nodeId()));
+    cv::imwrite(fname, tile);
+
+    // TODO: convert rendered mask from pixel space into grid space of coverage
+    // mask; process only valid pixels in current coverage and unset only those
+    // that mam to invalid area in the mask
+
+    // done
+    return coverage;
+}
+
 } // namespace
 
 void SurfaceDem::generateMesh(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fi
-                                   , GdalWarper &warper) const
+                              , const Sink::pointer &sink
+                              , const SurfaceFileInfo &fi
+                              , GdalWarper &warper) const
 {
     const int samplesPerSide(128);
     const int facesPerTile(1500);
@@ -652,11 +746,8 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
     // grab size of computed matrix, minus one to get number of edges
     math::Size2 size(dem->cols - 1, dem->rows - 1);
 
-    auto coverage(nodeInfo.coverageMask
-                  (vts::NodeInfo::CoverageType::grid
-                   , math::Size2(dem->cols, dem->rows), 1));
-
-    // TODO: intersect coverage with mask
+    // generate coverage
+    auto coverage(generateCoverage(size.width, nodeInfo, maskTree_));
 
     DemSampler ds(*dem, coverage);
 
