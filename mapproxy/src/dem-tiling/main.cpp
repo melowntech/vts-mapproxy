@@ -8,6 +8,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
+#include <boost/format.hpp>
 
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
@@ -16,6 +17,7 @@
 #include "service/cmdline.hpp"
 
 #include "geo/geodataset.hpp"
+#include "geo/gdal.hpp"
 
 #include "gdal-drivers/register.hpp"
 
@@ -140,10 +142,13 @@ private:
     void process(const vts::NodeInfo &node, bool upscaling = false);
 
     const geo::GeoDataset& dataset() {
-        if (!gds_.get()) {
-            gds_.reset(new geo::GeoDataset(geo::GeoDataset::open(dataset_)));
+        return gds_[omp_get_thread_num()];
+    }
+
+    void prepareDataset() {
+        for (int i(0), e(omp_get_num_threads()); i < e; ++i) {
+            gds_.emplace_back(geo::GeoDataset::open(dataset_));
         }
-        return *gds_;
     }
 
     const std::string dataset_;
@@ -152,7 +157,7 @@ private:
     int tileSampling_;
     geo::SrsDefinition srs_;
 
-    boost::thread_specific_ptr<geo::GeoDataset> gds_;
+    std::vector<geo::GeoDataset> gds_;
 };
 
 
@@ -164,16 +169,32 @@ TreeWalker::TreeWalker(vts::TileIndex &ti, const std::string &dataset
 {
     UTILITY_OMP(parallel)
         UTILITY_OMP(single)
-        process(root);
+        {
+            prepareDataset();
+            process(root);
+        }
 }
 
 void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 {
+    struct TIDGuard {
+        TIDGuard(const std::string &id)
+            : old(dbglog::thread_id())
+        {
+            dbglog::thread_id(id);
+        }
+        ~TIDGuard() { dbglog::thread_id(old); }
+
+        const std::string old;
+    };
+
     const auto tileId(node.nodeId());
     if (!node.valid() || (tileId.lod > lodRange_.max)) {
         // invalid node
         return;
     }
+
+    TIDGuard tg(str(boost::format("tile:%s") % tileId));
 
     LOG(info2) << "Processing tile " << tileId << ".";
 
@@ -183,11 +204,11 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 
     if (tileId.lod >= lodRange_.min) {
         // warp input dataset into tile
-        const auto& ds(dataset());
+        const auto &ds(dataset());
         auto tileDs(geo::GeoDataset::deriveInMemory
                     (ds, node.srsDef(), size
                      , extentsPlusHalfPixel(node.extents(), samples)
-                     , GDT_Byte));
+                     , GDT_Float32));
         geo::GeoDataset::WarpOptions wo;
 
         // set some output nodata value to force mask generation
@@ -292,5 +313,7 @@ int DemTiling::run()
 int main(int argc, char *argv[])
 {
     gdal_drivers::registerAll();
+    // force VRT not to share undelying datasets
+    geo::Gdal::setOption("VRT_SHARED_SOURCE", 0);
     return DemTiling()(argc, argv);
 }
