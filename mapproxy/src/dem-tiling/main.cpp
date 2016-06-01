@@ -187,7 +187,7 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         auto tileDs(geo::GeoDataset::deriveInMemory
                     (ds, node.srsDef(), size
                      , extentsPlusHalfPixel(node.extents(), samples)
-                     , GDT_Float64));
+                     , GDT_Byte));
         geo::GeoDataset::WarpOptions wo;
 
         // set some output nodata value to force mask generation

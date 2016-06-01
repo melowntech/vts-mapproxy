@@ -113,9 +113,9 @@ cv::Mat* warpMinMax(DatasetCache &cache, ManagedBuffer &mb
     auto &maxSrc(cache(dataset + ".max"));
 
     auto minDst(geo::GeoDataset::deriveInMemory
-                (minSrc, srs, size, extents, GDT_Float64));
+                (minSrc, srs, size, extents, GDT_Float32));
     auto maxDst(geo::GeoDataset::deriveInMemory
-                (maxSrc, srs, size, extents, GDT_Float64));
+                (maxSrc, srs, size, extents, GDT_Float32));
 
     geo::GeoDataset::WarpOptions wo;
     wo.dstNodataValue = std::numeric_limits<double>::lowest();
