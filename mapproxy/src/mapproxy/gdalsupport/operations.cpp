@@ -89,7 +89,8 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
     // generate metatile from mask dataset
     auto &srcMask(cache(dataset));
     auto dstMask(geo::GeoDataset::deriveInMemory
-                 (srcMask, srs, size, extents));
+                 (srcMask, srs, size, extents, boost::none
+                  , geo::GeoDataset::NodataValue()));
 
     geo::GeoDataset::WarpOptions wo;
     wo.srcNodataValue = geo::GeoDataset::NodataValue();
@@ -103,6 +104,8 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
     return tile;
 }
 
+const auto ForcedNodata(geo::GeoDataset::NodataValue(-1e10f));
+
 cv::Mat* warpMinMax(DatasetCache &cache, ManagedBuffer &mb
                          , const std::string &dataset
                          , const geo::SrsDefinition &srs
@@ -113,14 +116,12 @@ cv::Mat* warpMinMax(DatasetCache &cache, ManagedBuffer &mb
     auto &maxSrc(cache(dataset + ".max"));
 
     auto minDst(geo::GeoDataset::deriveInMemory
-                (minSrc, srs, size, extents, GDT_Float32));
+                (minSrc, srs, size, extents, GDT_Float32, ForcedNodata));
     auto maxDst(geo::GeoDataset::deriveInMemory
-                (maxSrc, srs, size, extents, GDT_Float32));
+                (maxSrc, srs, size, extents, GDT_Float32, ForcedNodata));
 
-    geo::GeoDataset::WarpOptions wo;
-    wo.dstNodataValue = std::numeric_limits<double>::lowest();
-    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum, wo);
-    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum, wo);
+    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum);
+    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum);
 
     // merge first channel from each matrix into one 3-channel matrix
     const auto &dmin(minDst.cdata());
@@ -146,31 +147,15 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
     auto &maxSrc(cache(dataset + ".max"));
 
     auto dst(geo::GeoDataset::deriveInMemory
-             (src, srs, size, extents, GDT_Float32));
+             (src, srs, size, extents, GDT_Float32, ForcedNodata));
     auto minDst(geo::GeoDataset::deriveInMemory
-                (minSrc, srs, size, extents, GDT_Float32));
+                (minSrc, srs, size, extents, GDT_Float32, ForcedNodata));
     auto maxDst(geo::GeoDataset::deriveInMemory
-                (maxSrc, srs, size, extents, GDT_Float32));
+                (maxSrc, srs, size, extents, GDT_Float32, ForcedNodata));
 
-    geo::GeoDataset::WarpOptions wo;
-    wo.dstNodataValue = std::numeric_limits<double>::lowest();
-    auto wri(src.warpInto(dst, resampling, wo));
-    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum, wo);
-    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum, wo);
-
-    // std::string ovr("None");
-    // if (wri.overview) {
-    //     ovr = boost::lexical_cast<std::string>(*wri.overview);
-    // }
-    // LOG(info4)
-    //     << std::fixed
-    //     << "gdalwarp -ts " << size.width << " " << size.height
-    //     << " -te " << extents.ll(0) << " "  << extents.ll(1)
-    //     << " " << extents.ur(0) << " " << extents.ur(1)
-    //     << " -r " << wri.resampling
-    //     << " -dstnodata " << **wo.dstNodataValue
-    //     << " -ovr " << ovr
-    //     << " " << dataset;
+    auto wri(src.warpInto(dst, resampling));
+    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum);
+    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum);
 
     // merge first channel from each matrix into one 3-channel matrix
     const auto &d(dst.cdata());
@@ -214,11 +199,10 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
 
     // warp in floats
     auto dst(geo::GeoDataset::deriveInMemory
-             (src, srs, gridSize, gridExtents, ::GDT_Float32));
+             (src, srs, gridSize, gridExtents, ::GDT_Float32
+              , ForcedNodata));
 
-    geo::GeoDataset::WarpOptions wo;
-    wo.dstNodataValue = std::numeric_limits<double>::lowest();
-    auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem, wo));
+    auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem));
     LOG(info1) << "Warp result: scale=" << wri.scale
                << ", resampling=" << wri.resampling << ".";
 

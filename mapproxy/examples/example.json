@@ -249,6 +249,27 @@
     },
 
     {
+        "comment": "Aster 1 degree tile at 50 N/15 E",
+        "group": "melown",
+        "id": "ASTGTM-N50E014.16",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "webmerc-projected": {
+                "lodRange": [9,16],
+                "tileRange": [[275, 171], [278, 174]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "aster/ASTGTM2_N50E014",
+            "mask": "masks/cz.mask",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
         "comment": "Mercury ellipsoid",
         "group": "melown",
         "id": "mercury",
@@ -262,6 +283,48 @@
         },
         "credits": [],
         "definition": {
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Mercury Messenger DEM 665m/px",
+        "group": "melown",
+        "id": "msgr-dem-665",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "mercury-provisional": {
+                "lodRange": [2,13],
+                "tileRange": [[0,0],[3,3]]
+            }
+        },
+        "credits": ["usgs-asc"],
+        "definition": {
+            "dataset": "msgr-dem-665",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Matterhorn (SRTM version)",
+        "group": "melown",
+        "id": "matterhorn-srtm",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "webmerc-projected": {
+                "lodRange": [2,20],
+                "tileRange": [[0,0],[1,1]]
+            }
+            , "melown2015": {
+                "lodRange": [2,21],
+                "tileRange": [[0,0],[1,1]]
+            }
+        },
+        "credits": ["usgs-asc"],
+        "definition": {
+            "dataset": "matterhorn",
             "textureLayerId": 120
         }
     }

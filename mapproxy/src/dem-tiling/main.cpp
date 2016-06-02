@@ -203,12 +203,6 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                     , (TiFlag::mesh | TiFlag::watertight));
         }
 
-        // stop descent here
-        LOG(info3)
-            << "Processed tile " << tileId
-            << " (extents: " << std::fixed << node.extents()
-            << ", srs: " << node.srs()
-            << ") [fake watertight subtree in invalid part of a tree].";
         return;
     });
 
@@ -221,6 +215,12 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         // set full subtree
         if (tileId.lod >= lodRange_.min) {
             fullSubtree();
+            // stop descent here
+            LOG(info3)
+                << "Processed tile " << tileId
+                << " (extents: " << std::fixed << node.extents()
+                << ", srs: " << node.srs()
+                << ") [fake watertight subtree in invalid part of a tree].";
         }
         return;
     }
@@ -236,16 +236,14 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
     if (tileId.lod >= lodRange_.min) {
         // warp input dataset into tile
         const auto &ds(dataset());
+        // set some output nodata value to force mask generation
         auto tileDs(geo::GeoDataset::deriveInMemory
                     (ds, node.srsDef(), size
                      , extentsPlusHalfPixel(node.extents(), samples)
-                     , GDT_Float32));
-        geo::GeoDataset::WarpOptions wo;
+                     , GDT_Float32
+                     , geo::GeoDataset::NodataValue(-1e6)));
 
-        // set some output nodata value to force mask generation
-        wo.dstNodataValue = std::numeric_limits<double>::lowest();
-        auto wri(ds.warpInto(tileDs, geo::GeoDataset::Resampling::cubicspline
-                             , wo));
+        auto wri(ds.warpInto(tileDs, geo::GeoDataset::Resampling::dem));
 
         TiFlag::value_type baseFlags(TiFlag::mesh);
         if (!upscaling) {
@@ -253,10 +251,8 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         }
 
         // grab mask of warped dataset
-        const auto mask(tileDs.cmask());
-        switch (node.checkMask
-                (tileDs.cmask(), vts::NodeInfo::CoverageType::grid, 1))
-        {
+        const auto &mask(tileDs.cmask());
+        switch (node.checkMask(mask, vts::NodeInfo::CoverageType::grid, 1)) {
         case vts::NodeInfo::CoveredArea::whole: {
             // fully covered by dataset and by reference frame definition
 
