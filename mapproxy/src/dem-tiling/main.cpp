@@ -189,8 +189,39 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
     };
 
     const auto tileId(node.nodeId());
-    if (!node.valid() || (tileId.lod > lodRange_.max)) {
-        // invalid node
+    if ((tileId.lod > lodRange_.max)) {
+        // outside of configured area
+        return;
+    }
+
+    auto fullSubtree([&]()
+    {
+        UTILITY_OMP(critical)
+        {
+            ti_.set(vts::LodRange(tileId.lod, lodRange_.max)
+                    , vts::tileRange(tileId)
+                    , (TiFlag::mesh | TiFlag::watertight));
+        }
+
+        // stop descent here
+        LOG(info3)
+            << "Processed tile " << tileId
+            << " (extents: " << std::fixed << node.extents()
+            << ", srs: " << node.srs()
+            << ") [fake watertight subtree in invalid part of a tree].";
+        return;
+    });
+
+    if (!node.valid()) {
+        // Node is invalid but we can safely say that we have watertight mesh
+        // here and down to the maximum LOD to save space in tile index.
+        //
+        // It is a lie but it will not hurt anyone.
+
+        // set full subtree
+        if (tileId.lod >= lodRange_.min) {
+            fullSubtree();
+        }
         return;
     }
 
@@ -223,19 +254,17 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 
         // grab mask of warped dataset
         const auto mask(tileDs.cmask());
-        if (mask.full() && !node.partial()) {
+        switch (node.checkMask
+                (tileDs.cmask(), vts::NodeInfo::CoverageType::grid, 1))
+        {
+        case vts::NodeInfo::CoveredArea::whole: {
             // fully covered by dataset and by reference frame definition
 
             if (!wri.overview) {
                 // warped using original dataset, no holes -> always without
                 // holes -> set whole subtree to watertight mesh
 
-                UTILITY_OMP(critical)
-                {
-                    ti_.set(vts::LodRange(tileId.lod, lodRange_.max)
-                            , vts::tileRange(tileId)
-                            , (TiFlag::mesh | TiFlag::watertight));
-                }
+                fullSubtree();
 
                 // stop descent here
                 LOG(info3)
@@ -253,7 +282,10 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 << " (extents: " << std::fixed << node.extents()
                 << ", srs: " << node.srs()
                 << ") [watertight].";
-        } else if (!mask.empty()) {
+            break;
+        }
+
+        case vts::NodeInfo::CoveredArea::some: {
             // partially covered
             UTILITY_OMP(critical)
                 ti_.set(tileId, baseFlags);
@@ -262,7 +294,10 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 << " (extents: " << std::fixed << node.extents()
                 << ", srs: " << node.srs()
                 << ") [partial].";
-        } else {
+            break;
+        }
+
+        case vts::NodeInfo::CoveredArea::none: {
             // empty -> no children
             LOG(info3)
                 << "Processed tile " << tileId
@@ -270,6 +305,7 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 << ", srs: " << node.srs()
                 << ") [empty].";
             return;
+        }
         }
 
         // update upscaling flag

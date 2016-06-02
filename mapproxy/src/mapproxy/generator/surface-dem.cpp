@@ -172,6 +172,8 @@ void SurfaceDem::prepare_impl()
 
     // finally clip everything by mask tree if present
     if (maskTree_) {
+        /** TODO: partial nodes should be handled differently
+         */
         const auto treeDepth(maskTree_.depth());
         for (const auto lod : r.lodRange) {
             auto filterByMask([&](MaskTree::Node node, boost::tribool value)
