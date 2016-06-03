@@ -46,19 +46,20 @@ MetatileBlock::list metatileBlocks(const Resource &resource
 class ShiftMask {
 public:
     ShiftMask(const MetatileBlock &block, int samplesPerTile)
-        : offset_(block.offset)
-        , size_((1 << offset_.lod) * samplesPerTile + 1
-                , (1 << offset_.lod) * samplesPerTile + 1)
+        : offset_(block.offset.x * samplesPerTile
+                  , block.offset.y * samplesPerTile)
+        , size_((1 << block.offset.lod) * samplesPerTile + 1
+                , (1 << block.offset.lod) * samplesPerTile + 1)
         , mask_(block.commonAncestor.coverageMask
                 (vts::NodeInfo::CoverageType::grid, size_, 1))
     {}
 
     bool operator()(int x, int y) const {
-        return mask_.get(x + offset_.x, y + offset_.y);
+        return mask_.get(x + offset_(0), y + offset_(1));
     }
 
 private:
-    const vts::TileId offset_;
+    const math::Point2i offset_;
     const math::Size2 size_;
     const vts::NodeInfo::CoverageMask mask_;
 };

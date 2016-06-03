@@ -301,12 +301,12 @@ inline bool validSample(double value)
 class ValueMinMaxSampler {
 public:
     ValueMinMaxSampler(const GdalWarper::Raster &dem)
-        : dem_(*dem)
+        : dem_(dem)
     {}
 
     boost::optional<cv::Vec3d> operator()(int i, int j) const {
         // first, try exact value
-        const auto &v(dem_.at<cv::Vec3d>(j, i));
+        const auto &v(dem_->at<cv::Vec3d>(j, i));
         if (validSample(v[0])) { return v; }
 
         // output vector and count of valid samples
@@ -323,10 +323,11 @@ public:
 
                 auto x(i + ii), y(j + jj);
                 // check bounds
-                if ((x < 0) || (x >= dem_.cols) || (y < 0) || (y >= dem_.rows))
+                if ((x < 0) || (x >= dem_->cols)
+                    || (y < 0) || (y >= dem_->rows))
                     { continue; }
 
-                const auto &v(dem_.at<cv::Vec3d>(y, x));
+                const auto &v(dem_->at<cv::Vec3d>(y, x));
                 if (validSample(v[0])) {
                     out[0] += v[0];
                     out[1] = std::min(out[1], v[1]);
@@ -343,7 +344,7 @@ public:
     }
 
 private:
-    const cv::Mat dem_;
+    GdalWarper::Raster dem_;
 };
 
 } // namespace
@@ -400,7 +401,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                    , extentsPlusHalfPixel
                    (extents, { gridSize.width - 1, gridSize.height - 1 })
                    , gridSize
-                   , geo::GeoDataset::Resampling::average)
+                   , geo::GeoDataset::Resampling::dem)
                   , sink));
 
         Grid<Sample> grid(gridSize);
@@ -440,7 +441,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                     conv(math::Point3(x, y, (*value)[0]))
                     , conv(math::Point3(x, y, (*value)[1]))
                     , conv(math::Point3(x, y, (*value)[2]))
-                    // use only z-component from converted point
+                    // use only z-component from converted points
                     , HeightRange
                     (navConv(math::Point3(x, y, (*value)[1]))(2)
                      , navConv(math::Point3(x, y, (*value)[2]))(2))
@@ -475,10 +476,11 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                     auto yy(j * metatileSamplesPerTile + jj);
                     for (int ii(0); ii <= metatileSamplesPerTile; ++ii) {
                         auto xx(i * metatileSamplesPerTile + ii);
+
                         const auto *p(getSample(grid(xx, yy)));
 
                         // update tile extents (if sample valid)
-                        if (p && p->valid) {
+                        if (p) {
                             // update by both minimum and maximum
                             math::update(te, p->min);
                             math::update(te, p->max);
@@ -772,16 +774,19 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
     addSkirt(lm, nodeInfo);
 
     // generate VTS mesh
-    vts::Mesh mesh;
-    auto &sm(addSubMesh(mesh, lm, nodeInfo, definition_.geoidGrid));
-    if (definition_.textureLayerId) {
-        sm.textureLayer = definition_.textureLayerId;
-    }
+    vts::Mesh mesh(false);
+    if (!lm.vertices.empty()) {
+        // local mesh is valid -> add as a submesh into output mesh
+        auto &sm(addSubMesh(mesh, lm, nodeInfo, definition_.geoidGrid));
+        if (definition_.textureLayerId) {
+            sm.textureLayer = definition_.textureLayerId;
+        }
 
-    if (fi.raw) {
-        // we are returning full mesh file -> generate coverage mask
-        meshCoverageMask
-            (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
+        if (fi.raw) {
+            // we are returning full mesh file -> generate coverage mask
+            meshCoverageMask
+                (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
+        }
     }
 
     // write mesh (only mesh!) to stream
