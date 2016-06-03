@@ -293,6 +293,59 @@ const math::Point3* getValue(const Sample &sample)
     return (sample.valid ? &sample.value : nullptr);
 }
 
+inline bool validSample(double value)
+{
+    return (value >= -1e6);
+}
+
+class ValueMinMaxSampler {
+public:
+    ValueMinMaxSampler(const GdalWarper::Raster &dem)
+        : dem_(*dem)
+    {}
+
+    boost::optional<cv::Vec3d> operator()(int i, int j) const {
+        // first, try exact value
+        const auto &v(dem_.at<cv::Vec3d>(j, i));
+        if (validSample(v[0])) { return v; }
+
+        // output vector and count of valid samples
+        boost::optional<cv::Vec3d> outFull;
+        outFull = boost::in_place(0, std::numeric_limits<double>::max()
+                                  , std::numeric_limits<double>::lowest());
+        auto &out(*outFull);
+        int count(0);
+
+        for (int jj(-1); jj <= +1; ++jj) {
+            for (int ii(-1); ii <= +1; ++ii) {
+                // ignore current point
+                if (!(ii || jj)) { continue; }
+
+                auto x(i + ii), y(j + jj);
+                // check bounds
+                if ((x < 0) || (x >= dem_.cols) || (y < 0) || (y >= dem_.rows))
+                    { continue; }
+
+                const auto &v(dem_.at<cv::Vec3d>(y, x));
+                if (validSample(v[0])) {
+                    out[0] += v[0];
+                    out[1] = std::min(out[1], v[1]);
+                    out[2] = std::max(out[2], v[2]);
+                    ++count;
+                }
+            }
+        }
+
+        if (!count) { return boost::none; }
+
+        out[0] /= count;
+        return out;
+    }
+
+private:
+    const cv::Mat dem_;
+};
+
 } // namespace
 
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
@@ -337,7 +390,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                    << ", size in tiles: " << vts::tileRangesSize(block.view)
                    << ".";
 
-        // warp intentionally by average filter
+        // warp value intentionally by average filter
         auto dem(warper.warp
                  (GdalWarper::RasterRequest
                   (GdalWarper::RasterRequest::Operation::valueMinMax
@@ -362,84 +415,35 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         auto conv(sds2phys(block.commonAncestor, definition_.geoidGrid));
         auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
 
-        auto sample([&](int i, int j) -> cv::Vec3d
-        {
-            // first, try exact value
-            const auto &v(dem->at<cv::Vec3d>(j, i));
-            if (v[0] >= -1e6) { return v; }
-
-            // output vector and count of valid samples
-            cv::Vec3d out(0, std::numeric_limits<double>::max()
-                          , std::numeric_limits<double>::lowest());
-            int count(0);
-
-            for (int jj(-1); jj <= +1; ++jj) {
-                for (int ii(-1); ii <= +1; ++ii) {
-                    // ignore current point
-                    if (!(ii || jj)) { continue; }
-
-                    auto x(i + ii), y(j + jj);
-                    // check bounds
-                    if ((x < 0) || (x >= dem->cols)
-                        || (y < 0) || (y >= dem->rows))
-                        { continue; }
-
-                    const auto &v(dem->at<cv::Vec3d>(y, x));
-                    if (v[0] >= -1e6) {
-                        out[0] += v[0];
-                        out[1] = std::min(out[1], v[1]);
-                        out[2] = std::max(out[2], v[2]);
-                        ++count;
-                    }
-                }
-            }
-
-            if (!count) {
-                return { std::numeric_limits<double>::lowest()
-                        , std::numeric_limits<double>::lowest()
-                        , std::numeric_limits<double>::lowest() };
-            }
-
-            out[0] /= count;
-            return out;
-        });
-
         // grid mask
         const ShiftMask rfmask(block, metatileSamplesPerTile);
 
         // fill in grid
         // TODO: use mask
+        ValueMinMaxSampler vmm(dem);
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
                 // work only with pixels not masked by reference frame's mask
                 if (!rfmask(i, j)) { continue; }
 
-                auto value(sample(i, j));
+                auto value(vmm(i, j));
 
                 // skip out invalid data
-                if (value[0] < -1e6) { continue; }
+                if (!value) { continue; }
 
                 auto x(extents.ll(0) + i * gts.width);
-
-                if ((value[0] < value[1]) || (value[0] > value[2])) {
-                    LOG(info4) << "Out of bounds ("
-                               << i << ", " << j
-                               << "): " << value[1]
-                               << " - " << value[0]
-                               << " - " << value[2] << ".";
-                }
-
 
                 // compute all 3 world points (value, min, max) and height range
                 // in navigation space
                 grid(i, j) = {
-                    conv(math::Point3(x, y, value[0]))
-                    , conv(math::Point3(x, y, value[1]))
-                    , conv(math::Point3(x, y, value[2]))
+                    conv(math::Point3(x, y, (*value)[0]))
+                    , conv(math::Point3(x, y, (*value)[1]))
+                    , conv(math::Point3(x, y, (*value)[2]))
                     // use only z-component from converted point
-                    , HeightRange(navConv(math::Point3(x, y, value[1]))(2)
-                                  , navConv(math::Point3(x, y, value[2]))(2))
+                    , HeightRange
+                    (navConv(math::Point3(x, y, (*value)[1]))(2)
+                     , navConv(math::Point3(x, y, (*value)[2]))(2))
                 };
             }
         }
@@ -576,7 +580,7 @@ public:
         if (!mask_.get(i, j)) { return false; }
 
         h = dem_.at<double>(j, i);
-        if (h >= -1e6) { return true; }
+        if (validSample(h)) { return true; }
 
         h = 0;
         int count(0);
@@ -597,7 +601,7 @@ public:
 
                 // sample pixel and use if valid
                 auto v(dem_.at<double>(y, x));
-                if (v < -1e6) { continue; }
+                if (!validSample(v)) { continue; }
 
                 h += v;
                 ++count;
@@ -827,62 +831,27 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                              , math::Size2(metatileSamplesPerTile + 1
                                            , metatileSamplesPerTile + 1), 1));
 
-        // warp min/max from dataset
+        // warp value/min/max from dataset the same way as is done in metatile
+        // calculation (we need to get the same value range)
         auto dem(warper.warp
                  (GdalWarper::RasterRequest
-                  (GdalWarper::RasterRequest::Operation::minMax
+                  (GdalWarper::RasterRequest::Operation::valueMinMax
                    , dataset_, node.srsDef()
                    // add half pixel to warp in grid coordinates
                    , extentsPlusHalfPixel
                    (extents, { metatileSamplesPerTile + 1
                            , metatileSamplesPerTile + 1 })
-                   , { metatileSamplesPerTile, metatileSamplesPerTile })
+                   , { metatileSamplesPerTile, metatileSamplesPerTile }
+                   , geo::GeoDataset::Resampling::average)
                   , sink));
-
-        auto sample([&](int i, int j) -> cv::Vec2d
-        {
-            // first, try exact value
-            const auto &v(dem->at<cv::Vec2d>(j, i));
-            if (v[0] >= -1e6) { return v; }
-
-            // output vector and count of valid samples
-            cv::Vec2d out(std::numeric_limits<double>::max()
-                          , std::numeric_limits<double>::lowest());
-            int count(0);
-
-            for (int jj(-1); jj <= +1; ++jj) {
-                for (int ii(-1); ii <= +1; ++ii) {
-                    // ignore current point
-                    if (!(ii || jj)) { continue; }
-
-                    auto x(i + ii), y(j + jj);
-                    // check bounds
-                    if ((x < 0) || (x >= dem->cols)
-                        || (y < 0) || (y >= dem->rows))
-                        { continue; }
-
-                    const auto &v(dem->at<cv::Vec2d>(y, x));
-                    if (v[0] >= -1e6) {
-                        out[0] = std::min(out[0], v[0]);
-                        out[1] = std::max(out[1], v[1]);
-                        ++count;
-                    }
-                }
-            }
-
-            if (!count) {
-                return { std::numeric_limits<double>::lowest()
-                        , std::numeric_limits<double>::lowest() };
-            }
-
-            return out;
-        });
 
         // TODO: combine with mask
         // grid pixel size
         math::Size2f gpx
             (ts.width / (metatileSamplesPerTile + 1)
              , ts.height / (metatileSamplesPerTile + 1));
+
+        ValueMinMaxSampler vmm(dem);
         for (int j(0); j <= metatileSamplesPerTile; ++j) {
             auto y(extents.ll(1) + j * gpx.height);
             for (int i(0); i <= metatileSamplesPerTile; ++i) {
@@ -890,13 +859,13 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                 if (!coverage.get(i, j)) { continue; }
 
                 // get sample and check for valid value
-                auto v(sample(i, j));
-                if (v[0] < -1e6) { continue; }
+                auto v(vmm(i, j));
+                if (!v) { continue; }
 
                 // update range with height of converted points
                 auto x(extents.ll(0) + i * gpx.width);
-                update(heightRange, navConv(math::Point3(x, y, v[0]))(2));
-                update(heightRange, navConv(math::Point3(x, y, v[1]))(2));
+                update(heightRange, navConv(math::Point3(x, y, (*v)[1]))(2));
+                update(heightRange, navConv(math::Point3(x, y, (*v)[2]))(2));
             }
         }
     }

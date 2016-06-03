@@ -106,34 +106,6 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
 
 const auto ForcedNodata(geo::GeoDataset::NodataValue(-1e10f));
 
-cv::Mat* warpMinMax(DatasetCache &cache, ManagedBuffer &mb
-                         , const std::string &dataset
-                         , const geo::SrsDefinition &srs
-                         , const math::Extents2 &extents
-                         , const math::Size2 &size)
-{
-    auto &minSrc(cache(dataset + ".min"));
-    auto &maxSrc(cache(dataset + ".max"));
-
-    auto minDst(geo::GeoDataset::deriveInMemory
-                (minSrc, srs, size, extents, GDT_Float32, ForcedNodata));
-    auto maxDst(geo::GeoDataset::deriveInMemory
-                (maxSrc, srs, size, extents, GDT_Float32, ForcedNodata));
-
-    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum);
-    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum);
-
-    // merge first channel from each matrix into one 3-channel matrix
-    const auto &dmin(minDst.cdata());
-    const auto &dmax(maxDst.cdata());
-    const cv::Mat mats[] = { dmin, dmax };
-    int pairs[] = { 0, 0, dmin.channels(), 1 };
-
-    auto *tile(allocateMat(mb, size, CV_64FC2));
-    cv::mixChannels(mats, 2, tile, 1, pairs, 2);
-    return tile;
-}
-
 cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
                          , const std::string &dataset
                          , const geo::SrsDefinition &srs
@@ -157,15 +129,49 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
     minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum);
     maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum);
 
-    // merge first channel from each matrix into one 3-channel matrix
-    const auto &d(dst.cdata());
-    const auto &dmin(minDst.cdata());
-    const auto &dmax(maxDst.cdata());
-    const cv::Mat mats[] = { d, dmin, dmax };
-    int pairs[] = { 0, 0, d.channels(), 1, d.channels() + dmin.channels(), 2 };
-
+    // combine data
     auto *tile(allocateMat(mb, size, CV_64FC3));
-    cv::mixChannels(mats, 3, tile, 1, pairs, 3);
+    *tile = cv::Scalar(*ForcedNodata, *ForcedNodata, *ForcedNodata);
+
+    {
+        // TODO: use masks (get them as a byte matrices)
+        const auto &d(dst.cdata());
+        const auto &dmin(minDst.cdata());
+        const auto &dmax(maxDst.cdata());
+
+        auto id(d.begin<double>());
+        auto idmin(dmin.begin<double>());
+        auto idmax(dmax.begin<double>());
+
+        for (auto itile(tile->begin<cv::Vec3d>())
+                 , etile(tile->end<cv::Vec3d>());
+             itile != etile; ++itile, ++id, ++idmin, ++idmax)
+        {
+            // skil invalid value
+            auto value(*id);
+            if (value == ForcedNodata) { continue; }
+
+            auto &sample(*itile);
+            sample[0] = value;
+
+            if ((*idmin == ForcedNodata) || (*idmin > value)) {
+                // clone value into minimum if minimum is invalid or above value
+                sample[1] = value;
+            } else {
+                // copy min
+                sample[1] = *idmin;
+            }
+
+            if ((*idmax == ForcedNodata) || (*idmax < value)) {
+                // clone value into maximum if maximum is invalid or below value
+                sample[2] = value;
+            } else {
+                // copy max
+                sample[2] = *idmax;
+            }
+        }
+    }
+
     return tile;
 }
 
@@ -206,10 +212,6 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
     LOG(info1) << "Warp result: scale=" << wri.scale
                << ", resampling=" << wri.resampling << ".";
 
-    if (dst.cmask().empty()) {
-        throw EmptyImage("No valid data.");
-    }
-
     // mask is guaranteed to have single (double) channel
     auto &dstMat(dst.cdata());
     auto *tile(allocateMat(mb, gridSize, dstMat.type()));
@@ -244,10 +246,6 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
         return warpDem
             (cache, mb, req.dataset, req.srs, req.extents, req.size
              , (req.operation == Operation::demOptimal));
-
-    case Operation::minMax:
-        return warpMinMax
-            (cache, mb, req.dataset, req.srs, req.extents, req.size);
 
     case Operation::valueMinMax:
         return warpValueMinMax

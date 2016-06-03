@@ -315,7 +315,7 @@
         "referenceFrames": {
             "webmerc-projected": {
                 "lodRange": [2,20],
-                "tileRange": [[0,0],[1,1]]
+                "tileRange": [[0,0],[3,3]]
             }
             , "melown2015": {
                 "lodRange": [2,21],

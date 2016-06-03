@@ -62,22 +62,15 @@ public:
          *       inflated by half pixel in each direction and raster size is
          *       incremented by one.
          *
-         * * minMax:
-         *       dataset.min by minimum filter
-         *       and dataset.max by maximum filter
-         *
-         *       returns 2-channel double matrix with minimum value and maximum
-         *       value in each pixel
-         *
          * * valueMinMax:
          *       warps dataset using given filter, dataset.min by minimum filter
          *       and dataset.max by maximum filter
-
+         *
          *       returns 3-channel double matrix with current value, minimum
          *       value and maximum value in each pixel
          */
         enum class Operation {
-            image, mask, detailMask, dem, demOptimal, minMax, valueMinMax
+            image, mask, detailMask, dem, demOptimal, valueMinMax
         };
 
         Operation operation;
