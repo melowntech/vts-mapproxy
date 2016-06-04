@@ -172,6 +172,8 @@ void SurfaceDem::prepare_impl()
 
     // finally clip everything by mask tree if present
     if (maskTree_) {
+        /** TODO: partial nodes should be handled differently
+         */
         const auto treeDepth(maskTree_.depth());
         for (const auto lod : r.lodRange) {
             auto filterByMask([&](MaskTree::Node node, boost::tribool value)
@@ -291,6 +293,60 @@ const math::Point3* getValue(const Sample &sample)
     return (sample.valid ? &sample.value : nullptr);
 }
 
+inline bool validSample(double value)
+{
+    return (value >= -1e6);
+}
+
+class ValueMinMaxSampler {
+public:
+    ValueMinMaxSampler(const GdalWarper::Raster &dem)
+        : dem_(dem)
+    {}
+
+    boost::optional<cv::Vec3d> operator()(int i, int j) const {
+        // first, try exact value
+        const auto &v(dem_->at<cv::Vec3d>(j, i));
+        if (validSample(v[0])) { return v; }
+
+        // output vector and count of valid samples
+        boost::optional<cv::Vec3d> outFull;
+        outFull = boost::in_place(0, std::numeric_limits<double>::max()
+                                  , std::numeric_limits<double>::lowest());
+        auto &out(*outFull);
+        int count(0);
+
+        for (int jj(-1); jj <= +1; ++jj) {
+            for (int ii(-1); ii <= +1; ++ii) {
+                // ignore current point
+                if (!(ii || jj)) { continue; }
+
+                auto x(i + ii), y(j + jj);
+                // check bounds
+                if ((x < 0) || (x >= dem_->cols)
+                    || (y < 0) || (y >= dem_->rows))
+                    { continue; }
+
+                const auto &v(dem_->at<cv::Vec3d>(y, x));
+                if (validSample(v[0])) {
+                    out[0] += v[0];
+                    out[1] = std::min(out[1], v[1]);
+                    out[2] = std::max(out[2], v[2]);
+                    ++count;
+                }
+            }
+        }
+
+        if (!count) { return boost::none; }
+
+        out[0] /= count;
+        return out;
+    }
+
+private:
+    GdalWarper::Raster dem_;
+};
+
 } // namespace
 
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
@@ -335,7 +391,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                    << ", size in tiles: " << vts::tileRangesSize(block.view)
                    << ".";
 
-        // warp intentionally by average filter
+        // warp value intentionally by average filter
         auto dem(warper.warp
                  (GdalWarper::RasterRequest
                   (GdalWarper::RasterRequest::Operation::valueMinMax
@@ -345,7 +401,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                    , extentsPlusHalfPixel
                    (extents, { gridSize.width - 1, gridSize.height - 1 })
                    , gridSize
-                   , geo::GeoDataset::Resampling::average)
+                   , geo::GeoDataset::Resampling::dem)
                   , sink));
 
         Grid<Sample> grid(gridSize);
@@ -360,84 +416,35 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         auto conv(sds2phys(block.commonAncestor, definition_.geoidGrid));
         auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
 
-        auto sample([&](int i, int j) -> cv::Vec3d
-        {
-            // first, try exact value
-            const auto &v(dem->at<cv::Vec3d>(j, i));
-            if (v[0] >= -1e6) { return v; }
-
-            // output vector and count of valid samples
-            cv::Vec3d out(0, std::numeric_limits<double>::max()
-                          , std::numeric_limits<double>::lowest());
-            int count(0);
-
-            for (int jj(-1); jj <= +1; ++jj) {
-                for (int ii(-1); ii <= +1; ++ii) {
-                    // ignore current point
-                    if (!(ii || jj)) { continue; }
-
-                    auto x(i + ii), y(j + jj);
-                    // check bounds
-                    if ((x < 0) || (x >= dem->cols)
-                        || (y < 0) || (y >= dem->rows))
-                        { continue; }
-
-                    const auto &v(dem->at<cv::Vec3d>(y, x));
-                    if (v[0] >= -1e6) {
-                        out[0] += v[0];
-                        out[1] = std::min(out[1], v[1]);
-                        out[2] = std::max(out[2], v[2]);
-                        ++count;
-                    }
-                }
-            }
-
-            if (!count) {
-                return { std::numeric_limits<double>::lowest()
-                        , std::numeric_limits<double>::lowest()
-                        , std::numeric_limits<double>::lowest() };
-            }
-
-            out[0] /= count;
-            return out;
-        });
-
         // grid mask
         const ShiftMask rfmask(block, metatileSamplesPerTile);
 
         // fill in grid
         // TODO: use mask
+        ValueMinMaxSampler vmm(dem);
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
                 // work only with pixels not masked by reference frame's mask
                 if (!rfmask(i, j)) { continue; }
 
-                auto value(sample(i, j));
+                auto value(vmm(i, j));
 
                 // skip out invalid data
-                if (value[0] < -1e6) { continue; }
+                if (!value) { continue; }
 
                 auto x(extents.ll(0) + i * gts.width);
-
-                if ((value[0] < value[1]) || (value[0] > value[2])) {
-                    LOG(info4) << "Out of bounds ("
-                               << i << ", " << j
-                               << "): " << value[1]
-                               << " - " << value[0]
-                               << " - " << value[2] << ".";
-                }
-
 
                 // compute all 3 world points (value, min, max) and height range
                 // in navigation space
                 grid(i, j) = {
-                    conv(math::Point3(x, y, value[0]))
-                    , conv(math::Point3(x, y, value[1]))
-                    , conv(math::Point3(x, y, value[2]))
-                    // use only z-component from converted point
-                    , HeightRange(navConv(math::Point3(x, y, value[1]))(2)
-                                  , navConv(math::Point3(x, y, value[2]))(2))
+                    conv(math::Point3(x, y, (*value)[0]))
+                    , conv(math::Point3(x, y, (*value)[1]))
+                    , conv(math::Point3(x, y, (*value)[2]))
+                    // use only z-component from converted points
+                    , HeightRange
+                    (navConv(math::Point3(x, y, (*value)[1]))(2)
+                     , navConv(math::Point3(x, y, (*value)[2]))(2))
                 };
             }
         }
@@ -469,10 +476,11 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                     auto yy(j * metatileSamplesPerTile + jj);
                     for (int ii(0); ii <= metatileSamplesPerTile; ++ii) {
                         auto xx(i * metatileSamplesPerTile + ii);
+
                         const auto *p(getSample(grid(xx, yy)));
 
                         // update tile extents (if sample valid)
-                        if (p && p->valid) {
+                        if (p) {
                             // update by both minimum and maximum
                             math::update(te, p->min);
                             math::update(te, p->max);
@@ -574,7 +582,7 @@ public:
         if (!mask_.get(i, j)) { return false; }
 
         h = dem_.at<double>(j, i);
-        if (h >= -1e6) { return true; }
+        if (validSample(h)) { return true; }
 
         h = 0;
         int count(0);
@@ -595,7 +603,7 @@ public:
 
                 // sample pixel and use if valid
                 auto v(dem_.at<double>(y, x));
-                if (v < -1e6) { continue; }
+                if (!validSample(v)) { continue; }
 
                 h += v;
                 ++count;
@@ -613,12 +621,106 @@ private:
     const vts::NodeInfo::CoverageMask &mask_;
 };
 
+template <typename T>
+T applyShift(T value, int shift)
+{
+    if (shift >= 0) {
+        return value << shift;
+    }
+    return value >> -shift;
+}
+
+typedef imgproc::mappedqtree::RasterMask MaskTree;
+
+vts::NodeInfo::CoverageMask
+generateCoverage(const int size, const vts::NodeInfo &nodeInfo
+                 , const MaskTree &maskTree)
+{
+    // get coverage mask from rf node
+    // size is in pixels, we are generating grid -> +1
+    // dilate by one pixel to make mask sane
+    auto coverage(nodeInfo.coverageMask
+                  (vts::NodeInfo::CoverageType::grid
+                   , math::Size2(size + 1, size + 1), 1));
+
+    if (!maskTree) {
+        // no mask to apply
+        return coverage;
+    }
+
+    // number of bits of detail derived from maximal dimension
+    const int detail(int(std::ceil(std::log2(size))));
+    // margin added around mask
+    const int margin(2);
+    // tile size in pixels
+    const int ts((1 << detail) + 2 * margin);
+
+    // rasterize mask tree that it covers current tile and half of neighbours
+    // get get tile ID
+    auto tileId(nodeInfo.nodeId());
+
+    // make detailed tile ID
+    tileId.lod += detail;
+    tileId.x <<= detail;
+    tileId.y <<= detail;
+
+    // apply margin
+    tileId.x -= margin;
+    tileId.y -= margin;
+
+    // clip sampling depth
+    int depth(std::min(int(tileId.lod), int(maskTree.depth())));
+
+    // bit shift; NB: can be negative!
+    int shift(maskTree.depth() - depth);
+
+    // setup constraints
+    MaskTree::Constraints con(depth);
+    con.extents.ll(0) = applyShift(tileId.x, shift);
+    con.extents.ll(1) = applyShift(tileId.y, shift);
+    con.extents.ur(0) = applyShift(tileId.x + ts, shift);
+    con.extents.ur(1) = applyShift(tileId.y + ts, shift);
+
+    cv::Mat tile(ts, ts, CV_8UC1, cv::Scalar(0x00));
+    cv::Rect tileBounds(0, 0, ts, ts);
+
+    cv::Scalar white(0xff);
+    auto draw([&](MaskTree::Node node, boost::tribool value)
+    {
+        // black -> nothing
+        if (!value) { return; }
+
+        // update to match level grid
+        node.shift(shift);
+
+        node.x -= tileId.x;
+        node.y -= tileId.y;
+
+        // construct rectangle and intersect it with bounds
+        cv::Rect r(node.x, node.y, node.size, node.size);
+        auto rr(r & tileBounds);
+        cv::rectangle(tile, rr, white, CV_FILLED, 4);
+    });
+
+    maskTree.forEachQuad(draw, con);
+
+    auto fname(str(boost::format("coverage.%s.png") % nodeInfo.nodeId()));
+    cv::imwrite(fname, tile);
+
+    // TODO: convert rendered mask from pixel space into grid space of coverage
+    // mask; process only valid pixels in current coverage and unset only those
+    // that mam to invalid area in the mask
+
+    // done
+    return coverage;
+}
+
 } // namespace
 
 void SurfaceDem::generateMesh(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fi
-                                   , GdalWarper &warper) const
+                              , const Sink::pointer &sink
+                              , const SurfaceFileInfo &fi
+                              , GdalWarper &warper) const
 {
     const int samplesPerSide(128);
     const int facesPerTile(1500);
@@ -652,11 +754,8 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
     // grab size of computed matrix, minus one to get number of edges
     math::Size2 size(dem->cols - 1, dem->rows - 1);
 
-    auto coverage(nodeInfo.coverageMask
-                  (vts::NodeInfo::CoverageType::grid
-                   , math::Size2(dem->cols, dem->rows), 1));
-
-    // TODO: intersect coverage with mask
+    // generate coverage
+    auto coverage(generateCoverage(size.width, nodeInfo, maskTree_));
 
     DemSampler ds(*dem, coverage);
 
@@ -675,16 +774,19 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
     addSkirt(lm, nodeInfo);
 
     // generate VTS mesh
-    vts::Mesh mesh;
-    auto &sm(addSubMesh(mesh, lm, nodeInfo, definition_.geoidGrid));
-    if (definition_.textureLayerId) {
-        sm.textureLayer = definition_.textureLayerId;
-    }
+    vts::Mesh mesh(false);
+    if (!lm.vertices.empty()) {
+        // local mesh is valid -> add as a submesh into output mesh
+        auto &sm(addSubMesh(mesh, lm, nodeInfo, definition_.geoidGrid));
+        if (definition_.textureLayerId) {
+            sm.textureLayer = definition_.textureLayerId;
+        }
 
-    if (fi.raw) {
-        // we are returning full mesh file -> generate coverage mask
-        meshCoverageMask
-            (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
+        if (fi.raw) {
+            // we are returning full mesh file -> generate coverage mask
+            meshCoverageMask
+                (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
+        }
     }
 
     // write mesh (only mesh!) to stream
@@ -734,62 +836,27 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                              , math::Size2(metatileSamplesPerTile + 1
                                            , metatileSamplesPerTile + 1), 1));
 
-        // warp min/max from dataset
+        // warp value/min/max from dataset the same way as is done in metatile
+        // calculation (we need to get the same value range)
         auto dem(warper.warp
                  (GdalWarper::RasterRequest
-                  (GdalWarper::RasterRequest::Operation::minMax
+                  (GdalWarper::RasterRequest::Operation::valueMinMax
                    , dataset_, node.srsDef()
                    // add half pixel to warp in grid coordinates
                    , extentsPlusHalfPixel
                    (extents, { metatileSamplesPerTile + 1
                            , metatileSamplesPerTile + 1 })
-                   , { metatileSamplesPerTile, metatileSamplesPerTile })
+                   , { metatileSamplesPerTile, metatileSamplesPerTile }
+                   , geo::GeoDataset::Resampling::average)
                   , sink));
-
-        auto sample([&](int i, int j) -> cv::Vec2d
-        {
-            // first, try exact value
-            const auto &v(dem->at<cv::Vec2d>(j, i));
-            if (v[0] >= -1e6) { return v; }
-
-            // output vector and count of valid samples
-            cv::Vec2d out(std::numeric_limits<double>::max()
-                          , std::numeric_limits<double>::lowest());
-            int count(0);
-
-            for (int jj(-1); jj <= +1; ++jj) {
-                for (int ii(-1); ii <= +1; ++ii) {
-                    // ignore current point
-                    if (!(ii || jj)) { continue; }
-
-                    auto x(i + ii), y(j + jj);
-                    // check bounds
-                    if ((x < 0) || (x >= dem->cols)
-                        || (y < 0) || (y >= dem->rows))
-                        { continue; }
-
-                    const auto &v(dem->at<cv::Vec2d>(y, x));
-                    if (v[0] >= -1e6) {
-                        out[0] = std::min(out[0], v[0]);
-                        out[1] = std::max(out[1], v[1]);
-                        ++count;
-                    }
-                }
-            }
-
-            if (!count) {
-                return { std::numeric_limits<double>::lowest()
-                        , std::numeric_limits<double>::lowest() };
-            }
-
-            return out;
-        });
 
         // TODO: combine with mask
         // grid pixel size
         math::Size2f gpx
             (ts.width / (metatileSamplesPerTile + 1)
              , ts.height / (metatileSamplesPerTile + 1));
+
+        ValueMinMaxSampler vmm(dem);
         for (int j(0); j <= metatileSamplesPerTile; ++j) {
             auto y(extents.ll(1) + j * gpx.height);
             for (int i(0); i <= metatileSamplesPerTile; ++i) {
@@ -797,13 +864,13 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                 if (!coverage.get(i, j)) { continue; }
 
                 // get sample and check for valid value
-                auto v(sample(i, j));
-                if (v[0] < -1e6) { continue; }
+                auto v(vmm(i, j));
+                if (!v) { continue; }
 
                 // update range with height of converted points
                 auto x(extents.ll(0) + i * gpx.width);
-                update(heightRange, navConv(math::Point3(x, y, v[0]))(2));
-                update(heightRange, navConv(math::Point3(x, y, v[1]))(2));
+                update(heightRange, navConv(math::Point3(x, y, (*v)[1]))(2));
+                update(heightRange, navConv(math::Point3(x, y, (*v)[2]))(2));
             }
         }
     }

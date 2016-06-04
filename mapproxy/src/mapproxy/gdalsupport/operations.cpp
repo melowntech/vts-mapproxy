@@ -89,7 +89,8 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
     // generate metatile from mask dataset
     auto &srcMask(cache(dataset));
     auto dstMask(geo::GeoDataset::deriveInMemory
-                 (srcMask, srs, size, extents));
+                 (srcMask, srs, size, extents, boost::none
+                  , geo::GeoDataset::NodataValue()));
 
     geo::GeoDataset::WarpOptions wo;
     wo.srcNodataValue = geo::GeoDataset::NodataValue();
@@ -103,35 +104,7 @@ cv::Mat* warpDetailMask(DatasetCache &cache, ManagedBuffer &mb
     return tile;
 }
 
-cv::Mat* warpMinMax(DatasetCache &cache, ManagedBuffer &mb
-                         , const std::string &dataset
-                         , const geo::SrsDefinition &srs
-                         , const math::Extents2 &extents
-                         , const math::Size2 &size)
-{
-    auto &minSrc(cache(dataset + ".min"));
-    auto &maxSrc(cache(dataset + ".max"));
-
-    auto minDst(geo::GeoDataset::deriveInMemory
-                (minSrc, srs, size, extents, GDT_Float32));
-    auto maxDst(geo::GeoDataset::deriveInMemory
-                (maxSrc, srs, size, extents, GDT_Float32));
-
-    geo::GeoDataset::WarpOptions wo;
-    wo.dstNodataValue = std::numeric_limits<double>::lowest();
-    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum, wo);
-    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum, wo);
-
-    // merge first channel from each matrix into one 3-channel matrix
-    const auto &dmin(minDst.cdata());
-    const auto &dmax(maxDst.cdata());
-    const cv::Mat mats[] = { dmin, dmax };
-    int pairs[] = { 0, 0, dmin.channels(), 1 };
-
-    auto *tile(allocateMat(mb, size, CV_64FC2));
-    cv::mixChannels(mats, 2, tile, 1, pairs, 2);
-    return tile;
-}
+const auto ForcedNodata(geo::GeoDataset::NodataValue(-1e10f));
 
 cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
                          , const std::string &dataset
@@ -146,41 +119,59 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
     auto &maxSrc(cache(dataset + ".max"));
 
     auto dst(geo::GeoDataset::deriveInMemory
-             (src, srs, size, extents, GDT_Float32));
+             (src, srs, size, extents, GDT_Float32, ForcedNodata));
     auto minDst(geo::GeoDataset::deriveInMemory
-                (minSrc, srs, size, extents, GDT_Float32));
+                (minSrc, srs, size, extents, GDT_Float32, ForcedNodata));
     auto maxDst(geo::GeoDataset::deriveInMemory
-                (maxSrc, srs, size, extents, GDT_Float32));
+                (maxSrc, srs, size, extents, GDT_Float32, ForcedNodata));
 
-    geo::GeoDataset::WarpOptions wo;
-    wo.dstNodataValue = std::numeric_limits<double>::lowest();
-    auto wri(src.warpInto(dst, resampling, wo));
-    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum, wo);
-    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum, wo);
+    auto wri(src.warpInto(dst, resampling));
+    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum);
+    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum);
 
-    // std::string ovr("None");
-    // if (wri.overview) {
-    //     ovr = boost::lexical_cast<std::string>(*wri.overview);
-    // }
-    // LOG(info4)
-    //     << std::fixed
-    //     << "gdalwarp -ts " << size.width << " " << size.height
-    //     << " -te " << extents.ll(0) << " "  << extents.ll(1)
-    //     << " " << extents.ur(0) << " " << extents.ur(1)
-    //     << " -r " << wri.resampling
-    //     << " -dstnodata " << **wo.dstNodataValue
-    //     << " -ovr " << ovr
-    //     << " " << dataset;
-
-    // merge first channel from each matrix into one 3-channel matrix
-    const auto &d(dst.cdata());
-    const auto &dmin(minDst.cdata());
-    const auto &dmax(maxDst.cdata());
-    const cv::Mat mats[] = { d, dmin, dmax };
-    int pairs[] = { 0, 0, d.channels(), 1, d.channels() + dmin.channels(), 2 };
-
+    // combine data
     auto *tile(allocateMat(mb, size, CV_64FC3));
-    cv::mixChannels(mats, 3, tile, 1, pairs, 3);
+    *tile = cv::Scalar(*ForcedNodata, *ForcedNodata, *ForcedNodata);
+
+    {
+        // TODO: use masks (get them as a byte matrices)
+        const auto &d(dst.cdata());
+        const auto &dmin(minDst.cdata());
+        const auto &dmax(maxDst.cdata());
+
+        auto id(d.begin<double>());
+        auto idmin(dmin.begin<double>());
+        auto idmax(dmax.begin<double>());
+
+        for (auto itile(tile->begin<cv::Vec3d>())
+                 , etile(tile->end<cv::Vec3d>());
+             itile != etile; ++itile, ++id, ++idmin, ++idmax)
+        {
+            // skil invalid value
+            auto value(*id);
+            if (value == ForcedNodata) { continue; }
+
+            auto &sample(*itile);
+            sample[0] = value;
+
+            if ((*idmin == ForcedNodata) || (*idmin > value)) {
+                // clone value into minimum if minimum is invalid or above value
+                sample[1] = value;
+            } else {
+                // copy min
+                sample[1] = *idmin;
+            }
+
+            if ((*idmax == ForcedNodata) || (*idmax < value)) {
+                // clone value into maximum if maximum is invalid or below value
+                sample[2] = value;
+            } else {
+                // copy max
+                sample[2] = *idmax;
+            }
+        }
+    }
+
     return tile;
 }
 
@@ -212,18 +203,14 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
     math::Size2 gridSize(size.width + 1, size.height + 1);
     auto gridExtents(extentsPlusHalfPixel(extents, size));
 
+    // warp in floats
     auto dst(geo::GeoDataset::deriveInMemory
-             (src, srs, gridSize, gridExtents));
+             (src, srs, gridSize, gridExtents, ::GDT_Float32
+              , ForcedNodata));
 
-    geo::GeoDataset::WarpOptions wo;
-    wo.dstNodataValue = std::numeric_limits<double>::lowest();
-    auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem, wo));
+    auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem));
     LOG(info1) << "Warp result: scale=" << wri.scale
                << ", resampling=" << wri.resampling << ".";
-
-    if (dst.cmask().empty()) {
-        throw EmptyImage("No valid data.");
-    }
 
     // mask is guaranteed to have single (double) channel
     auto &dstMat(dst.cdata());
@@ -259,10 +246,6 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
         return warpDem
             (cache, mb, req.dataset, req.srs, req.extents, req.size
              , (req.operation == Operation::demOptimal));
-
-    case Operation::minMax:
-        return warpMinMax
-            (cache, mb, req.dataset, req.srs, req.extents, req.size);
 
     case Operation::valueMinMax:
         return warpValueMinMax

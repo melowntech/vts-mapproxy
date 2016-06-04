@@ -8,6 +8,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
+#include <boost/format.hpp>
 
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
@@ -16,6 +17,7 @@
 #include "service/cmdline.hpp"
 
 #include "geo/geodataset.hpp"
+#include "geo/gdal.hpp"
 
 #include "gdal-drivers/register.hpp"
 
@@ -140,10 +142,13 @@ private:
     void process(const vts::NodeInfo &node, bool upscaling = false);
 
     const geo::GeoDataset& dataset() {
-        if (!gds_.get()) {
-            gds_.reset(new geo::GeoDataset(geo::GeoDataset::open(dataset_)));
+        return gds_[omp_get_thread_num()];
+    }
+
+    void prepareDataset() {
+        for (int i(0), e(omp_get_num_threads()); i < e; ++i) {
+            gds_.emplace_back(geo::GeoDataset::open(dataset_));
         }
-        return *gds_;
     }
 
     const std::string dataset_;
@@ -152,7 +157,7 @@ private:
     int tileSampling_;
     geo::SrsDefinition srs_;
 
-    boost::thread_specific_ptr<geo::GeoDataset> gds_;
+    std::vector<geo::GeoDataset> gds_;
 };
 
 
@@ -164,16 +169,63 @@ TreeWalker::TreeWalker(vts::TileIndex &ti, const std::string &dataset
 {
     UTILITY_OMP(parallel)
         UTILITY_OMP(single)
-        process(root);
+        {
+            prepareDataset();
+            process(root);
+        }
 }
 
 void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 {
+    struct TIDGuard {
+        TIDGuard(const std::string &id)
+            : old(dbglog::thread_id())
+        {
+            dbglog::thread_id(id);
+        }
+        ~TIDGuard() { dbglog::thread_id(old); }
+
+        const std::string old;
+    };
+
     const auto tileId(node.nodeId());
-    if (!node.valid() || (tileId.lod > lodRange_.max)) {
-        // invalid node
+    if ((tileId.lod > lodRange_.max)) {
+        // outside of configured area
         return;
     }
+
+    auto fullSubtree([&]()
+    {
+        UTILITY_OMP(critical)
+        {
+            ti_.set(vts::LodRange(tileId.lod, lodRange_.max)
+                    , vts::tileRange(tileId)
+                    , (TiFlag::mesh | TiFlag::watertight));
+        }
+
+        return;
+    });
+
+    if (!node.valid()) {
+        // Node is invalid but we can safely say that we have watertight mesh
+        // here and down to the maximum LOD to save space in tile index.
+        //
+        // It is a lie but it will not hurt anyone.
+
+        // set full subtree
+        if (tileId.lod >= lodRange_.min) {
+            fullSubtree();
+            // stop descent here
+            LOG(info3)
+                << "Processed tile " << tileId
+                << " (extents: " << std::fixed << node.extents()
+                << ", srs: " << node.srs()
+                << ") [fake watertight subtree in invalid part of a tree].";
+        }
+        return;
+    }
+
+    TIDGuard tg(str(boost::format("tile:%s") % tileId));
 
     LOG(info2) << "Processing tile " << tileId << ".";
 
@@ -183,17 +235,15 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 
     if (tileId.lod >= lodRange_.min) {
         // warp input dataset into tile
-        const auto& ds(dataset());
+        const auto &ds(dataset());
+        // set some output nodata value to force mask generation
         auto tileDs(geo::GeoDataset::deriveInMemory
                     (ds, node.srsDef(), size
                      , extentsPlusHalfPixel(node.extents(), samples)
-                     , GDT_Byte));
-        geo::GeoDataset::WarpOptions wo;
+                     , GDT_Float32
+                     , geo::GeoDataset::NodataValue(-1e6)));
 
-        // set some output nodata value to force mask generation
-        wo.dstNodataValue = std::numeric_limits<double>::lowest();
-        auto wri(ds.warpInto(tileDs, geo::GeoDataset::Resampling::cubicspline
-                             , wo));
+        auto wri(ds.warpInto(tileDs, geo::GeoDataset::Resampling::dem));
 
         TiFlag::value_type baseFlags(TiFlag::mesh);
         if (!upscaling) {
@@ -201,20 +251,16 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         }
 
         // grab mask of warped dataset
-        const auto mask(tileDs.cmask());
-        if (mask.full() && !node.partial()) {
+        const auto &mask(tileDs.cmask());
+        switch (node.checkMask(mask, vts::NodeInfo::CoverageType::grid, 1)) {
+        case vts::NodeInfo::CoveredArea::whole: {
             // fully covered by dataset and by reference frame definition
 
             if (!wri.overview) {
                 // warped using original dataset, no holes -> always without
                 // holes -> set whole subtree to watertight mesh
 
-                UTILITY_OMP(critical)
-                {
-                    ti_.set(vts::LodRange(tileId.lod, lodRange_.max)
-                            , vts::tileRange(tileId)
-                            , (TiFlag::mesh | TiFlag::watertight));
-                }
+                fullSubtree();
 
                 // stop descent here
                 LOG(info3)
@@ -232,7 +278,10 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 << " (extents: " << std::fixed << node.extents()
                 << ", srs: " << node.srs()
                 << ") [watertight].";
-        } else if (!mask.empty()) {
+            break;
+        }
+
+        case vts::NodeInfo::CoveredArea::some: {
             // partially covered
             UTILITY_OMP(critical)
                 ti_.set(tileId, baseFlags);
@@ -241,7 +290,10 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 << " (extents: " << std::fixed << node.extents()
                 << ", srs: " << node.srs()
                 << ") [partial].";
-        } else {
+            break;
+        }
+
+        case vts::NodeInfo::CoveredArea::none: {
             // empty -> no children
             LOG(info3)
                 << "Processed tile " << tileId
@@ -249,6 +301,7 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 << ", srs: " << node.srs()
                 << ") [empty].";
             return;
+        }
         }
 
         // update upscaling flag
@@ -292,5 +345,7 @@ int DemTiling::run()
 int main(int argc, char *argv[])
 {
     gdal_drivers::registerAll();
+    // force VRT not to share undelying datasets
+    geo::Gdal::setOption("VRT_SHARED_SOURCE", 0);
     return DemTiling()(argc, argv);
 }
