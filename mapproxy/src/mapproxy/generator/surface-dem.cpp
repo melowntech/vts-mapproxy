@@ -32,6 +32,7 @@
 #include "../support/srs.hpp"
 #include "../support/geo.hpp"
 #include "../support/grid.hpp"
+#include "../support/coverage.hpp"
 
 #include "./surface-dem.hpp"
 #include "./factory.hpp"
@@ -172,13 +173,13 @@ void SurfaceDem::prepare_impl()
 
     // finally clip everything by mask tree if present
     if (maskTree_) {
-        /** TODO: partial nodes should be handled differently
+        /** TODO: RF partial nodes should be handled differently
          */
         const auto treeDepth(maskTree_.depth());
         for (const auto lod : r.lodRange) {
             auto filterByMask([&](MaskTree::Node node, boost::tribool value)
             {
-                // valid -> nothing to done
+                // valid -> nothing to be done
                 if (value) { return; }
 
                 // update node to match lod grid
@@ -417,7 +418,8 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
 
         // grid mask
-        const ShiftMask rfmask(block, metatileSamplesPerTile);
+        const ShiftMask rfmask(block, metatileSamplesPerTile
+                               , maskTree_);
 
         // fill in grid
         // TODO: use mask
@@ -541,7 +543,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                         math::Size2 size(metatileSamplesPerTile
                                          , metatileSamplesPerTile);
 
-                        // return scaled coverage; NB: triangle covers hald of
+                        // return scaled coverage; NB: triangle covers half of
                         // pixel so real area is in pixels is half of number of
                         // pixels
                         return ((triangleCount * vr::BoundLayer::tileArea())
@@ -621,100 +623,6 @@ private:
     const vts::NodeInfo::CoverageMask &mask_;
 };
 
-template <typename T>
-T applyShift(T value, int shift)
-{
-    if (shift >= 0) {
-        return value << shift;
-    }
-    return value >> -shift;
-}
-
-typedef imgproc::mappedqtree::RasterMask MaskTree;
-
-vts::NodeInfo::CoverageMask
-generateCoverage(const int size, const vts::NodeInfo &nodeInfo
-                 , const MaskTree &maskTree)
-{
-    // get coverage mask from rf node
-    // size is in pixels, we are generating grid -> +1
-    // dilate by one pixel to make mask sane
-    auto coverage(nodeInfo.coverageMask
-                  (vts::NodeInfo::CoverageType::grid
-                   , math::Size2(size + 1, size + 1), 1));
-
-    if (!maskTree) {
-        // no mask to apply
-        return coverage;
-    }
-
-    // number of bits of detail derived from maximal dimension
-    const int detail(int(std::ceil(std::log2(size))));
-    // margin added around mask
-    const int margin(2);
-    // tile size in pixels
-    const int ts((1 << detail) + 2 * margin);
-
-    // rasterize mask tree that it covers current tile and half of neighbours
-    // get get tile ID
-    auto tileId(nodeInfo.nodeId());
-
-    // make detailed tile ID
-    tileId.lod += detail;
-    tileId.x <<= detail;
-    tileId.y <<= detail;
-
-    // apply margin
-    tileId.x -= margin;
-    tileId.y -= margin;
-
-    // clip sampling depth
-    int depth(std::min(int(tileId.lod), int(maskTree.depth())));
-
-    // bit shift; NB: can be negative!
-    int shift(maskTree.depth() - depth);
-
-    // setup constraints
-    MaskTree::Constraints con(depth);
-    con.extents.ll(0) = applyShift(tileId.x, shift);
-    con.extents.ll(1) = applyShift(tileId.y, shift);
-    con.extents.ur(0) = applyShift(tileId.x + ts, shift);
-    con.extents.ur(1) = applyShift(tileId.y + ts, shift);
-
-    cv::Mat tile(ts, ts, CV_8UC1, cv::Scalar(0x00));
-    cv::Rect tileBounds(0, 0, ts, ts);
-
-    cv::Scalar white(0xff);
-    auto draw([&](MaskTree::Node node, boost::tribool value)
-    {
-        // black -> nothing
-        if (!value) { return; }
-
-        // update to match level grid
-        node.shift(shift);
-
-        node.x -= tileId.x;
-        node.y -= tileId.y;
-
-        // construct rectangle and intersect it with bounds
-        cv::Rect r(node.x, node.y, node.size, node.size);
-        auto rr(r & tileBounds);
-        cv::rectangle(tile, rr, white, CV_FILLED, 4);
-    });
-
-    maskTree.forEachQuad(draw, con);
-
-    auto fname(str(boost::format("coverage.%s.png") % nodeInfo.nodeId()));
-    cv::imwrite(fname, tile);
-
-    // TODO: convert rendered mask from pixel space into grid space of coverage
-    // mask; process only valid pixels in current coverage and unset only those
-    // that mam to invalid area in the mask
-
-    // done
-    return coverage;
-}
-
 } // namespace
 
 void SurfaceDem::generateMesh(const vts::TileId &tileId
@@ -755,7 +663,8 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
     math::Size2 size(dem->cols - 1, dem->rows - 1);
 
     // generate coverage
-    auto coverage(generateCoverage(size.width, nodeInfo, maskTree_));
+    auto coverage(generateCoverage(dem->cols - 1, nodeInfo, maskTree_
+                                   , vts::NodeInfo::CoverageType::grid));
 
     DemSampler ds(*dem, coverage);
 
@@ -879,10 +788,9 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     auto ntd(nt.data());
 
     // generate coverage mask in grid coordinates
-    auto &coverage(nt.coverageMask() = node.coverageMask
-                   (vts::NodeInfo::CoverageType::grid
-                    , math::Size2(ntd.cols, ntd.rows), 1));
-    nt.coverageMask() = coverage;
+    auto &coverage(nt.coverageMask()
+                   = generateCoverage(ntd.cols - 1, node, maskTree_
+                                      , vts::NodeInfo::CoverageType::grid));
 
     // warp input dataset as a DEM
     auto dem(warper.warp
@@ -892,8 +800,6 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                , node.srsDef(), node.extents()
                , math::Size2(ntd.cols - 1, ntd.rows -1))
               , sink));
-
-    // TODO: intersect coverage with mask
 
     // set height range
     nt.heightRange(vts::NavTile::HeightRange

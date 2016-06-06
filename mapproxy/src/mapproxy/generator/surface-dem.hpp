@@ -8,6 +8,8 @@
 
 #include "./surface.hpp"
 
+#include "../support/coverage.hpp"
+
 namespace vts = vadstena::vts;
 
 namespace generator {
@@ -46,7 +48,6 @@ private:
     vts::FullTileSetProperties properties_;
 
     // mask tree
-    typedef imgproc::mappedqtree::RasterMask MaskTree;
     MaskTree maskTree_;
 };
 

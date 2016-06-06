@@ -6,6 +6,8 @@
 
 #include "../resource.hpp"
 
+#include "./coverage.hpp"
+
 namespace vts = vadstena::vts;
 namespace vr = vadstena::registry;
 
@@ -45,13 +47,13 @@ MetatileBlock::list metatileBlocks(const Resource &resource
 
 class ShiftMask {
 public:
-    ShiftMask(const MetatileBlock &block, int samplesPerTile)
+    ShiftMask(const MetatileBlock &block, int samplesPerTile
+              , const MaskTree &maskTree_ = MaskTree())
         : offset_(block.offset.x * samplesPerTile
                   , block.offset.y * samplesPerTile)
-        , size_((1 << block.offset.lod) * samplesPerTile + 1
-                , (1 << block.offset.lod) * samplesPerTile + 1)
-        , mask_(block.commonAncestor.coverageMask
-                (vts::NodeInfo::CoverageType::grid, size_, 1))
+        , mask_(generateCoverage((1 << block.offset.lod) * samplesPerTile
+                                 , block.commonAncestor, maskTree_
+                                 , vts::NodeInfo::CoverageType::grid))
     {}
 
     bool operator()(int x, int y) const {
@@ -60,7 +62,6 @@ public:
 
 private:
     const math::Point2i offset_;
-    const math::Size2 size_;
     const vts::NodeInfo::CoverageMask mask_;
 };
 
