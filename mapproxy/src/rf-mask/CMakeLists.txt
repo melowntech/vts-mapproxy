@@ -1,7 +1,6 @@
 # test program
 define_module(BINARY rf-mask
   DEPENDS vts-libs imgproc service gdal-drivers geometry
-  MHD
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS)
 

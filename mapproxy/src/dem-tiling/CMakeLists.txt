@@ -1,7 +1,6 @@
 # test program
 define_module(BINARY dem-tiling
   DEPENDS vts-libs service gdal-drivers geometry
-  MHD
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS)
 
