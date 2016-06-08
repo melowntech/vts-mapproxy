@@ -11,6 +11,8 @@
 #include <boost/format.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 
+#include "gdal/cpl_minixml.h"
+
 #include "utility/streams.hpp"
 #include "utility/buildsys.hpp"
 #include "utility/openmp.hpp"
@@ -45,6 +47,8 @@ struct Color {
         auto last(value.back());
         value.resize(size, last);
     }
+
+    typedef boost::optional<Color> optional;
 };
 
 template<typename CharT, typename Traits>
@@ -83,17 +87,32 @@ operator<<(std::basic_ostream<CharT, Traits> &os, const Color &c)
 template<typename CharT, typename Traits>
 inline std::basic_ostream<CharT, Traits>&
 operator<<(std::basic_ostream<CharT, Traits> &os
-           , const boost::optional<Color> &c)
+           , const Color::optional &c)
 {
     if (c) { return os << *c; }
     return os << "none";
 }
 
+struct Config {
+    fs::path input;
+    fs::path output;
+    math::Size2 blockSize;
+    geo::GeoDataset::Resampling resampling;
+    fs::path ovrPath;
+    math::Size2 minOvrSize;
+    bool wrapx;
+    bool overwrite;
+    Color::optional background;
+
+    Config()
+        : minOvrSize(256, 256), wrapx(false), overwrite(false)
+    {}
+};
+
 class VrtWo : public service::Cmdline {
 public:
     VrtWo()
         : service::Cmdline("generageVrtWo", BUILD_TARGET_VERSION)
-        , minOvrSize_(256, 256), wrapx_(false), overwrite_(false)
     {
     }
 
@@ -108,15 +127,7 @@ private:
 
     int run();
 
-    fs::path input_;
-    fs::path output_;
-    math::Size2 blockSize_;
-    geo::GeoDataset::Resampling resampling_;
-    fs::path ovrPath_;
-    math::Size2 minOvrSize_;
-    bool wrapx_;
-    bool overwrite_;
-    boost::optional<Color> background_;
+    Config config_;
 };
 
 void VrtWo::configuration(po::options_description &cmdline
@@ -124,23 +135,23 @@ void VrtWo::configuration(po::options_description &cmdline
                             , po::positional_options_description &pd)
 {
     cmdline.add_options()
-        ("input", po::value(&input_)->required()
+        ("input", po::value(&config_.input)->required()
          , "Path to input GDAL dataset.")
-        ("output", po::value(&output_)->required()
+        ("output", po::value(&config_.output)->required()
          , "Path to output GDAL dataset.")
-        ("blockSize", po::value(&blockSize_)->required()
+        ("blockSize", po::value(&config_.blockSize)->required()
         , "Block size.")
-        ("resampling", po::value(&resampling_)->required()
+        ("resampling", po::value(&config_.resampling)->required()
         , "Resampling algorithm.")
-        ("ovrPath", po::value(&ovrPath_)->required()
+        ("ovrPath", po::value(&config_.ovrPath)->required()
         , "Path where to store generated overviews.")
-        ("minOvrSize", po::value(&minOvrSize_)->required()
-         ->default_value(minOvrSize_)
+        ("minOvrSize", po::value(&config_.minOvrSize)->required()
+         ->default_value(config_.minOvrSize)
         , "Minimum size of generated overview.")
-        ("overwrite", po::value(&overwrite_)->required()
+        ("overwrite", po::value(&config_.overwrite)->required()
          ->default_value(false)->implicit_value(true)
         , "Overwrite existing dataset.")
-        ("wrapx", po::value(&wrapx_)->required()
+        ("wrapx", po::value(&config_.wrapx)->required()
          ->default_value(false)->implicit_value(true)
         , "Wrap dataset in X direction.")
         ("background", po::value<Color>()
@@ -158,19 +169,19 @@ void VrtWo::configuration(po::options_description &cmdline
 void VrtWo::configure(const po::variables_map &vars)
 {
     if (vars.count("background")) {
-        background_ = vars["background"].as<Color>();
+        config_.background = vars["background"].as<Color>();
     }
 
     LOG(info3, log_)
         << "Config:"
-        << "\n\tinput = " << input_
-        << "\n\toutput = " << output_
-        << "\n\tblockSize = " << blockSize_
-        << "\n\tresampling = " << resampling_
-        << "\n\tovrPath = " << ovrPath_
-        << "\n\tminOvrSize = " << minOvrSize_
-        << "\n\twrapx = " << wrapx_
-        << "\n\tbackground = " << background_
+        << "\n\tinput = " << config_.input
+        << "\n\toutput = " << config_.output
+        << "\n\tblockSize = " << config_.blockSize
+        << "\n\tresampling = " << config_.resampling
+        << "\n\tovrPath = " << config_.ovrPath
+        << "\n\tminOvrSize = " << config_.minOvrSize
+        << "\n\twrapx = " << config_.wrapx
+        << "\n\tbackground = " << config_.background
         << "\n"
         ;
 }
@@ -281,7 +292,6 @@ public:
         : ds_(geo::GeoDataset::create
               (path, srs, extents, size, asVrt(format), nodata))
         , bandCount_(format.channels.size())
-        , maxSourceIndices_(bandCount_, 0)
     {}
 
     void flush() { ds_.flush(); }
@@ -294,11 +304,41 @@ public:
                          , const OptionalRect &srcRect = boost::none
                          , const OptionalRect &dstRect = boost::none);
 
+    void addOverview(int band, const fs::path &filename, int srcBand);
+
+    void addBackground(const fs::path &path, const Color::optional &color);
+
+    const geo::GeoDataset& dataset() const { return ds_; }
+
+    std::size_t bandCount() const { return bandCount_; };
+
 private:
     geo::GeoDataset ds_;
-    int bandCount_;
-    std::vector<int> maxSourceIndices_;
+    std::size_t bandCount_;
 };
+
+void writeSourceFilename(std::ostream &os, const fs::path &filename
+                         , bool shared)
+{
+    os << "<SourceFilename relativeToVRT=\""
+       << int(!filename.is_absolute())
+       << " shared=" << int(shared)
+       << "\">" << filename.string() << "</SourceFilename>\n"
+        ;
+}
+
+void writeSourceBand(std::ostream &os, int srcBand)
+{
+    os << "<SourceBand>" << (srcBand + 1) << "</SourceBand>\n";
+}
+
+void writeRect(std::ostream &os, const char *name, const Rect &r)
+{
+    os <<  "<" << name << " xOff=\"" << r.origin(0)
+       << "\" yOff=\"" << r.origin(1)
+       << "\" xSize=\"" << r.size.width
+       << "\" ySize=\"" << r.size.height << "\" />";
+}
 
 void VrtDataset::addSimpleSource(int band, const fs::path &filename
                                  , const geo::GeoDataset &ds
@@ -311,23 +351,13 @@ void VrtDataset::addSimpleSource(int band, const fs::path &filename
 
     std::ostringstream os;
 
-    auto writeRect([&](const char *name, const Rect &r)
-    {
-        os <<  "<" << name << " xOff=\"" << r.origin(0)
-           << "\" yOff=\"" << r.origin(1)
-           << "\" xSize=\"" << r.size.width
-           << "\" ySize=\"" << r.size.height << "\" />";
-    });
+    os << "<SimpleSource>\n";
 
-    os << "<SimpleSource>\n"
-       << "<SourceFilename relativeToVRT=\""
-       << int(!filename.is_absolute())
-       << "\">" << filename.string() << "</SourceFilename>\n"
-       << "<SourceBand>" << (srcBand + 1) << "</SourceBand>\n"
-        ;
+    writeSourceFilename(os, filename, true);
+    writeSourceBand(os, srcBand);
 
-    writeRect("SrcRect", src);
-    writeRect("DstRect", dst);
+    writeRect(os, "SrcRect", src);
+    writeRect(os, "DstRect", dst);
 
     const auto bp(ds.bandProperties(srcBand));
 
@@ -342,85 +372,213 @@ void VrtDataset::addSimpleSource(int band, const fs::path &filename
     os << "</SimpleSource>\n"
         ;
 
-    geo::GeoDataset::Metadata
-        md(str(boost::format("source_%d") % maxSourceIndices_[band]++)
-           , os.str());
-
-    ds_.setMetadata(band + 1, md, "new_vrt_sources");
+    ds_.setMetadata(band + 1, geo::GeoDataset::Metadata("source", os.str())
+                    , "new_vrt_sources");
 }
 
-int VrtWo::run()
+void VrtDataset::addOverview(int band, const fs::path &filename, int srcBand)
 {
+    std::ostringstream os;
+    os << "<Overview>\n";
+    writeSourceFilename(os, filename, true);
+    writeSourceBand(os, srcBand);
+    os << "</Overview>\n";
+    ds_.setMetadata(band + 1, geo::GeoDataset::Metadata("overview", os.str())
+                    , "new_vrt_sources");
+}
 
-    auto in(geo::GeoDataset::open(input_));
+void VrtDataset::addBackground(const fs::path &path
+                               , const Color::optional &color)
+{
+    if (!color) { return; }
 
-    fs::create_directories(ovrPath_);
+    auto background(*color);
+    background.resize(bandCount_);
+    const fs::path bgPath(path / "bg.solid");
 
-    auto srcSize(in.size());
-    auto extents(in.extents());
-    auto setup(makeSetup(srcSize, extents, minOvrSize_, wrapx_));
+    gdal_drivers::SolidDataset::Config cfg;
+    cfg.srs = ds_.srs();
+    cfg.size = ds_.size();
+    for (std::size_t i(0); i != bandCount_; ++i) {
+        const auto bp(ds_.bandProperties(i));
 
-    // create virtual output dataset
-    VrtDataset out(output_, in.srs(), setup.extents
-                   , setup.size, in.getFormat(), in.rawNodataValue());
-
-    const auto bands(in.bandCount());
-
-    // add background
-    if (background_) {
-        Color background(*background_);
-        background.resize(bands);
-        const fs::path bgPath(ovrPath_ / "bg.solid");
-
-        gdal_drivers::SolidDataset::Config cfg;
-        cfg.srs = in.srs();
-        cfg.size = setup.size;
-        for (std::size_t i(0); i != bands; ++i) {
-            const auto bp(in.bandProperties(i));
-
-            gdal_drivers::SolidDataset::Config::Band band;
-            band.value = background[i];
-            band.colorInterpretation = bp.colorInterpretation;
-            band.dataType = bp.dataType;
-            cfg.bands.push_back(band);
-        }
-
-        // create background dataset
-        auto bg(geo::GeoDataset::use
-                (gdal_drivers::SolidDataset::create(bgPath, cfg)));
-
-        // map layers
-        for (int i(0), ei(in.bandCount()); i != ei; ++i) {
-            out.addSimpleSource(i, bgPath, bg, i);
-        }
+        gdal_drivers::SolidDataset::Config::Band band;
+        band.value = background[i];
+        band.colorInterpretation = bp.colorInterpretation;
+        band.dataType = bp.dataType;
+        cfg.bands.push_back(band);
     }
 
+    // create background dataset
+    auto bg(geo::GeoDataset::use
+            (gdal_drivers::SolidDataset::create(bgPath, cfg)));
+
+    // map layers
+    for (std::size_t i(0); i != bandCount_; ++i) {
+        addSimpleSource(i, bgPath, bg, i);
+    }
+}
+
+fs::path createOverview(const Config &config, const fs::path &dir
+                        , const math::Size2 &size
+                        , geo::GeoDataset::Overview srcOverview)
+{
+    auto src(geo::GeoDataset::open(config.output));
+
+    auto ovrName(dir / "ovr.vrt");
+    VrtDataset ovr(ovrName, src.srs(), src.extents()
+                   , size, src.getFormat(), src.rawNodataValue());
+
+    // TODO: warp input tiles and add them to ovr
+    (void) srcOverview;
+
+    ovr.flush();
+
+    return ovrName;
+}
+
+void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
+{
+    typedef std::shared_ptr< ::CPLXMLNode> XmlNode;
+    auto xmlNode([](::CPLXMLNode *n) -> XmlNode
+    {
+        if (!n) {
+            LOGTHROW(err1, std::runtime_error)
+                << "Cannot parse XML: <" << ::CPLGetLastErrorMsg() << ">.";
+        }
+        return XmlNode(n, [](::CPLXMLNode *n) { ::CPLDestroyXMLNode(n); });
+    });
+
+    class NodeIterator {
+    public:
+        NodeIterator(::CPLXMLNode *node, const char *name = nullptr)
+            : node_(node->psChild), name_(name)
+        {
+            // go till node with given name is hit
+            while (node_ && !matches()) {
+                node_ = node_->psNext;
+            }
+        }
+
+        operator bool() const { return node_; }
+        ::CPLXMLNode* operator*() { return node_; }
+        ::CPLXMLNode* operator->() { return node_; }
+
+        NodeIterator& operator++() {
+            if (!node_) { return *this; }
+            // skip current node and find new with the same name
+            do {
+                node_ = node_->psNext;
+            } while (node_ && !matches());
+            return *this;
+        }
+
+    private:
+        bool matches() const {
+            return !name_ || !std::strcmp(name_, node_->pszValue);
+        }
+
+        ::CPLXMLNode *node_;
+        const char *name_;
+    };
+
+    auto root(xmlNode(::CPLParseXMLFile(vrtPath.c_str())));
+
+    for (NodeIterator ni(root.get(), "VRTRasterBand"); ni; ++ni) {
+        NodeIterator bandNode(*ni, "band");
+        if (!bandNode) {
+            LOG(warn3) << "Cannot find band attribute in VRTRasterBand.";
+            continue;
+        }
+
+        // get band number
+        auto band(bandNode->psChild->pszValue);
+        LOG(info4) << "Band: " << band;
+
+        auto overview(::CPLCreateXMLNode(*ni, ::CXT_Element, "Overview"));
+        auto sourceFilename(::CPLCreateXMLNode
+                            (overview, ::CXT_Element, "SourceFilename"));
+        auto relativeToVRT(::CPLCreateXMLNode
+                           (sourceFilename, CXT_Attribute, "relativeToVRT"));
+        ::CPLCreateXMLNode(relativeToVRT, CXT_Text
+                           , (ovrPath.is_absolute() ? "0" : "1"));
+        ::CPLCreateXMLNode(sourceFilename, ::CXT_Text, ovrPath.c_str());
+        auto sourceBand(::CPLCreateXMLNode
+                        (overview, ::CXT_Element, "SourceBand"));
+        ::CPLCreateXMLNode(sourceBand, ::CXT_Text, band);
+    }
+
+    auto res(::CPLSerializeXMLTreeToFile(root.get(), vrtPath.c_str()));
+    LOG(info4) << "res: " << res;
+}
+
+Setup buildBasicDataset(const Config &config)
+{
+    auto in(geo::GeoDataset::open(config.input));
+
+    auto setup(makeSetup(in.size(), in.extents(), config.minOvrSize
+                         , config.wrapx));
+
+    // create virtual output dataset
+    VrtDataset out(config.output, in.srs(), setup.extents
+                   , setup.size, in.getFormat(), in.rawNodataValue());
+
+    // add (optional) background
+    out.addBackground(config.ovrPath, config.background);
+
+    // add input bands
     auto inSize(in.size());
-    for (std::size_t i(0); i != bands; ++i) {
-        if (wrapx_) {
+    for (std::size_t i(0); i != in.bandCount(); ++i) {
+        if (config.wrapx) {
             // wrapping in x
 
             // add center section
             Rect centerDst(math::Point2i(setup.xPlus, 0), inSize);
-            out.addSimpleSource(i, input_, in, i, boost::none
+            out.addSimpleSource(i, config.input, in, i, boost::none
                                 , centerDst);
             math::Size2 strip(math::Size2(setup.xPlus, inSize.height));
 
             Rect rightSrc(math::Point2i(inSize.width - setup.xPlus, 0)
                           , strip);
             Rect leftDst(math::Size2(setup.xPlus, inSize.height));
-            out.addSimpleSource(i, input_, in, i, rightSrc, leftDst);
+            out.addSimpleSource(i, config.input, in, i, rightSrc, leftDst);
 
             Rect leftSrc(strip);
             Rect rightDst(math::Point2i(inSize.width + setup.xPlus, 0)
                           , strip);
-            out.addSimpleSource(i, input_, in, i, leftSrc, rightDst);
+            out.addSimpleSource(i, config.input, in, i, leftSrc, rightDst);
         } else {
-            out.addSimpleSource(i, input_, in, i);
+            out.addSimpleSource(i, config.input, in, i);
         }
     }
 
     out.flush();
+
+    return setup;
+}
+
+int VrtWo::run()
+{
+    fs::create_directories(config_.ovrPath);
+
+    auto setup(buildBasicDataset(config_));
+
+    // generate overviews
+    geo::GeoDataset::Overview srcOverview;
+    for (std::size_t i(0); i != setup.ovrSizes.size(); ++i) {
+        auto dir(config_.ovrPath / str(boost::format("%d") % i));
+        fs::create_directories(dir);
+
+        auto path(createOverview(config_, dir, setup.ovrSizes[i]
+                                 , srcOverview));
+
+        // use previous level
+        srcOverview = i;
+
+        // add overview (manually by manipulating the XML)
+        addOverview(config_.output, path);
+
+    }
 
     return EXIT_SUCCESS;
 }
