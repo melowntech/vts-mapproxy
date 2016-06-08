@@ -493,7 +493,6 @@ void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
 
         // get band number
         auto band(bandNode->psChild->pszValue);
-        LOG(info4) << "Band: " << band;
 
         auto overview(::CPLCreateXMLNode(*ni, ::CXT_Element, "Overview"));
         auto sourceFilename(::CPLCreateXMLNode
@@ -509,7 +508,10 @@ void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
     }
 
     auto res(::CPLSerializeXMLTreeToFile(root.get(), vrtPath.c_str()));
-    LOG(info4) << "res: " << res;
+    if (!res) {
+        LOGTHROW(err3, std::runtime_error)
+            << "Cannot save updated VRT file into " << vrtPath << ".";
+    }
 }
 
 Setup buildBasicDataset(const Config &config)
