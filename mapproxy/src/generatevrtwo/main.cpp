@@ -94,9 +94,9 @@ operator<<(std::basic_ostream<CharT, Traits> &os
 }
 
 struct Config {
-    fs::path input;
+    std::string input;
     fs::path output;
-    math::Size2 blockSize;
+    math::Size2 tileSize;
     geo::GeoDataset::Resampling resampling;
     fs::path ovrPath;
     math::Size2 minOvrSize;
@@ -139,8 +139,8 @@ void VrtWo::configuration(po::options_description &cmdline
          , "Path to input GDAL dataset.")
         ("output", po::value(&config_.output)->required()
          , "Path to output GDAL dataset.")
-        ("blockSize", po::value(&config_.blockSize)->required()
-        , "Block size.")
+        ("tileSize", po::value(&config_.tileSize)->required()
+        , "Tile size.")
         ("resampling", po::value(&config_.resampling)->required()
         , "Resampling algorithm.")
         ("ovrPath", po::value(&config_.ovrPath)->required()
@@ -176,7 +176,7 @@ void VrtWo::configure(const po::variables_map &vars)
         << "Config:"
         << "\n\tinput = " << config_.input
         << "\n\toutput = " << config_.output
-        << "\n\tblockSize = " << config_.blockSize
+        << "\n\ttileSize = " << config_.tileSize
         << "\n\tresampling = " << config_.resampling
         << "\n\tovrPath = " << config_.ovrPath
         << "\n\tminOvrSize = " << config_.minOvrSize
@@ -306,7 +306,9 @@ public:
 
     void addOverview(int band, const fs::path &filename, int srcBand);
 
-    void addBackground(const fs::path &path, const Color::optional &color);
+    void addBackground(const fs::path &path, const Color::optional &color
+                       , const boost::optional<fs::path> &localTo
+                       = boost::none);
 
     const geo::GeoDataset& dataset() const { return ds_; }
 
@@ -388,13 +390,16 @@ void VrtDataset::addOverview(int band, const fs::path &filename, int srcBand)
 }
 
 void VrtDataset::addBackground(const fs::path &path
-                               , const Color::optional &color)
+                               , const Color::optional &color
+                               , const boost::optional<fs::path> &localTo)
 {
     if (!color) { return; }
 
     auto background(*color);
     background.resize(bandCount_);
-    const fs::path bgPath(path / "bg.solid");
+    const fs::path fname("bg.solid");
+    const fs::path bgPath(path / fname);
+    const fs::path storePath(localTo ? (*localTo / fname) : bgPath);
 
     gdal_drivers::SolidDataset::Config cfg;
     cfg.srs = ds_.srs();
@@ -415,26 +420,8 @@ void VrtDataset::addBackground(const fs::path &path
 
     // map layers
     for (std::size_t i(0); i != bandCount_; ++i) {
-        addSimpleSource(i, bgPath, bg, i);
+        addSimpleSource(i, storePath, bg, i);
     }
-}
-
-fs::path createOverview(const Config &config, const fs::path &dir
-                        , const math::Size2 &size
-                        , geo::GeoDataset::Overview srcOverview)
-{
-    auto src(geo::GeoDataset::open(config.output));
-
-    auto ovrName(dir / "ovr.vrt");
-    VrtDataset ovr(ovrName, src.srs(), src.extents()
-                   , size, src.getFormat(), src.rawNodataValue());
-
-    // TODO: warp input tiles and add them to ovr
-    (void) srcOverview;
-
-    ovr.flush();
-
-    return ovrName;
 }
 
 void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
@@ -514,8 +501,9 @@ void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
     }
 }
 
-Setup buildBasicDataset(const Config &config)
+Setup buildDatasetBase(const Config &config)
 {
+    LOG(info3) << "Creating dataset base in " << config.output << ".";
     auto in(geo::GeoDataset::open(config.input));
 
     auto setup(makeSetup(in.size(), in.extents(), config.minOvrSize
@@ -559,11 +547,153 @@ Setup buildBasicDataset(const Config &config)
     return setup;
 }
 
+struct TIDGuard {
+    TIDGuard(const std::string &id)
+        : old(dbglog::thread_id())
+    {
+        dbglog::thread_id(id);
+    }
+    ~TIDGuard() { dbglog::thread_id(old); }
+
+    const std::string old;
+};
+
+class Dataset {
+public:
+    Dataset(const std::string &path)
+        : path_(path), ds_(geo::GeoDataset::placeholder())
+    {}
+
+    Dataset(const Dataset &d)
+        : path_(d.path_), ds_(geo::GeoDataset::open(path_))
+    {}
+
+    ~Dataset() {}
+
+    geo::GeoDataset& ds() { return ds_; }
+
+private:
+    std::string path_;
+    geo::GeoDataset ds_;
+};
+
+fs::path createOverview(const Config &config, int ovrIndex
+                        , const fs::path &dir, const math::Size2 &size
+                        , geo::GeoDataset::Overview srcOverview)
+{
+    auto ovrName(dir / "ovr.vrt");
+
+    LOG(info3) << "Creating overview in " << ovrName << ".";
+
+    VrtDataset ovr([&]() -> VrtDataset
+    {
+        auto src(geo::GeoDataset::open(config.output));
+        return VrtDataset(ovrName, src.srs(), src.extents()
+                          , size, src.getFormat(), src.rawNodataValue());
+    }());
+
+    auto extents(ovr.dataset().extents());
+    ovr.addBackground(dir, config.background, fs::path());
+
+    const auto &ts(config.tileSize);
+    math::Size2 tiled((size.width + ts.width - 1) / ts.width
+                       , (size.height + ts.height - 1) / ts.height);
+
+    // compute tile size in real extents
+    auto tileSize([&]() -> math::Size2f
+    {
+        auto es(math::size(extents));
+        return math::Size2f((es.width * ts.width) / size.width
+                            , (es.height * ts.height) / size.height);
+    }());
+    // extent's upper-left corner is origin for tile calculations
+    math::Point2 origin(ul(extents));
+
+    auto tc(math::area(tiled));
+
+    // last tile size
+    math::Size2 lts(size.width - (tiled.width - 1) * ts.width
+                    , size.height - (tiled.height - 1) * ts.height);
+
+    Dataset dataset(config.input);
+
+    geo::GeoDataset::WarpOptions warpOptions;
+    warpOptions.overview = srcOverview;
+    warpOptions.safeChunks = false;
+
+    UTILITY_OMP(parallel for firstprivate(dataset))
+        for (int i = 0; i < tc; ++i) {
+            math::Point2i tile(i % tiled.width, i / tiled.width);
+
+            bool lastX(tile(0) == (tiled.width - 1));
+            bool lastY(tile(1) == (tiled.height - 1));
+
+            math::Size2 pxSize(lastX ? lts.width : ts.width
+                               , lastY ? lts.height : ts.height);
+
+            // calculate extents
+            math::Point2 ul(origin(0) + tileSize.width * tile(0)
+                            , origin(1) - tileSize.height * tile(1));
+            math::Point2 lr(lastX ? extents.ur(0) : ul(0) + tileSize.width
+                            , lastY ? extents.ll(1): ul(1) - tileSize.height);
+
+            math::Extents2 te(ul(0), lr(1), lr(0), ul(1));
+            TIDGuard tg(str(boost::format("tile:%d-%d-%d")
+                            % ovrIndex % tile(0) % tile(1)));
+
+            LOG(info2)
+                << std::fixed
+                << "Processing tile " << ovrIndex
+                << '-' << tile(0) << '-' << tile(1) << " (extents: " << te
+                << ").";
+
+            // try warp
+            auto &src(dataset.ds());
+            auto tmp(geo::GeoDataset::deriveInMemory
+                     (src, src.srs(), pxSize, te));
+            auto wri(src.warpInto(tmp, config.resampling, warpOptions));
+
+            // TODO: check result and skip if no need to store
+
+            // strore result to file
+            fs::path tileName(str(boost::format("%d-%d.jp2")
+                                  % tile(0) % tile(1)));
+            fs::path tilePath(dir / tileName);
+
+            // copy as a jpeg 2000 file that doesn't corrupt data
+            auto dst(geo::GeoDataset::createCopy
+                     (tilePath, "JP2OpenJPEG", tmp
+                      , geo::GeoDataset::Options
+                      ("REVERSIBLE", true)("QUALITY", 100)));
+            dst.flush();
+
+            // store result
+            Rect drect(math::Point2i(tile(0) * ts.width, tile(1) * ts.height)
+                       , pxSize);
+
+            for (std::size_t b(0), eb(ovr.bandCount()); b != eb; ++b) {
+                UTILITY_OMP(critical)
+                    ovr.addSimpleSource(b, tileName, dst, b
+                                        , boost::none, drect);
+            }
+
+            LOG(info3)
+                << std::fixed
+                << "Processed tile " << ovrIndex
+                << '-' << tile(0) << '-' << tile(1) << " (extents: " << te
+                << ").";
+        }
+
+    ovr.flush();
+
+    return ovrName;
+}
+
 int VrtWo::run()
 {
     fs::create_directories(config_.ovrPath);
 
-    auto setup(buildBasicDataset(config_));
+    auto setup(buildDatasetBase(config_));
 
     // generate overviews
     geo::GeoDataset::Overview srcOverview;
@@ -571,7 +701,7 @@ int VrtWo::run()
         auto dir(config_.ovrPath / str(boost::format("%d") % i));
         fs::create_directories(dir);
 
-        auto path(createOverview(config_, dir, setup.ovrSizes[i]
+        auto path(createOverview(config_, i, dir, setup.ovrSizes[i]
                                  , srcOverview));
 
         // use previous level
@@ -579,7 +709,6 @@ int VrtWo::run()
 
         // add overview (manually by manipulating the XML)
         addOverview(config_.output, path);
-
     }
 
     return EXIT_SUCCESS;
