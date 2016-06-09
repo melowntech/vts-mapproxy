@@ -16,6 +16,7 @@
 #include "utility/streams.hpp"
 #include "utility/buildsys.hpp"
 #include "utility/openmp.hpp"
+#include "utility/raise.hpp"
 #include "service/cmdline.hpp"
 
 #include "geo/geodataset.hpp"
@@ -155,8 +156,10 @@ void VrtWo::configuration(po::options_description &cmdline
          ->default_value(false)->implicit_value(true)
         , "Wrap dataset in X direction.")
         ("background", po::value<Color>()
-        , "Background color to use in place outside of valid "
-         "data in input dataset and generated overviews.")
+        , "Optional background. If whole warped tile contains this "
+         "color it is left empty in the output. Solid dataset with this color "
+         "is created and places as a first source for each band in "
+         "all overvies.")
         ;
 
     pd.add("input", 1)
@@ -404,6 +407,7 @@ void VrtDataset::addBackground(const fs::path &path
     gdal_drivers::SolidDataset::Config cfg;
     cfg.srs = ds_.srs();
     cfg.size = ds_.size();
+    cfg.geoTransform(ds_.geoTransform());
     for (std::size_t i(0); i != bandCount_; ++i) {
         const auto bp(ds_.bandProperties(i));
 
@@ -513,9 +517,6 @@ Setup buildDatasetBase(const Config &config)
     VrtDataset out(config.output, in.srs(), setup.extents
                    , setup.size, in.getFormat(), in.rawNodataValue());
 
-    // add (optional) background
-    out.addBackground(config.ovrPath, config.background);
-
     // add input bands
     auto inSize(in.size());
     for (std::size_t i(0); i != in.bandCount(); ++i) {
@@ -576,6 +577,90 @@ private:
     std::string path_;
     geo::GeoDataset ds_;
 };
+
+template <typename T>
+bool compareValue(const cv::Mat_<T> &block
+                  , const math::Size2 &size
+                  , T value)
+{
+    for (int j(0); j != size.height; ++j) {
+        for (int i(0); i != size.width; ++i) {
+            if (block(j, i) != value) { return false; }
+        }
+    }
+    return true;
+}
+
+bool compare(const geo::GeoDataset::Block &block, const math::Size2 &size
+             , ::GDALDataType type, double value)
+{
+    switch (type) {
+    case ::GDT_Byte:
+        return compareValue<std::uint8_t>(block.data, size, value);
+
+    case ::GDT_UInt16:
+        return compareValue<std::uint16_t>(block.data, size, value);
+
+    case ::GDT_Int16:
+        return compareValue<std::int16_t>(block.data, size, value);
+
+    case ::GDT_UInt32:
+        return compareValue<std::uint32_t>(block.data, size, value);
+
+    case ::GDT_Int32:
+        return compareValue<std::int32_t>(block.data, size, value);
+
+    case ::GDT_Float32:
+        return compareValue<float>(block.data, size, value);
+
+    case ::GDT_Float64:
+        return compareValue<double>(block.data, size, value);
+
+    default:
+        utility::raise<std::runtime_error>
+            ("Unsupported data type <%s>.", type);
+    };
+    throw;
+}
+
+bool emptyTile(const Config &config, const geo::GeoDataset &ds)
+{
+    if (config.background) {
+        // TODO: we are using a background color: need to check content for
+        // exact color
+
+        // get background
+        int bands(ds.bandCount());
+        auto background(*config.background);
+        background.resize(bands);
+
+        auto bps(ds.bandProperties());
+
+        // process all blocks
+        for (const auto &bi : ds.getBlocking()) {
+            for (int i(0); i != bands; ++i) {
+                // load block in native format
+                auto block(ds.readBlock(bi.offset, i, true));
+                if (!compare(block, bi.size, bps[i].dataType, background[i])) {
+                    // not single color
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // no background -> do not store if mask is empty
+
+    // fetch optimized mask
+    auto mask(ds.fetchMask(true));
+    // no data -> full area is valid
+    if (!mask.data) { return false; }
+
+    // no non-zero count -> empty mask
+    return !cv::countNonZero(mask);
+}
 
 fs::path createOverview(const Config &config, int ovrIndex
                         , const fs::path &dir, const math::Size2 &size
@@ -651,9 +736,17 @@ fs::path createOverview(const Config &config, int ovrIndex
             auto &src(dataset.ds());
             auto tmp(geo::GeoDataset::deriveInMemory
                      (src, src.srs(), pxSize, te));
-            auto wri(src.warpInto(tmp, config.resampling, warpOptions));
+            src.warpInto(tmp, config.resampling, warpOptions);
 
             // TODO: check result and skip if no need to store
+            if (emptyTile(config, tmp)) {
+                LOG(info3)
+                    << std::fixed
+                    << "Processed tile " << ovrIndex
+                    << '-' << tile(0) << '-' << tile(1) << " (extents: " << te
+                    << ") [empty].";
+                continue;
+            }
 
             // strore result to file
             fs::path tileName(str(boost::format("%d-%d.jp2")
@@ -664,7 +757,8 @@ fs::path createOverview(const Config &config, int ovrIndex
             auto dst(geo::GeoDataset::createCopy
                      (tilePath, "JP2OpenJPEG", tmp
                       , geo::GeoDataset::Options
-                      ("REVERSIBLE", true)("QUALITY", 100)));
+                      ("REVERSIBLE", true)("QUALITY", 100)
+                      ("BLOCKXSIZE", 256)("BLOCKYSIZE", 256)));
             dst.flush();
 
             // store result
@@ -681,7 +775,7 @@ fs::path createOverview(const Config &config, int ovrIndex
                 << std::fixed
                 << "Processed tile " << ovrIndex
                 << '-' << tile(0) << '-' << tile(1) << " (extents: " << te
-                << ").";
+                << ") [valid].";
         }
 
     ovr.flush();
