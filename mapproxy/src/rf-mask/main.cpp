@@ -398,7 +398,7 @@ void rasterizeBlock(const math::Point2i &block
                     , blockSize.height * tileSize.height}
              , geo::GeoDataset::Format::coverage
              (geo::GeoDataset::Format::Storage::memory)
-             , 0));
+             , geo::NodataValue(0)));
 
     // clip polygon by block extents
     ::OGRRawPoint clipPoints[5] = {

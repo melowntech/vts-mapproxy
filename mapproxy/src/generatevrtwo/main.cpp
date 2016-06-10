@@ -11,7 +11,7 @@
 #include <boost/format.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 
-#include "gdal/cpl_minixml.h"
+#include "cpl_minixml.h"
 
 #include "utility/streams.hpp"
 #include "utility/buildsys.hpp"
@@ -95,11 +95,11 @@ operator<<(std::basic_ostream<CharT, Traits> &os
 }
 
 struct Config {
-    std::string input;
+    fs::path input;
     fs::path output;
+    fs::path outputDataset;
     math::Size2 tileSize;
     geo::GeoDataset::Resampling resampling;
-    fs::path ovrPath;
     math::Size2 minOvrSize;
     bool wrapx;
     bool overwrite;
@@ -139,13 +139,12 @@ void VrtWo::configuration(po::options_description &cmdline
         ("input", po::value(&config_.input)->required()
          , "Path to input GDAL dataset.")
         ("output", po::value(&config_.output)->required()
-         , "Path to output GDAL dataset.")
+         , "Path to output directory where to place "
+         "GDAL dataset and its overviews.")
         ("tileSize", po::value(&config_.tileSize)->required()
         , "Tile size.")
         ("resampling", po::value(&config_.resampling)->required()
         , "Resampling algorithm.")
-        ("ovrPath", po::value(&config_.ovrPath)->required()
-        , "Path where to store generated overviews.")
         ("minOvrSize", po::value(&config_.minOvrSize)->required()
          ->default_value(config_.minOvrSize)
         , "Minimum size of generated overview.")
@@ -175,13 +174,15 @@ void VrtWo::configure(const po::variables_map &vars)
         config_.background = vars["background"].as<Color>();
     }
 
+    config_.input = fs::absolute(config_.input);
+    config_.outputDataset = config_.output / "dataset";
+
     LOG(info3, log_)
         << "Config:"
         << "\n\tinput = " << config_.input
         << "\n\toutput = " << config_.output
         << "\n\ttileSize = " << config_.tileSize
         << "\n\tresampling = " << config_.resampling
-        << "\n\tovrPath = " << config_.ovrPath
         << "\n\tminOvrSize = " << config_.minOvrSize
         << "\n\twrapx = " << config_.wrapx
         << "\n\tbackground = " << config_.background
@@ -210,14 +211,14 @@ struct Setup {
     math::Size2 size;
     math::Extents2 extents;
     Sizes ovrSizes;
+    Sizes ovrTiled;
     int xPlus;
 
     Setup() : xPlus() {}
 };
 
 Setup makeSetup(math::Size2 size, math::Extents2 extents
-                , const math::Size2 &minSize
-                , bool wrapx)
+                , const Config &config)
 {
     auto halve([&]()
     {
@@ -230,14 +231,27 @@ Setup makeSetup(math::Size2 size, math::Extents2 extents
     setup.size = size;
 
     halve();
-    while ((size.width >= minSize.width)
-           || (size.height >= minSize.height))
+    while ((size.width >= config.minOvrSize.width)
+           || (size.height >= config.minOvrSize.height))
     {
         setup.ovrSizes.push_back(size);
         halve();
     }
 
-    if (!wrapx) { return setup; }
+    auto makeTiled([&]()
+    {
+        const auto &ts(config.tileSize);
+        for (const auto &size : setup.ovrSizes) {
+            setup.ovrTiled.emplace_back
+                ((size.width + ts.width - 1) / ts.width
+                 , (size.height + ts.height - 1) / ts.height);
+        }
+    });
+
+    if (!config.wrapx) {
+        makeTiled();
+        return setup;
+    }
 
     // add one pixel to each side at bottom level and double on the way up
     int add(2);
@@ -263,6 +277,7 @@ Setup makeSetup(math::Size2 size, math::Extents2 extents
     // and finally update size
     setup.size.width += add;
 
+    makeTiled();
     return setup;
 }
 
@@ -306,8 +321,6 @@ public:
                          , int srcBand
                          , const OptionalRect &srcRect = boost::none
                          , const OptionalRect &dstRect = boost::none);
-
-    void addOverview(int band, const fs::path &filename, int srcBand);
 
     void addBackground(const fs::path &path, const Color::optional &color
                        , const boost::optional<fs::path> &localTo
@@ -381,17 +394,6 @@ void VrtDataset::addSimpleSource(int band, const fs::path &filename
                     , "new_vrt_sources");
 }
 
-void VrtDataset::addOverview(int band, const fs::path &filename, int srcBand)
-{
-    std::ostringstream os;
-    os << "<Overview>\n";
-    writeSourceFilename(os, filename, true);
-    writeSourceBand(os, srcBand);
-    os << "</Overview>\n";
-    ds_.setMetadata(band + 1, geo::GeoDataset::Metadata("overview", os.str())
-                    , "new_vrt_sources");
-}
-
 void VrtDataset::addBackground(const fs::path &path
                                , const Color::optional &color
                                , const boost::optional<fs::path> &localTo)
@@ -431,11 +433,13 @@ void VrtDataset::addBackground(const fs::path &path
 void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
 {
     typedef std::shared_ptr< ::CPLXMLNode> XmlNode;
-    auto xmlNode([](::CPLXMLNode *n) -> XmlNode
+    auto xmlNode([](const fs::path &path) -> XmlNode
     {
+        auto n(::CPLParseXMLFile(path.c_str()));
         if (!n) {
             LOGTHROW(err1, std::runtime_error)
-                << "Cannot parse XML: <" << ::CPLGetLastErrorMsg() << ">.";
+                << "Cannot parse XML from " << path
+                << ": <" << ::CPLGetLastErrorMsg() << ">.";
         }
         return XmlNode(n, [](::CPLXMLNode *n) { ::CPLDestroyXMLNode(n); });
     });
@@ -473,7 +477,7 @@ void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
         const char *name_;
     };
 
-    auto root(xmlNode(::CPLParseXMLFile(vrtPath.c_str())));
+    auto root(xmlNode(vrtPath));
 
     for (NodeIterator ni(root.get(), "VRTRasterBand"); ni; ++ni) {
         NodeIterator bandNode(*ni, "band");
@@ -507,14 +511,14 @@ void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
 
 Setup buildDatasetBase(const Config &config)
 {
-    LOG(info3) << "Creating dataset base in " << config.output << ".";
+    LOG(info3) << "Creating dataset base in " << config.outputDataset
+               << " from " << config.input << ".";
     auto in(geo::GeoDataset::open(config.input));
 
-    auto setup(makeSetup(in.size(), in.extents(), config.minOvrSize
-                         , config.wrapx));
+    auto setup(makeSetup(in.size(), in.extents(), config));
 
     // create virtual output dataset
-    VrtDataset out(config.output, in.srs(), setup.extents
+    VrtDataset out(config.outputDataset, in.srs(), setup.extents
                    , setup.size, in.getFormat(), in.rawNodataValue());
 
     // add input bands
@@ -663,26 +667,30 @@ bool emptyTile(const Config &config, const geo::GeoDataset &ds)
 }
 
 fs::path createOverview(const Config &config, int ovrIndex
-                        , const fs::path &dir, const math::Size2 &size
-                        , geo::GeoDataset::Overview srcOverview)
+                        , const fs::path &srcPath
+                        , const fs::path &dir
+                        , const math::Size2 &size
+                        , const math::Size2 &tiled
+                        , std::atomic<int> &progress, int total)
 {
     auto ovrName(dir / "ovr.vrt");
+    auto ovrPath(config.output / ovrName);
 
-    LOG(info3) << "Creating overview in " << ovrName << ".";
+    LOG(info3)
+        << "Creating overview #" << ovrIndex << " in " << ovrPath
+        << " from " << srcPath << ".";
 
     VrtDataset ovr([&]() -> VrtDataset
     {
-        auto src(geo::GeoDataset::open(config.output));
-        return VrtDataset(ovrName, src.srs(), src.extents()
+        auto src(geo::GeoDataset::open(srcPath));
+        return VrtDataset(ovrPath, src.srs(), src.extents()
                           , size, src.getFormat(), src.rawNodataValue());
     }());
 
     auto extents(ovr.dataset().extents());
-    ovr.addBackground(dir, config.background, fs::path());
+    ovr.addBackground(config.output / dir, config.background, fs::path());
 
     const auto &ts(config.tileSize);
-    math::Size2 tiled((size.width + ts.width - 1) / ts.width
-                       , (size.height + ts.height - 1) / ts.height);
 
     // compute tile size in real extents
     auto tileSize([&]() -> math::Size2f
@@ -700,13 +708,15 @@ fs::path createOverview(const Config &config, int ovrIndex
     math::Size2 lts(size.width - (tiled.width - 1) * ts.width
                     , size.height - (tiled.height - 1) * ts.height);
 
-    Dataset dataset(config.input);
+    // Dataset dataset(srcPath.string());
 
+    // use full dataset and distable safe-chunking
     geo::GeoDataset::WarpOptions warpOptions;
-    warpOptions.overview = srcOverview;
+    warpOptions.overview = geo::GeoDataset::Overview();
     warpOptions.safeChunks = false;
 
-    UTILITY_OMP(parallel for firstprivate(dataset))
+    // UTILITY_OMP(parallel for firstprivate(dataset) schedule(dynamic))
+    UTILITY_OMP(parallel for schedule(dynamic))
         for (int i = 0; i < tc; ++i) {
             math::Point2i tile(i % tiled.width, i / tiled.width);
 
@@ -729,53 +739,65 @@ fs::path createOverview(const Config &config, int ovrIndex
             LOG(info2)
                 << std::fixed
                 << "Processing tile " << ovrIndex
-                << '-' << tile(0) << '-' << tile(1) << " (extents: " << te
-                << ").";
+                << '-' << tile(0) << '-' << tile(1) << " (size: " << pxSize
+                << ", extents: " << te << ").";
 
             // try warp
-            auto &src(dataset.ds());
-            auto tmp(geo::GeoDataset::deriveInMemory
-                     (src, src.srs(), pxSize, te));
+            auto src(geo::GeoDataset::open(srcPath));
+
+            // auto &src(dataset.ds());
+
+            // strore result to file
+            fs::path tileName(str(boost::format("%d-%d.tif")
+                                  % tile(0) % tile(1)));
+            fs::path tilePath(config.output / dir / tileName);
+
+            // data format
+            auto format(src.getFormat());
+            format.storageType = geo::GeoDataset::Format::Storage::memory;
+
+            // create in-memory temporary dataset dataset
+            auto tmp(geo::GeoDataset::create
+                     ("MEM", src.srs(), te, pxSize, format
+                      , src.rawNodataValue()));
+
             src.warpInto(tmp, config.resampling, warpOptions);
 
-            // TODO: check result and skip if no need to store
+            // check result and skip if no need to store
             if (emptyTile(config, tmp)) {
+                auto id(++progress);
                 LOG(info3)
                     << std::fixed
-                    << "Processed tile " << ovrIndex
-                    << '-' << tile(0) << '-' << tile(1) << " (extents: " << te
-                    << ") [empty].";
+                    << "Processed tile #" << id << '/' << total << ' '
+                    << ovrIndex
+                    << '-' << tile(0) << '-' << tile(1) << " (size: " << pxSize
+                    << ", extents: " << te << ") [empty].";
                 continue;
             }
 
-            // strore result to file
-            fs::path tileName(str(boost::format("%d-%d.jp2")
-                                  % tile(0) % tile(1)));
-            fs::path tilePath(dir / tileName);
-
-            // copy as a jpeg 2000 file that doesn't corrupt data
-            auto dst(geo::GeoDataset::createCopy
-                     (tilePath, "JP2OpenJPEG", tmp
-                      , geo::GeoDataset::Options
-                      ("REVERSIBLE", true)("QUALITY", 100)
-                      ("BLOCKXSIZE", 256)("BLOCKYSIZE", 256)));
-            dst.flush();
+            // copy data into real gtiff
+            {
+                fs::remove(tilePath);
+                geo::GeoDataset::createCopy
+                    (tilePath, "GTiff", tmp, geo::Options("TILED", true));
+            }
 
             // store result
             Rect drect(math::Point2i(tile(0) * ts.width, tile(1) * ts.height)
                        , pxSize);
 
-            for (std::size_t b(0), eb(ovr.bandCount()); b != eb; ++b) {
-                UTILITY_OMP(critical)
-                    ovr.addSimpleSource(b, tileName, dst, b
+            UTILITY_OMP(critical)
+                for (std::size_t b(0), eb(ovr.bandCount()); b != eb; ++b) {
+                    ovr.addSimpleSource(b, tileName, tmp, b
                                         , boost::none, drect);
-            }
+                }
 
+            auto id(++progress);
             LOG(info3)
                 << std::fixed
-                << "Processed tile " << ovrIndex
-                << '-' << tile(0) << '-' << tile(1) << " (extents: " << te
-                << ") [valid].";
+                << "Processed tile #" << id << '/' << total << ' ' << ovrIndex
+                << '-' << tile(0) << '-' << tile(1) << " (size: " << pxSize
+                << ", extents: " << te << ") [valid].";
         }
 
     ovr.flush();
@@ -785,24 +807,41 @@ fs::path createOverview(const Config &config, int ovrIndex
 
 int VrtWo::run()
 {
-    fs::create_directories(config_.ovrPath);
+    if (!fs::create_directories(config_.output) && !config_.overwrite) {
+        LOG(fatal) << "Destination directory already exits. Use --overwrite "
+            "to force rewrite.";
+        return EXIT_FAILURE;
+    }
 
     auto setup(buildDatasetBase(config_));
 
+    auto total(std::accumulate(setup.ovrTiled.begin(), setup.ovrTiled.end()
+                               , 0, [&](int t, const math::Size2 &tiled)
+                               {
+                                   return t + math::area(tiled);
+                               }));
+
+    LOG(info3) << "About to generate " << setup.ovrSizes.size()
+               << " overviews with " << total << " tiles of size "
+               << config_.tileSize << ".";
+
+    std::atomic<int> progress(0);
+
     // generate overviews
-    geo::GeoDataset::Overview srcOverview;
+    fs::path inputPath(config_.outputDataset);
     for (std::size_t i(0); i != setup.ovrSizes.size(); ++i) {
-        auto dir(config_.ovrPath / str(boost::format("%d") % i));
-        fs::create_directories(dir);
+        auto dir(str(boost::format("%d") % i));
+        fs::create_directories(config_.output / dir);
 
-        auto path(createOverview(config_, i, dir, setup.ovrSizes[i]
-                                 , srcOverview));
-
-        // use previous level
-        srcOverview = i;
+        auto path(createOverview
+                  (config_, i, inputPath, dir, setup.ovrSizes[i]
+                   , setup.ovrTiled[i], progress, total));
 
         // add overview (manually by manipulating the XML)
-        addOverview(config_.output, path);
+        addOverview(config_.outputDataset, path);
+
+        // use previous level in the next round
+        inputPath = config_.output / path;
     }
 
     return EXIT_SUCCESS;
