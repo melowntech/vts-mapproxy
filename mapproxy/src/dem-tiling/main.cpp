@@ -52,12 +52,14 @@ private:
 
     int run();
 
-    std::string dataset_;
+    fs::path input_;
     fs::path output_;
     std::string referenceFrame_;
     vts::LodRange lodRange_;
     int extentsSampling_;
     int tileSampling_;
+
+    fs::path dataset_;
 };
 
 void DemTiling::configuration(po::options_description &cmdline
@@ -67,10 +69,11 @@ void DemTiling::configuration(po::options_description &cmdline
     vr::registryConfiguration(cmdline, vr::defaultPath());
 
     cmdline.add_options()
-        ("dataset", po::value(&dataset_)->required()
+        ("input", po::value(&input_)->required()
          , "Path to dataset to proces.")
-        ("output", po::value(&output_)->required()
-         , "Path output tiling file.")
+        ("output", po::value<fs::path>(&output_)
+         , "Path output tiling file if different from "
+         "input/tiling.referenceFrame.")
         ("referenceFrame", po::value(&referenceFrame_)->required()
          , "Tiling reference frame.")
         ("lodRange", po::value(&lodRange_)->required()
@@ -84,8 +87,8 @@ void DemTiling::configuration(po::options_description &cmdline
          , "Nuber of pixels to break tile into when analyzing its coverage.")
         ;
 
-    pd.add("dataset", 1)
-        .add("output", 1)
+    pd.add("input", 1)
+        .add("referenceFrame", 1)
         ;
 
     (void) config;
@@ -95,8 +98,16 @@ void DemTiling::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
 
+    dataset_ = input_ / "dem";
+    if (vars.count("output")) {
+        output_ = vars["output"].as<fs::path>();
+    } else {
+        output_ = input_ / ("tiling." + referenceFrame_);
+    }
+
     LOG(info3, log_)
         << "Config:"
+        << "\n\tinput = " << output_
         << "\n\tdataset = " << dataset_
         << "\n\toutput = " << output_
         << "\n\treferenceFrame = " << referenceFrame_
@@ -109,9 +120,11 @@ bool DemTiling::help(std::ostream &out, const std::string &what) const
 {
     if (what.empty()) {
         // program help
-        out << ("dem-tiling tool\n"
+        out << ("mapproxy-dem-tiling tool\n"
                 "    Analyzes input dataset and generates tiling "
                 "information.\n"
+                "usage:\n"
+                "    mapproxy-dem-tiling input referenceFrame [ options ]\n"
                 "\n"
                 );
 
@@ -134,7 +147,7 @@ typedef vts::TileIndex::Flag TiFlag;
 
 class TreeWalker {
 public:
-    TreeWalker(vts::TileIndex &ti, const std::string &dataset
+    TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                , const vts::NodeInfo &root
                , vts::LodRange lodRange, int tileSampling);
 
@@ -151,7 +164,7 @@ private:
         }
     }
 
-    const std::string dataset_;
+    const fs::path dataset_;
     vts::TileIndex &ti_;
     vts::LodRange lodRange_;
     int tileSampling_;
@@ -161,7 +174,7 @@ private:
 };
 
 
-TreeWalker::TreeWalker(vts::TileIndex &ti, const std::string &dataset
+TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                        , const vts::NodeInfo &root, vts::LodRange lodRange
                        , int tileSampling)
     : dataset_(dataset), ti_(ti), lodRange_(lodRange)
@@ -206,6 +219,8 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         return;
     });
 
+    TIDGuard tg(str(boost::format("tile:%s") % tileId));
+
     if (!node.valid()) {
         // Node is invalid but we can safely say that we have watertight mesh
         // here and down to the maximum LOD to save space in tile index.
@@ -225,8 +240,6 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         return;
     }
 
-    TIDGuard tg(str(boost::format("tile:%s") % tileId));
-
     LOG(info2) << "Processing tile " << tileId << ".";
 
     int samples(upscaling ? 8 : tileSampling_);
@@ -243,7 +256,18 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                      , GDT_Float32
                      , geo::GeoDataset::NodataValue(-1e6)));
 
-        auto wri(ds.warpInto(tileDs, geo::GeoDataset::Resampling::dem));
+        auto wri([&]() -> geo::GeoDataset::WarpResultInfo
+        {
+            try {
+                // try to warp as in mapproxy
+                return ds.warpInto
+                    (tileDs, geo::GeoDataset::Resampling::dem);
+            } catch (geo::WarpError) {
+                // failed -> average could help
+                return ds.warpInto
+                    (tileDs, geo::GeoDataset::Resampling::average);
+            }
+        }());
 
         TiFlag::value_type baseFlags(TiFlag::mesh);
         if (!upscaling) {

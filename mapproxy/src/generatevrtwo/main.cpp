@@ -17,6 +17,8 @@
 #include "utility/buildsys.hpp"
 #include "utility/openmp.hpp"
 #include "utility/raise.hpp"
+#include "utility/duration.hpp"
+#include "utility/time.hpp"
 #include "service/cmdline.hpp"
 
 #include "geo/geodataset.hpp"
@@ -101,12 +103,12 @@ struct Config {
     math::Size2 tileSize;
     geo::GeoDataset::Resampling resampling;
     math::Size2 minOvrSize;
-    bool wrapx;
+    boost::optional<int> wrapx;
     bool overwrite;
     Color::optional background;
 
     Config()
-        : minOvrSize(256, 256), wrapx(false), overwrite(false)
+        : minOvrSize(256, 256), overwrite(false)
     {}
 };
 
@@ -151,9 +153,10 @@ void VrtWo::configuration(po::options_description &cmdline
         ("overwrite", po::value(&config_.overwrite)->required()
          ->default_value(false)->implicit_value(true)
         , "Overwrite existing dataset.")
-        ("wrapx", po::value(&config_.wrapx)->required()
-         ->default_value(false)->implicit_value(true)
-        , "Wrap dataset in X direction.")
+        ("wrapx", po::value<int>()
+         ->implicit_value(0)
+        , "Wrap dataset in X direction. Optional. Value indicates number "
+         "of overlapping pixels.")
         ("background", po::value<Color>()
         , "Optional background. If whole warped tile contains this "
          "color it is left empty in the output. Solid dataset with this color "
@@ -174,6 +177,10 @@ void VrtWo::configure(const po::variables_map &vars)
         config_.background = vars["background"].as<Color>();
     }
 
+    if (vars.count("wrapx")) {
+        config_.wrapx = vars["wrapx"].as<int>();
+    }
+
     config_.input = fs::absolute(config_.input);
     config_.outputDataset = config_.output / "dataset";
 
@@ -184,7 +191,11 @@ void VrtWo::configure(const po::variables_map &vars)
         << "\n\ttileSize = " << config_.tileSize
         << "\n\tresampling = " << config_.resampling
         << "\n\tminOvrSize = " << config_.minOvrSize
-        << "\n\twrapx = " << config_.wrapx
+        << "\n\twrapx = "
+        << utility::LManip([&](std::ostream &os) -> std::ostream& {
+                if (config_.wrapx) { return os << "true, " << *config_.wrapx; }
+                return os << "false";
+            })
         << "\n\tbackground = " << config_.background
         << "\n"
         ;
@@ -253,8 +264,8 @@ Setup makeSetup(math::Size2 size, math::Extents2 extents
         return setup;
     }
 
-    // add one pixel to each side at bottom level and double on the way up
-    int add(2);
+    // add 16 pixel to each side at bottom level and double on the way up
+    int add(32);
     for (auto &s : boost::adaptors::reverse(setup.ovrSizes)) {
         s.width += add;
         add *= 2;
@@ -514,8 +525,15 @@ Setup buildDatasetBase(const Config &config)
     LOG(info3) << "Creating dataset base in " << config.outputDataset
                << " from " << config.input << ".";
     auto in(geo::GeoDataset::open(config.input));
-
     auto setup(makeSetup(in.size(), in.extents(), config));
+
+    // make symlink to input dataset
+    fs::path inputDataset("./original");
+    {
+        fs::path symlink(config.output / inputDataset);
+        fs::remove(symlink);
+        fs::create_symlink(config.input, symlink);
+    }
 
     // create virtual output dataset
     VrtDataset out(config.outputDataset, in.srs(), setup.extents
@@ -527,23 +545,27 @@ Setup buildDatasetBase(const Config &config)
         if (config.wrapx) {
             // wrapping in x
 
+            // get shift based on pixel overlap
+            const auto shift(*config.wrapx);
+
             // add center section
             Rect centerDst(math::Point2i(setup.xPlus, 0), inSize);
-            out.addSimpleSource(i, config.input, in, i, boost::none
+            out.addSimpleSource(i, inputDataset, in, i, boost::none
                                 , centerDst);
             math::Size2 strip(math::Size2(setup.xPlus, inSize.height));
 
-            Rect rightSrc(math::Point2i(inSize.width - setup.xPlus, 0)
+            Rect rightSrc(math::Point2i(inSize.width - setup.xPlus - shift, 0)
                           , strip);
             Rect leftDst(math::Size2(setup.xPlus, inSize.height));
-            out.addSimpleSource(i, config.input, in, i, rightSrc, leftDst);
+            out.addSimpleSource(i, inputDataset, in, i, rightSrc, leftDst);
 
-            Rect leftSrc(strip);
+            Rect leftSrc(math::Point2i(shift, 0)
+                         , math::Size2(setup.xPlus, inSize.height));
             Rect rightDst(math::Point2i(inSize.width + setup.xPlus, 0)
                           , strip);
-            out.addSimpleSource(i, config.input, in, i, leftSrc, rightDst);
+            out.addSimpleSource(i, inputDataset, in, i, leftSrc, rightDst);
         } else {
-            out.addSimpleSource(i, config.input, in, i);
+            out.addSimpleSource(i, inputDataset, in, i);
         }
     }
 
@@ -675,10 +697,12 @@ fs::path createOverview(const Config &config, int ovrIndex
 {
     auto ovrName(dir / "ovr.vrt");
     auto ovrPath(config.output / ovrName);
+    const auto &ts(config.tileSize);
 
     LOG(info3)
-        << "Creating overview #" << ovrIndex << " in " << ovrPath
-        << " from " << srcPath << ".";
+        << "Creating overview #" << ovrIndex
+        << " of " << math::area(tiled) << " tiles in "
+        << ovrPath << " from " << srcPath << ".";
 
     VrtDataset ovr([&]() -> VrtDataset
     {
@@ -690,7 +714,6 @@ fs::path createOverview(const Config &config, int ovrIndex
     auto extents(ovr.dataset().extents());
     ovr.addBackground(config.output / dir, config.background, fs::path());
 
-    const auto &ts(config.tileSize);
 
     // compute tile size in real extents
     auto tileSize([&]() -> math::Size2f
@@ -718,6 +741,7 @@ fs::path createOverview(const Config &config, int ovrIndex
     // UTILITY_OMP(parallel for firstprivate(dataset) schedule(dynamic))
     UTILITY_OMP(parallel for schedule(dynamic))
         for (int i = 0; i < tc; ++i) {
+            utility::DurationMeter timer;
             math::Point2i tile(i % tiled.width, i / tiled.width);
 
             bool lastX(tile(0) == (tiled.width - 1));
@@ -771,7 +795,9 @@ fs::path createOverview(const Config &config, int ovrIndex
                     << "Processed tile #" << id << '/' << total << ' '
                     << ovrIndex
                     << '-' << tile(0) << '-' << tile(1) << " (size: " << pxSize
-                    << ", extents: " << te << ") [empty].";
+                    << ", extents: " << te << ") [empty]"
+                    << "; duration: "
+                    << utility::formatDuration(timer.duration()) << ".";
                 continue;
             }
 
@@ -797,7 +823,9 @@ fs::path createOverview(const Config &config, int ovrIndex
                 << std::fixed
                 << "Processed tile #" << id << '/' << total << ' ' << ovrIndex
                 << '-' << tile(0) << '-' << tile(1) << " (size: " << pxSize
-                << ", extents: " << te << ") [valid].";
+                << ", extents: " << te << ") [valid]"
+                << "; duration: "
+                << utility::formatDuration(timer.duration()) << ".";
         }
 
     ovr.flush();
@@ -844,6 +872,8 @@ int VrtWo::run()
         inputPath = config_.output / path;
     }
 
+    LOG(info4) << "VRT with overviews in " << config_.output
+               << " successfully generated.";
     return EXIT_SUCCESS;
 }
 
