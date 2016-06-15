@@ -264,8 +264,9 @@ Setup makeSetup(math::Size2 size, math::Extents2 extents
         return setup;
     }
 
-    // add 16 pixel to each side at bottom level and double on the way up
-    int add(32);
+    // add 3 pixel to each side at bottom level and double on the way up
+    // 3 pixels because of worst scenario (lanczos filter)
+    int add(6);
     for (auto &s : boost::adaptors::reverse(setup.ovrSizes)) {
         s.width += add;
         add *= 2;
@@ -278,7 +279,7 @@ Setup makeSetup(math::Size2 size, math::Extents2 extents
     auto es(math::size(setup.extents));
     auto pw(es.width / setup.size.width);
 
-        // calculate addition
+    // calculate addition
     auto eadd(setup.xPlus * pw);
 
     // apply addition in both dimensions

@@ -107,7 +107,7 @@ void DemTiling::configure(const po::variables_map &vars)
 
     LOG(info3, log_)
         << "Config:"
-        << "\n\tinput = " << output_
+        << "\n\tinput = " << input_
         << "\n\tdataset = " << dataset_
         << "\n\toutput = " << output_
         << "\n\treferenceFrame = " << referenceFrame_
@@ -262,8 +262,11 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                 // try to warp as in mapproxy
                 return ds.warpInto
                     (tileDs, geo::GeoDataset::Resampling::dem);
-            } catch (geo::WarpError) {
+            } catch (const geo::WarpError &e) {
                 // failed -> average could help
+                LOG(info3)
+                    << "Warp failed (" << e.what()
+                    << "), restarting with simpler kernel.";
                 return ds.warpInto
                     (tileDs, geo::GeoDataset::Resampling::average);
             }
