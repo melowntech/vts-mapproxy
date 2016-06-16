@@ -12,6 +12,25 @@
 
 namespace vts = vadstena::vts;
 
+/** Calculates number of faces to simplify mesh to based on ideal flat tile and
+ *  tile's roughness.
+ */
+class TileFacesCalculator {
+public:
+    TileFacesCalculator()
+        : base_(750), roughnessFactorMin_(0.0), roughnessFactorMax_(6.0)
+        , quotient_(1.0 - (1.0 / roughnessFactorMax_))
+    {}
+
+    int operator()(double meshArea, double meshProjectedArea) const;
+
+private:
+    int base_;
+    double roughnessFactorMin_;
+    double roughnessFactorMax_;
+    double quotient_;
+};
+
 typedef std::function<bool(int, int, double&)> HeightSampler;
 
 std::tuple<geometry::Mesh, bool>
@@ -19,7 +38,7 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
              , const HeightSampler &heights = HeightSampler());
 
 void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
-                  , int facesPerTile);
+                  , const TileFacesCalculator &tileFacesCalculator);
 
 void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
                       , const vts::NodeInfo &nodeInfo, bool fullyCovered);

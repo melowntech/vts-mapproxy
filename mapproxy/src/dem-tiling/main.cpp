@@ -159,7 +159,9 @@ private:
     }
 
     void prepareDataset() {
-        for (int i(0), e(omp_get_num_threads()); i < e; ++i) {
+        int count(omp_get_num_threads());
+        gds_.reserve(count);
+        for (int i(0); i < count; ++i) {
             gds_.emplace_back(geo::GeoDataset::open(dataset_));
         }
     }

@@ -422,12 +422,11 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                                , maskTree_);
 
         // fill in grid
-        // TODO: use mask
         ValueMinMaxSampler vmm(dem);
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
-                // work only with pixels not masked by reference frame's mask
+                // work only with pixels not masked by combined mask
                 if (!rfmask(i, j)) { continue; }
 
                 auto value(vmm(i, j));
@@ -631,7 +630,7 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
                               , GdalWarper &warper) const
 {
     const int samplesPerSide(128);
-    const int facesPerTile(1500);
+    const TileFacesCalculator tileFacesCalculator;
 
     sink->checkAborted();
 
@@ -677,7 +676,7 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
     auto &lm(std::get<0>(meshInfo));
 
     // simplify
-    simplifyMesh(lm, nodeInfo, facesPerTile);
+    simplifyMesh(lm, nodeInfo, tileFacesCalculator);
 
     // and add skirt
     addSkirt(lm, nodeInfo);
@@ -759,7 +758,6 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                    , geo::GeoDataset::Resampling::average)
                   , sink));
 
-        // TODO: combine with mask
         // grid pixel size
         math::Size2f gpx
             (ts.width / (metatileSamplesPerTile + 1)

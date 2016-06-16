@@ -402,7 +402,7 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
 {
     // TODO: calculate tile sampling
     const int samplesPerSide(128);
-    const int facesPerTile(1500);
+    const TileFacesCalculator tileFacesCalculator;
 
     sink->checkAborted();
 
@@ -427,7 +427,7 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
     auto &lm(std::get<0>(meshInfo));
 
     // simplify
-    simplifyMesh(lm, nodeInfo, facesPerTile);
+    simplifyMesh(lm, nodeInfo, tileFacesCalculator);
 
     // and add skirt
     addSkirt(lm, nodeInfo);

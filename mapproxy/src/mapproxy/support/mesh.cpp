@@ -103,42 +103,42 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
 
 namespace {
 
-double calculateNormalizedMesh2dArea(const geometry::Mesh &mesh
-                                     , const math::Size2f &tileSize)
+/** Computes area of 3D mesh and area of its projecteion to X-Y plane.
+ *  Projection is determined as an area of triangle with Z cooridnated set to
+ *  zero. Therefore, mesh cannot have overlapping trinagles.
+ */
+std::pair<double, double> meshArea(const geometry::Mesh &mesh)
 {
-    // mesh is in local coordinates, i.e. X and Y coordinates are in range
-    // [-tileSize/2, tileSize/2]; to normalize them into range [-0.5, 0.5] we
-    // have to divide them by tileSize
+    std::pair<double, double> res(0.0, 0.0);
+    auto &area(res.first);
+    auto &projected(res.second);
 
-    double area(0.0);
     for (const auto &face : mesh.faces) {
         auto a(mesh.vertices[face.a]);
         auto b(mesh.vertices[face.b]);
         auto c(mesh.vertices[face.c]);
-        // normalize
-        a[0] /= tileSize.width; a[1] /= tileSize.height;
-        b[0] /= tileSize.width; b[1] /= tileSize.height;
-        c[0] /= tileSize.width; c[1] /= tileSize.height;
-        // reset z coordinate
-        a[2] = b[2] = c[2] = 0.0;
+
+        // area in 3D
         area += vts::triangleArea(a, b, c);
+
+        // reset z coordinate -> area in 2D
+        a[2] = b[2] = c[2] = 0.0;
+        projected += vts::triangleArea(a, b, c);
     }
 
-    // NB: area is normalized
-    return area;
+    return res;
 }
 
 } // namespace
 
 void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
-                  , int facesPerTile)
+                  , const TileFacesCalculator &tileFacesCalculator)
 {
     const auto ts(math::size(nodeInfo.extents()));
 
     // calculate number of faces
-    const auto normalizedArea(calculateNormalizedMesh2dArea(mesh, ts));
-    const int faceCount
-        (std::round(normalizedArea * facesPerTile));
+    auto area(meshArea(mesh));
+    const int faceCount(tileFacesCalculator(area.first, area.second));
     LOG(info1)
         << "Simplifying mesh to " << faceCount << " faces per tile (from "
         << mesh.faces.size() << ".";
@@ -346,4 +346,21 @@ std::tuple<double, int> quadArea(const math::Point3 *v00
     }
 
     return qa;
+}
+
+int TileFacesCalculator::operator()(double meshArea, double meshProjectedArea)
+    const
+{
+    // ratio between mesh area and area of its projection to tile base
+    const auto areaRatio(meshArea / meshProjectedArea);
+
+    // calculate scaling factor
+    auto factor((std::pow(quotient_, areaRatio) - 1.0)
+                      / (quotient_ - 1.0));
+
+    // clamp factor to min/max range
+    factor = math::clamp(factor, roughnessFactorMin_, roughnessFactorMax_);
+
+    // apply factor to base number of faces
+    return base_* factor;
 }
