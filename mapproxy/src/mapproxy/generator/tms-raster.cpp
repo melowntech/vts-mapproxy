@@ -96,7 +96,7 @@ vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
 
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
-    bl.credits = asStringSet(res.credits);
+    bl.credits = asCredits(res.credits);
 
     // done
     return bl;
@@ -221,6 +221,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
                            , geo::GeoDataset::Resampling::cubic
                            , absoluteDataset(definition_.mask))
                           , sink));
+    sink->checkAborted();
 
     // serialize
     std::vector<unsigned char> buf;
@@ -253,6 +254,8 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
                            , math::Size2(256, 256)
                            , geo::GeoDataset::Resampling::cubic)
                           , sink));
+
+    sink->checkAborted();
 
     // serialize
     std::vector<unsigned char> buf;
@@ -324,6 +327,7 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
                                , geo::GeoDataset::Resampling::cubic)
                               , sink);
         }
+        sink->checkAborted();
 
         // generate metatile content for current block
         math::Point2i origin(view.ll(0) - tileId.x, view.ll(1) - tileId.y);

@@ -63,7 +63,6 @@ SurfaceSpheroid::SurfaceSpheroid(const Config &config
                                  , const Resource &resource)
     : SurfaceBase(config, resource)
     , definition_(this->resource().definition<resdef::SurfaceSpheroid>())
-    , index_(resource.referenceFrame->metaBinaryOrder)
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));
@@ -395,30 +394,17 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
-void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fi
-                                   , GdalWarper&) const
+vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
+                                            , const Sink::pointer &sink
+                                            , const SurfaceFileInfo&
+                                            , GdalWarper&
+                                            , bool withMask) const
 {
     // TODO: calculate tile sampling
     const int samplesPerSide(128);
     const TileFacesCalculator tileFacesCalculator;
 
     sink->checkAborted();
-
-    const auto &rf(referenceFrame());
-
-    if (!index_.tileIndex.real(tileId)) {
-        sink->error(utility::makeError<NotFound>("No mesh for this tile."));
-        return;
-    }
-
-    vts::NodeInfo nodeInfo(rf, tileId);
-    if (!nodeInfo.valid()) {
-        sink->error(utility::makeError<NotFound>
-                    ("TileId outside of valid reference frame tree."));
-        return;
-    }
 
     // generate mesh
     auto meshInfo
@@ -433,27 +419,18 @@ void SurfaceSpheroid::generateMesh(const vts::TileId &tileId
     addSkirt(lm, nodeInfo);
 
     // generate VTS mesh
-    vts::Mesh mesh;
+    vts::Mesh mesh(false);
     auto &sm(addSubMesh(mesh, lm, nodeInfo, definition_.geoidGrid));
     if (definition_.textureLayerId) {
         sm.textureLayer = definition_.textureLayerId;
     }
 
-    if (fi.raw) {
-        // we are returning full mesh file -> generate coverage mask
+    if (withMask) {
+        // asked to generate coverage mask
         meshCoverageMask
             (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
     }
-
-    // write mesh (only mesh!) to stream
-    std::ostringstream os;
-    if (fi.raw) {
-        vts::saveMesh(os, mesh);
-    } else {
-        vts::saveMeshProper(os, mesh);
-    }
-
-    sink->content(os.str(), fi.sinkFileInfo());
+    return mesh;
 }
 
 void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
@@ -544,6 +521,31 @@ void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
     }
 
     sink->content(os.str(), fi.sinkFileInfo());
+}
+
+void SurfaceSpheroid::generate2dMetatile(const vts::TileId &tileId
+                                         , const Sink::pointer &sink
+                                         , const SurfaceFileInfo &fileInfo
+                                         , GdalWarper &warper) const
+
+{
+    (void) tileId;
+    (void) sink;
+    (void) fileInfo;
+    (void) warper;
+    throw utility::makeError<InternalError>("Unsupported file");
+}
+
+void SurfaceSpheroid::generate2dCredits(const vts::TileId &tileId
+                                        , const Sink::pointer &sink
+                                        , const SurfaceFileInfo &fileInfo
+                                        , GdalWarper &warper) const
+{
+    (void) tileId;
+    (void) sink;
+    (void) fileInfo;
+    (void) warper;
+    throw utility::makeError<InternalError>("Unsupported file");
 }
 
 } // namespace generator

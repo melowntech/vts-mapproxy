@@ -3,7 +3,10 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 
+#include <opencv2/highgui/highgui.hpp>
+
 #include "utility/raise.hpp"
+#include "imgproc/rastermask/cvmat.hpp"
 
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
@@ -46,6 +49,7 @@ fs::path SurfaceBase::filePath(vts::File fileType) const
 SurfaceBase::SurfaceBase(const Config &config
                        , const Resource &resource)
     : Generator(config, resource)
+    , index_(resource.referenceFrame->metaBinaryOrder)
 {}
 
 Generator::Task SurfaceBase
@@ -106,6 +110,29 @@ Generator::Task SurfaceBase
                 generateNavtile(fi.tileId, sink, fi, warper);
             };
             break;
+
+        case vts::TileFile::meta2d:
+            return[=](GdalWarper &warper) {
+                generate2dMetatile(fi.tileId, sink, fi, warper);
+            };
+            break;
+
+        case vts::TileFile::mask:
+            return[=](GdalWarper &warper) {
+                generate2dMask(fi.tileId, sink, fi, warper);
+            };
+            break;
+
+        case vts::TileFile::ortho:
+            sink->error(utility::makeError<NotFound>
+                        ("No orthophoto present."));
+            break;
+
+        case vts::TileFile::credits:
+            return[=](GdalWarper &warper) {
+                generate2dCredits(fi.tileId, sink, fi, warper);
+            };
+            break;
         }
         break;
     }
@@ -121,6 +148,72 @@ Generator::Task SurfaceBase
     }
 
     return {};
+}
+
+void SurfaceBase::generateMesh(const vts::TileId &tileId
+                               , const Sink::pointer &sink
+                               , const SurfaceFileInfo &fi
+                               , GdalWarper &warper) const
+
+{
+    auto flags(index_.tileIndex.get(tileId));
+    if (!vts::TileIndex::Flag::isReal(flags)) {
+        utility::raise<NotFound>("No mesh for this tile.");
+    }
+
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.valid()) {
+        utility::raise<NotFound>
+            ("TileId outside of valid reference frame tree.");
+    }
+
+    auto mesh(generateMeshImpl
+              (nodeInfo, sink, fi, warper, fi.raw));
+
+    // write mesh (only mesh!) to stream
+    std::ostringstream os;
+    if (fi.raw) {
+        vts::saveMesh(os, mesh);
+    } else {
+        vts::saveMeshProper(os, mesh);
+    }
+
+    sink->content(os.str(), fi.sinkFileInfo());
+}
+
+void SurfaceBase::generate2dMask(const vts::TileId &tileId
+                                 , const Sink::pointer &sink
+                                 , const SurfaceFileInfo &fi
+                                 , GdalWarper &warper) const
+
+{
+    vts::Mesh mesh(true);
+
+    auto flags(index_.tileIndex.get(tileId));
+    if (!vts::TileIndex::Flag::isReal(flags)) {
+        utility::raise<NotFound>("No mesh for this tile.");
+    }
+
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.valid()) {
+        utility::raise<NotFound>
+            ("TileId outside of valid reference frame tree.");
+    }
+
+    if (!vts::TileIndex::Flag::isWatertight(flags)) {
+        mesh = generateMeshImpl
+            (nodeInfo, sink, fi, warper, true);
+    }
+
+    // convert mask to a cv matrix
+    auto mat(asCvMat(mesh.coverageMask));
+
+    // serialize and return
+    std::vector<unsigned char> buf;
+    // write as png file
+    cv::imencode(".png", mat, buf
+                 , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+    sink->content(buf, fi.sinkFileInfo());
 }
 
 } // namespace generator

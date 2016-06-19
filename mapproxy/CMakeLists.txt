@@ -35,6 +35,9 @@ find_package(OpenMesh 2.3.1 REQUIRED)
 include_directories(${OPENMESH_INCLUDE_DIR})
 link_directories(${OPENMESH_LIBRARY_DIR})
 
+find_package(LibProc REQUIRED)
+include_directories(${LIBPROC_INCLUDE_DIR})
+
 # dependencies
 add_subdirectory(src/dbglog)
 add_subdirectory(src/utility)

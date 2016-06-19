@@ -18,25 +18,33 @@ private:
     virtual void prepare_impl();
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
-    void generateMetatile(const vts::TileId &tileId
-                          , const Sink::pointer &sink
-                          , const SurfaceFileInfo &fileInfo
-                          , GdalWarper &warper) const;
+    virtual void generateMetatile(const vts::TileId &tileId
+                                  , const Sink::pointer &sink
+                                  , const SurfaceFileInfo &fileInfo
+                                  , GdalWarper &warper) const;
 
-    void generateMesh(const vts::TileId &tileId
-                      , const Sink::pointer &sink
-                      , const SurfaceFileInfo &fileInfo
-                      , GdalWarper &warper) const;
+    virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
+                                       , const Sink::pointer &sink
+                                       , const SurfaceFileInfo &fileInfo
+                                       , GdalWarper &warper
+                                       , bool withMask) const;
 
-    void generateNavtile(const vts::TileId &tileId
-                         , const Sink::pointer &sink
-                         , const SurfaceFileInfo &fileInfo
-                         , GdalWarper &warper) const;
+    virtual void generateNavtile(const vts::TileId &tileId
+                                 , const Sink::pointer &sink
+                                 , const SurfaceFileInfo &fileInfo
+                                 , GdalWarper &warper) const;
+
+    virtual void generate2dMetatile(const vts::TileId &tileId
+                                    , const Sink::pointer &sink
+                                    , const SurfaceFileInfo &fileInfo
+                                    , GdalWarper &warper) const;
+
+    virtual void generate2dCredits(const vts::TileId &tileId
+                                   , const Sink::pointer &sink
+                                   , const SurfaceFileInfo &fileInfo
+                                   , GdalWarper &warper) const;
 
     const resdef::SurfaceSpheroid &definition_;
-
-    vts::tileset::Index index_;
-    vts::FullTileSetProperties properties_;
 };
 
 } // namespace generator

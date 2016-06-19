@@ -397,6 +397,15 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
             return { "image/jpeg", lastModified };
         case vts::TileFile::navtile:
             return { "image/jpeg", lastModified };
+
+        case vts::TileFile::meta2d:
+            return { "image/png", lastModified };
+        case vts::TileFile::mask:
+            return { "image/png", lastModified };
+        case vts::TileFile::ortho:
+            return { "image/jpeg", lastModified };
+        case vts::TileFile::credits:
+            return { "application/json", lastModified };
         }
         break;
 

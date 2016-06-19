@@ -74,7 +74,6 @@ SurfaceDem::SurfaceDem(const Config &config
     : SurfaceBase(config, resource)
     , definition_(this->resource().definition<resdef::SurfaceDem>())
     , dataset_(absoluteDataset(definition_.dataset + "/dem"))
-    , index_(resource.referenceFrame->metaBinaryOrder)
     , maskTree_(absoluteDatasetRf(definition_.mask))
 {
     try {
@@ -221,6 +220,9 @@ vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root)
     auto mc(vts::mapConfig
             (properties_, vts::ExtraTileSetProperties()
              , prependRoot(fs::path(), resource(), root)));
+
+    // force 2d interface existence
+    mc.surfaces.front().has2dInterface = true;
 
     // look down
     mc.position.orientation = { 0.0, -90.0, 0.0 };
@@ -404,6 +406,8 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                    , gridSize
                    , geo::GeoDataset::Resampling::dem)
                   , sink));
+
+        sink->checkAborted();
 
         Grid<Sample> grid(gridSize);
 
@@ -624,29 +628,16 @@ private:
 
 } // namespace
 
-void SurfaceDem::generateMesh(const vts::TileId &tileId
-                              , const Sink::pointer &sink
-                              , const SurfaceFileInfo &fi
-                              , GdalWarper &warper) const
+vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
+                                       , const Sink::pointer &sink
+                                       , const SurfaceFileInfo&
+                                       , GdalWarper &warper
+                                       , bool withMask) const
 {
     const int samplesPerSide(128);
     const TileFacesCalculator tileFacesCalculator;
 
     sink->checkAborted();
-
-    const auto &rf(referenceFrame());
-
-    if (!index_.tileIndex.real(tileId)) {
-        sink->error(utility::makeError<NotFound>("No mesh for this tile."));
-        return;
-    }
-
-    vts::NodeInfo nodeInfo(rf, tileId);
-    if (!nodeInfo.valid()) {
-        sink->error(utility::makeError<NotFound>
-                    ("TileId outside of valid reference frame tree."));
-        return;
-    }
 
     /** warp input dataset as a DEM, with optimized size
      */
@@ -657,6 +648,8 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
                , nodeInfo.srsDef(), nodeInfo.extents()
                , math::Size2(samplesPerSide, samplesPerSide))
               , sink));
+
+    sink->checkAborted();
 
     // grab size of computed matrix, minus one to get number of edges
     math::Size2 size(dem->cols - 1, dem->rows - 1);
@@ -690,22 +683,14 @@ void SurfaceDem::generateMesh(const vts::TileId &tileId
             sm.textureLayer = definition_.textureLayerId;
         }
 
-        if (fi.raw) {
+        if (withMask) {
             // we are returning full mesh file -> generate coverage mask
             meshCoverageMask
                 (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
         }
     }
 
-    // write mesh (only mesh!) to stream
-    std::ostringstream os;
-    if (fi.raw) {
-        vts::saveMesh(os, mesh);
-    } else {
-        vts::saveMeshProper(os, mesh);
-    }
-
-    sink->content(os.str(), fi.sinkFileInfo());
+    return mesh;
 }
 
 void SurfaceDem::generateNavtile(const vts::TileId &tileId
@@ -781,6 +766,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
             }
         }
     }
+    sink->checkAborted();
 
     vts::opencv::NavTile nt;
     auto ntd(nt.data());
@@ -798,6 +784,8 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                , node.srsDef(), node.extents()
                , math::Size2(ntd.cols - 1, ntd.rows -1))
               , sink));
+
+    sink->checkAborted();
 
     // set height range
     nt.heightRange(vts::NavTile::HeightRange
@@ -839,6 +827,30 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     }
 
     sink->content(os.str(), fi.sinkFileInfo());
+}
+
+void SurfaceDem::generate2dMetatile(const vts::TileId &tileId
+                                    , const Sink::pointer &sink
+                                    , const SurfaceFileInfo &fileInfo
+                                    , GdalWarper &warper) const
+{
+    (void) tileId;
+    (void) sink;
+    (void) fileInfo;
+    (void) warper;
+    throw utility::makeError<InternalError>("Unsupported file");
+}
+
+void SurfaceDem::generate2dCredits(const vts::TileId &tileId
+                                   , const Sink::pointer &sink
+                                   , const SurfaceFileInfo &fileInfo
+                                   , GdalWarper &warper) const
+{
+    (void) tileId;
+    (void) sink;
+    (void) fileInfo;
+    (void) warper;
+    throw utility::makeError<InternalError>("Unsupported file");
 }
 
 } // namespace generator
