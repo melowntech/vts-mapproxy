@@ -37,7 +37,7 @@ class DemTiling : public service::Cmdline {
 public:
     DemTiling()
         : service::Cmdline("dem-tiling", BUILD_TARGET_VERSION)
-        , extentsSampling_(20), tileSampling_(128)
+        , extentsSampling_(20), tileSampling_(128), parallel_(true)
     {
     }
 
@@ -60,6 +60,7 @@ private:
     int tileSampling_;
 
     fs::path dataset_;
+    bool parallel_;
 };
 
 void DemTiling::configuration(po::options_description &cmdline
@@ -85,6 +86,9 @@ void DemTiling::configuration(po::options_description &cmdline
         ("tileSampling", po::value(&tileSampling_)
          ->default_value(tileSampling_)
          , "Nuber of pixels to break tile into when analyzing its coverage.")
+        ("parallel", po::value(&parallel_)
+         ->default_value(parallel_)
+         , "Use OpenMP to parallelize work.")
         ;
 
     pd.add("input", 1)
@@ -149,7 +153,8 @@ class TreeWalker {
 public:
     TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                , const vts::NodeInfo &root
-               , vts::LodRange lodRange, int tileSampling);
+               , vts::LodRange lodRange, int tileSampling
+               , bool parallel);
 
 private:
     void process(const vts::NodeInfo &node, bool upscaling = false);
@@ -173,21 +178,28 @@ private:
     geo::SrsDefinition srs_;
 
     std::vector<geo::GeoDataset> gds_;
+    bool parallel_;
 };
 
 
 TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                        , const vts::NodeInfo &root, vts::LodRange lodRange
-                       , int tileSampling)
+                       , int tileSampling, bool parallel)
     : dataset_(dataset), ti_(ti), lodRange_(lodRange)
     , tileSampling_(tileSampling), srs_(root.srsDef())
+    , parallel_(parallel)
 {
-    UTILITY_OMP(parallel)
-        UTILITY_OMP(single)
-        {
-            prepareDataset();
-            process(root);
-        }
+    if (parallel_) {
+        UTILITY_OMP(parallel)
+            UTILITY_OMP(single)
+            {
+                prepareDataset();
+                process(root);
+            }
+    } else {
+        prepareDataset();
+        process(root);
+    }
 }
 
 void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
@@ -347,8 +359,12 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         // compute child node
         auto childNode(node.child(child));
 
-        UTILITY_OMP(task)
+        if (parallel_) {
+            UTILITY_OMP(task)
+                process(childNode, upscaling);
+        } else {
             process(childNode, upscaling);
+        }
     }
 
     // done
@@ -362,7 +378,8 @@ int DemTiling::run()
 
     vts::TileIndex ti;
 
-    TreeWalker(ti, dataset_, vts::NodeInfo(rf), lodRange_, tileSampling_);
+    TreeWalker(ti, dataset_, vts::NodeInfo(rf), lodRange_
+               , tileSampling_, parallel_);
 
     LOG(info3) << "Saving generated tile index into " << output_ << ".";
     ti.save(output_);

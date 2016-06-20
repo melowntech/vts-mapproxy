@@ -17,6 +17,7 @@
 #include "vts-libs/vts/math.hpp"
 #include "vts-libs/vts/mesh.hpp"
 #include "vts-libs/vts/opencv/navtile.hpp"
+#include "vts-libs/vts/types2d.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -181,6 +182,35 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
+namespace {
+
+/** Renders 2d mask for plain surface with just single mesh
+ */
+cv::Mat render2dMask(const imgproc::quadtree::RasterMask &mask)
+{
+    // ensure m has proper size and type
+    auto size(vts::Mask2d::size());
+    cv::Mat_<std::uint8_t> m(size.height, size.width, std::uint8_t(0));
+
+    // just one submesh
+    cv::Scalar color(1);
+
+    mask.forEachQuad([&](uint xstart, uint ystart, uint xsize
+                         , uint ysize, bool)
+    {
+        cv::rectangle(m, cv::Rect(xstart, ystart, xsize, ysize)
+                      , color, CV_FILLED, 4);
+    }, imgproc::quadtree::RasterMask::Filter::white);
+
+    // plain surface
+    m(vts::Mask2d::flagRow, 0) = vts::Mask2d::Flag::submesh;
+    m(vts::Mask2d::surfaceRow, 0) = 1;
+
+    return m;
+}
+
+} // namespace
+
 void SurfaceBase::generate2dMask(const vts::TileId &tileId
                                  , const Sink::pointer &sink
                                  , const SurfaceFileInfo &fi
@@ -205,8 +235,8 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
             (nodeInfo, sink, fi, warper, true);
     }
 
-    // convert mask to a cv matrix
-    auto mat(asCvMat(mesh.coverageMask));
+    // generate mask; we have just 1 submesh -> render valid area as 1
+    auto mat(render2dMask(mesh.coverageMask));
 
     // serialize and return
     std::vector<unsigned char> buf;
