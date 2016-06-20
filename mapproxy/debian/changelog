@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.3) citationtech-wheezy; urgency=low
+
+  * Full surface support.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Mon, 20 Jun 2016 15:45:01 +0200
+
 ctt-vts-mapproxy (0.2) citationtech-wheezy; urgency=low
 
   * Fixies. 
