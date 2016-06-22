@@ -34,12 +34,6 @@
 [submodule "externals/vts-libs"]
 	path = externals/vts-libs
 	url = ../../vts/vts-libs.git
-[submodule "externals/optics"]
-	path = externals/optics
-	url = ../../lib/optics.git
-[submodule "externals/cvision"]
-	path = externals/cvision
-	url = ../../lib/cvision.git
 [submodule "externals/gdal-drivers"]
 	path = externals/gdal-drivers
 	url = ../../lib/gdal-drivers.git
