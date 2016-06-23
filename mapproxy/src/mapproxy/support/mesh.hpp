@@ -18,7 +18,7 @@ namespace vts = vadstena::vts;
 class TileFacesCalculator {
 public:
     TileFacesCalculator()
-        : base_(1500), roughnessFactorMin_(0.0), roughnessFactorMax_(3.0)
+        : base_(1000), roughnessFactorMin_(0.0), roughnessFactorMax_(3.0)
         , quotient_(1.0 - (1.0 / roughnessFactorMax_))
     {}
 
