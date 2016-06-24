@@ -143,6 +143,11 @@ Generator::Task SurfaceBase
                       , fi.sinkFileInfo(), false);
         break;
 
+    case SurfaceFileInfo::Type::registry:
+        sink->content(vs::fileIStream
+                      (fi.registry->contentType, fi.registry->path));
+        break;
+
     default:
         sink->error(utility::makeError<InternalError>
                     ("Not implemented yet."));
