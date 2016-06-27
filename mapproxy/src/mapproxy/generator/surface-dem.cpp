@@ -353,9 +353,9 @@ private:
 } // namespace
 
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
-                                       , const Sink::pointer &sink
-                                       , const SurfaceFileInfo &fi
-                                       , GdalWarper &warper) const
+                                  , const Sink::pointer &sink
+                                  , const SurfaceFileInfo &fi
+                                  , GdalWarper &warper) const
 {
     sink->checkAborted();
 
@@ -364,12 +364,24 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         return;
     }
 
+    auto metatile(generateMetatileImpl(tileId, sink, warper));
+
+    // write metatile to stream
+    std::ostringstream os;
+    metatile.save(os);
+    sink->content(os.str(), fi.sinkFileInfo());
+}
+
+vts::MetaTile
+SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
+                                 , const Sink::pointer &sink
+                                 , GdalWarper &warper) const
+{
     auto blocks(metatileBlocks(resource(), tileId));
 
     if (blocks.empty()) {
-        sink->error(utility::makeError<NotFound>
-                    ("Metatile completely outside of configured range."));
-        return;
+        utility::raise<NotFound>
+            ("Metatile completely outside of configured range.");
     }
 
     const auto &rf(referenceFrame());
@@ -563,10 +575,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         }
     }
 
-    // write metatile to stream
-    std::ostringstream os;
-    metatile.save(os);
-    sink->content(os.str(), fi.sinkFileInfo());
+    return metatile;
 }
 
 namespace {
@@ -694,9 +703,9 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
 }
 
 void SurfaceDem::generateNavtile(const vts::TileId &tileId
-                                      , const Sink::pointer &sink
-                                      , const SurfaceFileInfo &fi
-                                      , GdalWarper &warper) const
+                                 , const Sink::pointer &sink
+                                 , const SurfaceFileInfo &fi
+                                 , GdalWarper &warper) const
 {
     sink->checkAborted();
 
@@ -714,59 +723,29 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
         return;
     }
 
+    auto metaId(tileId);
+    {
+        metaId.x &= ~((1 << rf.metaBinaryOrder) - 1);
+        metaId.y &= ~((1 << rf.metaBinaryOrder) - 1);
+    }
+
+    // suboptimal solution: generate metatile
+    auto metatile(generateMetatileImpl(metaId, sink, warper));
+
     const auto &extents(node.extents());
     const auto ts(math::size(extents));
 
     // sds -> navigation SRS convertor
     auto navConv(sds2nav(node, definition_.geoidGrid));
 
-    // first, calculate height range in the same way as is done in metatile
-    auto heightRange(vs::Range<double>::emptyRange());
-    {
-        // create node doverage
-        const auto coverage(node.coverageMask
-                            (vts::NodeInfo::CoverageType::grid
-                             , math::Size2(metatileSamplesPerTile + 1
-                                           , metatileSamplesPerTile + 1), 1));
-
-        // warp value/min/max from dataset the same way as is done in metatile
-        // calculation (we need to get the same value range)
-        auto dem(warper.warp
-                 (GdalWarper::RasterRequest
-                  (GdalWarper::RasterRequest::Operation::valueMinMax
-                   , dataset_, node.srsDef()
-                   // add half pixel to warp in grid coordinates
-                   , extentsPlusHalfPixel
-                   (extents, { metatileSamplesPerTile + 1
-                           , metatileSamplesPerTile + 1 })
-                   , { metatileSamplesPerTile, metatileSamplesPerTile }
-                   , geo::GeoDataset::Resampling::average)
-                  , sink));
-
-        // grid pixel size
-        math::Size2f gpx
-            (ts.width / (metatileSamplesPerTile + 1)
-             , ts.height / (metatileSamplesPerTile + 1));
-
-        ValueMinMaxSampler vmm(dem);
-        for (int j(0); j <= metatileSamplesPerTile; ++j) {
-            auto y(extents.ll(1) + j * gpx.height);
-            for (int i(0); i <= metatileSamplesPerTile; ++i) {
-                // masked by coverage?
-                if (!coverage.get(i, j)) { continue; }
-
-                // get sample and check for valid value
-                auto v(vmm(i, j));
-                if (!v) { continue; }
-
-                // update range with height of converted points
-                auto x(extents.ll(0) + i * gpx.width);
-                update(heightRange, navConv(math::Point3(x, y, (*v)[1]))(2));
-                update(heightRange, navConv(math::Point3(x, y, (*v)[2]))(2));
-            }
-        }
-    }
     sink->checkAborted();
+
+    const auto *metanode(metatile.get(tileId, std::nothrow));
+    if (!metanode) {
+        sink->error(utility::makeError<NotFound>("Metatile not found."));
+    }
+
+    const auto heightRange(metanode->heightRange);
 
     vts::opencv::NavTile nt;
     auto ntd(nt.data());

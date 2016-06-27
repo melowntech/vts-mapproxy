@@ -147,7 +147,7 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
                  , etile(tile->end<cv::Vec3d>());
              itile != etile; ++itile, ++id, ++idmin, ++idmax)
         {
-            // skil invalid value
+            // skip invalid value
             auto value(*id);
             if (value == ForcedNodata) { continue; }
 

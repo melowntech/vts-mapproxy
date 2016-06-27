@@ -48,6 +48,10 @@ private:
                                    , const SurfaceFileInfo &fileInfo
                                    , GdalWarper &warper) const;
 
+    vts::MetaTile generateMetatileImpl(const vts::TileId &tileId
+                                       , const Sink::pointer &sink
+                                       , GdalWarper &warper) const;
+
     const resdef::SurfaceDem &definition_;
 
     /** Path to original dataset (must contain overviews)
