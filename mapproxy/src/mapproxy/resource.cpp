@@ -520,3 +520,14 @@ bool checkRanges(const Resource &resource, const vts::TileId &tileId
 
     return true;
 }
+
+vr::Credits asInlineCredits(const DualId::set &set)
+{
+    vr::Credits credits;
+    for (auto &id : set) {
+        if (const auto *credit = vr::Registry::credit(id.id, std::nothrow)) {
+            credits.set(id, *credit);
+        }
+    }
+    return credits;
+}

@@ -96,7 +96,7 @@ vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
 
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
-    bl.credits = asCredits(res.credits);
+    bl.credits = asInlineCredits(res.credits);
 
     // done
     return bl;

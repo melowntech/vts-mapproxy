@@ -47,6 +47,8 @@ inline vr::Credits asCredits(const DualId::set &set)
     return credits;
 }
 
+vr::Credits asInlineCredits(const DualId::set &set);
+
 inline vr::IdSet asIntSet(const DualId::set &set)
 {
     return vr::IdSet(set.begin(), set.end());
