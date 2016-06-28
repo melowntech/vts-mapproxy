@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.4) citationtech-wheezy; urgency=low
+
+  * Fixed navtile ranges. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Mon, 27 Jun 2016 18:02:09 +0200
+
 ctt-vts-mapproxy (0.3) citationtech-wheezy; urgency=low
 
   * Full surface support.
