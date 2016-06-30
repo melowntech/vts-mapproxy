@@ -39,7 +39,11 @@
               if (!boundLayers.hasOwnProperty(name)) { continue; }
 
               var bl = boundLayers[name];
-              var url = bl.url.replace(/{lod}/g, "{z}");
+              var url = bl.url.replace(/{lod}/g, "{z}")
+                         .replace(/{loclod}/g, "{z}")
+                         .replace(/{locx}/g, "{x}")
+                         .replace(/{locy}/g, "{y}")
+                         .replace(/{alt\(([^,)]+).*\)}/g, "$1");
 
               var attribution = "";
               var prefix = "";

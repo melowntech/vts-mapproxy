@@ -154,6 +154,16 @@ struct TmsRaster {
     bool operator==(const TmsRaster &o) const;
 };
 
+struct TmsRasterRemote {
+    static Resource::Generator generator;
+
+    std::string remoteUrl;
+    boost::optional<std::string> mask;
+
+    TmsRasterRemote() {}
+    bool operator==(const TmsRasterRemote &o) const;
+};
+
 struct SurfaceSpheroid {
     static Resource::Generator generator;
 

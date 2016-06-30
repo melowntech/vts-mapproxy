@@ -20,6 +20,8 @@ namespace resdef {
 
 Resource::Generator TmsRaster::generator
     (Resource::Generator::Type::tms, "tms-raster");
+Resource::Generator TmsRasterRemote::generator
+    (Resource::Generator::Type::tms, "tms-raster-remote");
 Resource::Generator SurfaceSpheroid::generator
     (Resource::Generator::Type::surface, "surface-spheroid");
 Resource::Generator SurfaceDem::generator
@@ -75,6 +77,17 @@ void parseDefinition(resdef::TmsRaster &def, const Json::Value &value)
     }
 }
 
+void parseDefinition(resdef::TmsRasterRemote &def, const Json::Value &value)
+{
+    std::string s;
+
+    Json::get(def.remoteUrl, value, "remoteUrl");
+    if (value.isMember("mask")) {
+        def.mask = boost::in_place();
+        Json::get(*def.mask, value, "mask");
+    }
+}
+
 void parseDefinition(resdef::SurfaceSpheroid &def, const Json::Value &value)
 {
     if (value.isMember("textureLayerId")) {
@@ -113,6 +126,10 @@ void parseDefinition(Resource &r, const Json::Value &value)
         return parseDefinition
             (r.assignDefinition<resdef::TmsRaster>(), value);
     }
+    if (r.generator == resdef::TmsRasterRemote::generator) {
+        return parseDefinition
+            (r.assignDefinition<resdef::TmsRasterRemote>(), value);
+    }
     if (r.generator == resdef::SurfaceSpheroid::generator) {
         return parseDefinition
             (r.assignDefinition<resdef::SurfaceSpheroid>(), value);
@@ -133,6 +150,14 @@ void buildDefinition(Json::Value &value, const resdef::TmsRaster &def)
         value["mask"] = *def.mask;
     }
     value["format"] = boost::lexical_cast<std::string>(def.format);
+}
+
+void buildDefinition(Json::Value &value, const resdef::TmsRasterRemote &def)
+{
+    value["remoteUrl"] = def.remoteUrl;
+    if (def.mask) {
+        value["mask"] = *def.mask;
+    }
 }
 
 void buildDefinition(Json::Value &value, const resdef::SurfaceSpheroid &def)
@@ -165,6 +190,10 @@ void buildDefinition(Json::Value &value, const Resource &r)
     if (r.generator == resdef::TmsRaster::generator) {
         return buildDefinition
             (value, r.definition<resdef::TmsRaster>());
+    }
+    if (r.generator == resdef::TmsRasterRemote::generator) {
+        return buildDefinition
+            (value, r.definition<resdef::TmsRasterRemote>());
     }
     if (r.generator == resdef::SurfaceSpheroid::generator) {
         return buildDefinition
@@ -410,6 +439,10 @@ bool Resource::operator==(const Resource &o) const
         if (!detail::sameDefinition<resdef::TmsRaster>(*this, o)) {
             return false;
         }
+    } else if (generator == resdef::TmsRasterRemote::generator) {
+        if (!detail::sameDefinition<resdef::TmsRasterRemote>(*this, o)) {
+            return false;
+        }
     } else if (generator == resdef::SurfaceSpheroid::generator) {
         if (!detail::sameDefinition<resdef::SurfaceSpheroid>(*this, o)) {
             return false;
@@ -431,6 +464,14 @@ bool TmsRaster::operator==(const TmsRaster &o) const
     if (mask != o.mask) { return false; }
 
     // format can change
+    return true;
+}
+
+bool TmsRasterRemote::operator==(const TmsRasterRemote &o) const
+{
+    if (remoteUrl != o.remoteUrl) { return false; }
+    if (mask != o.mask) { return false; }
+
     return true;
 }
 
