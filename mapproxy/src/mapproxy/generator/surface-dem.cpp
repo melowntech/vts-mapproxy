@@ -808,28 +808,4 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
-void SurfaceDem::generate2dMetatile(const vts::TileId &tileId
-                                    , const Sink::pointer &sink
-                                    , const SurfaceFileInfo &fileInfo
-                                    , GdalWarper &warper) const
-{
-    (void) tileId;
-    (void) sink;
-    (void) fileInfo;
-    (void) warper;
-    throw utility::makeError<InternalError>("Unsupported file");
-}
-
-void SurfaceDem::generate2dCredits(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fileInfo
-                                   , GdalWarper &warper) const
-{
-    (void) tileId;
-    (void) sink;
-    (void) fileInfo;
-    (void) warper;
-    throw utility::makeError<InternalError>("Unsupported file");
-}
-
 } // namespace generator

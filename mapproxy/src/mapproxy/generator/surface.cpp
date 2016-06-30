@@ -7,6 +7,7 @@
 
 #include "utility/raise.hpp"
 #include "imgproc/rastermask/cvmat.hpp"
+#include "imgproc/png.hpp"
 
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
@@ -18,6 +19,7 @@
 #include "vts-libs/vts/mesh.hpp"
 #include "vts-libs/vts/opencv/navtile.hpp"
 #include "vts-libs/vts/types2d.hpp"
+#include "vts-libs/vts/2d.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -131,7 +133,7 @@ Generator::Task SurfaceBase
 
         case vts::TileFile::credits:
             return[=](GdalWarper &warper) {
-                generate2dCredits(fi.tileId, sink, fi, warper);
+                generateCredits(fi.tileId, sink, fi, warper);
             };
             break;
         }
@@ -187,43 +189,12 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
     sink->content(os.str(), fi.sinkFileInfo());
 }
 
-namespace {
-
-/** Renders 2d mask for plain surface with just single mesh
- */
-cv::Mat render2dMask(const imgproc::quadtree::RasterMask &mask)
-{
-    // ensure m has proper size and type
-    auto size(vts::Mask2d::size());
-    cv::Mat_<std::uint8_t> m(size.height, size.width, std::uint8_t(0));
-
-    // just one submesh
-    cv::Scalar color(1);
-
-    mask.forEachQuad([&](uint xstart, uint ystart, uint xsize
-                         , uint ysize, bool)
-    {
-        cv::rectangle(m, cv::Rect(xstart, ystart, xsize, ysize)
-                      , color, CV_FILLED, 4);
-    }, imgproc::quadtree::RasterMask::Filter::white);
-
-    // plain surface
-    m(vts::Mask2d::flagRow, 0) = vts::Mask2d::Flag::submesh;
-    m(vts::Mask2d::surfaceRow, 0) = 1;
-
-    return m;
-}
-
-} // namespace
-
 void SurfaceBase::generate2dMask(const vts::TileId &tileId
                                  , const Sink::pointer &sink
                                  , const SurfaceFileInfo &fi
                                  , GdalWarper &warper) const
 
 {
-    vts::Mesh mesh(true);
-
     auto flags(index_.tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
         utility::raise<NotFound>("No mesh for this tile.");
@@ -235,20 +206,39 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
             ("TileId outside of valid reference frame tree.");
     }
 
+    // by default full watertight mesh
+    vts::Mesh mesh(true);
+
     if (!vts::TileIndex::Flag::isWatertight(flags)) {
         mesh = generateMeshImpl
             (nodeInfo, sink, fi, warper, true);
     }
 
-    // generate mask; we have just 1 submesh -> render valid area as 1
-    auto mat(render2dMask(mesh.coverageMask));
+    sink->content(imgproc::serialize(vts::mask2d(mesh.coverageMask, { 1 }), 9)
+                  , fi.sinkFileInfo());
+}
 
-    // serialize and return
-    std::vector<unsigned char> buf;
-    // write as png file
-    cv::imencode(".png", mat, buf
-                 , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-    sink->content(buf, fi.sinkFileInfo());
+void SurfaceBase::generate2dMetatile(const vts::TileId &tileId
+                                     , const Sink::pointer &sink
+                                     , const SurfaceFileInfo &fi
+                                     , GdalWarper&) const
+
+{
+    sink->content(imgproc::serialize(vts::meta2d(index_.tileIndex, tileId), 9)
+                  , fi.sinkFileInfo());
+}
+
+void SurfaceBase::generateCredits(const vts::TileId&
+                                  , const Sink::pointer &sink
+                                  , const SurfaceFileInfo &fi
+                                  , GdalWarper&) const
+{
+    vts::CreditTile creditTile;
+    creditTile.credits = asInlineCredits(resource().credits);
+
+    std::ostringstream os;
+    saveCreditTile(os, creditTile, true);
+    sink->content(os.str(), fi.sinkFileInfo());
 }
 
 } // namespace generator

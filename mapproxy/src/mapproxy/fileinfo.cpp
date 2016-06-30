@@ -375,38 +375,11 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
 {
     switch (type) {
     case Type::file:
-        switch (fileType) {
-        case vts::File::config:
-            return { vts::MapConfig::contentType, lastModified };
-
-        case vts::File::tileIndex:
-            return { "application/octet-stream", lastModified };
-
-        default:
-            return {};
-        }
+        return { vs::contentType(fileType), lastModified };
         break;
 
     case Type::tile:
-        switch (tileType) {
-        case vts::TileFile::meta:
-            return { "application/octet-stream", lastModified };
-        case vts::TileFile::mesh:
-            return { "application/octet-stream", lastModified };
-        case vts::TileFile::atlas:
-            return { "image/jpeg", lastModified };
-        case vts::TileFile::navtile:
-            return { "image/jpeg", lastModified };
-
-        case vts::TileFile::meta2d:
-            return { "image/png", lastModified };
-        case vts::TileFile::mask:
-            return { "image/png", lastModified };
-        case vts::TileFile::ortho:
-            return { "image/jpeg", lastModified };
-        case vts::TileFile::credits:
-            return { "application/json", lastModified };
-        }
+        return { vs::contentType(tileType), lastModified };
         break;
 
     case Type::support:

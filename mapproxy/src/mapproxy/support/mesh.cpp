@@ -172,7 +172,7 @@ void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
 {
     const auto size(vts::Mesh::coverageSize());
     if (fullyCovered) {
-        mask = vts::Mesh::CoverageMask(size, vts::Mesh::CoverageMask::FULL);
+        mask.recreate(vts::Mesh::coverageOrder, 1);
         return;
     }
 
@@ -195,7 +195,7 @@ void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
         trafo(1, 3) = gridSize.height / 2.0 - 0.5;
     }
 
-    mask = vts::Mesh::CoverageMask(size, vts::Mesh::CoverageMask::EMPTY);
+    mask.recreate(vts::Mesh::coverageOrder, 0);
     std::vector<imgproc::Scanline> scanlines;
     cv::Point3f tri[3];
     for (const auto &face : mesh.faces) {
@@ -215,7 +215,7 @@ void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
             imgproc::processScanline(sl, 0, size.width
                                      , [&](int x, int y, float)
             {
-                mask.set(x, y);
+                mask.set(x, y, 1);
             });
         }
     }

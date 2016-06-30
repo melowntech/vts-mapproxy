@@ -41,20 +41,20 @@ private:
                         , const SurfaceFileInfo &fileInfo
                         , GdalWarper &warper) const;
 
+    void generate2dMetatile(const vts::TileId &tileId
+                            , const Sink::pointer &sink
+                            , const SurfaceFileInfo &fileInfo
+                            , GdalWarper &warper) const;
+
+    void generateCredits(const vts::TileId &tileId
+                         , const Sink::pointer &sink
+                         , const SurfaceFileInfo &fileInfo
+                         , GdalWarper &warper) const;
+
     virtual void generateNavtile(const vts::TileId &tileId
                                  , const Sink::pointer &sink
                                  , const SurfaceFileInfo &fileInfo
                                  , GdalWarper &warper) const = 0;
-
-    virtual void generate2dMetatile(const vts::TileId &tileId
-                                    , const Sink::pointer &sink
-                                    , const SurfaceFileInfo &fileInfo
-                                    , GdalWarper &warper) const = 0;
-
-    virtual void generate2dCredits(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fileInfo
-                                   , GdalWarper &warper) const = 0;
 
     enum MeshRequest { full, mesh, mask };
 

@@ -38,16 +38,6 @@ private:
                                  , const SurfaceFileInfo &fileInfo
                                  , GdalWarper &warper) const;
 
-    virtual void generate2dMetatile(const vts::TileId &tileId
-                                    , const Sink::pointer &sink
-                                    , const SurfaceFileInfo &fileInfo
-                                    , GdalWarper &warper) const;
-
-    virtual void generate2dCredits(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fileInfo
-                                   , GdalWarper &warper) const;
-
     vts::MetaTile generateMetatileImpl(const vts::TileId &tileId
                                        , const Sink::pointer &sink
                                        , GdalWarper &warper) const;
