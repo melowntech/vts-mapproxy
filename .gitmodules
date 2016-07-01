@@ -37,3 +37,7 @@
 [submodule "externals/gdal-drivers"]
 	path = externals/gdal-drivers
 	url = ../../lib/gdal-drivers.git
+[submodule "externals/http"]
+        path = externals/http
+        url = ../../lib/http.git
+
