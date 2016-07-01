@@ -1,6 +1,6 @@
 # test program
 define_module(BINARY mapproxy
-  DEPENDS vts-libs service gdal-drivers geometry
+  DEPENDS vts-libs http service gdal-drivers geometry
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS)
 
@@ -28,8 +28,7 @@ set(mapproxy_SOURCES
   generator/surface-spheroid.hpp generator/surface-spheroid.cpp
   generator/surface-dem.hpp generator/surface-dem.cpp
 
-  http.hpp http.cpp
-  contentgenerator.hpp contentgenerator.cpp
+  sink.hpp sink.cpp
 
   fileinfo.hpp fileinfo.cpp
   core.hpp core.cpp

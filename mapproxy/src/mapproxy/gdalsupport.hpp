@@ -11,7 +11,7 @@
 #include "geo/srsdef.hpp"
 #include "geo/geodataset.hpp"
 
-#include "./contentgenerator.hpp"
+#include "./sink.hpp"
 
 class GdalWarper {
 public:
@@ -96,7 +96,7 @@ public:
         {}
     };
 
-    Raster warp(const RasterRequest &request, const Sink::pointer &sink);
+    Raster warp(const RasterRequest &request, Sink &sink);
 
     /** Do housekeeping. Must be called in the process where internals are being
      * run.

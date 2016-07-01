@@ -56,35 +56,35 @@ SurfaceBase::SurfaceBase(const Config &config
 {}
 
 Generator::Task SurfaceBase
-::generateFile_impl(const FileInfo &fileInfo, const Sink::pointer &sink) const
+::generateFile_impl(const FileInfo &fileInfo, Sink &sink) const
 {
     SurfaceFileInfo fi(fileInfo, config().fileFlags);
 
     switch (fi.type) {
     case SurfaceFileInfo::Type::unknown:
-        sink->error(utility::makeError<NotFound>("Unrecognized filename."));
+        sink.error(utility::makeError<NotFound>("Unrecognized filename."));
         break;
 
     case SurfaceFileInfo::Type::file: {
         switch (fi.fileType) {
         case vts::File::config: {
             if (fi.raw) {
-                sink->content(vs::fileIStream
+                sink.content(vs::fileIStream
                               (fi.fileType, filePath(vts::File::config)));
             } else {
                 std::ostringstream os;
                 mapConfig(os, ResourceRoot::none);
-                sink->content(os.str(), fi.sinkFileInfo());
+                sink.content(os.str(), fi.sinkFileInfo());
             }
             break;
         }
         case vts::File::tileIndex:
-            sink->content(vs::fileIStream
+            sink.content(vs::fileIStream
                           (fi.fileType, filePath(vts::File::tileIndex)));
             break;
 
         default:
-            sink->error(utility::makeError<InternalError>
+            sink.error(utility::makeError<InternalError>
                         ("Unsupported file"));
             break;
         }
@@ -94,45 +94,45 @@ Generator::Task SurfaceBase
     case SurfaceFileInfo::Type::tile: {
         switch (fi.tileType) {
         case vts::TileFile::meta:
-            return[=](GdalWarper &warper) {
+            return[=](Sink &sink, GdalWarper &warper) {
                 generateMetatile(fi.tileId, sink, fi, warper);
             };
 
         case vts::TileFile::mesh:
-            return[=](GdalWarper &warper) {
+            return[=](Sink &sink, GdalWarper &warper) {
                 generateMesh(fi.tileId, sink, fi, warper);
             };
 
         case vts::TileFile::atlas:
-            sink->error(utility::makeError<NotFound>
+            sink.error(utility::makeError<NotFound>
                         ("No internal texture present."));
             break;
 
         case vts::TileFile::navtile:
-            return[=](GdalWarper &warper) {
+            return[=](Sink &sink, GdalWarper &warper) {
                 generateNavtile(fi.tileId, sink, fi, warper);
             };
             break;
 
         case vts::TileFile::meta2d:
-            return[=](GdalWarper &warper) {
+            return[=](Sink &sink, GdalWarper &warper) {
                 generate2dMetatile(fi.tileId, sink, fi, warper);
             };
             break;
 
         case vts::TileFile::mask:
-            return[=](GdalWarper &warper) {
+            return[=](Sink &sink, GdalWarper &warper) {
                 generate2dMask(fi.tileId, sink, fi, warper);
             };
             break;
 
         case vts::TileFile::ortho:
-            sink->error(utility::makeError<NotFound>
+            sink.error(utility::makeError<NotFound>
                         ("No orthophoto present."));
             break;
 
         case vts::TileFile::credits:
-            return[=](GdalWarper &warper) {
+            return[=](Sink &sink, GdalWarper &warper) {
                 generateCredits(fi.tileId, sink, fi, warper);
             };
             break;
@@ -141,17 +141,17 @@ Generator::Task SurfaceBase
     }
 
     case SurfaceFileInfo::Type::support:
-        sink->content(fi.support->data, fi.support->size
+        sink.content(fi.support->data, fi.support->size
                       , fi.sinkFileInfo(), false);
         break;
 
     case SurfaceFileInfo::Type::registry:
-        sink->content(vs::fileIStream
+        sink.content(vs::fileIStream
                       (fi.registry->contentType, fi.registry->path));
         break;
 
     default:
-        sink->error(utility::makeError<InternalError>
+        sink.error(utility::makeError<InternalError>
                     ("Not implemented yet."));
     }
 
@@ -159,7 +159,7 @@ Generator::Task SurfaceBase
 }
 
 void SurfaceBase::generateMesh(const vts::TileId &tileId
-                               , const Sink::pointer &sink
+                               , Sink &sink
                                , const SurfaceFileInfo &fi
                                , GdalWarper &warper) const
 
@@ -186,11 +186,11 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
         vts::saveMeshProper(os, mesh);
     }
 
-    sink->content(os.str(), fi.sinkFileInfo());
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 void SurfaceBase::generate2dMask(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , const SurfaceFileInfo &fi
                                  , GdalWarper &warper) const
 
@@ -214,22 +214,22 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
             (nodeInfo, sink, fi, warper, true);
     }
 
-    sink->content(imgproc::serialize(vts::mask2d(mesh.coverageMask, { 1 }), 9)
+    sink.content(imgproc::serialize(vts::mask2d(mesh.coverageMask, { 1 }), 9)
                   , fi.sinkFileInfo());
 }
 
 void SurfaceBase::generate2dMetatile(const vts::TileId &tileId
-                                     , const Sink::pointer &sink
+                                     , Sink &sink
                                      , const SurfaceFileInfo &fi
                                      , GdalWarper&) const
 
 {
-    sink->content(imgproc::serialize(vts::meta2d(index_.tileIndex, tileId), 9)
+    sink.content(imgproc::serialize(vts::meta2d(index_.tileIndex, tileId), 9)
                   , fi.sinkFileInfo());
 }
 
 void SurfaceBase::generateCredits(const vts::TileId&
-                                  , const Sink::pointer &sink
+                                  , Sink &sink
                                   , const SurfaceFileInfo &fi
                                   , GdalWarper&) const
 {
@@ -238,7 +238,7 @@ void SurfaceBase::generateCredits(const vts::TileId&
 
     std::ostringstream os;
     saveCreditTile(os, creditTile, true);
-    sink->content(os.str(), fi.sinkFileInfo());
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 } // namespace generator

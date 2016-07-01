@@ -11,6 +11,7 @@
 #include "./fileinfo.hpp"
 #include "./error.hpp"
 #include "./core.hpp"
+#include "./sink.hpp"
 
 namespace asio = boost::asio;
 namespace vts = vadstena::vts;
@@ -32,21 +33,18 @@ public:
         stop();
     }
 
-    void generate(const std::string &location
-                  , const Sink::pointer &sink);
+    void generate(const std::string &location, Sink sink);
 
     void generateRfMapConfig(const std::string &referenceFrame
-                             , const Sink::pointer &sink);
+                             , Sink &sink);
 
-    void generateResourceFile(const FileInfo &fi
-                              , const Sink::pointer &sink);
+    void generateResourceFile(const FileInfo &fi, Sink &sink);
 
-    void generateListing(const FileInfo &fi
-                         , const Sink::pointer &sink);
+    void generateListing(const FileInfo &fi, Sink &sink);
 
-    bool assertBrowserEnabled(const Sink::pointer &sink) const {
+    bool assertBrowserEnabled(Sink &sink) const {
         if (browserEnabled_) { return true; }
-        sink->error(utility::makeError<NotFound>("Browsing disabled."));
+        sink.error(utility::makeError<NotFound>("Browsing disabled."));
         return false;
     }
 
@@ -54,8 +52,7 @@ private:
     void start(std::size_t count);
     void stop();
     void worker(std::size_t id);
-    void post(const Generator::Task &task
-              , const Sink::pointer &sink);
+    void post(const Generator::Task &task, Sink sink);
 
     Generators &generators_;
     GdalWarper &warper_;
@@ -114,17 +111,16 @@ void Core::Detail::worker(std::size_t id)
     }
 }
 
-void Core::Detail::post(const Generator::Task &task
-                        , const Sink::pointer &sink)
+void Core::Detail::post(const Generator::Task &task, Sink sink)
 {
     if (!task) { return; }
 
-    ios_.post([=]()
+    ios_.post([=]() mutable // sink is passed as non-const ref
     {
         try {
-            task(warper_);
+            task(sink, warper_);
         } catch (...) {
-            sink->error();
+            sink.error();
         }
     });
 }
@@ -135,9 +131,9 @@ Core::Core(Generators &generators, GdalWarper &warper
 {}
 
 void Core::generate_impl(const std::string &location
-                         , const Sink::pointer &sink)
+                         , const http::Sink::pointer &sink)
 {
-    detail().generate(location, sink);
+    detail().generate(location, Sink(sink));
 }
 
 namespace {
@@ -166,7 +162,7 @@ std::string getName(const T &value)
 }
 
 template <bool allowEmpty, typename Container>
-inline Sink::Listing
+inline http::Sink::Listing
 buildListing(const Container &container
              , const Sink::Listing &bootstrap = Sink::Listing())
 {
@@ -188,15 +184,14 @@ buildListing(const Container &container
 template <typename Container>
 inline Sink::Listing
 buildListing(const Container &container
-             , const Sink::Listing &bootstrap = Sink::Listing())
+             , const Sink::Listing &bootstrap = http::Sink::Listing())
 {
     return buildListing<true, Container>(container, bootstrap);
 }
 
 } // namespace
 
-void Core::Detail::generate(const std::string &location
-                            , const Sink::pointer &sink)
+void Core::Detail::generate(const std::string &location, Sink sink)
 {
     try {
         FileInfo fi(location);
@@ -212,7 +207,7 @@ void Core::Detail::generate(const std::string &location
 
         case FileInfo::Type::dirRedir:
             // append slash to filename and let browser try luck again
-            sink->seeOther(fi.filename + "/");
+            sink.seeOther(fi.filename + "/");
             return;
 
         case FileInfo::Type::referenceFrameListing:
@@ -225,18 +220,18 @@ void Core::Detail::generate(const std::string &location
         default: break;
         }
 
-        sink->error(utility::makeError<InternalError>("Unhandled."));
+        sink.error(utility::makeError<InternalError>("Unhandled."));
     } catch (...) {
-        sink->error();
+        sink.error();
     }
 }
 
 void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
-                                       , const Sink::pointer &sink)
+                                       , Sink &sink)
 {
     auto genlist(generators_.referenceFrame(referenceFrame));
     if (genlist.empty()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("No data for <%s>.", referenceFrame));
         return;
     }
@@ -249,15 +244,14 @@ void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
 
     std::ostringstream os;
     vts::saveMapConfig(mapConfig, os);
-    sink->content(os.str(), Sink::FileInfo("application/json"));
+    sink.content(os.str(), http::Sink::FileInfo("application/json"));
 }
 
-void Core::Detail::generateResourceFile(const FileInfo &fi
-                                        , const Sink::pointer &sink)
+void Core::Detail::generateResourceFile(const FileInfo &fi, Sink &sink)
 {
     auto generator(generators_.generator(fi));
     if (!generator) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("No generator for URL <%s> found.", fi.url));
         return;
     }
@@ -278,32 +272,31 @@ Sink::Listing otherDirectoryContent = {
 
 } // namespace
 
-void Core::Detail::generateListing(const FileInfo &fi
-                                   , const Sink::pointer &sink)
+void Core::Detail::generateListing(const FileInfo &fi, Sink &sink)
 {
     if (!assertBrowserEnabled(sink)) { return; }
 
     switch (fi.type) {
     case FileInfo::Type::referenceFrameListing:
-        sink->listing(buildListing(vr::Registry::referenceFrames()
+        sink.listing(buildListing(vr::Registry::referenceFrames()
                                    , otherDirectoryContent));
         return;
 
     case FileInfo::Type::typeListing:
-        sink->listing
+        sink.listing
             (buildListing(enumerationValues(Resource::Generator::Type())
                           , browsableDirectoryContent));
         return;
 
     case FileInfo::Type::groupListing:
-        sink->listing(buildListing
+        sink.listing(buildListing
                       (generators_.listGroups
                        (fi.resourceId.referenceFrame, fi.generatorType)
                        , browsableDirectoryContent));
         return;
 
     case FileInfo::Type::idListing:
-        sink->listing(buildListing<false>
+        sink.listing(buildListing<false>
                       (generators_.listIds
                        (fi.resourceId.referenceFrame, fi.generatorType
                         , fi.resourceId.group)
@@ -313,5 +306,5 @@ void Core::Detail::generateListing(const FileInfo &fi
     default: break;
     }
 
-    sink->error(utility::makeError<InternalError>("Unhandled."));
+    sink.error(utility::makeError<InternalError>("Unhandled."));
 }

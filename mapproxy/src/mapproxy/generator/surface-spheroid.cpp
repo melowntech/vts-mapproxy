@@ -208,21 +208,21 @@ bool special(const vr::ReferenceFrame &referenceFrame
 } // namespace
 
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
-                                       , const Sink::pointer &sink
+                                       , Sink &sink
                                        , const SurfaceFileInfo &fi
                                        , GdalWarper&) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     if (!index_.meta(tileId)) {
-        sink->error(utility::makeError<NotFound>("Metatile not found."));
+        sink.error(utility::makeError<NotFound>("Metatile not found."));
         return;
     }
 
     auto blocks(metatileBlocks(resource(), tileId));
 
     if (blocks.empty()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("Metatile completely outside of configured range."));
         return;
     }
@@ -391,11 +391,11 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
     // write metatile to stream
     std::ostringstream os;
     metatile.save(os);
-    sink->content(os.str(), fi.sinkFileInfo());
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                            , const Sink::pointer &sink
+                                            , Sink &sink
                                             , const SurfaceFileInfo&
                                             , GdalWarper&
                                             , bool withMask) const
@@ -404,7 +404,7 @@ vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
     const int samplesPerSide(128);
     const TileFacesCalculator tileFacesCalculator;
 
-    sink->checkAborted();
+    sink.checkAborted();
 
     // generate mesh
     auto meshInfo
@@ -434,22 +434,22 @@ vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
 }
 
 void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
-                                      , const Sink::pointer &sink
+                                      , Sink &sink
                                       , const SurfaceFileInfo &fi
                                       , GdalWarper&) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     const auto &rf(referenceFrame());
 
     if (!index_.tileIndex.navtile(tileId)) {
-        sink->error(utility::makeError<NotFound>("No navtile for this tile."));
+        sink.error(utility::makeError<NotFound>("No navtile for this tile."));
         return;
     }
 
     vts::NodeInfo nodeInfo(rf, tileId);
     if (!nodeInfo.valid()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("TileId outside of valid reference frame tree."));
         return;
     }
@@ -520,7 +520,7 @@ void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
         nt.serializeNavtileProper(os);
     }
 
-    sink->content(os.str(), fi.sinkFileInfo());
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 } // namespace generator

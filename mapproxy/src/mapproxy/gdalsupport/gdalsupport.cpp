@@ -273,8 +273,7 @@ public:
     Detail(const Options &options);
     ~Detail();
 
-    Raster warp(const RasterRequest &req
-                , const Sink::pointer &sink);
+    Raster warp(const RasterRequest &req, Sink &sink);
 
     void housekeeping();
 
@@ -313,8 +312,7 @@ GdalWarper::GdalWarper(const Options &options)
     : detail_(std::make_shared<Detail>(options))
 {}
 
-GdalWarper::Raster GdalWarper::warp(const RasterRequest &req
-                                    , const Sink::pointer &sink)
+GdalWarper::Raster GdalWarper::warp(const RasterRequest &req, Sink &sink)
 {
     return detail().warp(req, sink);
 }
@@ -557,7 +555,7 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
 }
 
 GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
-                                            , const Sink::pointer &sink)
+                                            , Sink &sink)
 {
     Lock lock(mutex());
     ShRasterRequest::pointer shReq(ShRasterRequest::create(req, mb_));
@@ -567,7 +565,7 @@ GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
     {
         // set aborter for this request
         ShRasterRequest::wpointer wreq(shReq);
-        sink->setAborter([wreq, this]()
+        sink.setAborter([wreq, this]()
         {
             if (auto r = wreq.lock()) {
                 r->setError

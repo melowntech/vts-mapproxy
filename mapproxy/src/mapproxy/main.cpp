@@ -18,10 +18,11 @@
 
 #include "vts-libs/registry/po.hpp"
 
+#include "http/http.hpp"
+
 #include "./error.hpp"
 #include "./resourcebackend.hpp"
 #include "./generator.hpp"
-#include "./http.hpp"
 #include "./core.hpp"
 #include "./gdalsupport.hpp"
 
@@ -98,7 +99,7 @@ private:
     boost::optional<GdalWarper> gdalWarper_;
     boost::optional<Generators> generators_;
     boost::optional<Core> core_;
-    boost::optional<Http> http_;
+    boost::optional<http::Http> http_;
 };
 
 void Daemon::configuration(po::options_description &cmdline

@@ -117,7 +117,7 @@ vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
 }
 
 Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
-                                             , const Sink::pointer &sink) const
+                                             , Sink &sink) const
 {
     TmsFileInfo fi(fileInfo, config().fileFlags);
 
@@ -126,7 +126,7 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
     case TmsFileInfo::Type::image:
     case TmsFileInfo::Type::mask:
         if (!checkRanges(resource(), fi.tileId)) {
-            sink->error(utility::makeError<NotFound>
+            sink.error(utility::makeError<NotFound>
                         ("TileId outside of configured range."));
             return {};
         }
@@ -134,12 +134,12 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
 
     case TmsFileInfo::Type::metatile:
         if (!hasMetatiles_) {
-            sink->error(utility::makeError<NotFound>
+            sink.error(utility::makeError<NotFound>
                         ("This dataset doesn't provide metatiles."));
             return {};
         }
         if (!checkRanges(resource(), fi.tileId, RangeType::lod)) {
-            sink->error(utility::makeError<NotFound>
+            sink.error(utility::makeError<NotFound>
                         ("TileId outside of configured range."));
             return {};
         }
@@ -150,48 +150,48 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
 
     switch (fi.type) {
     case TmsFileInfo::Type::unknown:
-        sink->error(utility::makeError<NotFound>("Unrecognized filename."));
+        sink.error(utility::makeError<NotFound>("Unrecognized filename."));
         break;
 
     case TmsFileInfo::Type::config: {
         std::ostringstream os;
         mapConfig(os, ResourceRoot::none);
-        sink->content(os.str(), fi.sinkFileInfo());
+        sink.content(os.str(), fi.sinkFileInfo());
         break;
     }
 
     case TmsFileInfo::Type::definition: {
         std::ostringstream os;
         vr::saveBoundLayer(os, boundLayer(ResourceRoot::none));
-        sink->content(os.str(), fi.sinkFileInfo());
+        sink.content(os.str(), fi.sinkFileInfo());
         break;
     }
 
     case TmsFileInfo::Type::support:
-        sink->content(fi.support->data, fi.support->size
+        sink.content(fi.support->data, fi.support->size
                       , fi.sinkFileInfo(), false);
         break;
 
     case TmsFileInfo::Type::image: {
         if (fi.format != definition_.format) {
-            sink->error(utility::makeError<NotFound>
+            sink.error(utility::makeError<NotFound>
                         ("Format <%s> is not supported by this resource (%s)."
                          , fi.format, definition_.format));
             return {};
         }
 
-        return[=](GdalWarper &warper)  {
+        return[=](Sink &sink, GdalWarper &warper) {
             generateTileImage(fi.tileId, sink, warper);
         };
     }
 
     case TmsFileInfo::Type::mask:
-        return [=](GdalWarper &warper) {
+        return [=](Sink &sink, GdalWarper &warper)  {
             generateTileMask(fi.tileId, sink, warper);
         };
 
     case TmsFileInfo::Type::metatile:
-        return [=](GdalWarper &warper) {
+        return [=](Sink &sink, GdalWarper &warper) {
             generateMetatile(fi.tileId, sink, warper);
         };
     }
@@ -200,14 +200,14 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
 }
 
 void TmsRaster::generateTileImage(const vts::TileId &tileId
-                                  , const Sink::pointer &sink
+                                  , Sink &sink
                                   , GdalWarper &warper) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
     if (!nodeInfo.valid()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("TileId outside of valid reference frame tree."));
         return;
     }
@@ -221,7 +221,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
                            , geo::GeoDataset::Resampling::cubic
                            , absoluteDataset(definition_.mask))
                           , sink));
-    sink->checkAborted();
+    sink.checkAborted();
 
     // serialize
     std::vector<unsigned char> buf;
@@ -229,18 +229,18 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
     cv::imencode(".jpg", *tile, buf
                  , { cv::IMWRITE_JPEG_QUALITY, 75 });
 
-    sink->content(buf, Sink::FileInfo(contentType(definition_.format)));
+    sink.content(buf, Sink::FileInfo(contentType(definition_.format)));
 }
 
 void TmsRaster::generateTileMask(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , GdalWarper &warper) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
     if (!nodeInfo.valid()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("TileId outside of valid reference frame tree."));
         return;
     }
@@ -255,7 +255,7 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
                            , geo::GeoDataset::Resampling::cubic)
                           , sink));
 
-    sink->checkAborted();
+    sink.checkAborted();
 
     // serialize
     std::vector<unsigned char> buf;
@@ -263,7 +263,7 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
     cv::imencode(".png", *mask, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
-    sink->content(buf, Sink::FileInfo(contentType(MaskFormat)));
+    sink.content(buf, Sink::FileInfo(contentType(MaskFormat)));
 }
 
 namespace Constants {
@@ -279,16 +279,16 @@ namespace MetaFlags {
 }
 
 void TmsRaster::generateMetatile(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , GdalWarper &warper) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     auto blocks(metatileBlocks
                 (resource(), tileId, Constants::RasterMetatileBinaryOrder));
 
     if (blocks.empty()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("Metatile completely outside of configured range."));
         return;
     }
@@ -327,7 +327,7 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
                                , geo::GeoDataset::Resampling::cubic)
                               , sink);
         }
-        sink->checkAborted();
+        sink.checkAborted();
 
         // generate metatile content for current block
         math::Point2i origin(view.ll(0) - tileId.x, view.ll(1) - tileId.y);
@@ -356,7 +356,7 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
     // write as png file
     cv::imencode(".png", metatile, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-    sink->content(buf, Sink::FileInfo(contentType(RasterMetatileFormat)));
+    sink.content(buf, Sink::FileInfo(contentType(RasterMetatileFormat)));
 }
 
 } // namespace generator
