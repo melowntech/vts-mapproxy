@@ -353,14 +353,14 @@ private:
 } // namespace
 
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
-                                  , const Sink::pointer &sink
+                                  , Sink &sink
                                   , const SurfaceFileInfo &fi
                                   , GdalWarper &warper) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     if (!index_.meta(tileId)) {
-        sink->error(utility::makeError<NotFound>("Metatile not found."));
+        sink.error(utility::makeError<NotFound>("Metatile not found."));
         return;
     }
 
@@ -369,12 +369,12 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
     // write metatile to stream
     std::ostringstream os;
     metatile.save(os);
-    sink->content(os.str(), fi.sinkFileInfo());
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 vts::MetaTile
 SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , GdalWarper &warper) const
 {
     auto blocks(metatileBlocks(resource(), tileId));
@@ -419,7 +419,7 @@ SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
                    , geo::GeoDataset::Resampling::dem)
                   , sink));
 
-        sink->checkAborted();
+        sink.checkAborted();
 
         Grid<Sample> grid(gridSize);
 
@@ -638,7 +638,7 @@ private:
 } // namespace
 
 vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , const Sink::pointer &sink
+                                       , Sink &sink
                                        , const SurfaceFileInfo&
                                        , GdalWarper &warper
                                        , bool withMask) const
@@ -646,7 +646,7 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
     const int samplesPerSide(128);
     const TileFacesCalculator tileFacesCalculator;
 
-    sink->checkAborted();
+    sink.checkAborted();
 
     /** warp input dataset as a DEM, with optimized size
      */
@@ -658,7 +658,7 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
                , math::Size2(samplesPerSide, samplesPerSide))
               , sink));
 
-    sink->checkAborted();
+    sink.checkAborted();
 
     // grab size of computed matrix, minus one to get number of edges
     math::Size2 size(dem->cols - 1, dem->rows - 1);
@@ -703,22 +703,22 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
 }
 
 void SurfaceDem::generateNavtile(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , const SurfaceFileInfo &fi
                                  , GdalWarper &warper) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     const auto &rf(referenceFrame());
 
     if (!index_.tileIndex.navtile(tileId)) {
-        sink->error(utility::makeError<NotFound>("No navtile for this tile."));
+        sink.error(utility::makeError<NotFound>("No navtile for this tile."));
         return;
     }
 
     vts::NodeInfo node(rf, tileId);
     if (!node.valid()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("TileId outside of valid reference frame tree."));
         return;
     }
@@ -738,11 +738,11 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     // sds -> navigation SRS convertor
     auto navConv(sds2nav(node, definition_.geoidGrid));
 
-    sink->checkAborted();
+    sink.checkAborted();
 
     const auto *metanode(metatile.get(tileId, std::nothrow));
     if (!metanode) {
-        sink->error(utility::makeError<NotFound>("Metatile not found."));
+        sink.error(utility::makeError<NotFound>("Metatile not found."));
     }
 
     const auto heightRange(metanode->heightRange);
@@ -764,7 +764,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                , math::Size2(ntd.cols - 1, ntd.rows -1))
               , sink));
 
-    sink->checkAborted();
+    sink.checkAborted();
 
     // set height range
     nt.heightRange(vts::NavTile::HeightRange
@@ -805,7 +805,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
         nt.serializeNavtileProper(os);
     }
 
-    sink->content(os.str(), fi.sinkFileInfo());
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 } // namespace generator

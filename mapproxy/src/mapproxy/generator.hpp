@@ -15,8 +15,8 @@
 #include "./resource.hpp"
 #include "./resourcebackend.hpp"
 #include "./fileinfo.hpp"
-#include "./contentgenerator.hpp"
 #include "./gdalsupport.hpp"
+#include "./sink.hpp"
 
 namespace vts = vadstena::vts;
 
@@ -27,7 +27,7 @@ public:
     typedef std::shared_ptr<Generator> pointer;
     typedef std::vector<pointer> list;
     typedef std::map<Resource::Id, pointer> map;
-    typedef std::function<void(GdalWarper&)> Task;
+    typedef std::function<void(Sink&, GdalWarper&)> Task;
 
     /** Configuration
      */
@@ -82,8 +82,7 @@ public:
 
     vts::MapConfig mapConfig(ResourceRoot root) const;
 
-    Task generateFile(const FileInfo &fileInfo
-                      , const Sink::pointer &sink) const;
+    Task generateFile(const FileInfo &fileInfo, Sink sink) const;
 
 protected:
     Generator(const Config &config, const Resource &resource);
@@ -116,7 +115,7 @@ private:
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
 
     virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , const Sink::pointer &sink) const = 0;
+                                   , Sink &sink) const = 0;
 
     Config config_;
     Resource resource_;
@@ -187,7 +186,7 @@ inline vts::MapConfig Generator::mapConfig(ResourceRoot root) const
 }
 
 inline Generator::Task Generator::generateFile(const FileInfo &fileInfo
-                                               , const Sink::pointer &sink)
+                                               , Sink sink)
     const
 {
     return generateFile_impl(fileInfo, sink);

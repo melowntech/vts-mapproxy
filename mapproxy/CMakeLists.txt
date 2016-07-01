@@ -49,6 +49,7 @@ add_subdirectory(src/service)
 add_subdirectory(src/jsoncpp)
 add_subdirectory(src/half)
 add_subdirectory(src/gdal-drivers)
+add_subdirectory(src/http)
 
 # vts libraries
 add_subdirectory(src/vts-libs)

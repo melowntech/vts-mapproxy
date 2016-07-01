@@ -24,42 +24,42 @@ protected:
 
 private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , const Sink::pointer &sink) const;
+                                   , Sink &sink) const;
 
     virtual void generateMetatile(const vts::TileId &tileId
-                                  , const Sink::pointer &sink
+                                  , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
                                   , GdalWarper &warper) const = 0;
 
     void generateMesh(const vts::TileId &tileId
-                      , const Sink::pointer &sink
+                      , Sink &sink
                       , const SurfaceFileInfo &fileInfo
                       , GdalWarper &warper) const;
 
     void generate2dMask(const vts::TileId &tileId
-                        , const Sink::pointer &sink
+                        , Sink &sink
                         , const SurfaceFileInfo &fileInfo
                         , GdalWarper &warper) const;
 
     void generate2dMetatile(const vts::TileId &tileId
-                            , const Sink::pointer &sink
+                            , Sink &sink
                             , const SurfaceFileInfo &fileInfo
                             , GdalWarper &warper) const;
 
     void generateCredits(const vts::TileId &tileId
-                         , const Sink::pointer &sink
+                         , Sink &sink
                          , const SurfaceFileInfo &fileInfo
                          , GdalWarper &warper) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
                                  , GdalWarper &warper) const = 0;
 
     enum MeshRequest { full, mesh, mask };
 
     virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , const Sink::pointer &sink
+                                       , Sink &sink
                                        , const SurfaceFileInfo &fileInfo
                                        , GdalWarper &warper
                                        , bool withMesh) const = 0;

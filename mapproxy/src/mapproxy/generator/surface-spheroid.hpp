@@ -19,18 +19,18 @@ private:
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
     virtual void generateMetatile(const vts::TileId &tileId
-                                  , const Sink::pointer &sink
+                                  , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
                                   , GdalWarper &warper) const;
 
     virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , const Sink::pointer &sink
+                                       , Sink &sink
                                        , const SurfaceFileInfo &fileInfo
                                        , GdalWarper &warper
                                        , bool withMask) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
                                  , GdalWarper &warper) const;
 

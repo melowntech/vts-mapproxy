@@ -15,14 +15,14 @@ private:
     mapConfig_impl(ResourceRoot root) const;
 
     virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , const Sink::pointer &sink) const;
+                                   , Sink &sink) const;
 
     void generateTileMask(const vts::TileId &tileId
-                          , const Sink::pointer &sink
+                          , Sink &sink
                           , GdalWarper &warper) const;
 
     void generateMetatile(const vts::TileId &tileId
-                          , const Sink::pointer &sink
+                          , Sink &sink
                           , GdalWarper &warper) const;
 
     vr::BoundLayer boundLayer(ResourceRoot root) const;

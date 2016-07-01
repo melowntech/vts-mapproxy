@@ -6,7 +6,7 @@
 #include "vts-libs/vts/tileop.hpp"
 
 #include "./resource.hpp"
-#include "./contentgenerator.hpp"
+#include "./sink.hpp"
 
 namespace vs = vadstena::storage;
 namespace vts = vadstena::vts;

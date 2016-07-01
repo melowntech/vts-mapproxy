@@ -34,12 +34,6 @@ struct AbandonAll : Error {
     AbandonAll(const std::string &message) : Error(message) {}
 };
 
-/** Given method is not allowed.
- */
-struct NotAllowed : Error {
-    NotAllowed(const std::string &message) : Error(message) {}
-};
-
 class GenerateError : public Error {
 public:
     typedef void(*RaiseError)(const std::string &message);
