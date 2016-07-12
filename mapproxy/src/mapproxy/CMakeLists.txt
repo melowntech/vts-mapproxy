@@ -1,12 +1,18 @@
 # test program
 define_module(BINARY mapproxy
-  DEPENDS vts-libs http service gdal-drivers geometry
+  DEPENDS
+  pysupport pydbglog
+  vts-libs http service gdal-drivers geometry
+
+  Boost_SERIALIZATION
   Boost_FILESYSTEM
-  Boost_PROGRAM_OPTIONS)
+  Boost_PROGRAM_OPTIONS
+  Boost_PYTHON
+  )
 
 set(mapproxy_SOURCES
   error.hpp
-  resource.hpp resource.cpp
+  resource.hpp resource.cpp pyresource.cpp
   support/metatile.hpp support/metatile.cpp
   support/mesh.hpp support/mesh.cpp
   support/geo.hpp support/geo.cpp
@@ -16,7 +22,7 @@ set(mapproxy_SOURCES
   resourcebackend/resourcebackend.cpp
   resourcebackend/factory.hpp
   resourcebackend/conffile.hpp resourcebackend/conffile.cpp
-  resourcebackend/mysql.hpp resourcebackend/mysql.cpp
+  resourcebackend/python.hpp resourcebackend/python.cpp
 
   generator.hpp
   generator/generator.cpp

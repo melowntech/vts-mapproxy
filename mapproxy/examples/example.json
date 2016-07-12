@@ -515,5 +515,46 @@
             "mask": "mapycz/cz.qm",
             "remoteUrl": "http://m{alt(1,2,3,4)}.mapserver.mapy.cz/ophoto-m/{loclod}-{locx}-{locy}"
         }
+    },
+
+    {
+        "comment": "Czech Republic",
+        "group": "melown",
+        "id": "cz15",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0,8],
+                "tileRange": [[0,0],[0,0]]
+            }
+        },
+        "credits": ["melown"],
+        "definition": {
+            "dataset": "/mnt/media/derivatives/mapproxy/cz",
+            "mask": "/mnt/media/derivatives/mask/osm-boundaries/cz/cz.mask",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "viewfinder",
+        "group": "melown",
+        "id": "world15",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [4,8],
+                "tileRange": [[0,0], [15,15]]
+            }
+        },
+        "credits": ["jonathan"],
+        "definition": {
+            "dataset": "viewfinder",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
     }
 ]

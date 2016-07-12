@@ -27,16 +27,15 @@ find_package(PNG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(magic REQUIRED)
 
-find_package(MySQL++ REQUIRED)
-add_definitions(${MYSQL++_DEFINITIONS})
-include_directories(${MYSQL++_INCLUDE_DIR})
-
 find_package(OpenMesh 2.3.1 REQUIRED)
 include_directories(${OPENMESH_INCLUDE_DIR})
 link_directories(${OPENMESH_LIBRARY_DIR})
 
 find_package(LibProc REQUIRED)
 include_directories(${LIBPROC_INCLUDE_DIR})
+
+enable_python(2.7)
+include_directories(${PYTHONLIBS_INCLUDE_DIRS})
 
 # dependencies
 add_subdirectory(src/dbglog)
@@ -50,6 +49,11 @@ add_subdirectory(src/jsoncpp)
 add_subdirectory(src/half)
 add_subdirectory(src/gdal-drivers)
 add_subdirectory(src/http)
+
+# python stuff
+set(PYDBGLOG_STATIC TRUE)
+add_subdirectory(src/pydbglog)
+add_subdirectory(src/pysupport)
 
 # vts libraries
 add_subdirectory(src/vts-libs)

@@ -16,7 +16,7 @@ const std::vector<unsigned char> emptyImage([]() -> std::vector<unsigned char>
     return buf;
 }());
 
-class IStreamDataSource : public http::Sink::DataSource {
+class IStreamDataSource : public http::ServerSink::DataSource {
 public:
     IStreamDataSource(const vs::IStream::pointer &stream)
         : stream_(stream), stat_(stream->stat())
@@ -25,7 +25,7 @@ public:
         stream->get().exceptions(std::ios::badbit);
     }
 
-    virtual http::Sink::FileInfo stat() const {
+    virtual http::SinkBase::FileInfo stat() const {
         return { stat_.contentType, stat_.lastModified };
     }
 

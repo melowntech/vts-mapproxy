@@ -131,7 +131,7 @@ Core::Core(Generators &generators, GdalWarper &warper
 {}
 
 void Core::generate_impl(const std::string &location
-                         , const http::Sink::pointer &sink)
+                         , const http::ServerSink::pointer &sink)
 {
     detail().generate(location, Sink(sink));
 }
@@ -162,7 +162,7 @@ std::string getName(const T &value)
 }
 
 template <bool allowEmpty, typename Container>
-inline http::Sink::Listing
+inline Sink::Listing
 buildListing(const Container &container
              , const Sink::Listing &bootstrap = Sink::Listing())
 {
@@ -184,7 +184,7 @@ buildListing(const Container &container
 template <typename Container>
 inline Sink::Listing
 buildListing(const Container &container
-             , const Sink::Listing &bootstrap = http::Sink::Listing())
+             , const Sink::Listing &bootstrap = Sink::Listing())
 {
     return buildListing<true, Container>(container, bootstrap);
 }
@@ -244,7 +244,7 @@ void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
 
     std::ostringstream os;
     vts::saveMapConfig(mapConfig, os);
-    sink.content(os.str(), http::Sink::FileInfo("application/json"));
+    sink.content(os.str(), http::SinkBase::FileInfo("application/json"));
 }
 
 void Core::Detail::generateResourceFile(const FileInfo &fi, Sink &sink)

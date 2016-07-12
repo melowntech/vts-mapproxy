@@ -16,12 +16,12 @@ namespace vs = vadstena::storage;
  */
 class Sink {
 public:
-    typedef http::Sink::AbortedCallback AbortedCallback;
-    typedef http::Sink::FileInfo FileInfo;
-    typedef http::Sink::ListingItem ListingItem;
+    typedef http::ServerSink::AbortedCallback AbortedCallback;
+    typedef http::ServerSink::FileInfo FileInfo;
+    typedef http::ServerSink::ListingItem ListingItem;
     typedef std::vector<ListingItem> Listing;
 
-    Sink(const http::Sink::pointer &sink) : sink_(sink) {}
+    Sink(const http::ServerSink::pointer &sink) : sink_(sink) {}
 
     /** Sends content to client.
      * \param data data top send
@@ -95,7 +95,7 @@ private:
      */
     void error(const std::exception_ptr &exc);
 
-    http::Sink::pointer sink_;
+    http::ServerSink::pointer sink_;
 };
 
 template <typename T>

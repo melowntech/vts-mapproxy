@@ -16,7 +16,7 @@ public:
 
 private:
     virtual void generate_impl(const std::string &location
-                               , const http::Sink::pointer &sink);
+                               , const http::ServerSink::pointer &sink);
 
     std::shared_ptr<Detail> detail_;
     Detail& detail() { return *detail_; }

@@ -196,6 +196,11 @@ Resource::map loadResources(const boost::filesystem::path &path);
  */
 Resource::list loadResource(const boost::filesystem::path &path);
 
+/** Load resources from Python list (passed as a boost::any to hide
+ *  implementation)
+ */
+Resource::map loadResourcesFromPython(const boost::any &pylist);
+
 /** Save single resource to given path.
  */
 void save(const boost::filesystem::path &path, const Resource &resource);
