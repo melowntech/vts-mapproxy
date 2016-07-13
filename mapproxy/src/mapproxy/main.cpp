@@ -60,7 +60,8 @@ private:
                        , po::positional_options_description &pd);
 
     service::UnrecognizedParser::optional
-    configure(const po::variables_map &vars, const std::vector<std::string>&);
+    configure(const po::variables_map &vars
+              , const service::UnrecognizedOptions &unrecognized);
 
     void configure(const po::variables_map &vars);
 
@@ -159,7 +160,7 @@ const std::string RBPrefixDotted(RBPrefix + ".");
 
 service::UnrecognizedParser::optional
 Daemon::configure(const po::variables_map &vars
-                  , const std::vector<std::string>&)
+                  , const service::UnrecognizedOptions &unrecognized)
 {
     // configure resource backend
     const auto RBType(RBPrefixDotted + "type");
@@ -169,7 +170,7 @@ Daemon::configure(const po::variables_map &vars
         resourceBackendConfig_.type = vars[RBType].as<std::string>();
         // and configure
         return ResourceBackend::configure
-            (RBPrefixDotted, resourceBackendConfig_);
+            (RBPrefixDotted, resourceBackendConfig_, unrecognized);
     } catch (const UnknownResourceBackend&) {
         throw po::validation_error
             (po::validation_error::invalid_option_value, RBType);
@@ -229,7 +230,8 @@ bool Daemon::help(std::ostream &out, const std::string &what) const
     // check for resource backend snippet help
     if (ba::starts_with(what, RBHelpPrefix)) {
         ResourceBackend::TypedConfig config(what.substr(RBHelpPrefix.size()));
-        auto parser(ResourceBackend::configure(RBPrefixDotted, config));
+        auto parser(ResourceBackend::configure(RBPrefixDotted, config
+                                               , {}));
         if (parser) {
             out << parser->options;
             return true;

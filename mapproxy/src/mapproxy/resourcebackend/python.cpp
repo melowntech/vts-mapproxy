@@ -37,7 +37,8 @@ struct Factory : ResourceBackend::Factory {
     }
 
     virtual service::UnrecognizedParser::optional
-    configure(const std::string &prefix, TypedConfig &typedConfig)
+    configure(const std::string &prefix, TypedConfig &typedConfig
+              , const service::UnrecognizedOptions &unrecognized)
     {
         auto &config(typedConfig.assign<Python::Config>());
 
@@ -48,7 +49,47 @@ struct Factory : ResourceBackend::Factory {
         parser.options.add_options()
             ((prefix + "script").c_str()
              , po::value(&config.script)->required()
-             , "Path pythong script. It must privide global function run().");
+             , "Path pythong script. It must privide global function run().")
+            ;
+
+        const auto optPrefix(prefix + "option");
+        const auto optPrefixDotted(optPrefix +".");
+        const auto optPrefixDashed("--" + optPrefixDotted);
+
+        auto add([&](const std::string &name) -> std::string*
+        {
+            auto res(config.options.insert
+                     (Python::Config::Options::value_type(name, "")));
+            if (!res.second) { return nullptr; }
+            return &res.first->second;
+        });
+
+        for (const auto &option : unrecognized.cmdline) {
+            if (option.find(optPrefixDashed) != 0) { continue; }
+
+            auto name(option.substr(optPrefixDashed.size()));
+            if (auto *location = add(name)) {
+                parser.options.add_options()
+                    (option.substr(2).c_str(), po::value(location)
+                     , "extra option")
+                    ;
+            }
+        }
+        for (const auto &config : unrecognized.config) {
+            for (const auto &options : config) {
+                const auto &option(options.first);
+                if (option.find(optPrefixDotted) != 0) { continue; }
+
+                auto name(option.substr(optPrefixDotted.size()));
+
+                if (auto *location = add(name)) {
+                    parser.options.add_options()
+                        (option.c_str(), po::value(location)
+                     , "extra option")
+                        ;
+                }
+            }
+        }
 
         return parser;
     }
@@ -59,6 +100,11 @@ struct Factory : ResourceBackend::Factory {
         const auto &config(typedConfig.value<Python::Config>());
 
         os << prefix << "script = " << config.script << "\n";
+
+        for (const auto &option : config.options) {
+            os << prefix << "option." << option.first << " = "
+               << option.second << "\n";
+        }
     }
 
 private:
@@ -76,7 +122,13 @@ Python::Python(const Config &config)
     : run_()
 {
     try {
-        run_ = pysupport::import(config.script).attr("run");
+        python::dict options;
+        for (const auto &option : config.options) {
+            options[option.first] = option.second;
+        }
+
+        run_ = pysupport::import(config.script)
+            .attr("resource_backend")(options);
     } catch (const python::error_already_set&) {
         // TODO: handle exceptions
         ::PyErr_Print();

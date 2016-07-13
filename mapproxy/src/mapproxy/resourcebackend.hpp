@@ -53,7 +53,8 @@ public:
      * \param config placeholder for configuration (i.e. parsed data)
      */
     static service::UnrecognizedParser::optional
-    configure(const std::string &prefix, TypedConfig &config);
+    configure(const std::string &prefix, TypedConfig &config
+              , const service::UnrecognizedOptions &unrecognized);
 
     static void printConfig(std::ostream &os, const std::string &prefix
                             , const TypedConfig &config);

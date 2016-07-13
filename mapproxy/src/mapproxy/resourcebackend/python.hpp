@@ -14,7 +14,9 @@ namespace resource_backend {
 class Python : public ResourceBackend {
 public:
     struct Config {
+        typedef std::map<std::string, std::string> Options;
         boost::filesystem::path script;
+        Options options;
     };
 
     Python(const Config &config);
