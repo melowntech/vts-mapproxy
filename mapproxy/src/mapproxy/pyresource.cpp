@@ -11,6 +11,8 @@
 
 #include "./error.hpp"
 #include "./resource.hpp"
+#include "./generator.hpp"
+#include "./support/python.hpp"
 
 namespace fs = boost::filesystem;
 namespace python = boost::python;
@@ -19,12 +21,6 @@ namespace vr = vadstena::registry;
 namespace vs = vadstena::storage;
 
 namespace detail {
-
-std::string utf8(boost::python::object s)
-{
-    using namespace python;
-    return extract<std::string>(s.attr("encode")("utf-8"));
-}
 
 void parseCredits(DualId::set &ids, const python::object &object
                   , const char *name)
@@ -43,101 +39,29 @@ void parseCredits(DualId::set &ids, const python::object &object
                 return vr::Registry::credit(asInt);
             }
 
-            return vr::Registry::credit(utf8(element));
+            return vr::Registry::credit(py2utf8(element));
         }());
 
         ids.insert(DualId(credit.id, credit.numericId));
     }
 }
 
-void parseDefinition(resdef::TmsRaster &def, const python::dict &value)
-{
-    def.dataset = utf8(value["dataset"]);
-
-    if (value.has_key("mask")) {
-        def.mask = utf8(value["mask"]);
-    }
-
-    if (value.has_key("format")) {
-        try {
-            def.format = boost::lexical_cast<RasterFormat>
-                (utf8(value["format"]));
-        } catch (boost::bad_lexical_cast) {
-            utility::raise<Error>
-                ("Value stored in format is not RasterFormat value");
-        }
-    }
-}
-
-void parseDefinition(resdef::TmsRasterRemote &def, const python::dict &value)
-{
-    def.remoteUrl = utf8(value["remoteUrl"]);
-
-    if (value.has_key("mask")) {
-        def.mask = utf8(value["mask"]);
-    }
-}
-
-void parseDefinition(resdef::SurfaceSpheroid &def, const python::dict &value)
-{
-    if (value.has_key("textureLayerId")) {
-        def.textureLayerId = python::extract<int>(value["textureLayerId"]);
-    }
-
-    if (value.has_key("geoidGrid")) {
-        def.geoidGrid = utf8(value["geoidGrid"]);
-    }
-}
-
-void parseDefinition(resdef::SurfaceDem &def, const python::dict &value)
-{
-    def.dataset = utf8(value["dataset"]);
-
-    if (value.has_key("mask")) {
-        def.mask = utf8(value["mask"]);
-    }
-
-    if (value.has_key("textureLayerId")) {
-        def.textureLayerId = python::extract<int>(value["textureLayerId"]);
-    }
-
-    if (value.has_key("geoidGrid")) {
-        def.geoidGrid = utf8(value["geoidGrid"]);
-    }
-}
-
 void parseDefinition(Resource &r, const python::dict &value)
 {
-    if (r.generator == resdef::TmsRaster::generator) {
-        return parseDefinition
-            (r.assignDefinition<resdef::TmsRaster>(), value);
-    }
-    if (r.generator == resdef::TmsRasterRemote::generator) {
-        return parseDefinition
-            (r.assignDefinition<resdef::TmsRasterRemote>(), value);
-    }
-    if (r.generator == resdef::SurfaceSpheroid::generator) {
-        return parseDefinition
-            (r.assignDefinition<resdef::SurfaceSpheroid>(), value);
-    }
-    if (r.generator == resdef::SurfaceDem::generator) {
-        return parseDefinition
-            (r.assignDefinition<resdef::SurfaceDem>(), value);
-    }
-
-    LOGTHROW(err1, UnknownGenerator)
-        << "Unknown generator <" << r.generator << ">.";
+    auto definition(Generator::definition(r.generator));
+    definition->from(value);
+    r.definition(definition);
 }
 
 Resource::list parseResource(const python::object &value)
 {
     Resource r;
-    r.id.group = utf8(value["group"]);
-    r.id.id = utf8(value["id"]);
+    r.id.group = py2utf8(value["group"]);
+    r.id.id = py2utf8(value["id"]);
 
-    std::string tmp(utf8(value["type"]));
+    std::string tmp(py2utf8(value["type"]));
     r.generator.type = boost::lexical_cast<Resource::Generator::Type>(tmp);
-    r.generator.driver = utf8(value["driver"]);
+    r.generator.driver = py2utf8(value["driver"]);
 
     parseCredits(r.credits, value, "credits");
 
@@ -151,7 +75,7 @@ Resource::list parseResource(const python::object &value)
              ireferenceFrames(referenceFrames), ereferenceFrames;
          ireferenceFrames != ereferenceFrames; ++ireferenceFrames)
     {
-        const auto &name(utf8(*ireferenceFrames));
+        const auto &name(py2utf8(*ireferenceFrames));
         const auto &content(referenceFrames[*ireferenceFrames]);
 
         out.push_back(r);

@@ -48,6 +48,11 @@ void Generator::registerType(const Resource::Generator &type
     registry.insert(Registry::value_type(type, factory));
 }
 
+DefinitionBase::pointer Generator::definition(const Resource::Generator &type)
+{
+    return findFactory(type)->definition();
+}
+
 Generator::pointer Generator::create(const Config &config
                                      , const Resource::Generator &type
                                      , const Resource &resource)

@@ -12,6 +12,9 @@
 
 #include "geo/coordinates.hpp"
 
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
+
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
@@ -27,6 +30,7 @@
 #include "../support/mesh.hpp"
 #include "../support/srs.hpp"
 #include "../support/grid.hpp"
+#include "../support/python.hpp"
 
 #include "./surface-spheroid.hpp"
 #include "./factory.hpp"
@@ -47,6 +51,10 @@ struct Factory : Generator::Factory {
         return std::make_shared<SurfaceSpheroid>(config, resource);
     }
 
+    virtual DefinitionBase::pointer definition() {
+        return std::make_shared<SurfaceSpheroid::Definition>();
+    }
+
 private:
     static utility::PreMain register_;
 };
@@ -54,15 +62,87 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        (resdef::SurfaceSpheroid::generator, std::make_shared<Factory>());
+        (Resource::Generator(Resource::Generator::Type::surface
+                             , "surface-spheroid")
+         , std::make_shared<Factory>());
 });
 
+void parseDefinition(SurfaceSpheroid::Definition &def
+                     , const Json::Value &value)
+{
+    if (value.isMember("textureLayerId")) {
+        Json::get(def.textureLayerId, value, "textureLayerId");
+    }
+    if (value.isMember("geoidGrid")) {
+        std::string s;
+        Json::get(s, value, "geoidGrid");
+        def.geoidGrid = s;
+    }
+}
+
+void buildDefinition(Json::Value &value
+                     , const SurfaceSpheroid::Definition &def)
+{
+    if (def.textureLayerId) {
+        value["textureLayerId"] = def.textureLayerId;
+    }
+    if (def.geoidGrid) {
+        value["geoidGrid"] = *def.geoidGrid;
+    }
+}
+
+void parseDefinition(SurfaceSpheroid::Definition &def
+                     , const boost::python::dict &value)
+{
+    namespace python = boost::python;
+    if (value.has_key("textureLayerId")) {
+        def.textureLayerId = python::extract<int>(value["textureLayerId"]);
+    }
+
+    if (value.has_key("geoidGrid")) {
+        def.geoidGrid = py2utf8(value["geoidGrid"]);
+    }
+}
+
 } // namespace
+
+void SurfaceSpheroid::Definition::from_impl(const boost::any &value)
+{
+    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
+        parseDefinition(*this, *json);
+    } else if (const auto *py
+               = boost::any_cast<boost::python::dict>(&value))
+    {
+        parseDefinition(*this, *py);
+    } else {
+        LOGTHROW(err1, Error)
+            << "SurfaceSpheroid: Unsupported configuration from: <"
+            << value.type().name() << ">.";
+    }
+}
+
+void SurfaceSpheroid::Definition::to_impl(boost::any &value) const
+{
+    if (auto *json = boost::any_cast<Json::Value>(&value)) {
+        buildDefinition(*json, *this);
+    } else {
+        LOGTHROW(err1, Error)
+            << "SurfaceSpheroid:: Unsupported serialization into: <"
+            << value.type().name() << ">.";
+    }
+}
+
+bool SurfaceSpheroid::Definition::operator==(const Definition &o) const
+{
+    if (textureLayerId != o.textureLayerId) { return false; }
+    if (geoidGrid != o.geoidGrid) { return false; }
+    return true;
+}
 
 SurfaceSpheroid::SurfaceSpheroid(const Config &config
                                  , const Resource &resource)
     : SurfaceBase(config, resource)
-    , definition_(this->resource().definition<resdef::SurfaceSpheroid>())
+    , definition_(this->resource().definition<Definition>())
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));

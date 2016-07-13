@@ -45,6 +45,8 @@ public:
                                      , const Resource::Generator &type
                                      , const Resource &resource);
 
+    static DefinitionBase::pointer definition(const Resource::Generator &type);
+
     struct Factory;
     static void registerType(const Resource::Generator &type
                              , const std::shared_ptr<Factory> &factory);

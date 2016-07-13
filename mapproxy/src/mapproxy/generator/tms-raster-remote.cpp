@@ -10,6 +10,9 @@
 
 #include "imgproc/rastermask/cvmat.hpp"
 
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
+
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 
@@ -18,6 +21,7 @@
 
 #include "./tms-raster-remote.hpp"
 #include "./factory.hpp"
+#include "../support/python.hpp"
 
 #include "browser2d/index.html.hpp"
 
@@ -34,6 +38,10 @@ struct Factory : Generator::Factory {
         return std::make_shared<TmsRasterRemote>(config, resource);
     }
 
+    virtual DefinitionBase::pointer definition() {
+        return std::make_shared<TmsRasterRemote::Definition>();
+    }
+
 private:
     static utility::PreMain register_;
 };
@@ -41,14 +49,82 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        (resdef::TmsRasterRemote::generator, std::make_shared<Factory>());
+        (Resource::Generator(Resource::Generator::Type::tms
+                             , "tms-raster-remote")
+         , std::make_shared<Factory>());
 });
+
+void parseDefinition(TmsRasterRemote::Definition &def
+                     , const Json::Value &value)
+{
+    std::string s;
+
+    Json::get(def.remoteUrl, value, "remoteUrl");
+    if (value.isMember("mask")) {
+        def.mask = boost::in_place();
+        Json::get(*def.mask, value, "mask");
+    }
+}
+
+void buildDefinition(Json::Value &value
+                     , const TmsRasterRemote::Definition &def)
+{
+    value["remoteUrl"] = def.remoteUrl;
+    if (def.mask) {
+        value["mask"] = *def.mask;
+    }
+}
+
+void parseDefinition(TmsRasterRemote::Definition &def
+                     , const boost::python::dict &value)
+{
+    def.remoteUrl = py2utf8(value["remoteUrl"]);
+
+    if (value.has_key("mask")) {
+        def.mask = py2utf8(value["mask"]);
+    }
+}
 
 } // namespace
 
-TmsRasterRemote::TmsRasterRemote(const Config &config, const Resource &resource)
+void TmsRasterRemote::Definition::from_impl(const boost::any &value)
+{
+    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
+        parseDefinition(*this, *json);
+    } else if (const auto *py
+               = boost::any_cast<boost::python::dict>(&value))
+    {
+        parseDefinition(*this, *py);
+    } else {
+        LOGTHROW(err1, Error)
+            << "TmsRasterRemote: Unsupported configuration from: <"
+            << value.type().name() << ">.";
+    }
+}
+
+void TmsRasterRemote::Definition::to_impl(boost::any &value) const
+{
+    if (auto *json = boost::any_cast<Json::Value>(&value)) {
+        buildDefinition(*json, *this);
+    } else {
+        LOGTHROW(err1, Error)
+            << "TmsRasterRemote:: Unsupported serialization into: <"
+            << value.type().name() << ">.";
+    }
+}
+
+bool TmsRasterRemote::Definition::operator==(const Definition &o) const
+{
+    if (remoteUrl != o.remoteUrl) { return false; }
+    if (mask != o.mask) { return false; }
+
+    return true;
+}
+
+TmsRasterRemote::TmsRasterRemote(const Config &config
+                                 , const Resource &resource)
     : Generator(config, resource)
-    , definition_(this->resource().definition<resdef::TmsRasterRemote>())
+    , definition_(this->resource().definition<Definition>())
     , hasMetatiles_(false)
 {
     LOG(info1) << "Generator for <" << resource.id << "> not ready.";

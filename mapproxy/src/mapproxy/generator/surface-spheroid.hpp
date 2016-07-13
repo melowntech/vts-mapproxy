@@ -14,6 +14,21 @@ class SurfaceSpheroid : public SurfaceBase {
 public:
     SurfaceSpheroid(const Config &config, const Resource &resource);
 
+    struct Definition : public DefinitionBase {
+        unsigned int textureLayerId;
+        boost::optional<std::string> geoidGrid;
+
+        Definition() : textureLayerId() {}
+        bool operator==(const Definition &o) const;
+
+    private:
+        virtual void from_impl(const boost::any &value);
+        virtual void to_impl(boost::any &value) const;
+        virtual bool same_impl(const DefinitionBase &other) const {
+            return (*this == other.as<Definition>());
+        }
+    };
+
 private:
     virtual void prepare_impl();
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
@@ -34,7 +49,7 @@ private:
                                  , const SurfaceFileInfo &fileInfo
                                  , GdalWarper &warper) const;
 
-    const resdef::SurfaceSpheroid &definition_;
+    const Definition &definition_;
 };
 
 } // namespace generator

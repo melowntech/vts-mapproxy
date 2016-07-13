@@ -16,6 +16,9 @@
 
 #include "imgproc/rastermask/mappedqtree.hpp"
 
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
+
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
@@ -33,6 +36,7 @@
 #include "../support/geo.hpp"
 #include "../support/grid.hpp"
 #include "../support/coverage.hpp"
+#include "../support/python.hpp"
 
 #include "./surface-dem.hpp"
 #include "./factory.hpp"
@@ -53,6 +57,10 @@ struct Factory : Generator::Factory {
         return std::make_shared<SurfaceDem>(config, resource);
     }
 
+    virtual DefinitionBase::pointer definition() {
+        return std::make_shared<SurfaceDem::Definition>();
+    }
+
 private:
     static utility::PreMain register_;
 };
@@ -60,19 +68,112 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        (resdef::SurfaceDem::generator, std::make_shared<Factory>());
+        (Resource::Generator(Resource::Generator::Type::surface
+                             , "surface-dem")
+         , std::make_shared<Factory>());
 });
 
 
 typedef vts::MetaNode::Flag MetaFlag;
 typedef vts::TileIndex::Flag TiFlag;
 
+void parseDefinition(SurfaceDem::Definition &def, const Json::Value &value)
+{
+    Json::get(def.dataset, value, "dataset");
+    if (value.isMember("mask")) {
+        std::string s;
+        Json::get(s, value, "mask");
+        def.mask = s;;
+    }
+
+    if (value.isMember("textureLayerId")) {
+        Json::get(def.textureLayerId, value, "textureLayerId");
+    }
+
+    if (value.isMember("geoidGrid")) {
+        std::string s;
+        Json::get(s, value, "geoidGrid");
+        def.geoidGrid = s;
+    }
+}
+
+void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
+{
+    value["dataset"] = def.dataset;
+    if (def.mask) {
+        value["mask"] = def.mask->string();
+    }
+
+    if (def.textureLayerId) {
+        value["textureLayerId"] = def.textureLayerId;
+    }
+    if (def.geoidGrid) {
+        value["geoidGrid"] = *def.geoidGrid;
+    }
+}
+
+void parseDefinition(SurfaceDem::Definition &def
+                     , const boost::python::dict &value)
+{
+    namespace python = boost::python;
+
+    def.dataset = py2utf8(value["dataset"]);
+
+    if (value.has_key("mask")) {
+        def.mask = py2utf8(value["mask"]);
+    }
+
+    if (value.has_key("textureLayerId")) {
+        def.textureLayerId = python::extract<int>(value["textureLayerId"]);
+    }
+
+    if (value.has_key("geoidGrid")) {
+        def.geoidGrid = py2utf8(value["geoidGrid"]);
+    }
+}
+
 } // namespace
+
+void SurfaceDem::Definition::from_impl(const boost::any &value)
+{
+    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
+        parseDefinition(*this, *json);
+    } else if (const auto *py
+               = boost::any_cast<boost::python::dict>(&value))
+    {
+        parseDefinition(*this, *py);
+    } else {
+        LOGTHROW(err1, Error)
+            << "SurfaceDem: Unsupported configuration from: <"
+            << value.type().name() << ">.";
+    }
+}
+
+void SurfaceDem::Definition::to_impl(boost::any &value) const
+{
+    if (auto *json = boost::any_cast<Json::Value>(&value)) {
+        buildDefinition(*json, *this);
+    } else {
+        LOGTHROW(err1, Error)
+            << "SurfaceDem:: Unsupported serialization into: <"
+            << value.type().name() << ">.";
+    }
+}
+
+bool SurfaceDem::Definition::operator==(const Definition &o) const
+{
+    if (dataset != o.dataset) { return false; }
+    if (mask != o.mask) { return false; }
+    if (textureLayerId != o.textureLayerId) { return false; }
+    if (geoidGrid != o.geoidGrid) { return false; }
+
+    return true;
+}
 
 SurfaceDem::SurfaceDem(const Config &config
                        , const Resource &resource)
     : SurfaceBase(config, resource)
-    , definition_(this->resource().definition<resdef::SurfaceDem>())
+    , definition_(this->resource().definition<Definition>())
     , dataset_(absoluteDataset(definition_.dataset + "/dem"))
     , maskTree_(absoluteDatasetRf(definition_.mask))
 {

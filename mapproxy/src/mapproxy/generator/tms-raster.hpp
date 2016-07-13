@@ -9,6 +9,22 @@ class TmsRaster : public Generator {
 public:
     TmsRaster(const Config &config, const Resource &resource);
 
+    struct Definition : public DefinitionBase {
+        std::string dataset;
+        boost::optional<std::string> mask;
+        RasterFormat format;
+
+        Definition(): format(RasterFormat::jpg) {}
+        bool operator==(const Definition &o) const;
+
+    private:
+        virtual void from_impl(const boost::any &value);
+        virtual void to_impl(boost::any &value) const;
+        virtual bool same_impl(const DefinitionBase &other) const {
+            return (*this == other.as<Definition>());
+        }
+    };
+
 private:
     virtual void prepare_impl();
     virtual vts::MapConfig
@@ -31,7 +47,7 @@ private:
 
     vr::BoundLayer boundLayer(ResourceRoot root) const;
 
-    const resdef::TmsRaster &definition_;
+    const Definition &definition_;
 
     bool hasMetatiles_;
 };

@@ -10,24 +10,12 @@
 
 #include "./error.hpp"
 #include "./resource.hpp"
+#include "./generator.hpp"
 
 namespace fs = boost::filesystem;
 
 namespace vr = vadstena::registry;
 namespace vs = vadstena::storage;
-
-namespace resdef {
-
-Resource::Generator TmsRaster::generator
-    (Resource::Generator::Type::tms, "tms-raster");
-Resource::Generator TmsRasterRemote::generator
-    (Resource::Generator::Type::tms, "tms-raster-remote");
-Resource::Generator SurfaceSpheroid::generator
-    (Resource::Generator::Type::surface, "surface-spheroid");
-Resource::Generator SurfaceDem::generator
-    (Resource::Generator::Type::surface, "surface-dem");
-
-} // namespace resdef
 
 namespace detail {
 
@@ -56,156 +44,18 @@ void parseCredits(DualId::set &ids, const Json::Value &object
     }
 }
 
-void parseDefinition(resdef::TmsRaster &def, const Json::Value &value)
-{
-    std::string s;
-
-    Json::get(def.dataset, value, "dataset");
-    if (value.isMember("mask")) {
-        def.mask = boost::in_place();
-        Json::get(*def.mask, value, "mask");
-    }
-
-    if (value.isMember("format")) {
-        Json::get(s, value, "format");
-        try {
-            def.format = boost::lexical_cast<RasterFormat>(s);
-        } catch (boost::bad_lexical_cast) {
-            utility::raise<Json::Error>
-                ("Value stored in format is not RasterFormat value");
-        }
-    }
-}
-
-void parseDefinition(resdef::TmsRasterRemote &def, const Json::Value &value)
-{
-    std::string s;
-
-    Json::get(def.remoteUrl, value, "remoteUrl");
-    if (value.isMember("mask")) {
-        def.mask = boost::in_place();
-        Json::get(*def.mask, value, "mask");
-    }
-}
-
-void parseDefinition(resdef::SurfaceSpheroid &def, const Json::Value &value)
-{
-    if (value.isMember("textureLayerId")) {
-        Json::get(def.textureLayerId, value, "textureLayerId");
-    }
-    if (value.isMember("geoidGrid")) {
-        std::string s;
-        Json::get(s, value, "geoidGrid");
-        def.geoidGrid = s;
-    }
-}
-
-void parseDefinition(resdef::SurfaceDem &def, const Json::Value &value)
-{
-    Json::get(def.dataset, value, "dataset");
-    if (value.isMember("mask")) {
-        std::string s;
-        Json::get(s, value, "mask");
-        def.mask = s;;
-    }
-
-    if (value.isMember("textureLayerId")) {
-        Json::get(def.textureLayerId, value, "textureLayerId");
-    }
-
-    if (value.isMember("geoidGrid")) {
-        std::string s;
-        Json::get(s, value, "geoidGrid");
-        def.geoidGrid = s;
-    }
-}
-
 void parseDefinition(Resource &r, const Json::Value &value)
 {
-    if (r.generator == resdef::TmsRaster::generator) {
-        return parseDefinition
-            (r.assignDefinition<resdef::TmsRaster>(), value);
-    }
-    if (r.generator == resdef::TmsRasterRemote::generator) {
-        return parseDefinition
-            (r.assignDefinition<resdef::TmsRasterRemote>(), value);
-    }
-    if (r.generator == resdef::SurfaceSpheroid::generator) {
-        return parseDefinition
-            (r.assignDefinition<resdef::SurfaceSpheroid>(), value);
-    }
-    if (r.generator == resdef::SurfaceDem::generator) {
-        return parseDefinition
-            (r.assignDefinition<resdef::SurfaceDem>(), value);
-    }
-
-    LOGTHROW(err1, UnknownGenerator)
-        << "Unknown generator <" << r.generator << ">.";
+    auto definition(Generator::definition(r.generator));
+    definition->from(value);
+    r.definition(definition);
 }
 
-void buildDefinition(Json::Value &value, const resdef::TmsRaster &def)
+Json::Value buildDefinition(const Resource &r)
 {
-    value["dataset"] = def.dataset;
-    if (def.mask) {
-        value["mask"] = *def.mask;
-    }
-    value["format"] = boost::lexical_cast<std::string>(def.format);
-}
-
-void buildDefinition(Json::Value &value, const resdef::TmsRasterRemote &def)
-{
-    value["remoteUrl"] = def.remoteUrl;
-    if (def.mask) {
-        value["mask"] = *def.mask;
-    }
-}
-
-void buildDefinition(Json::Value &value, const resdef::SurfaceSpheroid &def)
-{
-    if (def.textureLayerId) {
-        value["textureLayerId"] = def.textureLayerId;
-    }
-    if (def.geoidGrid) {
-        value["geoidGrid"] = *def.geoidGrid;
-    }
-}
-
-void buildDefinition(Json::Value &value, const resdef::SurfaceDem &def)
-{
-    value["dataset"] = def.dataset;
-    if (def.mask) {
-        value["mask"] = def.mask->string();
-    }
-
-    if (def.textureLayerId) {
-        value["textureLayerId"] = def.textureLayerId;
-    }
-    if (def.geoidGrid) {
-        value["geoidGrid"] = *def.geoidGrid;
-    }
-}
-
-void buildDefinition(Json::Value &value, const Resource &r)
-{
-    if (r.generator == resdef::TmsRaster::generator) {
-        return buildDefinition
-            (value, r.definition<resdef::TmsRaster>());
-    }
-    if (r.generator == resdef::TmsRasterRemote::generator) {
-        return buildDefinition
-            (value, r.definition<resdef::TmsRasterRemote>());
-    }
-    if (r.generator == resdef::SurfaceSpheroid::generator) {
-        return buildDefinition
-            (value, r.definition<resdef::SurfaceSpheroid>());
-    }
-    if (r.generator == resdef::SurfaceDem::generator) {
-        return buildDefinition
-            (value, r.definition<resdef::SurfaceDem>());
-    }
-
-    LOGTHROW(err1, UnknownGenerator)
-        << "Unknown generator <" << r.generator << ">.";
+    boost::any tmp(Json::Value(Json::objectValue));
+    r.definition()->to(tmp);
+    return boost::any_cast<const Json::Value&>(tmp);
 }
 
 Resource::list parseResource(const Json::Value &value)
@@ -354,7 +204,7 @@ void buildResource(Json::Value &value, const Resource &r)
     tileRange1.append(r.tileRange.ur(0));
     tileRange1.append(r.tileRange.ur(1));
 
-    buildDefinition(value["definition"], r);
+    value["definition"] = buildDefinition(r);
 }
 
 void saveResource(std::ostream &out, const Resource &resource)
@@ -416,16 +266,6 @@ void save(const boost::filesystem::path &path, const Resource &resource)
     detail::saveResource(f, resource);
 }
 
-namespace detail {
-
-template<typename T>
-bool sameDefinition(const Resource &l, const Resource &r)
-{
-    return (l.definition<T>() == r.definition<T>());
-}
-
-} // namespace detail
-
 bool Resource::operator==(const Resource &o) const
 {
     if (!(id == o.id)) { return false; }
@@ -435,64 +275,10 @@ bool Resource::operator==(const Resource &o) const
     if (lodRange != o.lodRange) { return false; }
     if (tileRange != o.tileRange) { return false; }
 
-    if (generator == resdef::TmsRaster::generator) {
-        if (!detail::sameDefinition<resdef::TmsRaster>(*this, o)) {
-            return false;
-        }
-    } else if (generator == resdef::TmsRasterRemote::generator) {
-        if (!detail::sameDefinition<resdef::TmsRasterRemote>(*this, o)) {
-            return false;
-        }
-    } else if (generator == resdef::SurfaceSpheroid::generator) {
-        if (!detail::sameDefinition<resdef::SurfaceSpheroid>(*this, o)) {
-            return false;
-        }
-    } else if (generator == resdef::SurfaceDem::generator) {
-        if (!detail::sameDefinition<resdef::SurfaceDem>(*this, o)) {
-            return false;
-        }
-    }
+    if (!definition_->same(*o.definition())) { return false; }
 
     return true;
 }
-
-namespace resdef {
-
-bool TmsRaster::operator==(const TmsRaster &o) const
-{
-    if (dataset != o.dataset) { return false; }
-    if (mask != o.mask) { return false; }
-
-    // format can change
-    return true;
-}
-
-bool TmsRasterRemote::operator==(const TmsRasterRemote &o) const
-{
-    if (remoteUrl != o.remoteUrl) { return false; }
-    if (mask != o.mask) { return false; }
-
-    return true;
-}
-
-bool SurfaceSpheroid::operator==(const SurfaceSpheroid &o) const
-{
-    if (textureLayerId != o.textureLayerId) { return false; }
-    if (geoidGrid != o.geoidGrid) { return false; }
-    return true;
-}
-
-bool SurfaceDem::operator==(const SurfaceDem &o) const
-{
-    if (dataset != o.dataset) { return false; }
-    if (mask != o.mask) { return false; }
-    if (textureLayerId != o.textureLayerId) { return false; }
-    if (geoidGrid != o.geoidGrid) { return false; }
-
-    return true;
-}
-
-} // namespace resdef
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource &resource

@@ -10,6 +10,9 @@
 
 #include "imgproc/rastermask/cvmat.hpp"
 
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
+
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 
@@ -18,6 +21,7 @@
 
 #include "./tms-raster.hpp"
 #include "./factory.hpp"
+#include "../support/python.hpp"
 
 #include "browser2d/index.html.hpp"
 
@@ -34,6 +38,10 @@ struct Factory : Generator::Factory {
         return std::make_shared<TmsRaster>(config, resource);
     }
 
+    virtual DefinitionBase::pointer definition() {
+        return std::make_shared<TmsRaster::Definition>();
+    }
+
 private:
     static utility::PreMain register_;
 };
@@ -41,14 +49,100 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        (resdef::TmsRaster::generator, std::make_shared<Factory>());
+        (Resource::Generator(Resource::Generator::Type::tms, "tms-raster")
+         , std::make_shared<Factory>());
 });
+
+void parseDefinition(TmsRaster::Definition &def, const Json::Value &value)
+{
+    std::string s;
+
+    Json::get(def.dataset, value, "dataset");
+    if (value.isMember("mask")) {
+        def.mask = boost::in_place();
+        Json::get(*def.mask, value, "mask");
+    }
+
+    if (value.isMember("format")) {
+        Json::get(s, value, "format");
+        try {
+            def.format = boost::lexical_cast<RasterFormat>(s);
+        } catch (boost::bad_lexical_cast) {
+            utility::raise<Json::Error>
+                ("Value stored in format is not RasterFormat value");
+        }
+    }
+}
+
+void buildDefinition(Json::Value &value, const TmsRaster::Definition &def)
+{
+    value["dataset"] = def.dataset;
+    if (def.mask) {
+        value["mask"] = *def.mask;
+    }
+    value["format"] = boost::lexical_cast<std::string>(def.format);
+}
+
+void parseDefinition(TmsRaster::Definition &def
+                     , const boost::python::dict &value)
+{
+    def.dataset = py2utf8(value["dataset"]);
+
+    if (value.has_key("mask")) {
+        def.mask = py2utf8(value["mask"]);
+    }
+
+    if (value.has_key("format")) {
+        try {
+            def.format = boost::lexical_cast<RasterFormat>
+                (py2utf8(value["format"]));
+        } catch (boost::bad_lexical_cast) {
+            utility::raise<Error>
+                ("Value stored in format is not RasterFormat value");
+        }
+    }
+}
 
 } // namespace
 
+void TmsRaster::Definition::from_impl(const boost::any &value)
+{
+    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
+        parseDefinition(*this, *json);
+    } else if (const auto *py
+               = boost::any_cast<boost::python::dict>(&value))
+    {
+        parseDefinition(*this, *py);
+    } else {
+        LOGTHROW(err1, Error)
+            << "TmsRaster: Unsupported configuration from: <"
+            << value.type().name() << ">.";
+    }
+}
+
+void TmsRaster::Definition::to_impl(boost::any &value) const
+{
+    if (auto *json = boost::any_cast<Json::Value>(&value)) {
+        buildDefinition(*json, *this);
+    } else {
+        LOGTHROW(err1, Error)
+            << "TmsRaster:: Unsupported serialization into: <"
+            << value.type().name() << ">.";
+    }
+}
+
+bool TmsRaster::Definition::operator==(const Definition &o) const
+{
+    if (dataset != o.dataset) { return false; }
+    if (mask != o.mask) { return false; }
+
+    // format can change
+    return true;
+}
+
 TmsRaster::TmsRaster(const Config &config, const Resource &resource)
     : Generator(config, resource)
-    , definition_(this->resource().definition<resdef::TmsRaster>())
+    , definition_(this->resource().definition<Definition>())
     , hasMetatiles_(false)
 {
     LOG(info1) << "Generator for <" << resource.id << "> not ready.";

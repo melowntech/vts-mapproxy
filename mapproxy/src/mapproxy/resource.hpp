@@ -1,16 +1,60 @@
 #ifndef mapproxy_resource_hpp_included_
 #define mapproxy_resource_hpp_included_
 
+#include <memory>
 #include <iostream>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/any.hpp>
 #include <boost/optional.hpp>
 
+#include "dbglog/dbglog.hpp"
+
 #include "utility/enum-io.hpp"
 
 #include "vts-libs/registry.hpp"
 #include "vts-libs/vts/basetypes.hpp"
+
+#include "./error.hpp"
+
+/** Base of all resource definitions.
+ */
+class DefinitionBase {
+public:
+    typedef std::shared_ptr<DefinitionBase> pointer;
+    virtual ~DefinitionBase() {}
+
+    void from(const boost::any &value) { from_impl(value); }
+    void to(boost::any &value) const { to_impl(value); }
+    bool same(const DefinitionBase &other) const { return same_impl(other); }
+
+    template <typename T> const T& as() const {
+        if (const auto *value = dynamic_cast<const T*>(this)) {
+            return *value;
+        }
+        LOGTHROW(err1, Error)
+            << "Incompatible resource definitions: cannot convert <"
+            << typeid(*this).name() << "> into <" << typeid(T).name() << ">.";
+        throw;
+    }
+
+private:
+    /** Fills in this definition from given input value.
+     *  Value can be either Json::Value or boost::python::dict.
+     */
+    virtual void from_impl(const boost::any &value) = 0;
+
+    /** Fills in this definition into given output value.
+     *  Value can be either Json::Value or boost::python::dict.
+     */
+    virtual void to_impl(boost::any &value) const = 0;
+
+    /** Compares this resource definition the other one and check whether they
+     *  are basically the same. The definitions can differ but the difference
+     *  must not affect resource generation.
+     */
+    virtual bool same_impl(const DefinitionBase &other) const = 0;
+};
 
 namespace vr = vadstena::registry;
 namespace vts = vadstena::vts;
@@ -95,12 +139,16 @@ struct Resource {
     vr::LodRange lodRange;
     vr::TileRange tileRange;
 
-    template <typename T> const T& definition() const {
-        return boost::any_cast<const T&>(definition_);
+    DefinitionBase::pointer definition() const {
+        return definition_;
     }
 
-    template <typename T> T& assignDefinition(const T &definition = T()) {
-        return boost::any_cast<T&>(definition_ = definition);
+    template <typename T> const T& definition() const {
+        return definition_->as<T>();
+    }
+
+    void definition(const DefinitionBase::pointer &definition) {
+        definition_ = definition;
     }
 
     typedef std::map<Id, Resource> map;
@@ -115,7 +163,7 @@ private:
     /** Definition: based on type and driver, created by resource
      *  parser/generator and interpreted by driver.
      */
-    boost::any definition_;
+    DefinitionBase::pointer definition_;
 };
 
 UTILITY_GENERATE_ENUM_IO(Resource::Generator::Type,
@@ -140,53 +188,6 @@ UTILITY_GENERATE_ENUM(ResourceRoot,
     ((id))
     ((none))
 )
-
-namespace resdef {
-
-struct TmsRaster {
-    static Resource::Generator generator;
-
-    std::string dataset;
-    boost::optional<std::string> mask;
-    RasterFormat format;
-
-    TmsRaster(): format(RasterFormat::jpg) {}
-    bool operator==(const TmsRaster &o) const;
-};
-
-struct TmsRasterRemote {
-    static Resource::Generator generator;
-
-    std::string remoteUrl;
-    boost::optional<std::string> mask;
-
-    TmsRasterRemote() {}
-    bool operator==(const TmsRasterRemote &o) const;
-};
-
-struct SurfaceSpheroid {
-    static Resource::Generator generator;
-
-    unsigned int textureLayerId;
-    boost::optional<std::string> geoidGrid;
-
-    SurfaceSpheroid() : textureLayerId() {}
-    bool operator==(const SurfaceSpheroid &o) const;
-};
-
-struct SurfaceDem {
-    static Resource::Generator generator;
-
-    std::string dataset;
-    boost::optional<boost::filesystem::path> mask;
-    unsigned int textureLayerId;
-    boost::optional<std::string> geoidGrid;
-
-    SurfaceDem() : textureLayerId() {}
-    bool operator==(const SurfaceDem &o) const;
-};
-
-} // namespace resdef
 
 /** Load resources from given path.
  */
