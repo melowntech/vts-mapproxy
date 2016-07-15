@@ -43,6 +43,6 @@
 [submodule "externals/pysupport"]
 	path = externals/pysupport
 	url = ../../lib/pysupport
-[submodule "externals/pydbglog"]
+[submodule "examples/pydbglog"]
 	path = examples/pydbglog
-	url = ../../lib/pydbglog
+	url = ../../lib/pydbglog.git
