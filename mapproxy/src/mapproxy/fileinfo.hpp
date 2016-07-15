@@ -101,7 +101,7 @@ struct SurfaceFileInfo {
      */
     FileInfo fileInfo;
 
-    enum class Type { unknown, file, tile, support, registry };
+    enum class Type { unknown, file, tile, definition, support, registry };
 
     /** File type.
      */

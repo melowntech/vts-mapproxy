@@ -20,6 +20,7 @@ namespace vr = vadstena::registry;
 namespace constants {
     const std::string Config("mapConfig.json");
     const std::string BoundLayerDefinition("boundlayer.json");
+    const std::string FreeLayerDefinition("freelayer.json");
     const std::string Self("");
     const std::string Index("index.html");
 
@@ -331,6 +332,11 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
         return;
     }
 
+    if (constants::FreeLayerDefinition == fi.filename) {
+        type = Type::definition;
+        return;
+    }
+
     if (constants::tileset::Config == fi.filename) {
         type = Type::file;
         fileType = vs::File::config;
@@ -387,6 +393,9 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
 
     case Type::registry:
         return { registry->contentType, lastModified };
+
+    case Type::definition:
+        return { "application/json", lastModified };
 
     case Type::unknown:
         return {};

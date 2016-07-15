@@ -65,6 +65,18 @@ Generator::Task SurfaceBase
         sink.error(utility::makeError<NotFound>("Unrecognized filename."));
         break;
 
+    case SurfaceFileInfo::Type::definition: {
+        auto fl(vts::freeLayer
+                (vts::meshTilesConfig
+                 (properties_, vts::ExtraTileSetProperties()
+                  , prependRoot(fs::path(), resource(), ResourceRoot::none))));
+
+        std::ostringstream os;
+        vr::saveFreeLayer(os, fl);
+        sink.content(os.str(), fi.sinkFileInfo());
+        break;
+    }
+
     case SurfaceFileInfo::Type::file: {
         switch (fi.fileType) {
         case vts::File::config: {
@@ -78,6 +90,7 @@ Generator::Task SurfaceBase
             }
             break;
         }
+
         case vts::File::tileIndex:
             sink.content(vs::fileIStream
                           (fi.fileType, filePath(vts::File::tileIndex)));
