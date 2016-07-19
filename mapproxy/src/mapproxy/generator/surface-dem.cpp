@@ -456,7 +456,7 @@ private:
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
                                   , Sink &sink
                                   , const SurfaceFileInfo &fi
-                                  , GdalWarper &warper) const
+                                  , Arsenal &arsenal) const
 {
     sink.checkAborted();
 
@@ -465,7 +465,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         return;
     }
 
-    auto metatile(generateMetatileImpl(tileId, sink, warper));
+    auto metatile(generateMetatileImpl(tileId, sink, arsenal));
 
     // write metatile to stream
     std::ostringstream os;
@@ -476,7 +476,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
 vts::MetaTile
 SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
                                  , Sink &sink
-                                 , GdalWarper &warper) const
+                                 , Arsenal &arsenal) const
 {
     auto blocks(metatileBlocks(resource(), tileId));
 
@@ -508,7 +508,7 @@ SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
                    << ".";
 
         // warp value intentionally by average filter
-        auto dem(warper.warp
+        auto dem(arsenal.warper.warp
                  (GdalWarper::RasterRequest
                   (GdalWarper::RasterRequest::Operation::valueMinMax
                    , dataset_
@@ -741,7 +741,7 @@ private:
 vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
                                        , Sink &sink
                                        , const SurfaceFileInfo&
-                                       , GdalWarper &warper
+                                       , Arsenal &arsenal
                                        , bool withMask) const
 {
     const int samplesPerSide(128);
@@ -751,7 +751,7 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
 
     /** warp input dataset as a DEM, with optimized size
      */
-    auto dem(warper.warp
+    auto dem(arsenal.warper.warp
              (GdalWarper::RasterRequest
               (GdalWarper::RasterRequest::Operation::demOptimal
                , dataset_
@@ -806,7 +806,7 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
 void SurfaceDem::generateNavtile(const vts::TileId &tileId
                                  , Sink &sink
                                  , const SurfaceFileInfo &fi
-                                 , GdalWarper &warper) const
+                                 , Arsenal &arsenal) const
 {
     sink.checkAborted();
 
@@ -831,7 +831,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     }
 
     // suboptimal solution: generate metatile
-    auto metatile(generateMetatileImpl(metaId, sink, warper));
+    auto metatile(generateMetatileImpl(metaId, sink, arsenal));
 
     const auto &extents(node.extents());
     const auto ts(math::size(extents));
@@ -857,7 +857,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                                       , vts::NodeInfo::CoverageType::grid));
 
     // warp input dataset as a DEM
-    auto dem(warper.warp
+    auto dem(arsenal.warper.warp
              (GdalWarper::RasterRequest
               (GdalWarper::RasterRequest::Operation::dem
                , dataset_

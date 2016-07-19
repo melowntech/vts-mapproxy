@@ -274,19 +274,19 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
             return {};
         }
 
-        return[=](Sink &sink, GdalWarper &warper) {
-            generateTileImage(fi.tileId, sink, warper);
+        return[=](Sink &sink, Arsenal &arsenal) {
+            generateTileImage(fi.tileId, sink, arsenal);
         };
     }
 
     case TmsFileInfo::Type::mask:
-        return [=](Sink &sink, GdalWarper &warper)  {
-            generateTileMask(fi.tileId, sink, warper);
+        return [=](Sink &sink, Arsenal &arsenal)  {
+            generateTileMask(fi.tileId, sink, arsenal);
         };
 
     case TmsFileInfo::Type::metatile:
-        return [=](Sink &sink, GdalWarper &warper) {
-            generateMetatile(fi.tileId, sink, warper);
+        return [=](Sink &sink, Arsenal &arsenal) {
+            generateMetatile(fi.tileId, sink, arsenal);
         };
     }
 
@@ -295,7 +295,7 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
 
 void TmsRaster::generateTileImage(const vts::TileId &tileId
                                   , Sink &sink
-                                  , GdalWarper &warper) const
+                                  , Arsenal &arsenal) const
 {
     sink.checkAborted();
 
@@ -306,15 +306,16 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
         return;
     }
 
-    auto tile(warper.warp(GdalWarper::RasterRequest
-                          (GdalWarper::RasterRequest::Operation::image
-                           , absoluteDataset(definition_.dataset)
-                           , vr::Registry::srs(nodeInfo.srs()).srsDef
-                           , nodeInfo.extents()
-                           , math::Size2(256, 256)
+    auto tile(arsenal.warper.warp
+              (GdalWarper::RasterRequest
+               (GdalWarper::RasterRequest::Operation::image
+                                   , absoluteDataset(definition_.dataset)
+                , vr::Registry::srs(nodeInfo.srs()).srsDef
+                , nodeInfo.extents()
+                , math::Size2(256, 256)
                            , geo::GeoDataset::Resampling::cubic
-                           , absoluteDataset(definition_.mask))
-                          , sink));
+                , absoluteDataset(definition_.mask))
+               , sink));
     sink.checkAborted();
 
     // serialize
@@ -328,7 +329,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
 
 void TmsRaster::generateTileMask(const vts::TileId &tileId
                                  , Sink &sink
-                                 , GdalWarper &warper) const
+                                 , Arsenal &arsenal) const
 {
     sink.checkAborted();
 
@@ -339,15 +340,16 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
         return;
     }
 
-    auto mask(warper.warp(GdalWarper::RasterRequest
-                          (GdalWarper::RasterRequest::Operation::mask
-                           , absoluteDataset(definition_.dataset
-                                             , definition_.mask)
-                           , vr::Registry::srs(nodeInfo.srs()).srsDef
-                           , nodeInfo.extents()
-                           , math::Size2(256, 256)
-                           , geo::GeoDataset::Resampling::cubic)
-                          , sink));
+    auto mask(arsenal.warper.warp
+              (GdalWarper::RasterRequest
+               (GdalWarper::RasterRequest::Operation::mask
+                , absoluteDataset(definition_.dataset
+                                  , definition_.mask)
+                , vr::Registry::srs(nodeInfo.srs()).srsDef
+                , nodeInfo.extents()
+                , math::Size2(256, 256)
+                , geo::GeoDataset::Resampling::cubic)
+               , sink));
 
     sink.checkAborted();
 
@@ -374,7 +376,7 @@ namespace MetaFlags {
 
 void TmsRaster::generateMetatile(const vts::TileId &tileId
                                  , Sink &sink
-                                 , GdalWarper &warper) const
+                                 , Arsenal &arsenal) const
 {
     sink.checkAborted();
 
@@ -405,21 +407,23 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
         GdalWarper::Raster src;
         if (definition_.mask) {
             // warp detailed mask
-            src = warper.warp(GdalWarper::RasterRequest
-                              (GdalWarper::RasterRequest::Operation::detailMask
-                               , absoluteDataset(*definition_.mask)
-                               , vr::Registry::srs(block.srs).srsDef
-                               , block.extents, bSize)
-                              , sink);
+            src = arsenal.warper.warp
+                (GdalWarper::RasterRequest
+                 (GdalWarper::RasterRequest::Operation::detailMask
+                  , absoluteDataset(*definition_.mask)
+                  , vr::Registry::srs(block.srs).srsDef
+                  , block.extents, bSize)
+                 , sink);
         } else {
             // warp dataset as mask
-            src = warper.warp(GdalWarper::RasterRequest
-                              (GdalWarper::RasterRequest::Operation::mask
-                               , absoluteDataset(definition_.dataset)
-                               , vr::Registry::srs(block.srs).srsDef
-                               , block.extents, bSize
-                               , geo::GeoDataset::Resampling::cubic)
-                              , sink);
+            src = arsenal.warper.warp
+                (GdalWarper::RasterRequest
+                 (GdalWarper::RasterRequest::Operation::mask
+                  , absoluteDataset(definition_.dataset)
+                  , vr::Registry::srs(block.srs).srsDef
+                  , block.extents, bSize
+                  , geo::GeoDataset::Resampling::cubic)
+                 , sink);
         }
         sink.checkAborted();
 

@@ -107,13 +107,13 @@ Generator::Task SurfaceBase
     case SurfaceFileInfo::Type::tile: {
         switch (fi.tileType) {
         case vts::TileFile::meta:
-            return[=](Sink &sink, GdalWarper &warper) {
-                generateMetatile(fi.tileId, sink, fi, warper);
+            return[=](Sink &sink, Arsenal &arsenal) {
+                generateMetatile(fi.tileId, sink, fi, arsenal);
             };
 
         case vts::TileFile::mesh:
-            return[=](Sink &sink, GdalWarper &warper) {
-                generateMesh(fi.tileId, sink, fi, warper);
+            return[=](Sink &sink, Arsenal &arsenal) {
+                generateMesh(fi.tileId, sink, fi, arsenal);
             };
 
         case vts::TileFile::atlas:
@@ -122,20 +122,20 @@ Generator::Task SurfaceBase
             break;
 
         case vts::TileFile::navtile:
-            return[=](Sink &sink, GdalWarper &warper) {
-                generateNavtile(fi.tileId, sink, fi, warper);
+            return[=](Sink &sink, Arsenal &arsenal) {
+                generateNavtile(fi.tileId, sink, fi, arsenal);
             };
             break;
 
         case vts::TileFile::meta2d:
-            return[=](Sink &sink, GdalWarper &warper) {
-                generate2dMetatile(fi.tileId, sink, fi, warper);
+            return[=](Sink &sink, Arsenal &arsenal) {
+                generate2dMetatile(fi.tileId, sink, fi, arsenal);
             };
             break;
 
         case vts::TileFile::mask:
-            return[=](Sink &sink, GdalWarper &warper) {
-                generate2dMask(fi.tileId, sink, fi, warper);
+            return[=](Sink &sink, Arsenal &arsenal) {
+                generate2dMask(fi.tileId, sink, fi, arsenal);
             };
             break;
 
@@ -145,8 +145,8 @@ Generator::Task SurfaceBase
             break;
 
         case vts::TileFile::credits:
-            return[=](Sink &sink, GdalWarper &warper) {
-                generateCredits(fi.tileId, sink, fi, warper);
+            return[=](Sink &sink, Arsenal &arsenal) {
+                generateCredits(fi.tileId, sink, fi, arsenal);
             };
             break;
         }
@@ -174,7 +174,7 @@ Generator::Task SurfaceBase
 void SurfaceBase::generateMesh(const vts::TileId &tileId
                                , Sink &sink
                                , const SurfaceFileInfo &fi
-                               , GdalWarper &warper) const
+                               , Arsenal &arsenal) const
 
 {
     auto flags(index_.tileIndex.get(tileId));
@@ -189,7 +189,7 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
     }
 
     auto mesh(generateMeshImpl
-              (nodeInfo, sink, fi, warper, fi.raw));
+              (nodeInfo, sink, fi, arsenal, fi.raw));
 
     // write mesh (only mesh!) to stream
     std::ostringstream os;
@@ -205,7 +205,7 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
 void SurfaceBase::generate2dMask(const vts::TileId &tileId
                                  , Sink &sink
                                  , const SurfaceFileInfo &fi
-                                 , GdalWarper &warper) const
+                                 , Arsenal &arsenal) const
 
 {
     auto flags(index_.tileIndex.get(tileId));
@@ -224,7 +224,7 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
 
     if (!vts::TileIndex::Flag::isWatertight(flags)) {
         mesh = generateMeshImpl
-            (nodeInfo, sink, fi, warper, true);
+            (nodeInfo, sink, fi, arsenal, true);
     }
 
     sink.content(imgproc::serialize(vts::mask2d(mesh.coverageMask, { 1 }), 9)
@@ -234,7 +234,7 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
 void SurfaceBase::generate2dMetatile(const vts::TileId &tileId
                                      , Sink &sink
                                      , const SurfaceFileInfo &fi
-                                     , GdalWarper&) const
+                                     , Arsenal&) const
 
 {
     sink.content(imgproc::serialize(vts::meta2d(index_.tileIndex, tileId), 9)
@@ -244,7 +244,7 @@ void SurfaceBase::generate2dMetatile(const vts::TileId &tileId
 void SurfaceBase::generateCredits(const vts::TileId&
                                   , Sink &sink
                                   , const SurfaceFileInfo &fi
-                                  , GdalWarper&) const
+                                  , Arsenal&) const
 {
     vts::CreditTile creditTile;
     creditTile.credits = asInlineCredits(resource().credits);

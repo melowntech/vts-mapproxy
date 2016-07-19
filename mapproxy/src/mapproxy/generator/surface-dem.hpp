@@ -42,22 +42,22 @@ private:
     virtual void generateMetatile(const vts::TileId &tileId
                                   , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
-                                  , GdalWarper &warper) const;
+                                  , Arsenal &arsenal) const;
 
     virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
                                        , Sink &sink
                                        , const SurfaceFileInfo &fileInfo
-                                       , GdalWarper &warper
+                                       , Arsenal &arsenal
                                        , bool withMask) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
                                  , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
-                                 , GdalWarper &warper) const;
+                                 , Arsenal &arsenal) const;
 
     vts::MetaTile generateMetatileImpl(const vts::TileId &tileId
                                        , Sink &sink
-                                       , GdalWarper &warper) const;
+                                       , Arsenal &arsenal) const;
 
     const Definition &definition_;
 

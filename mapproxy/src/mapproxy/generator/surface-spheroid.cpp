@@ -290,7 +290,7 @@ bool special(const vr::ReferenceFrame &referenceFrame
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                                        , Sink &sink
                                        , const SurfaceFileInfo &fi
-                                       , GdalWarper&) const
+                                       , Arsenal&) const
 {
     sink.checkAborted();
 
@@ -477,7 +477,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
                                             , Sink &sink
                                             , const SurfaceFileInfo&
-                                            , GdalWarper&
+                                            , Arsenal&
                                             , bool withMask) const
 {
     // TODO: calculate tile sampling
@@ -516,7 +516,7 @@ vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
 void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
                                       , Sink &sink
                                       , const SurfaceFileInfo &fi
-                                      , GdalWarper&) const
+                                      , Arsenal&) const
 {
     sink.checkAborted();
 

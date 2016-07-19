@@ -10,6 +10,8 @@
 #include <boost/any.hpp>
 #include <boost/filesystem/path.hpp>
 
+#include "utility/resourcefetcher.hpp"
+
 #include "vts-libs/vts/mapconfig.hpp"
 
 #include "./resource.hpp"
@@ -20,6 +22,15 @@
 
 namespace vts = vadstena::vts;
 
+struct Arsenal {
+    GdalWarper &warper;
+    const utility::ResourceFetcher &fetcher;
+
+    Arsenal(GdalWarper &warper, const utility::ResourceFetcher &fetcher)
+        : warper(warper), fetcher(fetcher)
+    {}
+};
+
 /** Dataset generator.
  */
 class Generator : boost::noncopyable {
@@ -27,7 +38,7 @@ public:
     typedef std::shared_ptr<Generator> pointer;
     typedef std::vector<pointer> list;
     typedef std::map<Resource::Id, pointer> map;
-    typedef std::function<void(Sink&, GdalWarper&)> Task;
+    typedef std::function<void(Sink&, Arsenal&)> Task;
 
     /** Configuration
      */

@@ -40,6 +40,7 @@ public:
                            | service::ENABLE_UNRECOGNIZED_OPTIONS)
         , httpListen_(3070)
         , httpThreadCount_(boost::thread::hardware_concurrency())
+        , httpClientThreadCount_(1)
         , coreThreadCount_(boost::thread::hardware_concurrency())
         , httpEnableBrowser_(false)
     {
@@ -90,6 +91,7 @@ private:
 
     utility::TcpEndpoint httpListen_;
     unsigned int httpThreadCount_;
+    unsigned int httpClientThreadCount_;
     unsigned int coreThreadCount_;
     bool httpEnableBrowser_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
@@ -119,7 +121,10 @@ void Daemon::configuration(po::options_description &cmdline
          , "TCP endpoint where to listen at.")
         ("http.threadCount", po::value(&httpThreadCount_)
          ->default_value(httpThreadCount_)->required()
-         , "Number of HTTP threads.")
+         , "Number of server HTTP threads.")
+        ("http.client.threadCount", po::value(&httpClientThreadCount_)
+         ->default_value(httpClientThreadCount_)->required()
+         , "Number of client HTTP threads.")
         ("http.enableBrowser", po::value(&httpEnableBrowser_)
          ->default_value(httpEnableBrowser_)->required()
          , "Enables resource browsering functionaly if set to true.")
@@ -193,6 +198,7 @@ void Daemon::configure(const po::variables_map &vars)
         << "\n\tstore.path = " << generatorsConfig_.root
         << "\n\thttp.listen = " << httpListen_
         << "\n\thttp.threadCount = " << httpThreadCount_
+        << "\n\thttp.client.threadCount = " << httpClientThreadCount_
         << "\n\thttp.enableBrowser = " << std::boolalpha << httpEnableBrowser_
         << "\n\tcore.threadCount = " << coreThreadCount_
         << "\n\tgdal.processCount = " << gdalWarperOptions_.processCount
@@ -254,11 +260,18 @@ service::Service::Cleanup Daemon::start()
     gdalWarper_ = boost::in_place(gdalWarperOptions_);
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
-    generators_ = boost::in_place
-        (generatorsConfig_, resourceBackend_);
+    generators_ = boost::in_place(generatorsConfig_, resourceBackend_);
+
+    http_ = boost::in_place();
+    http_->startClient(httpClientThreadCount_);
+
+    // starts core + generators
     core_ = boost::in_place(std::ref(*generators_), std::ref(*gdalWarper_)
-                            , coreThreadCount_);
-    http_ = boost::in_place(httpListen_, httpThreadCount_, std::ref(*core_));
+                            , coreThreadCount_
+                            , std::ref(http_->fetcher()));
+
+    http_->listen(httpListen_, std::ref(*core_));
+    http_->startServer(httpThreadCount_);
 
     return guard;
 }

@@ -29,39 +29,39 @@ private:
     virtual void generateMetatile(const vts::TileId &tileId
                                   , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
-                                  , GdalWarper &warper) const = 0;
+                                  , Arsenal &arsenal) const = 0;
 
     void generateMesh(const vts::TileId &tileId
                       , Sink &sink
                       , const SurfaceFileInfo &fileInfo
-                      , GdalWarper &warper) const;
+                      , Arsenal &arsenal) const;
 
     void generate2dMask(const vts::TileId &tileId
                         , Sink &sink
                         , const SurfaceFileInfo &fileInfo
-                        , GdalWarper &warper) const;
+                        , Arsenal &arsenal) const;
 
     void generate2dMetatile(const vts::TileId &tileId
                             , Sink &sink
                             , const SurfaceFileInfo &fileInfo
-                            , GdalWarper &warper) const;
+                            , Arsenal &arsenal) const;
 
     void generateCredits(const vts::TileId &tileId
                          , Sink &sink
                          , const SurfaceFileInfo &fileInfo
-                         , GdalWarper &warper) const;
+                         , Arsenal &arsenal) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
                                  , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
-                                 , GdalWarper &warper) const = 0;
+                                 , Arsenal &arsenal) const = 0;
 
     enum MeshRequest { full, mesh, mask };
 
     virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
                                        , Sink &sink
                                        , const SurfaceFileInfo &fileInfo
-                                       , GdalWarper &warper
+                                       , Arsenal &arsenal
                                        , bool withMesh) const = 0;
 };
 

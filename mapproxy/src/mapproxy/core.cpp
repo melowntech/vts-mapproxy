@@ -5,6 +5,8 @@
 
 #include "utility/raise.hpp"
 
+#include "http/resourcefetcher.hpp"
+
 #include "vts-libs/vts/mapconfig.hpp"
 #include "vts-libs/registry.hpp"
 
@@ -20,8 +22,10 @@ namespace vr = vadstena::registry;
 class Core::Detail : boost::noncopyable {
 public:
     Detail(Generators &generators, GdalWarper &warper
-           , unsigned int threadCount)
-        : generators_(generators), warper_(warper)
+           , unsigned int threadCount, http::ContentFetcher &contentFetcher)
+        : resourceFetcher_(contentFetcher, &ios_)
+        , generators_(generators)
+        , arsenal_(warper, resourceFetcher_)
         , browserEnabled_(generators.config().fileFlags
                           & FileFlags::browserEnabled)
         , work_(ios_)
@@ -54,13 +58,15 @@ private:
     void worker(std::size_t id);
     void post(const Generator::Task &task, Sink sink);
 
+    asio::io_service ios_;
+    http::ResourceFetcher resourceFetcher_;
+
     Generators &generators_;
-    GdalWarper &warper_;
+    Arsenal arsenal_;
     bool browserEnabled_;
 
     /** Processing pool stuff.
      */
-    asio::io_service ios_;
     asio::io_service::work work_;
     std::vector<std::thread> workers_;
 };
@@ -118,7 +124,7 @@ void Core::Detail::post(const Generator::Task &task, Sink sink)
     ios_.post([=]() mutable // sink is passed as non-const ref
     {
         try {
-            task(sink, warper_);
+            task(sink, arsenal_);
         } catch (...) {
             sink.error();
         }
@@ -126,8 +132,9 @@ void Core::Detail::post(const Generator::Task &task, Sink sink)
 }
 
 Core::Core(Generators &generators, GdalWarper &warper
-           , unsigned int threadCount)
-    : detail_(std::make_shared<Detail>(generators, warper, threadCount))
+           , unsigned int threadCount, http::ContentFetcher &contentFetcher)
+    : detail_(std::make_shared<Detail>
+              (generators, warper, threadCount, contentFetcher))
 {}
 
 void Core::generate_impl(const std::string &location

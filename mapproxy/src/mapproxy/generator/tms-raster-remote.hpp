@@ -34,11 +34,11 @@ private:
 
     void generateTileMask(const vts::TileId &tileId
                           , Sink &sink
-                          , GdalWarper &warper) const;
+                          , Arsenal &arsenal) const;
 
     void generateMetatile(const vts::TileId &tileId
                           , Sink &sink
-                          , GdalWarper &warper) const;
+                          , Arsenal &arsenal) const;
 
     vr::BoundLayer boundLayer(ResourceRoot root) const;
 
