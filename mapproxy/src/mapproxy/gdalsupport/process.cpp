@@ -25,7 +25,7 @@ Process::ExitCode Process::join(bool justTry)
         throw e;
     }
 
-    LOG(info1) << (justTry ? "Trying to join process " : "Joining process ")
+    LOG(debug) << (justTry ? "Trying to join process " : "Joining process ")
                << id_ << ".";
 
     int status;

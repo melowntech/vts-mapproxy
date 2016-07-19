@@ -556,5 +556,31 @@
             "geoidGrid": "egm96_15.gtx",
             "textureLayerId": 120
         }
+    },
+
+    {
+        "comment": "Bing maps",
+        "group": "microsoft",
+        "id": "bing",
+        "type": "tms",
+        "driver": "tms-bing",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 21],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-projected": {
+                "lodRange": [0, 20],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [0, 20],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": ["microsoft"],
+        "definition": {
+           "metadataUrl": "http://dev.virtualearth.net/REST/v1/Imagery/Metadata/Aerial?key=Ag7PO7bUdf-l6FrOjQT9w1ZOdyz1Y8QJyenAdOn5--QHj7W50wuwG14HSdvdNFke"
+        }
     }
 ]

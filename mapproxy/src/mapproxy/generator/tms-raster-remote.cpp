@@ -170,7 +170,7 @@ vr::BoundLayer TmsRasterRemote::boundLayer(ResourceRoot root) const
     return bl;
 }
 
-vts::MapConfig TmsRasterRemote::mapConfig_impl(ResourceRoot root)
+vts::MapConfig TmsRasterRemote::mapConfig_impl(ResourceRoot root, Arsenal&)
     const
 {
     const auto &res(resource());
@@ -221,12 +221,12 @@ Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
         sink.error(utility::makeError<NotFound>("Unrecognized filename."));
         break;
 
-    case TmsFileInfo::Type::config: {
-        std::ostringstream os;
-        mapConfig(os, ResourceRoot::none);
-        sink.content(os.str(), fi.sinkFileInfo());
-        break;
-    }
+    case TmsFileInfo::Type::config:
+        return[=](Sink &sink, Arsenal &arsenal) {
+            std::ostringstream os;
+            mapConfig(os, ResourceRoot::none, arsenal);
+            sink.content(os.str(), fi.sinkFileInfo());
+        };
 
     case TmsFileInfo::Type::definition: {
         std::ostringstream os;

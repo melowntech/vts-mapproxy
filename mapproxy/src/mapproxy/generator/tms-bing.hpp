@@ -1,17 +1,18 @@
-#ifndef mapproxy_generator_tms_raster_remote_hpp_included_
-#define mapproxy_generator_tms_raster_remote_hpp_included_
+#ifndef mapproxy_generator_tms_bing_hpp_included_
+#define mapproxy_generator_tms_bing_hpp_included_
+
+#include <functional>
 
 #include "../generator.hpp"
 
 namespace generator {
 
-class TmsRasterRemote : public Generator {
+class TmsBing : public Generator {
 public:
-    TmsRasterRemote(const Config &config, const Resource &resource);
+    TmsBing(const Config &config, const Resource &resource);
 
     struct Definition : public DefinitionBase {
-        std::string remoteUrl;
-        boost::optional<std::string> mask;
+        std::string metadataUrl;
 
         Definition() {}
         bool operator==(const Definition &o) const;
@@ -32,21 +33,11 @@ private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , Sink &sink) const;
 
-    void generateTileMask(const vts::TileId &tileId
-                          , Sink &sink
-                          , Arsenal &arsenal) const;
-
-    void generateMetatile(const vts::TileId &tileId
-                          , Sink &sink
-                          , Arsenal &arsenal) const;
-
-    vr::BoundLayer boundLayer(ResourceRoot root) const;
+    vr::BoundLayer boundLayer(ResourceRoot root, Arsenal &arsenal) const;
 
     const Definition &definition_;
-
-    bool hasMetatiles_;
 };
 
 } // namespace generator
 
-#endif // mapproxy_generator_tms_raster_remote_hpp_included_
+#endif // mapproxy_generator_tms_bing_hpp_included_

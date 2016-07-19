@@ -37,7 +37,8 @@ public:
 
 private:
     virtual void prepare_impl();
-    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root, Arsenal &arsenal)
+        const;
 
     virtual void generateMetatile(const vts::TileId &tileId
                                   , Sink &sink

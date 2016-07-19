@@ -40,7 +40,7 @@ public:
     void generate(const std::string &location, Sink sink);
 
     void generateRfMapConfig(const std::string &referenceFrame
-                             , Sink &sink);
+                             , Sink &sink, Arsenal &arsenal);
 
     void generateResourceFile(const FileInfo &fi, Sink &sink);
 
@@ -205,8 +205,10 @@ void Core::Detail::generate(const std::string &location, Sink sink)
 
         switch (fi.type) {
         case FileInfo::Type::referenceFrameMapConfig:
-            generateRfMapConfig(fi.resourceId.referenceFrame, sink);
-            return;
+            post([=](Sink &sink, Arsenal &arsenal) {
+                    generateRfMapConfig(fi.resourceId.referenceFrame, sink
+                                        , arsenal);
+                }, sink);
 
         case FileInfo::Type::resourceFile:
             generateResourceFile(fi, sink);
@@ -234,7 +236,7 @@ void Core::Detail::generate(const std::string &location, Sink sink)
 }
 
 void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
-                                       , Sink &sink)
+                                       , Sink &sink, Arsenal &arsenal)
 {
     auto genlist(generators_.referenceFrame(referenceFrame));
     if (genlist.empty()) {
@@ -246,7 +248,7 @@ void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
     // build map
     vts::MapConfig mapConfig;
     for (const auto &generator : genlist) {
-        mapConfig.merge(generator->mapConfig(ResourceRoot::type));
+        mapConfig.merge(generator->mapConfig(ResourceRoot::type, arsenal));
     }
 
     std::ostringstream os;

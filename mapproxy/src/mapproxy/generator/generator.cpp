@@ -114,9 +114,11 @@ void Generator::makeReady()
                << "> (type <" << resource().generator << ">).";
 }
 
-void Generator::mapConfig(std::ostream &os, ResourceRoot root) const
+void Generator::mapConfig(std::ostream &os, ResourceRoot root
+                          , Arsenal &arsenal)
+    const
 {
-    vts::MapConfig mc(mapConfig(root));
+    vts::MapConfig mc(mapConfig(root, arsenal));
     vts::saveMapConfig(mc, os);
 }
 

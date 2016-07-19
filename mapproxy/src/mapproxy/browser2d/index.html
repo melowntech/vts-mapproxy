@@ -27,6 +27,23 @@
           x.send(null);
       }
 
+      function quadKey(x, y, z) {
+          var quadKey = [];
+          for (i = z - 1; i >= 0; --i) {
+              quadKey.push(((((y >> i) & 1) << 1) + ((x >> i) & 1)));
+          }
+          return quadKey.join('');
+      }
+
+      var BingLayer = L.TileLayer.extend({
+          getTileUrl: function (tilePoint) {
+              this._adjustTilePoint(tilePoint);
+              return L.Util.template(this._url, {
+                  quad: quadKey(tilePoint.x, tilePoint.y, this._getZoomForUrl())
+              });
+          }
+      });
+
       var map = new L.Map("map");
 
       loadMapConfig(function (mc) {
@@ -61,11 +78,17 @@
                   maxLod = bl.lodRange[1];
               }
 
-              var tl = new L.TileLayer(url, {
+              var layerGenerator = L.TileLayer;
+              if (url.includes("{quad}")) {
+                  layerGenerator = BingLayer;
+              }
+
+              var tl = new layerGenerator(url, {
                   minZoom: bl.lodRange[0]
                   , maxZoom: bl.lodRange[1]
                   , attribution: attribution
               });
+
               var layers = {};
               var overlays = {};
               layers[name] = tl;
