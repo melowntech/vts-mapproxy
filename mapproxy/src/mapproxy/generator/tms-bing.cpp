@@ -183,7 +183,7 @@ std::future<std::string> generateTileUrl(Arsenal &arsenal
 
             auto url(jurl.asString());
 
-            ba::replace_all(url, "{quadkey}", "{quad}");
+            ba::replace_all(url, "{quadkey}", "{quad(loclod,locx,locy)}");
             ba::replace_all(url, "{subdomain}", subdomains());
 
             promise->set_value(url);

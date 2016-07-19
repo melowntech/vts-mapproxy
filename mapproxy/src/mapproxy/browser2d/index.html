@@ -60,7 +60,8 @@
                          .replace(/{loclod}/g, "{z}")
                          .replace(/{locx}/g, "{x}")
                          .replace(/{locy}/g, "{y}")
-                         .replace(/{alt\(([^,)]+).*\)}/g, "$1");
+                         .replace(/{alt\(([^,)]+)[^)]*\)}/g, "$1")
+                         .replace(/{quad\([^)]*\)}/g, "{quad}");
 
               var attribution = "";
               var prefix = "";
