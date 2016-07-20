@@ -26,8 +26,7 @@ public:
 
 private:
     virtual void prepare_impl();
-    virtual vts::MapConfig
-    mapConfig_impl(ResourceRoot root, Arsenal &arsenal) const;
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , Sink &sink) const;

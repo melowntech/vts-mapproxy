@@ -84,11 +84,9 @@ Generator::Task SurfaceBase
                 sink.content(vs::fileIStream
                               (fi.fileType, filePath(vts::File::config)));
             } else {
-                return[=](Sink &sink, Arsenal &arsenal) {
-                    std::ostringstream os;
-                    mapConfig(os, ResourceRoot::none, arsenal);
-                    sink.content(os.str(), fi.sinkFileInfo());
-                };
+                std::ostringstream os;
+                mapConfig(os, ResourceRoot::none);
+                sink.content(os.str(), fi.sinkFileInfo());
             }
             break;
         }

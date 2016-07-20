@@ -14,10 +14,10 @@
     <script src="leaflet.js"></script>
 
     <script>
-      function loadMapConfig(callback) {
+      function loadBoundLayer(callback) {
           var x = new XMLHttpRequest();
           x.overrideMimeType("application/json");
-          x.open("GET", "mapConfig.json", true);
+          x.open("GET", "boundlayer.json", true);
           x.onreadystatechange = function () {
               if ((x.readyState) == 4 && ((x.status == 200) || (x.status == 0)))
               {
@@ -46,70 +46,65 @@
 
       var map = new L.Map("map");
 
-      loadMapConfig(function (mc) {
-          var boundLayers = mc["boundLayers"];
-          var credits = mc["credits"];
+      loadBoundLayer(function (bl) {
+          var credits = bl["credits"];
           var copyyear = "&copy; " + new Date().getFullYear() + " ";
 
           var maxLod = 0;
-          for (var name in boundLayers) {
-              if (!boundLayers.hasOwnProperty(name)) { continue; }
 
-              var bl = boundLayers[name];
-              var url = bl.url.replace(/{lod}/g, "{z}")
-                         .replace(/{loclod}/g, "{z}")
-                         .replace(/{locx}/g, "{x}")
-                         .replace(/{locy}/g, "{y}")
-                         .replace(/{alt\(([^,)]+)[^)]*\)}/g, "$1")
-                         .replace(/{quad\([^)]*\)}/g, "{quad}");
+          var url = bl.url.replace(/{lod}/g, "{z}")
+              .replace(/{loclod}/g, "{z}")
+              .replace(/{locx}/g, "{x}")
+              .replace(/{locy}/g, "{y}")
+              .replace(/{alt\(([^,)]+)[^)]*\)}/g, "$1")
+              .replace(/{quad\([^)]*\)}/g, "{quad}");
 
-              var attribution = "";
-              var prefix = "";
-              for (var creditIndex in credits) {
-                  var credit = credits[creditIndex];
-                  attribution += prefix;
-                  if (credit.copyrighted != false) {
-                      attribution += copyyear;
-                  }
-                  attribution += credit.notice;
-                  prefix = ", ";
+          var attribution = "";
+          var prefix = "";
+          for (var creditIndex in credits) {
+              var credit = credits[creditIndex];
+              attribution += prefix;
+              if (credit.copyrighted != false) {
+                  attribution += copyyear;
               }
+              attribution += credit.notice;
+              prefix = ", ";
+          }
 
-              if (bl.lodRange[1] > maxLod) {
-                  maxLod = bl.lodRange[1];
-              }
+          if (bl.lodRange[1] > maxLod) {
+              maxLod = bl.lodRange[1];
+          }
 
-              var layerGenerator = L.TileLayer;
-              if (url.includes("{quad}")) {
-                  layerGenerator = BingLayer;
-              }
+          var layerGenerator = L.TileLayer;
+          if (url.includes("{quad}")) {
+              layerGenerator = BingLayer;
+          }
 
-              var tl = new layerGenerator(url, {
+          var tl = new layerGenerator(url, {
+              minZoom: bl.lodRange[0]
+              , maxZoom: bl.lodRange[1]
+              , attribution: attribution
+          });
+
+          var layers = {};
+          var overlays = {};
+          layers["map"] = tl;
+
+          if (bl.maskUrl) {
+              var murl = bl.maskUrl.replace(/{lod}/g, "{z}");
+
+              var mtl = new L.TileLayer(murl, {
                   minZoom: bl.lodRange[0]
                   , maxZoom: bl.lodRange[1]
                   , attribution: attribution
+                  , opacity: 0.25
               });
 
-              var layers = {};
-              var overlays = {};
-              layers[name] = tl;
-
-              if (bl.maskUrl) {
-                  var murl = bl.maskUrl.replace(/{lod}/g, "{z}");
-
-                  var mtl = new L.TileLayer(murl, {
-                      minZoom: bl.lodRange[0]
-                      , maxZoom: bl.lodRange[1]
-                      , attribution: attribution
-                      , opacity: 0.25
-                  });
-
-                  overlays[name + "/mask"] = mtl;
-              }
-
-              L.control.layers(layers, overlays).addTo(map);
-              map.addLayer(tl);
+              overlays["mask"] = mtl;
           }
+
+          L.control.layers(layers, overlays).addTo(map);
+          map.addLayer(tl);
 
           // TODO: set from view mapConfig position
           map.setView(new L.LatLng(50, 15), maxLod);

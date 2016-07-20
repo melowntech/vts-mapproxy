@@ -170,7 +170,7 @@ vr::BoundLayer TmsRasterRemote::boundLayer(ResourceRoot root) const
     return bl;
 }
 
-vts::MapConfig TmsRasterRemote::mapConfig_impl(ResourceRoot root, Arsenal&)
+vts::MapConfig TmsRasterRemote::mapConfig_impl(ResourceRoot root)
     const
 {
     const auto &res(resource());
@@ -178,8 +178,11 @@ vts::MapConfig TmsRasterRemote::mapConfig_impl(ResourceRoot root, Arsenal&)
     vts::MapConfig mapConfig;
     mapConfig.referenceFrame = *res.referenceFrame;
 
-    // this is Tiled service: we have bound layer only
-    mapConfig.boundLayers.add(boundLayer(root));
+    // this is Tiled service: we have bound layer only; use remote definition
+    mapConfig.boundLayers.add
+        (vr::BoundLayer
+         (res.id.fullId()
+          , prependRoot(std::string("boundlayer.json"), resource(), root)));
 
     return mapConfig;
 }
@@ -221,12 +224,12 @@ Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
         sink.error(utility::makeError<NotFound>("Unrecognized filename."));
         break;
 
-    case TmsFileInfo::Type::config:
-        return[=](Sink &sink, Arsenal &arsenal) {
-            std::ostringstream os;
-            mapConfig(os, ResourceRoot::none, arsenal);
-            sink.content(os.str(), fi.sinkFileInfo());
-        };
+    case TmsFileInfo::Type::config: {
+        std::ostringstream os;
+        mapConfig(os, ResourceRoot::none);
+        sink.content(os.str(), fi.sinkFileInfo());
+        break;
+    }
 
     case TmsFileInfo::Type::definition: {
         std::ostringstream os;

@@ -93,7 +93,7 @@ public:
 
     bool check(const Resource &resource) const;
 
-    vts::MapConfig mapConfig(ResourceRoot root, Arsenal &arsenal) const;
+    vts::MapConfig mapConfig(ResourceRoot root) const;
 
     Task generateFile(const FileInfo &fileInfo, Sink sink) const;
 
@@ -103,8 +103,7 @@ protected:
     void makeReady();
     bool fresh() const { return fresh_; }
 
-    void mapConfig(std::ostream &os, ResourceRoot root
-                   , Arsenal &arsenal) const;
+    void mapConfig(std::ostream &os, ResourceRoot root) const;
 
     std::string absoluteDataset(const std::string &path) const;
     boost::filesystem::path
@@ -126,8 +125,7 @@ protected:
 
 private:
     virtual void prepare_impl() = 0;
-    virtual vts::MapConfig mapConfig_impl(ResourceRoot root, Arsenal &arsenal)
-        const = 0;
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
 
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , Sink &sink) const = 0;
@@ -195,10 +193,9 @@ inline void Generator::prepare()
     makeReady();
 }
 
-inline vts::MapConfig Generator::mapConfig(ResourceRoot root
-                                           , Arsenal &arsenal) const
+inline vts::MapConfig Generator::mapConfig(ResourceRoot root) const
 {
-    return mapConfig_impl(root, arsenal);
+    return mapConfig_impl(root);
 }
 
 inline Generator::Task Generator::generateFile(const FileInfo &fileInfo

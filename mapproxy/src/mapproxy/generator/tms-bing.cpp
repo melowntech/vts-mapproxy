@@ -54,8 +54,7 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::tms
-                             , "tms-bing")
+        (Resource::Generator(Resource::Generator::Type::tms, "tms-bing")
          , std::make_shared<Factory>());
 });
 
@@ -129,13 +128,13 @@ void TmsBing::prepare_impl()
 
 namespace {
 
-std::future<std::string> generateTileUrl(Arsenal &arsenal
-                                         , const std::string &metadataUrl)
+template <typename Callback>
+void generateTileUrl(Sink sink, Arsenal &arsenal
+                     , const std::string &metadataUrl
+                     , Callback callback)
 {
     typedef utility::ResourceFetcher::Query Query;
     typedef utility::ResourceFetcher::MultiQuery MultiQuery;
-
-    auto promise(std::make_shared<std::promise<std::string>>());
 
     Query q(metadataUrl);
     q.reuse(false);
@@ -186,18 +185,17 @@ std::future<std::string> generateTileUrl(Arsenal &arsenal
             ba::replace_all(url, "{quadkey}", "{quad(loclod,locx,locy)}");
             ba::replace_all(url, "{subdomain}", subdomains());
 
-            promise->set_value(url);
+            callback(sink, url);
         } catch (...) {
-            promise->set_exception(std::current_exception());
+            sink.error();
         }
     });
-
-    return promise->get_future();
 }
 
 } // namespace
 
-vr::BoundLayer TmsBing::boundLayer(ResourceRoot, Arsenal &arsenal) const
+vr::BoundLayer TmsBing::boundLayer(ResourceRoot, const std::string &url)
+    const
 {
     const auto &res(resource());
 
@@ -207,7 +205,7 @@ vr::BoundLayer TmsBing::boundLayer(ResourceRoot, Arsenal &arsenal) const
     bl.type = vr::BoundLayer::Type::raster;
 
     // build url
-    bl.url = generateTileUrl(arsenal, definition_.metadataUrl).get();
+    bl.url = url;
 
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
@@ -221,7 +219,7 @@ vr::BoundLayer TmsBing::boundLayer(ResourceRoot, Arsenal &arsenal) const
     return bl;
 }
 
-vts::MapConfig TmsBing::mapConfig_impl(ResourceRoot root, Arsenal &arsenal)
+vts::MapConfig TmsBing::mapConfig_impl(ResourceRoot root)
     const
 {
     const auto &res(resource());
@@ -229,8 +227,11 @@ vts::MapConfig TmsBing::mapConfig_impl(ResourceRoot root, Arsenal &arsenal)
     vts::MapConfig mapConfig;
     mapConfig.referenceFrame = *res.referenceFrame;
 
-    // this is Tiled service: we have bound layer only
-    mapConfig.boundLayers.add(boundLayer(root, arsenal));
+    // this is Tiled service: we have bound layer only; use remote definition
+    mapConfig.boundLayers.add
+        (vr::BoundLayer
+         (res.id.fullId()
+          , prependRoot(std::string("boundlayer.json"), resource(), root)));
 
     return mapConfig;
 }
@@ -245,18 +246,23 @@ Generator::Task TmsBing::generateFile_impl(const FileInfo &fileInfo
         sink.error(utility::makeError<NotFound>("Unrecognized filename."));
         break;
 
-    case TmsFileInfo::Type::config:
-        return [=](Sink &sink, Arsenal &arsenal) {
-            std::ostringstream os;
-            mapConfig(os, ResourceRoot::none, arsenal);
-            sink.content(os.str(), fi.sinkFileInfo());
-        };
+    case TmsFileInfo::Type::config: {
+        std::ostringstream os;
+        mapConfig(os, ResourceRoot::none);
+        sink.content(os.str(), fi.sinkFileInfo());
+        break;
+    }
 
     case TmsFileInfo::Type::definition:
-        return [=](Sink &sink, Arsenal &arsenal) {
-            std::ostringstream os;
-            vr::saveBoundLayer(os, boundLayer(ResourceRoot::none, arsenal));
-            sink.content(os.str(), fi.sinkFileInfo());
+        return [this, fi](Sink &sink, Arsenal &arsenal) {
+            generateTileUrl(sink, arsenal, definition_.metadataUrl
+                            , [this, fi](Sink sink, const std::string &url)
+                            mutable
+            {
+                std::ostringstream os;
+                vr::saveBoundLayer(os, boundLayer(ResourceRoot::none, url));
+                sink.content(os.str(), fi.sinkFileInfo());
+            });
         };
 
     case TmsFileInfo::Type::support:

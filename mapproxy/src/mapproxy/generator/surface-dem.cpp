@@ -315,8 +315,7 @@ void SurfaceDem::prepare_impl()
     vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
 }
 
-vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root, Arsenal&)
-    const
+vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
 {
     auto mc(vts::mapConfig
             (properties_, vts::ExtraTileSetProperties()

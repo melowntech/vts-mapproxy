@@ -234,7 +234,7 @@ void SurfaceSpheroid::prepare_impl()
     vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
 }
 
-vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root, Arsenal&)
+vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
     const
 {
     auto mc(vts::mapConfig
