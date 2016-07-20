@@ -19,11 +19,15 @@ namespace FileFlags { enum {
 /** Parsed file information.
  */
 struct FileInfo {
-    FileInfo(const std::string &url);
+    FileInfo(const http::Request &request, int flags = FileFlags::none);
 
     /** Full url.
      */
     std::string url;
+
+    /** Delivery flags.
+     */
+    int flags;
 
     enum class Type {
         dirRedir
@@ -62,7 +66,7 @@ struct FileInfo {
 /** Parsed TMS file information.
  */
 struct TmsFileInfo {
-    TmsFileInfo(const FileInfo &fi, int flags = FileFlags::none);
+    TmsFileInfo(const FileInfo &fi);
 
     Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
 
@@ -93,7 +97,7 @@ struct TmsFileInfo {
 /** Parsed surface file information.
  */
 struct SurfaceFileInfo {
-    SurfaceFileInfo(const FileInfo &fi, int flags = FileFlags::none);
+    SurfaceFileInfo(const FileInfo &fi);
 
     Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
 

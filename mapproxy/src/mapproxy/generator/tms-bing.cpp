@@ -239,7 +239,7 @@ vts::MapConfig TmsBing::mapConfig_impl(ResourceRoot root)
 Generator::Task TmsBing::generateFile_impl(const FileInfo &fileInfo
                                            , Sink &sink) const
 {
-    TmsFileInfo fi(fileInfo, config().fileFlags);
+    TmsFileInfo fi(fileInfo);
 
     switch (fi.type) {
     case TmsFileInfo::Type::unknown:

@@ -58,7 +58,7 @@ SurfaceBase::SurfaceBase(const Config &config
 Generator::Task SurfaceBase
 ::generateFile_impl(const FileInfo &fileInfo, Sink &sink) const
 {
-    SurfaceFileInfo fi(fileInfo, config().fileFlags);
+    SurfaceFileInfo fi(fileInfo);
 
     switch (fi.type) {
     case SurfaceFileInfo::Type::unknown:

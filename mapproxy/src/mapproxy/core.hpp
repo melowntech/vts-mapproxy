@@ -15,7 +15,7 @@ public:
     struct Detail;
 
 private:
-    virtual void generate_impl(const std::string &location
+    virtual void generate_impl(const http::Request &request
                                , const http::ServerSink::pointer &sink);
 
     std::shared_ptr<Detail> detail_;

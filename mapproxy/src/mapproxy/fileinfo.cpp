@@ -28,6 +28,8 @@ namespace constants {
         const std::string Config("tileset.conf");
         const std::string Index("tileset.index");
     } // namespace tileset
+
+    const std::string DisableBrowserHeader("X-Mapproxy-Disable-Browser");
 } // namesapce constants
 
 namespace {
@@ -65,9 +67,16 @@ const std::string& checkReferenceFrame(const std::string &referenceFrame)
 
 } // namespace
 
-FileInfo::FileInfo(const std::string &url)
-    : url(url), type(Type::resourceFile)
+FileInfo::FileInfo(const http::Request &request, int f)
+    : url(request.uri), flags(f), type(Type::resourceFile)
 {
+    if (flags & FileFlags::browserEnabled) {
+        // browsing enabled, check for disable header
+        if (request.hasHeader(constants::DisableBrowserHeader)) {
+            flags &= ~FileFlags::browserEnabled;
+        }
+    }
+
     auto end(url.end());
     auto qm(url.find('?'));
     if (qm != std::string::npos) {
@@ -230,7 +239,7 @@ inline const char* parsePart(const char *p, T &value)
 
 } // namespace
 
-TmsFileInfo::TmsFileInfo(const FileInfo &fi, int flags)
+TmsFileInfo::TmsFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), support()
 {
     if ([&]() -> bool
@@ -274,7 +283,7 @@ TmsFileInfo::TmsFileInfo(const FileInfo &fi, int flags)
         return;
     }
 
-    if (flags & FileFlags::browserEnabled) {
+    if (fi.flags & FileFlags::browserEnabled) {
         LOG(debug) << "Browser enabled, checking browser files.";
 
         auto path(fi.filename);
@@ -314,7 +323,7 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
     return {};
 }
 
-SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
+SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), fileType(vs::File::config)
     , tileType(vts::TileFile::meta), raw(false), support(), registry()
 {
@@ -351,7 +360,7 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
         return;
     }
 
-    if (flags & FileFlags::browserEnabled) {
+    if (fi.flags & FileFlags::browserEnabled) {
         LOG(debug) << "Browser enabled, checking browser files.";
 
         auto path(fi.filename);

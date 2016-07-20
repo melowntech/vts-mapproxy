@@ -26,8 +26,6 @@ public:
         : resourceFetcher_(contentFetcher, &ios_)
         , generators_(generators)
         , arsenal_(warper, resourceFetcher_)
-        , browserEnabled_(generators.config().fileFlags
-                          & FileFlags::browserEnabled)
         , work_(ios_)
     {
         start(threadCount);
@@ -37,7 +35,7 @@ public:
         stop();
     }
 
-    void generate(const std::string &location, Sink sink);
+    void generate(const http::Request &request, Sink sink);
 
     void generateRfMapConfig(const std::string &referenceFrame, Sink &sink);
 
@@ -45,8 +43,8 @@ public:
 
     void generateListing(const FileInfo &fi, Sink &sink);
 
-    bool assertBrowserEnabled(Sink &sink) const {
-        if (browserEnabled_) { return true; }
+    bool assertBrowserEnabled(int flags, Sink &sink) const {
+        if (flags & FileFlags::browserEnabled) { return true; }
         sink.error(utility::makeError<NotFound>("Browsing disabled."));
         return false;
     }
@@ -62,7 +60,6 @@ private:
 
     Generators &generators_;
     Arsenal arsenal_;
-    bool browserEnabled_;
 
     /** Processing pool stuff.
      */
@@ -136,10 +133,10 @@ Core::Core(Generators &generators, GdalWarper &warper
               (generators, warper, threadCount, contentFetcher))
 {}
 
-void Core::generate_impl(const std::string &location
+void Core::generate_impl(const http::Request &request
                          , const http::ServerSink::pointer &sink)
 {
-    detail().generate(location, Sink(sink));
+    detail().generate(request, Sink(sink));
 }
 
 namespace {
@@ -197,10 +194,10 @@ buildListing(const Container &container
 
 } // namespace
 
-void Core::Detail::generate(const std::string &location, Sink sink)
+void Core::Detail::generate(const http::Request &request, Sink sink)
 {
     try {
-        FileInfo fi(location);
+        FileInfo fi(request, generators_.config().fileFlags);
 
         switch (fi.type) {
         case FileInfo::Type::referenceFrameMapConfig:
@@ -279,7 +276,7 @@ Sink::Listing otherDirectoryContent = {
 
 void Core::Detail::generateListing(const FileInfo &fi, Sink &sink)
 {
-    if (!assertBrowserEnabled(sink)) { return; }
+    if (!assertBrowserEnabled(fi.flags, sink)) { return; }
 
     switch (fi.type) {
     case FileInfo::Type::referenceFrameListing:
