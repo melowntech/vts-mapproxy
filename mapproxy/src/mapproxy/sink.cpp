@@ -39,7 +39,7 @@ public:
 
     virtual void close() const { stream_->close(); }
 
-    virtual std::size_t size() const { return stat_.size; }
+    virtual long size() const { return stat_.size; }
 
 private:
     vs::IStream::pointer stream_;
