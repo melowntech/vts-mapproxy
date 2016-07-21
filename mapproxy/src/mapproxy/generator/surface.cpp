@@ -97,8 +97,7 @@ Generator::Task SurfaceBase
             break;
 
         default:
-            sink.error(utility::makeError<InternalError>
-                        ("Unsupported file"));
+            sink.error(utility::makeError<NotFound>("Not found"));
             break;
         }
         break;
