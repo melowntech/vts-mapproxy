@@ -1,3 +1,10 @@
+ctt-vts-mapproxy (0.5) citationtech-wheezy; urgency=low
+
+  * Added 2D interface.
+  * Added tms-bing driver.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 21 Jul 2016 17:19:38 +0200
+
 ctt-vts-mapproxy (0.3) citationtech-wheezy; urgency=low
 
   * Full surface support.
