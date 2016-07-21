@@ -36,10 +36,10 @@ void parseCredits(DualId::set &ids, const python::object &object
         {
             python::extract<int> asInt(element);
             if (asInt.check()) {
-                return vr::Registry::credit(asInt);
+                return vr::system.credits(asInt);
             }
 
-            return vr::Registry::credit(py2utf8(element));
+            return vr::system.credits(py2utf8(element));
         }());
 
         ids.insert(DualId(credit.id, credit.numericId));
@@ -83,7 +83,7 @@ Resource::list parseResource(const python::object &value)
         rr.id.referenceFrame = name;
 
         // NB: function either returns valid reference of throws
-        rr.referenceFrame = &vr::Registry::referenceFrame(name);
+        rr.referenceFrame = &vr::system.referenceFrames(name);
 
         const auto &lodRange(content["lodRange"]);
         rr.lodRange.min = python::extract<vts::Lod>(lodRange[0]);

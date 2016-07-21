@@ -280,7 +280,7 @@ void Core::Detail::generateListing(const FileInfo &fi, Sink &sink)
 
     switch (fi.type) {
     case FileInfo::Type::referenceFrameListing:
-        sink.listing(buildListing(vr::Registry::referenceFrames()
+        sink.listing(buildListing(vr::system.referenceFrames
                                    , otherDirectoryContent));
         return;
 

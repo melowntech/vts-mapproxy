@@ -312,7 +312,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
               (GdalWarper::RasterRequest
                (GdalWarper::RasterRequest::Operation::image
                                    , absoluteDataset(definition_.dataset)
-                , vr::Registry::srs(nodeInfo.srs()).srsDef
+                , nodeInfo.srsDef()
                 , nodeInfo.extents()
                 , math::Size2(256, 256)
                            , geo::GeoDataset::Resampling::cubic
@@ -347,7 +347,7 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
                (GdalWarper::RasterRequest::Operation::mask
                 , absoluteDataset(definition_.dataset
                                   , definition_.mask)
-                , vr::Registry::srs(nodeInfo.srs()).srsDef
+                , nodeInfo.srsDef()
                 , nodeInfo.extents()
                 , math::Size2(256, 256)
                 , geo::GeoDataset::Resampling::cubic)
@@ -413,7 +413,7 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
                 (GdalWarper::RasterRequest
                  (GdalWarper::RasterRequest::Operation::detailMask
                   , absoluteDataset(*definition_.mask)
-                  , vr::Registry::srs(block.srs).srsDef
+                  , vr::system.srs(block.srs).srsDef
                   , block.extents, bSize)
                  , sink);
         } else {
@@ -422,7 +422,7 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
                 (GdalWarper::RasterRequest
                  (GdalWarper::RasterRequest::Operation::mask
                   , absoluteDataset(definition_.dataset)
-                  , vr::Registry::srs(block.srs).srsDef
+                  , vr::system.srs(block.srs).srsDef
                   , block.extents, bSize
                   , geo::GeoDataset::Resampling::cubic)
                  , sink);

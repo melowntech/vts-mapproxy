@@ -511,7 +511,7 @@ SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
                  (GdalWarper::RasterRequest
                   (GdalWarper::RasterRequest::Operation::valueMinMax
                    , dataset_
-                   , vr::Registry::srs(block.srs).srsDef
+                   , vr::system.srs(block.srs).srsDef
                    // add half pixel to warp in grid coordinates
                    , extentsPlusHalfPixel
                    (extents, { gridSize.width - 1, gridSize.height - 1 })

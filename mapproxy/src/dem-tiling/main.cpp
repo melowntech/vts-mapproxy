@@ -372,7 +372,7 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 
 int DemTiling::run()
 {
-    auto rf(vr::Registry::referenceFrame(referenceFrame_));
+    auto rf(vr::system.referenceFrames(referenceFrame_));
 
     auto ds(geo::GeoDataset::open(dataset_));
 

@@ -33,11 +33,11 @@ void parseCredits(DualId::set &ids, const Json::Value &object
         const auto &credit([&]() -> const vr::Credit&
         {
             if (element.isIntegral()) {
-                return vr::Registry::credit(element.asInt());
+                return vr::system.credits(element.asInt());
             }
 
             Json::check(element, Json::stringValue);
-            return vr::Registry::credit(element.asString());
+            return vr::system.credits(element.asString());
         }());
 
         ids.insert(DualId(credit.id, credit.numericId));
@@ -94,7 +94,7 @@ Resource::list parseResource(const Json::Value &value)
         rr.id.referenceFrame = name;
 
         // NB: function either returns valid reference of throws
-        rr.referenceFrame = &vr::Registry::referenceFrame(name);
+        rr.referenceFrame = &vr::system.referenceFrames(name);
 
         Json::get(rr.lodRange.min, content, "lodRange", 0);
         Json::get(rr.lodRange.max, content, "lodRange", 1);
@@ -352,7 +352,7 @@ vr::Credits asInlineCredits(const DualId::set &set)
 {
     vr::Credits credits;
     for (auto &id : set) {
-        if (const auto *credit = vr::Registry::credit(id.id, std::nothrow)) {
+        if (const auto *credit = vr::system.credits(id.id, std::nothrow)) {
             credits.set(id, *credit);
         }
     }

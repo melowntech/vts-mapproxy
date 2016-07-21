@@ -56,7 +56,7 @@ void asEnumChecked(const std::string &str, E &value, const std::string message)
 
 const std::string& checkReferenceFrame(const std::string &referenceFrame)
 {
-    if (vr::Registry::referenceFrame(referenceFrame, std::nothrow)) {
+    if (vr::system.referenceFrames(referenceFrame, std::nothrow)) {
         return referenceFrame;
     }
 
@@ -378,8 +378,8 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
     }
 
     // extra files, unknown to common machinery
-    registry = vr::Registry::dataFile
-        (fi.filename, vr::Registry::DataFileKey::filename, std::nothrow);
+    registry = vr::dataFile
+        (fi.filename, vr::DataFile::Key::filename, std::nothrow);
     if (registry) {
         type = Type::registry;
         return;

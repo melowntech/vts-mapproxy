@@ -241,7 +241,7 @@ vts::CsConvertor sds2srs(const std::string &sds, const std::string &dst
 
     // force given geoid
     return vts::CsConvertor
-        (geo::setGeoid(vr::Registry::srs(sds).srsDef, *geoidGrid)
+        (geo::setGeoid(vr::system.srs(sds).srsDef, *geoidGrid)
          , dst);
 }
 
