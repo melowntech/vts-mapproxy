@@ -35,6 +35,9 @@ set(mapproxy_SOURCES
   generator/surface-spheroid.hpp generator/surface-spheroid.cpp
   generator/surface-dem.hpp generator/surface-dem.cpp
 
+  generator/geodatavectorbase.hpp generator/geodatavectorbase.cpp
+  generator/geodata-vector-tiled.hpp generator/geodata-vector-tiled.cpp
+
   sink.hpp sink.cpp
 
   fileinfo.hpp fileinfo.cpp

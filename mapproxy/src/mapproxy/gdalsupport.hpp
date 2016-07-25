@@ -101,7 +101,7 @@ public:
     /** Do housekeeping. Must be called in the process where internals are being
      * run.
      */
-     void housekeeping();
+    void housekeeping();
 
     struct Detail;
 

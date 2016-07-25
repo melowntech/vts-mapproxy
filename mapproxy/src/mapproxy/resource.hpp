@@ -115,7 +115,7 @@ struct Resource {
     };
 
     struct Generator {
-        enum Type { tms, surface };
+        enum Type { tms, surface, geodata };
         Type type;
         std::string driver;
 
@@ -169,6 +169,7 @@ private:
 UTILITY_GENERATE_ENUM_IO(Resource::Generator::Type,
     ((tms))
     ((surface))
+    ((geodata))
 )
 
 UTILITY_GENERATE_ENUM(RasterFormat,
