@@ -37,7 +37,7 @@ MetatileBlock::list metatileBlocksImpl(const vr::ReferenceFrame &referenceFrame
     if (((tileId.x & metaMask) != tileId.x)
         || ((tileId.y & metaMask) != tileId.y))
     {
-        throw utility::makeError<NotFound>
+        throw utility::makeError<http::NotFound>
             ("TileId doesn't point to metatile origin.");
     }
 

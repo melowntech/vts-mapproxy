@@ -10,6 +10,8 @@
 #include <boost/asio.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include "utility/errorcode.hpp"
+
 #include "geo/gdal.hpp"
 
 #include "../error.hpp"
@@ -66,6 +68,8 @@ public:
         , done_(false)
         , response_()
         , error_(sm.get_allocator<char>())
+        , errorType_(ErrorType::none)
+        , ec_()
     {
         if (other.mask) {
             mask_.assign(other.mask->data(), other.mask->size());
@@ -92,7 +96,8 @@ public:
 
     void setError(Lock&, const char *message);
     void setError(Lock&, const std::exception &e);
-    void setError(Lock&, const GenerateError &e);
+    void setError(Lock&, const utility::HttpError &exc);
+    void setError(Lock&, const EmptyImage &exc);
 
     GdalWarper::Raster get(Lock &lock);
     GdalWarper::Raster get(bi::interprocess_mutex &mutex);
@@ -137,7 +142,10 @@ private:
 
     // response error
     String error_;
-    GenerateError::RaiseError raiseError_;
+
+    enum class ErrorType { none, errorCode, emptyImage };
+    ErrorType errorType_;
+    std::error_code ec_;
 };
 
 template <typename T>
@@ -151,16 +159,27 @@ void ShRasterRequest::setError(Lock&, const char *message)
 {
     if (!error_.empty()) { return; }
     error_.assign(message);
-    raiseError_ = &GenerateError::runtimeError;
+    errorType_ = ErrorType::errorCode;
+    ec_ = make_error_code(utility::HttpCode::InternalServerError);
     done_ = true;
     cond_.notify_one();
 }
 
-void ShRasterRequest::setError(Lock&, const GenerateError &e)
+void ShRasterRequest::setError(Lock&, const utility::HttpError &exc)
 {
     if (!error_.empty()) { return; }
-    error_.assign(e.what());
-    raiseError_ = e.getRaise();
+    error_.assign(exc.what());
+    errorType_ = ErrorType::errorCode;
+    ec_ = exc.code();
+    done_ = true;
+    cond_.notify_one();
+}
+
+void ShRasterRequest::setError(Lock&, const EmptyImage &exc)
+{
+    if (!error_.empty()) { return; }
+    error_.assign(exc.what());
+    errorType_ = ErrorType::emptyImage;
     done_ = true;
     cond_.notify_one();
 }
@@ -197,8 +216,13 @@ GdalWarper::Raster ShRasterRequest::get(Lock &lock)
         });
     }
 
-    if (raiseError_) {
-        raiseError_(std::string(error_.data(), error_.size()));
+    switch (errorType_) {
+    case ErrorType::none: break; // handled at the end of function
+
+    case ErrorType::emptyImage: throw EmptyImage(asString(error_));
+
+    case ErrorType::errorCode:
+        utility::throwErrorCode(ec_, asString(error_));
     }
 
     throw std::runtime_error("Unknown exception!");
@@ -531,7 +555,9 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
 
             try {
                 req->set(mutex(), ::warp(cache, mb_, *req));
-            } catch (const GenerateError &e) {
+            } catch (const utility::HttpError &e) {
+                req->setError(mutex(), e);
+            } catch (const EmptyImage &e) {
                 req->setError(mutex(), e);
             } catch (const std::exception &e) {
                 req->setError(mutex(), e);

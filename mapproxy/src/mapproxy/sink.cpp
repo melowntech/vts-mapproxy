@@ -59,14 +59,6 @@ void Sink::error(const std::exception_ptr &exc)
 {
     try {
         std::rethrow_exception(exc);
-    } catch (const NotFound &e) {
-        sink_->error(std::make_exception_ptr(http::NotFound(e.what())));
-    } catch (const Unavailable &e) {
-        sink_->error(std::make_exception_ptr(http::Unavailable(e.what())));
-    } catch (const InternalError &e) {
-        sink_->error(std::make_exception_ptr(http::InternalError(e.what())));
-    } catch (const RequestAborted &e) {
-        sink_->error(std::make_exception_ptr(http::RequestAborted(e.what())));
     } catch (const EmptyImage &e) {
         // special "error" -> send "empty" image
         sink_->content(emptyImage.data(), emptyImage.size()
