@@ -23,6 +23,7 @@ namespace constants {
     const std::string FreeLayerDefinition("freelayer.json");
     const std::string Self("");
     const std::string Index("index.html");
+    const std::string Geo("geo");
 
     namespace tileset {
         const std::string Config("tileset.conf");
@@ -411,4 +412,67 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
     }
 
     return {};
+}
+
+GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled)
+    : fileInfo(fi), type(Type::unknown), support()
+{
+    if (tiled && [&]() -> bool
+    {
+        const char *p(fi.filename.c_str());
+
+        if (!(p = parsePart<1>(p, tileId.lod))) { return false; }
+        if (*p++ != '-') { return false; }
+
+        if (!(p = parsePart<1>(p, tileId.x))) { return false; }
+        if (*p++ != '-') { return false; }
+
+        if (!(p = parsePart<1>(p, tileId.y))) { return false; }
+        if (*p++ != '.') { return false; }
+
+        std::string ext(p);
+        if (ext == "geo") {
+            // mask file
+            type = Type::geo;
+        } else if (ext == "meta") {
+            // mask file
+            type = Type::metatile;
+        }
+
+        return true;
+    }()) {
+        return;
+    }
+
+    if (constants::Config == fi.filename) {
+        type = Type::config;
+        return;
+    }
+
+    if (!tiled && constants::Geo == fi.filename) {
+        type = Type::geo;
+        return;
+    }
+
+    if (constants::FreeLayerDefinition == fi.filename) {
+        type = Type::definition;
+        return;
+    }
+
+    if (fi.flags & FileFlags::browserEnabled) {
+        LOG(debug) << "Browser enabled, checking browser files.";
+
+        auto path(fi.filename);
+        if (constants::Self == path) { path = constants::Index; }
+
+        // support files
+        auto fsupport(browser2d::supportFiles.find(path));
+        if (fsupport != browser2d::supportFiles.end()) {
+            type = Type::support;
+            support = &fsupport->second;
+            return;
+        }
+    } else {
+        LOG(debug) << "Browser disabled, skipping browser files.";
+    }
 }

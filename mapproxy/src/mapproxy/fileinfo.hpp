@@ -141,4 +141,34 @@ struct SurfaceFileInfo {
     const vr::DataFile *registry;
 };
 
+/** Parsed surface file information.
+ */
+struct GeodataFileInfo {
+    GeodataFileInfo(const FileInfo &fi, bool tiled);
+
+    /** Parent information.
+     */
+    FileInfo fileInfo;
+
+    enum class Type {
+        unknown, config, definition, geo, metatile, support, registry
+    };
+
+    /** File type.
+     */
+    Type type;
+
+    /** Valid only when type in (Type::geo, Type::metatile)
+     */
+    vts::TileId tileId;
+
+    /** Valid only when type == Type::support;
+     */
+    const vs::SupportFile *support;
+
+    /** Valid only when type == Type::registry;
+     */
+    const vr::DataFile *registry;
+};
+
 #endif // mapproxy_fileinfo_hpp_included_

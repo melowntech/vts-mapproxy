@@ -54,6 +54,8 @@ void parseDefinition(GeodataVectorBase::Definition &def
                  " coded data format.");
         }
     }
+
+    Json::get(def.styleUrl, value, "styleUrl");
 }
 
 void buildDefinition(Json::Value &value
@@ -72,6 +74,7 @@ void buildDefinition(Json::Value &value
     }
 
     value["format"] = boost::lexical_cast<std::string>(def.format);
+    value["styleUrl"] = def.styleUrl;
 }
 
 void parseDefinition(GeodataVectorBase::Definition &def
@@ -106,6 +109,8 @@ void parseDefinition(GeodataVectorBase::Definition &def
                  " coded data format.");
         }
     }
+
+    def.styleUrl = py2utf8(value["styleUrl"]);
 }
 
 } // namespace

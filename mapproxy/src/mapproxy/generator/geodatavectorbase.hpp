@@ -20,6 +20,7 @@ public:
         boost::optional<std::string> geoidGrid;
         boost::optional<geo::HeightCodingConfig::LayerNames> layers;
         geo::HeightCodingConfig::Format format;
+        std::string styleUrl;
 
         Definition(): format(geo::HeightCodingConfig::Format::geodataJson) {}
         bool operator==(const Definition &o) const;

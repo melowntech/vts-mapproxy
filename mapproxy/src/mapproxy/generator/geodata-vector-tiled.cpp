@@ -92,6 +92,9 @@ Generator::Task GeodataVectorTiled::generateFile_impl(const FileInfo &fileInfo
     (void) fileInfo;
     (void) sink;
 
+    // parse input filename, use tiled version
+    GeodataFileInfo fi(fileInfo, true);
+
 #if 0
     TmsFileInfo fi(fileInfo);
 
