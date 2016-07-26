@@ -8,6 +8,7 @@
 
 #include "./geodata-vector-tiled.hpp"
 #include "./factory.hpp"
+#include "./metatile.hpp"
 
 namespace vr = vadstena::registry;
 namespace fs = boost::filesystem;
@@ -123,11 +124,21 @@ void GeodataVectorTiled::generateMetatile(Sink &sink
                                           , const GeodataFileInfo &fi
                                           , Arsenal &arsenal) const
 {
-    sink.error(utility::makeError<InternalError>("Unimplemented"));
+    sink.checkAborted();
 
-    (void) sink;
-    (void) fi;
-    (void) arsenal;
+    if (!index_.meta(fi.tileId)) {
+        sink.error(utility::makeError<NotFound>("Metatile not found."));
+        return;
+    }
+
+    auto metatile(metatileFromDem
+                  (fi.tileId, sink, arsenal, resource()
+                   , index_.tileIndex, demDataset_, definition_.geoidGrid));
+
+    // write metatile to stream
+    std::ostringstream os;
+    metatile.save(os);
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 void GeodataVectorTiled::generateGeodata(Sink &sink

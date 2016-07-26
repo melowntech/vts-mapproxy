@@ -1,5 +1,5 @@
-#ifndef mapproxy_metatile_hpp_included_
-#define mapproxy_metatile_hpp_included_
+#ifndef mapproxy_support_metatile_hpp_included_
+#define mapproxy_support_metatile_hpp_included_
 
 #include "vts-libs/registry.hpp"
 #include "vts-libs/vts/basetypes.hpp"
@@ -65,4 +65,4 @@ private:
     const vts::NodeInfo::CoverageMask mask_;
 };
 
-#endif // mapproxy_metatile_included_
+#endif // mapproxy_support_metatile_hpp_included_

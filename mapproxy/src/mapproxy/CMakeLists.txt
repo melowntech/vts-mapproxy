@@ -26,6 +26,7 @@ set(mapproxy_SOURCES
   resourcebackend/python.hpp resourcebackend/python.cpp
 
   generator.hpp
+  generator/metatile.hpp generator/metatile.cpp
   generator/generator.cpp
   generator/factory.hpp
   generator/tms-raster.hpp generator/tms-raster.cpp
