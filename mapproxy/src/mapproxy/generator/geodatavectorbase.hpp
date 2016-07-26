@@ -23,12 +23,13 @@ public:
         geo::VectorFormat format;
         std::string styleUrl;
 
-        Definition(): format(geo::VectorFormat::geodataJson) {}
+        Definition() : format(geo::VectorFormat::geodataJson) {}
         bool operator==(const Definition &o) const;
 
-    private:
         virtual void from_impl(const boost::any &value);
         virtual void to_impl(boost::any &value) const;
+
+    private:
         virtual bool same_impl(const DefinitionBase &other) const {
             return (*this == other.as<Definition>());
         }
@@ -46,10 +47,8 @@ private:
                                  , const GeodataFileInfo &fileInfo
                                  , Arsenal &arsenal) const = 0;
 
-protected:
-    const Definition &definition_;
-
 private:
+    const Definition &definition_;
     bool tiled_;
 };
 

@@ -14,6 +14,8 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , const vts::TileIndex &tileIndex
                               , const std::string &demDataset
                               , const boost::optional<std::string> &geoidGrid
-                              , const MaskTree &maskTree = MaskTree());
+                              , const MaskTree &maskTree = MaskTree()
+                              , const boost::optional<int> &displaySize
+                              = boost::none);
 
 #endif // mapproxy_metatile_hpp_included_

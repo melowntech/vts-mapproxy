@@ -603,6 +603,7 @@
             , "geoidGrid": "egm96_15.gtx"
             , "format": "geodataJson"
             , "styleUrl": "http://have/no/idea"
+            , "displaySize": 256
         }
     }
 ]

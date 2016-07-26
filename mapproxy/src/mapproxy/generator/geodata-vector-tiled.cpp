@@ -3,6 +3,10 @@
 
 #include "geo/heightcoding.hpp"
 
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
+
+#include "../support/python.hpp"
 #include "../support/tileindex.hpp"
 #include "../support/srs.hpp"
 
@@ -25,7 +29,7 @@ struct Factory : Generator::Factory {
     }
 
     virtual DefinitionBase::pointer definition() {
-        return std::make_shared<GeodataVectorBase::Definition>();
+        return std::make_shared<GeodataVectorTiled::Definition>();
     }
 
 private:
@@ -40,11 +44,70 @@ utility::PreMain Factory::register_([]()
          , std::make_shared<Factory>());
 });
 
+void parseDefinition(GeodataVectorTiled::Definition &def
+                     , const Json::Value &value)
+{
+    Json::get(def.displaySize, value, "displaySize");
+}
+
+void buildDefinition(Json::Value &value
+                     , const GeodataVectorTiled::Definition &def)
+{
+    value["displaySize"] = def.displaySize;
+}
+
+void parseDefinition(GeodataVectorTiled::Definition &def
+                     , const boost::python::dict &value)
+{
+    def.displaySize = boost::python::extract<int>(value["displaySize"]);
+}
+
 } // namespace
+
+void GeodataVectorTiled::Definition::from_impl(const boost::any &value)
+{
+    GeodataVectorBase::Definition::from_impl(value);
+
+    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
+        parseDefinition(*this, *json);
+    } else if (const auto *py
+               = boost::any_cast<boost::python::dict>(&value))
+    {
+        parseDefinition(*this, *py);
+    } else {
+        LOGTHROW(err1, Error)
+            << "GeodataVectorBase: Unsupported configuration from: <"
+            << value.type().name() << ">.";
+    }
+}
+
+void GeodataVectorTiled::Definition::to_impl(boost::any &value) const
+{
+    GeodataVectorBase::Definition::to_impl(value);
+
+    if (auto *json = boost::any_cast<Json::Value>(&value)) {
+        buildDefinition(*json, *this);
+    } else {
+        LOGTHROW(err1, Error)
+            << "GeodataVectorBase:: Unsupported serialization into: <"
+            << value.type().name() << ">.";
+    }
+}
+
+bool GeodataVectorTiled::Definition::operator==(const Definition &o) const
+{
+    if (!GeodataVectorBase::Definition::operator==(o)) {
+        return false;
+    }
+
+    // display size can change
+    return true;
+}
 
 GeodataVectorTiled::GeodataVectorTiled(const Config &config
                                        , const Resource &resource)
     : GeodataVectorBase(config, resource, true)
+    , definition_(this->resource().definition<Definition>())
     , demDataset_(absoluteDataset(definition_.demDataset + "/dem"))
     , tileUrl_(definition_.dataset)
     , physicalSrs_(vr::system.srs(resource.referenceFrame->model.physicalSrs))
@@ -133,7 +196,8 @@ void GeodataVectorTiled::generateMetatile(Sink &sink
 
     auto metatile(metatileFromDem
                   (fi.tileId, sink, arsenal, resource()
-                   , index_.tileIndex, demDataset_, definition_.geoidGrid));
+                   , index_.tileIndex, demDataset_, definition_.geoidGrid
+                   , MaskTree(), definition_.displaySize));
 
     // write metatile to stream
     std::ostringstream os;

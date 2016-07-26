@@ -12,6 +12,20 @@ class GeodataVectorTiled : public GeodataVectorBase {
 public:
     GeodataVectorTiled(const Config &config, const Resource &resource);
 
+    struct Definition : public GeodataVectorBase::Definition {
+        int displaySize;
+
+        Definition() : displaySize() {}
+        bool operator==(const Definition &o) const;
+
+    private:
+        virtual void from_impl(const boost::any &value);
+        virtual void to_impl(boost::any &value) const;
+        virtual bool same_impl(const DefinitionBase &other) const {
+            return (*this == other.as<Definition>());
+        }
+    };
+
 private:
     virtual void prepare_impl();
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
@@ -25,6 +39,8 @@ private:
     virtual void generateGeodata(Sink &sink
                                  , const GeodataFileInfo &fileInfo
                                  , Arsenal &arsenal) const;
+
+    Definition definition_;
 
     /** Path to /dem dataset
      */

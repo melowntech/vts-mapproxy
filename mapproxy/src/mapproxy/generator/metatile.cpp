@@ -132,7 +132,8 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 , const vts::TileIndex &tileIndex
                 , const std::string &demDataset
                 , const boost::optional<std::string> &geoidGrid
-                , const MaskTree &maskTree)
+                , const MaskTree &maskTree
+                , const boost::optional<int> &displaySize)
 {
     auto blocks(metatileBlocks(resource, tileId));
 
@@ -306,23 +307,31 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                     // set credits
                     node.updateCredits(resource.credits);
 
-                    node.applyTexelSize(true);
+                    if (displaySize) {
+                        // use display size
+                        node.applyDisplaySize(true);
+                        node.displaySize = *displaySize;
+                    } else {
+                        // use texel size
+                        node.applyTexelSize(true);
 
-                    // calculate texture size using node mask
-                    auto textureArea([&]() -> double
-                    {
-                        math::Size2 size(metatileSamplesPerTile
-                                         , metatileSamplesPerTile);
+                        // calculate texture size using node mask
+                        auto textureArea([&]() -> double
+                        {
+                            math::Size2 size(metatileSamplesPerTile
+                                             , metatileSamplesPerTile);
 
-                        // return scaled coverage; NB: triangle covers half of
-                        // pixel so real area is in pixels is half of number of
-                        // pixels
-                        return ((triangleCount * vr::BoundLayer::tileArea())
-                                / (2.0 * math::area(size)));
-                    }());
+                            // return scaled coverage; NB: triangle covers half
+                            // of pixel so real area is in pixels is half of
+                            // number of pixels
+                            return ((triangleCount
+                                     * vr::BoundLayer::tileArea())
+                                    / (2.0 * math::area(size)));
+                        }());
 
-                    // calculate texel size
-                    node.texelSize = std::sqrt(area / textureArea);
+                        // calculate texel size
+                        node.texelSize = std::sqrt(area / textureArea);
+                    }
                 }
 
                 // store metata node
