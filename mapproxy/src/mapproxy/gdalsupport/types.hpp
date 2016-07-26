@@ -11,6 +11,7 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/containers/deque.hpp>
 #include <boost/interprocess/containers/string.hpp>
+#include <boost/interprocess/containers/vector.hpp>
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 #include <boost/interprocess/sync/interprocess_condition.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
@@ -33,6 +34,9 @@ typedef bi::basic_string<
     char, std::char_traits<char>
     , bi::allocator<char, SegmentManager>
     > String;
+
+
+typedef bi::vector<String, bi::allocator<String, SegmentManager>> StringVector;
 
 typedef bi::scoped_lock<bi::interprocess_mutex> Lock;
 

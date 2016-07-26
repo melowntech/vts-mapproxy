@@ -40,23 +40,35 @@ SystemTime absTime(const Delta &delta)
     return systemTime() + delta;
 }
 
+std::string asString(const String &str) {
+    return { str.data(), str.size() };
+}
+
+boost::optional<std::string> asOptional(const String &str) {
+    if (str.empty()) { return {}; }
+    return std::string(str.data(), str.size());
+}
+
+boost::optional<geo::SrsDefinition>
+asOptional(const String &str, geo::SrsDefinition::Type type)
+{
+    if (str.empty()) { return {}; }
+    return geo::SrsDefinition(std::string(str.data(), str.size()), type);
+}
+
 typedef boost::posix_time::milliseconds milliseconds;
 
-class ShRasterRequest : boost::noncopyable {
+class ShRequest;
+
+class ShRaster : boost::noncopyable {
 public:
-    typedef bi::deleter<ShRasterRequest, SegmentManager> Deleter;
-    typedef bi::shared_ptr<ShRasterRequest, Allocator, Deleter> pointer;
-    typedef bi::weak_ptr<ShRasterRequest, Allocator, Deleter> wpointer;
-
-    typedef bi::deque<pointer, bi::allocator<pointer, SegmentManager>> Deque;
-
-    ShRasterRequest(const GdalWarper::RasterRequest &other
-                    , ManagedBuffer &sm)
-        : sm_(sm)
+    ShRaster(const GdalWarper::RasterRequest &other
+                    , ManagedBuffer &sm, ShRequest *owner)
+        : sm_(sm), owner_(owner)
         , operation_(other.operation)
         , dataset_(other.dataset.data()
-                 , other.dataset.size()
-                 , sm.get_allocator<char>())
+                   , other.dataset.size()
+                   , sm.get_allocator<char>())
         , srs_(other.srs.srs.data()
                , other.srs.srs.size()
                , sm.get_allocator<char>())
@@ -65,21 +77,15 @@ public:
         , size_(other.size)
         , resampling_(other.resampling)
         , mask_(sm.get_allocator<char>())
-        , done_(false)
         , response_()
-        , error_(sm.get_allocator<char>())
-        , errorType_(ErrorType::none)
-        , ec_()
     {
         if (other.mask) {
             mask_.assign(other.mask->data(), other.mask->size());
         }
     }
 
-    ~ShRasterRequest() {
-        if (response_) {
-            sm_.deallocate(response_);
-        }
+    ~ShRaster() {
+        if (response_) { sm_.deallocate(response_); }
     }
 
     operator GdalWarper::RasterRequest() const {
@@ -91,38 +97,19 @@ public:
              , asOptional(mask_));
     }
 
-    template <typename T>
-    void setError(bi::interprocess_mutex &mutex, const T &what);
-
-    void setError(Lock&, const char *message);
-    void setError(Lock&, const std::exception &e);
-    void setError(Lock&, const utility::HttpError &exc);
-    void setError(Lock&, const EmptyImage &exc);
-
-    GdalWarper::Raster get(Lock &lock);
-    GdalWarper::Raster get(bi::interprocess_mutex &mutex);
-    void set(bi::interprocess_mutex &mutex, cv::Mat *response);
-
-    static pointer create(const GdalWarper::RasterRequest &req
-                          , ManagedBuffer &mb)
-    {
-        return pointer(mb.construct<ShRasterRequest>
-                       (bi::anonymous_instance)(req, mb)
-                       , mb.get_allocator<void>()
-                       , mb.get_deleter<ShRasterRequest>());
+    /** Steals response.
+     */
+    cv::Mat* response() {
+        auto response(response_);
+        response_ = 0;
+        return response;
     }
+
+    void response(bi::interprocess_mutex &mutex, cv::Mat *response);
 
 private:
-    std::string asString(const String &str) const {
-        return { str.data(), str.size() };
-    }
-
-    boost::optional<std::string> asOptional(const String &str) const {
-        if (str.empty()) { return {}; }
-        return std::string(str.data(), str.size());
-    }
-
     ManagedBuffer &sm_;
+    ShRequest *owner_;
 
     GdalWarper::RasterRequest::Operation operation_;
     String dataset_;
@@ -133,12 +120,200 @@ private:
     geo::GeoDataset::Resampling resampling_;
     String mask_;
 
+    // response matrix
+    cv::Mat *response_;
+};
+
+class ShHeightCode : boost::noncopyable {
+public:
+    ShHeightCode(const std::string &vectorDs, const std::string &rasterDs
+                 , const geo::HeightCodingConfig &config
+                 , ManagedBuffer &sm, ShRequest *owner)
+        : sm_(sm), owner_(owner)
+        , vectorDs_(vectorDs.data(), vectorDs.size()
+                    , sm.get_allocator<char>())
+        , rasterDs_(rasterDs.data(), rasterDs.size()
+                    , sm.get_allocator<char>())
+
+        , workingSrs_(sm.get_allocator<char>())
+        , workingSrsType_()
+
+        , outputSrs_(sm.get_allocator<char>())
+        , outputSrsType_()
+
+        , clipExtents_(config.clipExtents)
+        , format_(config.format)
+
+        , response_()
+    {
+
+        if (config.workingSrs) {
+            workingSrs_.assign(config.workingSrs->srs.data()
+                               , config.workingSrs->srs.size());
+            workingSrsType_ = config.workingSrs->type;
+        }
+
+        if (config.outputSrs) {
+            outputSrs_.assign(config.outputSrs->srs.data()
+                              , config.outputSrs->srs.size());
+            outputSrsType_ = config.outputSrs->type;
+        }
+
+        if (config.layers) {
+            layers_ = boost::in_place(sm.get_allocator<String>());
+
+            for (const auto &str : *config.layers) {
+                layers_->push_back(String(str.data(), str.size()
+                                          , sm.get_allocator<char>()));
+            }
+        }
+    }
+
+    ~ShHeightCode() {
+        if (response_) { sm_.deallocate(response_); }
+    }
+
+    std::string vectorDs() const { return asString(vectorDs_); }
+
+    std::string rasterDs() const { return asString(rasterDs_); }
+
+    geo::HeightCodingConfig config() const {
+        geo::HeightCodingConfig config;
+        config.workingSrs = asOptional(workingSrs_, workingSrsType_);
+        config.outputSrs = asOptional(outputSrs_, outputSrsType_);
+        config.clipExtents = clipExtents_;
+
+        if (layers_) {
+            config.layers = boost::in_place();
+            for (const auto &str : *layers_) {
+                config.layers->emplace_back(str.data(), str.size());
+            }
+        }
+
+        config.format = format_;
+
+        return config;
+    }
+
+
+    /** Steals response.
+     */
+    GdalWarper::MemBlock* response() {
+        auto response(response_);
+        response_ = 0;
+        return response;
+    }
+
+    void response(bi::interprocess_mutex &mutex
+                  , GdalWarper::MemBlock *response);
+
+private:
+    ManagedBuffer &sm_;
+    ShRequest *owner_;
+
+    String vectorDs_;
+    String rasterDs_;
+
+    String workingSrs_;
+    geo::SrsDefinition::Type workingSrsType_;
+
+    String outputSrs_;
+    geo::SrsDefinition::Type outputSrsType_;
+
+    boost::optional<StringVector> layers_;
+
+    boost::optional<math::Extents2> clipExtents_;
+
+    geo::VectorFormat format_;
+
+    // response memory block
+    GdalWarper::MemBlock *response_;
+};
+
+class ShRequest : boost::noncopyable {
+public:
+    typedef bi::deleter<ShRequest, SegmentManager> Deleter;
+    typedef bi::shared_ptr<ShRequest, Allocator, Deleter> pointer;
+    typedef bi::weak_ptr<ShRequest, Allocator, Deleter> wpointer;
+
+    typedef bi::deque<pointer, bi::allocator<pointer, SegmentManager>> Deque;
+
+    ShRequest(const GdalWarper::RasterRequest &other, ManagedBuffer &sm)
+        : sm_(sm)
+        , raster_(sm.construct<ShRaster>
+                  (bi::anonymous_instance)(other, sm, this))
+        , heightcode_()
+        , done_(false)
+        , error_(sm.get_allocator<char>())
+        , errorType_(ErrorType::none)
+        , ec_()
+    {}
+
+    ShRequest(const std::string &vectorDs
+              , const std::string &rasterDs
+              , const geo::HeightCodingConfig &config
+              , ManagedBuffer &sm)
+        : sm_(sm)
+        , raster_()
+        , heightcode_(sm.construct<ShHeightCode>
+                      (bi::anonymous_instance)
+                      (vectorDs, rasterDs, config, sm, this))
+        , done_(false)
+        , error_(sm.get_allocator<char>())
+        , errorType_(ErrorType::none)
+        , ec_()
+    {}
+
+    ~ShRequest() {
+        if (raster_) { sm_.destroy_ptr(raster_); }
+    }
+
+    template <typename T>
+    void setError(bi::interprocess_mutex &mutex, const T &what);
+
+    void setError(Lock&, const char *message);
+    void setError(Lock&, const std::exception &e);
+    void setError(Lock&, const utility::HttpError &exc);
+    void setError(Lock&, const EmptyImage &exc);
+
+    GdalWarper::Raster getRaster(Lock &lock);
+    GdalWarper::Raster getRaster(bi::interprocess_mutex &mutex);
+
+    GdalWarper::MemBlock::pointer getMemBlock(Lock &lock);
+    GdalWarper::MemBlock::pointer getMemBlock(bi::interprocess_mutex &mutex);
+
+    void done();
+    void process(bi::interprocess_mutex &mutex, DatasetCache &cache);
+
+    static pointer create(const GdalWarper::RasterRequest &req
+                          , ManagedBuffer &mb)
+    {
+        return pointer(mb.construct<ShRequest>
+                       (bi::anonymous_instance)(req, mb)
+                       , mb.get_allocator<void>()
+                       , mb.get_deleter<ShRequest>());
+    }
+
+    static pointer create(const std::string &vectorDs
+                          , const std::string &rasterDs
+                          , const geo::HeightCodingConfig &config
+                          , ManagedBuffer &mb)
+    {
+        return pointer(mb.construct<ShRequest>
+                       (bi::anonymous_instance)(vectorDs, rasterDs, config, mb)
+                       , mb.get_allocator<void>()
+                       , mb.get_deleter<ShRequest>());
+    }
+
+private:
+    ManagedBuffer &sm_;
+
+    ShRaster *raster_;
+    ShHeightCode *heightcode_;
+
     // response condition and flag
     bi::interprocess_condition cond_;
     bool done_;
-
-    // response matrix
-    cv::Mat *response_;
 
     // response error
     String error_;
@@ -148,14 +323,58 @@ private:
     std::error_code ec_;
 };
 
+void ShRequest::process(bi::interprocess_mutex &mutex
+                        , DatasetCache &cache)
+{
+    if (raster_) {
+        raster_->response(mutex, ::warp(cache, sm_, *raster_));
+        return;
+    }
+
+    if (heightcode_) {
+        heightcode_->response
+            (mutex, ::heightcode(cache, sm_
+                                 , heightcode_->vectorDs()
+                                 , heightcode_->rasterDs()
+                                 , heightcode_->config()));
+        return;
+    }
+
+    setError(mutex, InternalError("No associated request."));
+}
+
+void ShRequest::done()
+{
+
+    done_ = true;
+    cond_.notify_one();
+}
+
+void ShRaster::response(bi::interprocess_mutex &mutex, cv::Mat *response)
+{
+    Lock lock(mutex);
+    if (response_) { return; }
+    response_ = response;
+    owner_->done();
+}
+
+void ShHeightCode::response(bi::interprocess_mutex &mutex
+                            , GdalWarper::MemBlock *response)
+{
+    Lock lock(mutex);
+    if (response_) { return; }
+    response_ = response;
+    owner_->done();
+}
+
 template <typename T>
-void ShRasterRequest::setError(bi::interprocess_mutex &mutex, const T &what)
+void ShRequest::setError(bi::interprocess_mutex &mutex, const T &what)
 {
     Lock lock(mutex);
     setError(lock, what);
 }
 
-void ShRasterRequest::setError(Lock&, const char *message)
+void ShRequest::setError(Lock&, const char *message)
 {
     if (!error_.empty()) { return; }
     error_.assign(message);
@@ -165,7 +384,7 @@ void ShRasterRequest::setError(Lock&, const char *message)
     cond_.notify_one();
 }
 
-void ShRasterRequest::setError(Lock&, const utility::HttpError &exc)
+void ShRequest::setError(Lock&, const utility::HttpError &exc)
 {
     if (!error_.empty()) { return; }
     error_.assign(exc.what());
@@ -175,7 +394,7 @@ void ShRasterRequest::setError(Lock&, const utility::HttpError &exc)
     cond_.notify_one();
 }
 
-void ShRasterRequest::setError(Lock&, const EmptyImage &exc)
+void ShRequest::setError(Lock&, const EmptyImage &exc)
 {
     if (!error_.empty()) { return; }
     error_.assign(exc.what());
@@ -184,31 +403,24 @@ void ShRasterRequest::setError(Lock&, const EmptyImage &exc)
     cond_.notify_one();
 }
 
-void ShRasterRequest::setError(Lock &lock, const std::exception &e)
+void ShRequest::setError(Lock &lock, const std::exception &e)
 {
     setError(lock, e.what());
 }
 
-void ShRasterRequest::set(bi::interprocess_mutex &mutex, cv::Mat *response)
-{
-    Lock lock(mutex);
-    if (response_) { return; }
-    response_ = response;
-    done_ = true;
-    cond_.notify_one();
-}
-
-GdalWarper::Raster ShRasterRequest::get(Lock &lock)
+GdalWarper::Raster ShRequest::getRaster(Lock &lock)
 {
     cond_.wait(lock, [&]()
     {
         return done_;
     });
 
-    if (response_) {
-        // steal and wrap in std::smard_ptr
-        auto response(response_);
-        response_ = 0;
+    if (!raster_) {
+        throw std::logic_error("This shared request is not handling a "
+                               "raster operation!");
+    }
+
+    if (auto *response = raster_->response()) {
         return GdalWarper::Raster(response, [&sm_](cv::Mat *mat)
         {
             // deallocate data
@@ -228,10 +440,52 @@ GdalWarper::Raster ShRasterRequest::get(Lock &lock)
     throw std::runtime_error("Unknown exception!");
 }
 
-GdalWarper::Raster ShRasterRequest::get(bi::interprocess_mutex &mutex)
+GdalWarper::Raster ShRequest::getRaster(bi::interprocess_mutex &mutex)
 {
     Lock lock(mutex);
-    return get(lock);
+    return getRaster(lock);
+}
+
+GdalWarper::MemBlock::pointer ShRequest::getMemBlock(Lock &lock)
+{
+    cond_.wait(lock, [&]()
+    {
+        return done_;
+    });
+
+    // TODO: extend for other memblock-generating operations
+
+    if (!heightcode_) {
+        throw std::logic_error("This shared request is not handling a "
+                               "vector operation!");
+    }
+
+    if (auto *response = heightcode_->response()) {
+        return GdalWarper::MemBlock::pointer
+            (response, [&sm_](GdalWarper::MemBlock *block)
+        {
+            // deallocate data
+            sm_.deallocate(block);
+        });
+    }
+
+    switch (errorType_) {
+    case ErrorType::none: break; // handled at the end of function
+
+    case ErrorType::emptyImage: throw EmptyImage(asString(error_));
+
+    case ErrorType::errorCode:
+        utility::throwErrorCode(ec_, asString(error_));
+    }
+
+    throw std::runtime_error("Unknown exception!");
+}
+
+GdalWarper::MemBlock::pointer
+ShRequest::getMemBlock(bi::interprocess_mutex &mutex)
+{
+    Lock lock(mutex);
+    return getMemBlock(lock);
 }
 
 struct Worker {
@@ -258,7 +512,7 @@ struct Worker {
         }
     }
 
-    void associate(const ShRasterRequest::pointer &req) { req_ = req; }
+    void associate(const ShRequest::pointer &req) { req_ = req; }
 
     void disassociate() { req_ = {}; }
 
@@ -286,7 +540,7 @@ private:
 
     /** Processed request.
      */
-    ShRasterRequest::pointer req_;
+    ShRequest::pointer req_;
 };
 
 } // namespace
@@ -298,6 +552,11 @@ public:
     ~Detail();
 
     Raster warp(const RasterRequest &req, Sink &sink);
+
+    MemBlock::pointer heightcode(const std::string &vectorDs
+                                 , const std::string &rasterDs
+                                 , const geo::HeightCodingConfig &config
+                                 , Sink &sink);
 
     void housekeeping();
 
@@ -321,14 +580,13 @@ private:
     ManagedBuffer mb_;
 
     std::atomic<bool> *running_;
-    ShRasterRequest::Deque *queue_;
+    ShRequest::Deque *queue_;
 
     bi::interprocess_mutex *mutex_;
     bi::interprocess_condition *cond_;
 
     Process manager_;
 
-    // TODO: rewrite to use processes
     Worker::map workers_;
 };
 
@@ -341,6 +599,15 @@ GdalWarper::Raster GdalWarper::warp(const RasterRequest &req, Sink &sink)
     return detail().warp(req, sink);
 }
 
+GdalWarper::MemBlock::pointer
+GdalWarper::heightcode(const std::string &vectorDs
+                       , const std::string &rasterDs
+                       , const geo::HeightCodingConfig &config
+                       , Sink &sink)
+{
+    return detail().heightcode(vectorDs, rasterDs, config, sink);
+}
+
 void GdalWarper::housekeeping()
 {
     return detail().housekeeping();
@@ -351,9 +618,9 @@ GdalWarper::Detail::Detail(const Options &options)
     , mem_(bi::anonymous_shared_memory(std::size_t(1) << 30))
     , mb_(bi::create_only, mem_.get_address(), mem_.get_size())
     , running_(mb_.construct<std::atomic<bool>>(bi::anonymous_instance)(true))
-    , queue_(mb_.construct<ShRasterRequest::Deque>
+    , queue_(mb_.construct<ShRequest::Deque>
              (bi::anonymous_instance)
-             (mb_.get_allocator<ShRasterRequest>()))
+             (mb_.get_allocator<ShRequest>()))
     , mutex_(mb_.construct<bi::interprocess_mutex>
              (bi::anonymous_instance)())
     , cond_(mb_.construct<bi::interprocess_condition>
@@ -532,7 +799,7 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
 
     while (isRunning()) {
         try {
-            ShRasterRequest::pointer req;
+            ShRequest::pointer req;
 
             {
                 Lock lock(mutex());
@@ -554,7 +821,7 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
             }
 
             try {
-                req->set(mutex(), ::warp(cache, mb_, *req));
+                req->process(mutex(), cache);
             } catch (const utility::HttpError &e) {
                 req->setError(mutex(), e);
             } catch (const EmptyImage &e) {
@@ -581,16 +848,16 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
 }
 
 GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
-                                            , Sink &sink)
+                                               , Sink &sink)
 {
     Lock lock(mutex());
-    ShRasterRequest::pointer shReq(ShRasterRequest::create(req, mb_));
+    ShRequest::pointer shReq(ShRequest::create(req, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 
     {
         // set aborter for this request
-        ShRasterRequest::wpointer wreq(shReq);
+        ShRequest::wpointer wreq(shReq);
         sink.setAborter([wreq, this]()
         {
             if (auto r = wreq.lock()) {
@@ -600,5 +867,32 @@ GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
         });
     }
 
-    return shReq->get(lock);
+    return shReq->getRaster(lock);
+}
+
+GdalWarper::MemBlock::pointer
+GdalWarper::Detail::heightcode(const std::string &vectorDs
+                               , const std::string &rasterDs
+                               , const geo::HeightCodingConfig &config
+                               , Sink &sink)
+{
+    Lock lock(mutex());
+    ShRequest::pointer shReq
+        (ShRequest::create(vectorDs, rasterDs, config, mb_));
+    queue_->push_back(shReq);
+    cond().notify_one();
+
+    {
+        // set aborter for this request
+        ShRequest::wpointer wreq(shReq);
+        sink.setAborter([wreq, this]()
+        {
+            if (auto r = wreq.lock()) {
+                r->setError
+                    (mutex(), RequestAborted("Request has been aborted"));
+            }
+        });
+    }
+
+    return shReq->getMemBlock(lock);
 }

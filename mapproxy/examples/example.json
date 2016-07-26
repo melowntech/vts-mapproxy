@@ -583,4 +583,26 @@
            "metadataUrl": "http://dev.virtualearth.net/REST/v1/Imagery/Metadata/Aerial?key=Ag7PO7bUdf-l6FrOjQT9w1ZOdyz1Y8QJyenAdOn5--QHj7W50wuwG14HSdvdNFke"
         }
     }
+
+    , {
+        "comment": "Mapbox vector tiles",
+        "group": "mapbox",
+        "id": "test",
+        "type": "geodata",
+        "driver": "geodata-vector-tiled",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 21],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "https://vector.mapzen.com/osm/all/{loclod}/{locx}/{locy}.json?api_key=vector-tiles-mJRqnWb"
+            , "demDataset": "viewfinder"
+            , "geoidGrid": "egm96_15.gtx"
+            , "format": "geodataJson"
+            , "styleUrl": "http://have/no/idea"
+        }
+    }
 ]

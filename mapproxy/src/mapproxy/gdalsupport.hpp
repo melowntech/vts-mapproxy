@@ -10,6 +10,8 @@
 
 #include "geo/srsdef.hpp"
 #include "geo/geodataset.hpp"
+#include "geo/vectorformat.hpp"
+#include "geo/heightcoding.hpp"
 
 #include "./sink.hpp"
 
@@ -97,6 +99,26 @@ public:
     };
 
     Raster warp(const RasterRequest &request, Sink &sink);
+
+    struct MemBlock {
+        typedef std::shared_ptr<MemBlock> pointer;
+
+        const char *data;
+        std::size_t size;
+
+        MemBlock(const char *data, std::size_t size)
+            : data(data), size(size)
+        {}
+    };
+
+    // Vector operations
+
+    /** Heightcode vector ds using raster ds
+     */
+    MemBlock::pointer heightcode(const std::string &vectorDs
+                                 , const std::string &rasterDs
+                                 , const geo::HeightCodingConfig &config
+                                 , Sink &sink);
 
     /** Do housekeeping. Must be called in the process where internals are being
      * run.

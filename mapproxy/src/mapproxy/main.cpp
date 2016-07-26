@@ -309,6 +309,7 @@ int Daemon::run()
 int main(int argc, char *argv[])
 {
     gdal_drivers::registerAll();
+    ::OGRRegisterAll();
 
     return Daemon()(argc, argv);
 }

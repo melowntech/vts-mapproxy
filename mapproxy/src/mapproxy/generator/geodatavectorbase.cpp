@@ -8,6 +8,8 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
+#include "vts-libs/storage/fstreams.hpp"
+
 #include "../support/python.hpp"
 
 #include "./geodatavectorbase.hpp"
@@ -22,7 +24,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
     std::string s;
 
     Json::get(def.dataset, value, "dataset");
-    Json::get(def.dataset, value, "demDataset");
+    Json::get(def.demDataset, value, "demDataset");
 
     if (value.isMember("geoidGrid")) {
         def.geoidGrid = boost::in_place();
@@ -47,7 +49,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
         Json::get(s, value, "format");
         try {
             def.format
-                = boost::lexical_cast<geo::HeightCodingConfig::Format>(s);
+                = boost::lexical_cast<geo::VectorFormat>(s);
         } catch (boost::bad_lexical_cast) {
             utility::raise<Error>
                 ("Value stored in format is not a valid height"
@@ -101,7 +103,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
 
     if (value.has_key("format")) {
         try {
-            def.format = boost::lexical_cast<geo::HeightCodingConfig::Format>
+            def.format = boost::lexical_cast<geo::VectorFormat>
                 (py2utf8(value["format"]));
         } catch (boost::bad_lexical_cast) {
             utility::raise<Error>
@@ -153,9 +155,60 @@ bool GeodataVectorBase::Definition::operator==(const Definition &o) const
 }
 
 GeodataVectorBase::GeodataVectorBase(const Config &config
-                                     , const Resource &resource)
+                                     , const Resource &resource
+                                     , bool tiled)
     : Generator(config, resource)
     , definition_(this->resource().definition<Definition>())
+    , tiled_(tiled)
 {}
+
+Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
+                                                     , Sink &sink) const
+{
+    GeodataFileInfo fi(fileInfo, tiled_, definition_.format);
+
+    // check for valid tileId
+    switch (fi.type) {
+    case GeodataFileInfo::Type::geo:
+        return[=](Sink &sink, Arsenal &arsenal) {
+            generateGeodata(sink, fi, arsenal);
+        };
+        break;
+
+    case GeodataFileInfo::Type::metatile:
+        if (tiled_) {
+            return[=](Sink &sink, Arsenal &arsenal) {
+                generateMetatile(sink, fi, arsenal);
+            };
+        }
+        sink.error(utility::makeError<NotFound>
+                   ("Metatiles not supported by non-tiled driver."));
+        break;
+
+    case GeodataFileInfo::Type::config: {
+        std::ostringstream os;
+        mapConfig(os, ResourceRoot::none);
+        sink.content(os.str(), fi.sinkFileInfo());
+        break;
+    }
+
+    case GeodataFileInfo::Type::support:
+        sink.content(fi.support->data, fi.support->size
+                      , fi.sinkFileInfo(), false);
+        break;
+
+    case GeodataFileInfo::Type::registry:
+        sink.content(vs::fileIStream
+                      (fi.registry->contentType, fi.registry->path));
+        break;
+
+    default:
+        sink.error(utility::makeError<InternalError>
+                    ("Not implemented yet."));
+        break;
+    }
+
+    return {};
+}
 
 } // namespace generator

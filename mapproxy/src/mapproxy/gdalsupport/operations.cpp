@@ -1,3 +1,6 @@
+#include <new>
+#include <algorithm>
+
 #include "imgproc/rastermask/cvmat.hpp"
 
 #include "../error.hpp"
@@ -19,6 +22,23 @@ cv::Mat* allocateMat(ManagedBuffer &mb
     // allocate matrix in raw data block
     return new (raw) cv::Mat(size.height, size.width, type
                              , raw + sizeof(cv::Mat));
+}
+
+GdalWarper::MemBlock* allocateBlock(ManagedBuffer &mb
+                                    , const std::string &data)
+{
+    // create raw memory to hold block and data
+    char *raw(static_cast<char*>
+              (mb.allocate(sizeof(GdalWarper::MemBlock) + data.size())));
+
+    // poiter to output data
+    auto *dataPtr(raw + sizeof(GdalWarper::MemBlock));
+
+    // copy data into block
+    std::copy(data.begin(), data.end(), dataPtr);
+
+    // allocate block in raw data block
+    return new (raw) GdalWarper::MemBlock(dataPtr, data.size());
 }
 
 cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
@@ -253,4 +273,35 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
              , req.resampling);
     }
     throw;
+}
+
+typedef std::shared_ptr< ::GDALDataset> VectorDataset;
+
+VectorDataset openVectorDataset(const std::string &dataset)
+{
+    auto ds(::GDALOpenEx(dataset.c_str(), (GDAL_OF_VECTOR | GDAL_OF_READONLY)
+                         , nullptr, nullptr, nullptr));
+
+    if (!ds) {
+        LOGTHROW(err2, std::runtime_error)
+            << "Failed to open dataset " << dataset << ".";
+    }
+
+    return VectorDataset(static_cast< ::GDALDataset*>(ds)
+                         , [](::GDALDataset *ds) { delete ds; });
+}
+
+GdalWarper::MemBlock* heightcode(DatasetCache &cache, ManagedBuffer &mb
+                                 , const std::string &vectorDs
+                                 , const std::string &rasterDs
+                                 , const geo::HeightCodingConfig &config)
+{
+    // open vector dataset
+    auto vds(openVectorDataset(vectorDs));
+    auto &rds(cache(rasterDs));
+
+    std::ostringstream os;
+    geo::heightCode(*vds, rds, os, config);
+
+    return allocateBlock(mb, os.str());
 }

@@ -1,9 +1,16 @@
 #include "utility/premain.hpp"
+#include "utility/raise.hpp"
+
+#include "geo/heightcoding.hpp"
+
+#include "../support/tileindex.hpp"
+#include "../support/srs.hpp"
 
 #include "./geodata-vector-tiled.hpp"
 #include "./factory.hpp"
 
 namespace vr = vadstena::registry;
+namespace fs = boost::filesystem;
 
 namespace generator {
 
@@ -36,8 +43,24 @@ utility::PreMain Factory::register_([]()
 
 GeodataVectorTiled::GeodataVectorTiled(const Config &config
                                        , const Resource &resource)
-    : GeodataVectorBase(config, resource)
+    : GeodataVectorBase(config, resource, true)
+    , demDataset_(absoluteDataset(definition_.demDataset + "/dem"))
+    , tileUrl_(definition_.dataset)
+    , physicalSrs_(vr::system.srs(resource.referenceFrame->model.physicalSrs))
+    , index_(resource.referenceFrame->metaBinaryOrder)
 {
+    try {
+        auto indexPath(root() / "tileset.index");
+        if (fs::exists(indexPath)) {
+            // OK, load
+            vts::tileset::loadTileSetIndex(index_, indexPath);
+            makeReady();
+            return;
+        }
+    } catch (const std::exception &e) {
+        // not ready
+    }
+
     LOG(info1) << "Generator for <" << resource.id << "> not ready.";
 }
 
@@ -45,11 +68,21 @@ void GeodataVectorTiled::prepare_impl()
 {
     LOG(info2) << "Preparing <" << resource().id << ">.";
 
-    // try to open datasets
-    auto dataset(geo::GeoDataset::open
-                 (absoluteDataset(definition_.demDataset)));
+    const auto &r(resource());
 
-    makeReady();
+    // try to open datasets
+    geo::GeoDataset::open(demDataset_);
+    geo::GeoDataset::open(demDataset_ + ".min");
+    geo::GeoDataset::open(demDataset_ + ".max");
+
+    // prepare tile index
+    prepareTileIndex(index_
+                     , (absoluteDataset(definition_.demDataset)
+                        + "/tiling." + r.id.referenceFrame)
+                     , r);
+
+    // save it all
+    vts::tileset::saveTileSetIndex(index_, root() / "tileset.index");
 }
 
 vr::FreeLayer GeodataVectorTiled::freeLayer(ResourceRoot root) const
@@ -86,94 +119,52 @@ vts::MapConfig GeodataVectorTiled::mapConfig_impl(ResourceRoot root)
     return mapConfig;
 }
 
-Generator::Task GeodataVectorTiled::generateFile_impl(const FileInfo &fileInfo
-                                                      , Sink &sink) const
+void GeodataVectorTiled::generateMetatile(Sink &sink
+                                          , const GeodataFileInfo &fi
+                                          , Arsenal &arsenal) const
 {
-    (void) fileInfo;
+    sink.error(utility::makeError<InternalError>("Unimplemented"));
+
     (void) sink;
+    (void) fi;
+    (void) arsenal;
+}
 
-    // parse input filename, use tiled version
-    GeodataFileInfo fi(fileInfo, true);
-
-#if 0
-    TmsFileInfo fi(fileInfo);
-
-    // check for valid tileId
-    switch (fi.type) {
-    case TmsFileInfo::Type::image:
-    case TmsFileInfo::Type::mask:
-        if (!checkRanges(resource(), fi.tileId)) {
-            sink.error(utility::makeError<NotFound>
-                        ("TileId outside of configured range."));
-            return {};
-        }
-        break;
-
-    case TmsFileInfo::Type::metatile:
-        if (!hasMetatiles_) {
-            sink.error(utility::makeError<NotFound>
-                        ("This dataset doesn't provide metatiles."));
-            return {};
-        }
-        if (!checkRanges(resource(), fi.tileId, RangeType::lod)) {
-            sink.error(utility::makeError<NotFound>
-                        ("TileId outside of configured range."));
-            return {};
-        }
-        break;
-
-    default: break;
+void GeodataVectorTiled::generateGeodata(Sink &sink
+                                         , const GeodataFileInfo &fi
+                                         , Arsenal &arsenal) const
+{
+    const auto &tileId(fi.tileId);
+    auto flags(index_.tileIndex.get(tileId));
+    if (!vts::TileIndex::Flag::isReal(flags)) {
+        sink.error(utility::makeError<NotFound>("No geodata for this tile."));
     }
 
-    switch (fi.type) {
-    case TmsFileInfo::Type::unknown:
-        sink.error(utility::makeError<NotFound>("Unrecognized filename."));
-        break;
-
-    case TmsFileInfo::Type::config: {
-        std::ostringstream os;
-        mapConfig(os, ResourceRoot::none);
-        sink.content(os.str(), fi.sinkFileInfo());
-    };
-
-    case TmsFileInfo::Type::definition: {
-        std::ostringstream os;
-        vr::saveBoundLayer(os, boundLayer(ResourceRoot::none));
-        sink.content(os.str(), fi.sinkFileInfo());
-        break;
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.valid()) {
+        sink.error(utility::makeError<NotFound>
+                   ("TileId outside of valid reference frame tree."));
+        return;
     }
 
-    case TmsFileInfo::Type::support:
-        sink.content(fi.support->data, fi.support->size
-                      , fi.sinkFileInfo(), false);
-        break;
+    const auto tileUrl
+        (tileUrl_(vts::UrlTemplate::Vars
+                  (tileId, vts::local(nodeInfo.rootLod(), tileId))));
 
-    case TmsFileInfo::Type::image: {
-        if (fi.format != definition_.format) {
-            sink.error(utility::makeError<NotFound>
-                        ("Format <%s> is not supported by this resource (%s)."
-                         , fi.format, definition_.format));
-            return {};
-        }
+    LOG(debug) << "Using geo file: <" << tileUrl << ">.";
 
-        return[=](Sink &sink, Arsenal &arsenal) {
-            generateTileImage(fi.tileId, sink, arsenal);
-        };
-    }
+    geo::HeightCodingConfig config;
+    config.workingSrs = sds(nodeInfo, definition_.geoidGrid);
+    config.outputSrs = physicalSrs_.srsDef;
+    config.outputVerticalAdjust = physicalSrs_.adjustVertical();
+    config.layers = definition_.layers;
+    config.clipExtents = nodeInfo.extents();
+    config.format = definition_.format;
 
-    case TmsFileInfo::Type::mask:
-        return [=](Sink &sink, Arsenal &arsenal)  {
-            generateTileMask(fi.tileId, sink, arsenal);
-        };
+    // heightcode data using warper's machinery
+    auto mb(arsenal.warper.heightcode(tileUrl, demDataset_, config, sink));
 
-    case TmsFileInfo::Type::metatile:
-        return [=](Sink &sink, Arsenal &arsenal) {
-            generateMetatile(fi.tileId, sink, arsenal);
-        };
-    }
-#endif
-
-    return {};
+    sink.content(mb->data, mb->size, fi.sinkFileInfo(), true);
 }
 
 } // namespace generator

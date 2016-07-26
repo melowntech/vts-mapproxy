@@ -17,6 +17,7 @@ set(mapproxy_SOURCES
   support/mesh.hpp support/mesh.cpp
   support/geo.hpp support/geo.cpp
   support/coverage.hpp support/coverage.cpp
+  support/tileindex.hpp support/tileindex.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp

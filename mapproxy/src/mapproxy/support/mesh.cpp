@@ -261,6 +261,15 @@ vts::CsConvertor sds2nav(const vts::NodeInfo &nodeInfo
                    , geoidGrid);
 }
 
+geo::SrsDefinition sds(const vts::NodeInfo &nodeInfo
+                       , const boost::optional<std::string> &geoidGrid)
+{
+    if (!geoidGrid) { return nodeInfo.srsDef(); }
+
+    // force given geoid
+    return geo::setGeoid(nodeInfo.srsDef(), *geoidGrid);
+}
+
 namespace {
 
 class TextureNormalizer {

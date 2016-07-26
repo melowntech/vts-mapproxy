@@ -37,6 +37,7 @@
 #include "../support/grid.hpp"
 #include "../support/coverage.hpp"
 #include "../support/python.hpp"
+#include "../support/tileindex.hpp"
 
 #include "./surface-dem.hpp"
 #include "./factory.hpp"
@@ -204,11 +205,6 @@ void SurfaceDem::prepare_impl()
     auto datasetMin(geo::GeoDataset::open(dataset_ + ".min"));
     auto datasetMax(geo::GeoDataset::open(dataset_ + ".max"));
 
-    // load definition
-    vts::TileIndex datasetTiles;
-    datasetTiles.load(absoluteDataset(definition_.dataset)
-                      + "/tiling." + r.id.referenceFrame);
-
     // build properties
     properties_ = {};
     properties_.id = r.id.fullId();
@@ -222,93 +218,10 @@ void SurfaceDem::prepare_impl()
     properties_.lodRange = r.lodRange;
     properties_.tileRange = r.tileRange;
 
-    // grab and reset tile index
-    auto &ti(index_.tileIndex);
-
-    // clean tile index
-    ti = {};
-
-    // generate tile index from lod/tile ranges
-    for (auto lod : r.lodRange) {
-        // treat whole lod as a huge metatile and process each block
-        // independently
-        for (const auto &block
-                 : metatileBlocks(resource(), vts::TileId(lod), lod, true))
-        {
-            LOG(info1) << "Generating tile index LOD <" << lod
-                       << ">: ancestor: "
-                       << block.commonAncestor.nodeId()
-                       << ", block: " << block.view << ".";
-
-            if (block.valid() && in(lod, r.lodRange)) {
-                TiFlag::value_type flags(TiFlag::mesh);
-
-                if (lod == r.lodRange.min) {
-                    // force navtile in topmost lod
-                    flags |= TiFlag::navtile;
-                }
-
-                // set current block to computed value
-                ti.set(lod, block.view, flags);
-            }
-        }
-    }
-
-    // and clip with dataset tiles
-    {
-        auto combiner([&](TiFlag::value_type o, TiFlag::value_type n)
-                      -> TiFlag::value_type
-        {
-            if (!o || !n) {
-                // no intersection -> nothing
-                return 0;
-            }
-
-            // intersection -> merge flags
-            return o | n;
-        });
-
-        ti.combine(datasetTiles, combiner, r.lodRange);
-    }
-
-    // finally clip everything by mask tree if present
-    if (maskTree_) {
-        /** TODO: RF partial nodes should be handled differently
-         */
-        const auto treeDepth(maskTree_.depth());
-        for (const auto lod : r.lodRange) {
-            auto filterByMask([&](MaskTree::Node node, boost::tribool value)
-            {
-                // valid -> nothing to be done
-                if (value) { return; }
-
-                // update node to match lod grid
-                node.shift(treeDepth - lod);
-
-                vts::TileRange tileRange
-                    (node.x, node.y
-                     , node.x + node.size - 1, node.y + node.size - 1);
-
-                if (!value) {
-                    // invalid: unset whole quad
-                    ti.set(lod, tileRange, TiFlag::none);
-                    return;
-                }
-
-                // partially covered tile: unset watertight node; tells the
-                // implementation that we are removing some values therefore it
-                // is not needed to generate tree for lods that do not exist
-                ti.update(lod, tileRange
-                          , [&](TiFlag::value_type value)
-                {
-                    // remove watertight flag
-                    return (value & ~TiFlag::watertight);
-                }, false);
-            });
-
-            maskTree_.forEachQuad(filterByMask, MaskTree::Constraints(lod));
-        }
-    }
+    prepareTileIndex(index_
+                     , (absoluteDataset(definition_.dataset)
+                        + "/tiling." + r.id.referenceFrame)
+                     , r, true, maskTree_);
 
     // save it all
     vts::tileset::saveConfig(filePath(vts::File::config), properties_);

@@ -1,6 +1,8 @@
 #ifndef mapproxy_fileinfo_hpp_included_
 #define mapproxy_fileinfo_hpp_included_
 
+#include "geo/vectorformat.hpp"
+
 #include "vts-libs/storage/support.hpp"
 #include "vts-libs/vts/basetypes.hpp"
 #include "vts-libs/vts/tileop.hpp"
@@ -144,7 +146,9 @@ struct SurfaceFileInfo {
 /** Parsed surface file information.
  */
 struct GeodataFileInfo {
-    GeodataFileInfo(const FileInfo &fi, bool tiled);
+    GeodataFileInfo(const FileInfo &fi, bool tiled, geo::VectorFormat format);
+
+    Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
 
     /** Parent information.
      */
@@ -169,6 +173,10 @@ struct GeodataFileInfo {
     /** Valid only when type == Type::registry;
      */
     const vr::DataFile *registry;
+
+    /** File format. Passed in ctor.
+     */
+    geo::VectorFormat format;
 };
 
 #endif // mapproxy_fileinfo_hpp_included_

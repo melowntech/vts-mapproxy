@@ -414,8 +414,10 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
     return {};
 }
 
-GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled)
+GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled
+                                 , geo::VectorFormat format)
     : fileInfo(fi), type(Type::unknown), support()
+    , format(format)
 {
     if (tiled && [&]() -> bool
     {
@@ -466,8 +468,8 @@ GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled)
         if (constants::Self == path) { path = constants::Index; }
 
         // support files
-        auto fsupport(browser2d::supportFiles.find(path));
-        if (fsupport != browser2d::supportFiles.end()) {
+        auto fsupport(vts::supportFiles.find(path));
+        if (fsupport != vts::supportFiles.end()) {
             type = Type::support;
             support = &fsupport->second;
             return;
@@ -475,4 +477,40 @@ GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled)
     } else {
         LOG(debug) << "Browser disabled, skipping browser files.";
     }
+
+    // extra files, unknown to common machinery
+    registry = vr::dataFile
+        (fi.filename, vr::DataFile::Key::filename, std::nothrow);
+    if (registry) {
+        type = Type::registry;
+        return;
+    }
+}
+
+Sink::FileInfo GeodataFileInfo::sinkFileInfo(std::time_t lastModified) const
+{
+    switch (type) {
+    case Type::geo:
+        return { contentType(format), lastModified };
+
+    case Type::metatile:
+        return { vs::contentType(vs::TileFile::meta), lastModified };
+
+    case Type::support:
+        return { support->contentType, support->lastModified };
+
+    case Type::registry:
+        return { registry->contentType, lastModified };
+
+    case Type::config:
+        return { vts::MapConfig::contentType, lastModified };
+
+    case Type::definition:
+        return { "application/json; charset=utf-8", lastModified };
+
+    case Type::unknown:
+        return {};
+    }
+
+    return {};
 }
