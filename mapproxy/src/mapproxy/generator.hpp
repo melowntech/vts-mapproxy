@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <map>
 #include <iostream>
 #include <atomic>
 
@@ -12,6 +13,7 @@
 
 #include "utility/resourcefetcher.hpp"
 
+#include "vts-libs/storage/support.hpp"
 #include "vts-libs/vts/mapconfig.hpp"
 
 #include "./resource.hpp"
@@ -20,6 +22,7 @@
 #include "./gdalsupport.hpp"
 #include "./sink.hpp"
 
+namespace vs = vadstena::storage;
 namespace vts = vadstena::vts;
 
 struct Arsenal {
@@ -62,8 +65,10 @@ public:
         boost::filesystem::path root;
         boost::filesystem::path resourceRoot;
         int fileFlags;
+        const vs::SupportFile::Vars *variables;
+        const vs::SupportFile::Vars *defaults;
 
-        Config() : fileFlags() {}
+        Config() : fileFlags(), variables(), defaults() {}
     };
 
     virtual ~Generator() {}
@@ -145,6 +150,9 @@ protected:
 
     Generator::pointer otherGenerator(Resource::Generator::Type generatorType
                                       , const Resource::Id &resourceId) const;
+
+    void supportFile(const vs::SupportFile &support, Sink &sink
+                     , const Sink::FileInfo &fileInfo) const;
 
 private:
     virtual void prepare_impl() = 0;

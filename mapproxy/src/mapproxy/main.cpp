@@ -53,6 +53,11 @@ public:
         gdalWarperOptions_.tmpRoot
             = utility::buildsys::installPath("var/mapproxy/tmp");
         generatorsConfig_.resourceUpdatePeriod = 300;
+
+        generatorsConfig_.variables = &variables_;
+
+        variables_["VTS_BUILTIN_BROWSER_URL"]
+            = "https://cdn.iris-test.citationtech.net/libs/melownjs/builtin/devel";
     }
 
 private:
@@ -95,6 +100,7 @@ private:
     unsigned int coreThreadCount_;
     bool httpEnableBrowser_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
+    vs::SupportFile::Vars variables_;
     Generators::Config generatorsConfig_;
     GdalWarper::Options gdalWarperOptions_;
 
@@ -154,6 +160,10 @@ void Daemon::configuration(po::options_description &cmdline
          , po::value(&generatorsConfig_.resourceRoot)
          ->default_value(generatorsConfig_.resourceRoot)->required()
          , "Root of datasets defined as relative path.")
+
+        ("vts.builtinBrowserUrl"
+         , po::value(&variables_["VTS_BUILTIN_BROWSER_URL"])
+         , "URL of built in browser.");
         ;
 
     (void) cmdline;

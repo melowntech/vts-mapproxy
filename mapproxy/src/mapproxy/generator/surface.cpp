@@ -152,8 +152,7 @@ Generator::Task SurfaceBase
     }
 
     case SurfaceFileInfo::Type::support:
-        sink.content(fi.support->data, fi.support->size
-                      , fi.sinkFileInfo(), false);
+        supportFile(*fi.support, sink, fi.sinkFileInfo());
         break;
 
     case SurfaceFileInfo::Type::registry:

@@ -673,3 +673,16 @@ Generators::listIds(const std::string &referenceFrame
 {
     return detail().listIds(referenceFrame, type, group);
 }
+
+void Generator::supportFile(const vs::SupportFile &support, Sink &sink
+                            , const Sink::FileInfo &fileInfo) const
+{
+    if (!support.isTemplate) {
+        sink.content(support.data, support.size, fileInfo, false);
+        return;
+    }
+
+    // expand and send
+    sink.content(support.expand(config_.variables, config_.defaults)
+                 , fileInfo);
+}

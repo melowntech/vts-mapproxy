@@ -210,8 +210,7 @@ Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
     }
 
     case GeodataFileInfo::Type::support:
-        sink.content(fi.support->data, fi.support->size
-                      , fi.sinkFileInfo(), false);
+        supportFile(*fi.support, sink, fi.sinkFileInfo());
         break;
 
     case GeodataFileInfo::Type::registry:
