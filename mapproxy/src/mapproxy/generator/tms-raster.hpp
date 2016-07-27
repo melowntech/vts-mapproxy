@@ -7,7 +7,7 @@ namespace generator {
 
 class TmsRaster : public Generator {
 public:
-    TmsRaster(const Config &config, const Resource &resource);
+    TmsRaster(const Params &params);
 
     struct Definition : public DefinitionBase {
         std::string dataset;

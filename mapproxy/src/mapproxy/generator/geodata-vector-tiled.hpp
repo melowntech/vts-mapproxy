@@ -10,7 +10,7 @@ namespace generator {
 
 class GeodataVectorTiled : public GeodataVectorBase {
 public:
-    GeodataVectorTiled(const Config &config, const Resource &resource);
+    GeodataVectorTiled(const Params &params);
 
     struct Definition : public GeodataVectorBase::Definition {
         int displaySize;
@@ -28,9 +28,9 @@ public:
 
 private:
     virtual void prepare_impl();
-    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
-    vr::FreeLayer freeLayer(ResourceRoot root) const;
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
+    virtual vr::FreeLayer freeLayer_impl(ResourceRoot root) const;
 
     virtual void generateMetatile(Sink &sink
                                   , const GeodataFileInfo &fileInfo

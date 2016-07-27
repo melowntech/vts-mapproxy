@@ -12,7 +12,7 @@ namespace generator {
 
 class SurfaceSpheroid : public SurfaceBase {
 public:
-    SurfaceSpheroid(const Config &config, const Resource &resource);
+    SurfaceSpheroid(const Params &params);
 
     struct Definition : public DefinitionBase {
         unsigned int textureLayerId;

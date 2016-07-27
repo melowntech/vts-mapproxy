@@ -7,7 +7,7 @@ namespace generator {
 
 class TmsRasterRemote : public Generator {
 public:
-    TmsRasterRemote(const Config &config, const Resource &resource);
+    TmsRasterRemote(const Params &params);
 
     struct Definition : public DefinitionBase {
         std::string remoteUrl;

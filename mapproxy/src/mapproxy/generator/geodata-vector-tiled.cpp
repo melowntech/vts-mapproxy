@@ -22,10 +22,9 @@ namespace generator {
 namespace {
 
 struct Factory : Generator::Factory {
-    virtual Generator::pointer create(const Generator::Config &config
-                                      , const Resource &resource)
+    virtual Generator::pointer create(const Generator::Params &params)
     {
-        return std::make_shared<GeodataVectorTiled>(config, resource);
+        return std::make_shared<GeodataVectorTiled>(params);
     }
 
     virtual DefinitionBase::pointer definition() {
@@ -104,14 +103,14 @@ bool GeodataVectorTiled::Definition::operator==(const Definition &o) const
     return true;
 }
 
-GeodataVectorTiled::GeodataVectorTiled(const Config &config
-                                       , const Resource &resource)
-    : GeodataVectorBase(config, resource, true)
+GeodataVectorTiled::GeodataVectorTiled(const Params &params)
+    : GeodataVectorBase(params, true)
     , definition_(this->resource().definition<Definition>())
     , demDataset_(absoluteDataset(definition_.demDataset + "/dem"))
     , tileUrl_(definition_.dataset)
-    , physicalSrs_(vr::system.srs(resource.referenceFrame->model.physicalSrs))
-    , index_(resource.referenceFrame->metaBinaryOrder)
+    , physicalSrs_
+      (vr::system.srs(resource().referenceFrame->model.physicalSrs))
+    , index_(resource().referenceFrame->metaBinaryOrder)
 {
     try {
         auto indexPath(root() / "tileset.index");
@@ -125,12 +124,12 @@ GeodataVectorTiled::GeodataVectorTiled(const Config &config
         // not ready
     }
 
-    LOG(info1) << "Generator for <" << resource.id << "> not ready.";
+    LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
 void GeodataVectorTiled::prepare_impl()
 {
-    LOG(info2) << "Preparing <" << resource().id << ">.";
+    LOG(info2) << "Preparing <" << id() << ">.";
 
     const auto &r(resource());
 
@@ -149,15 +148,24 @@ void GeodataVectorTiled::prepare_impl()
     vts::tileset::saveTileSetIndex(index_, root() / "tileset.index");
 }
 
-vr::FreeLayer GeodataVectorTiled::freeLayer(ResourceRoot root) const
+vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
 {
     const auto &res(resource());
 
     vr::FreeLayer fl;
     fl.id = res.id.fullId();
+    fl.type = vr::FreeLayer::Type::geodataTiles;
 
-    // TODO: implement me
-    (void) root;
+    auto &def(fl.createDefinition<vr::FreeLayer::GeodataTiles>());
+    def.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
+                             , resource(), root);
+    def.geodataUrl = prependRoot(std::string("{lod}-{x}-{y}.geo")
+                                , resource(), root);
+    def.style = definition_.styleUrl;
+
+    def.lodRange = res.lodRange;
+    def.tileRange = res.tileRange;
+    fl.credits = asInlineCredits(res.credits);
 
     // done
     return fl;
@@ -171,15 +179,28 @@ vts::MapConfig GeodataVectorTiled::mapConfig_impl(ResourceRoot root)
     vts::MapConfig mapConfig;
     mapConfig.referenceFrame = *res.referenceFrame;
 
-    (void) root;
-    // TODO: add freelayer
+    // add free layer into list of free layers
+    mapConfig.freeLayers.add
+        (vr::FreeLayer
+         (res.id.fullId()
+          , prependRoot(std::string("freelayer.json"), resource(), root)));
 
-    // // this is Tiled service: we have bound layer only; use remote definition
-    // mapConfig.boundLayers.add
-    //     (vr::BoundLayer
-    //      (res.id.fullId()
-    //       , prependRoot(std::string("boundlayer.json"), resource(), root)));
+    // add free layer into view
+    mapConfig.view.freeLayers[res.id.fullId()];
 
+    if (definition_.introspectionSurface) {
+        LOG(info4) << "trying to find surface";
+        if (auto other = otherGenerator
+            (Resource::Generator::Type::surface
+             , addReferenceFrame(*definition_.introspectionSurface
+                                 , referenceFrameId())))
+        {
+            mapConfig.merge(other->mapConfig
+                            (resolveRoot(resource(), other->resource())));
+        }
+    }
+
+    // done
     return mapConfig;
 }
 

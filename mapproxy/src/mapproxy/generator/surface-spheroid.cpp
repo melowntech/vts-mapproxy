@@ -45,10 +45,9 @@ namespace generator {
 namespace {
 
 struct Factory : Generator::Factory {
-    virtual Generator::pointer create(const Generator::Config &config
-                                      , const Resource &resource)
+    virtual Generator::pointer create(const Generator::Params &params)
     {
-        return std::make_shared<SurfaceSpheroid>(config, resource);
+        return std::make_shared<SurfaceSpheroid>(params);
     }
 
     virtual DefinitionBase::pointer definition() {
@@ -139,10 +138,9 @@ bool SurfaceSpheroid::Definition::operator==(const Definition &o) const
     return true;
 }
 
-SurfaceSpheroid::SurfaceSpheroid(const Config &config
-                                 , const Resource &resource)
-    : SurfaceBase(config, resource)
-    , definition_(this->resource().definition<Definition>())
+SurfaceSpheroid::SurfaceSpheroid(const Params &params)
+    : SurfaceBase(params)
+    , definition_(resource().definition<Definition>())
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));
@@ -157,12 +155,12 @@ SurfaceSpheroid::SurfaceSpheroid(const Config &config
     } catch (const std::exception &e) {
         // not ready
     }
-    LOG(info1) << "Generator for <" << resource.id << "> not ready.";
+    LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
 void SurfaceSpheroid::prepare_impl()
 {
-    LOG(info2) << "Preparing <" << resource().id << ">.";
+    LOG(info2) << "Preparing <" << id() << ">.";
 
     const auto &r(resource());
 

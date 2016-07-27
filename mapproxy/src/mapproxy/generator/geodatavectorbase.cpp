@@ -58,6 +58,17 @@ void parseDefinition(GeodataVectorBase::Definition &def
     }
 
     Json::get(def.styleUrl, value, "styleUrl");
+
+    if (value.isMember("introspection")) {
+        const auto &introspection(value["introspection"]);
+        if (introspection.isMember("surface")) {
+            const auto &surface(introspection["surface"]);
+            Resource::Id rid;
+            Json::get(rid.group, surface, "group");
+            Json::get(rid.id, surface, "id");
+            def.introspectionSurface = rid;
+        }
+    }
 }
 
 void buildDefinition(Json::Value &value
@@ -151,13 +162,12 @@ bool GeodataVectorBase::Definition::operator==(const Definition &o) const
     if (layers != o.layers) { return false; }
 
     // format can change
+    // introspection can change
     return true;
 }
 
-GeodataVectorBase::GeodataVectorBase(const Config &config
-                                     , const Resource &resource
-                                     , bool tiled)
-    : Generator(config, resource)
+GeodataVectorBase::GeodataVectorBase(const Params &params, bool tiled)
+    : Generator(params)
     , definition_(this->resource().definition<Definition>())
     , tiled_(tiled)
 {}
@@ -188,6 +198,13 @@ Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
     case GeodataFileInfo::Type::config: {
         std::ostringstream os;
         mapConfig(os, ResourceRoot::none);
+        sink.content(os.str(), fi.sinkFileInfo());
+        break;
+    }
+
+    case GeodataFileInfo::Type::definition: {
+        std::ostringstream os;
+        vr::saveFreeLayer(os, freeLayer_impl(ResourceRoot::none));
         sink.content(os.str(), fi.sinkFileInfo());
         break;
     }

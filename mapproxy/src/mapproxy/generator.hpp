@@ -31,6 +31,22 @@ struct Arsenal {
     {}
 };
 
+class Generator;
+
+class GeneratorFinder {
+public:
+    virtual ~GeneratorFinder() {}
+
+    std::shared_ptr<Generator>
+    findGenerator(Resource::Generator::Type generatorType
+                  , const Resource::Id &resourceId) const;
+
+private:
+    virtual std::shared_ptr<Generator>
+    findGenerator_impl(Resource::Generator::Type generatorType
+                       , const Resource::Id &resourceId) const = 0;
+};
+
 /** Dataset generator.
  */
 class Generator : boost::noncopyable {
@@ -52,9 +68,13 @@ public:
 
     virtual ~Generator() {}
 
-    static Generator::pointer create(const Config &config
-                                     , const Resource::Generator &type
-                                     , const Resource &resource);
+    struct Params {
+        Config config;
+        Resource resource;
+        const GeneratorFinder *generatorFinder;
+    };
+
+    static Generator::pointer create(const Params &params);
 
     static DefinitionBase::pointer definition(const Resource::Generator &type);
 
@@ -98,7 +118,7 @@ public:
     Task generateFile(const FileInfo &fileInfo, Sink sink) const;
 
 protected:
-    Generator(const Config &config, const Resource &resource);
+    Generator(const Params &params);
 
     void makeReady();
     bool fresh() const { return fresh_; }
@@ -123,6 +143,9 @@ protected:
     absoluteDatasetRf(const boost::optional<boost::filesystem::path> &path)
         const;
 
+    Generator::pointer otherGenerator(Resource::Generator::Type generatorType
+                                      , const Resource::Id &resourceId) const;
+
 private:
     virtual void prepare_impl() = 0;
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
@@ -130,6 +153,7 @@ private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , Sink &sink) const = 0;
 
+    const GeneratorFinder *generatorFinder_;
     Config config_;
     Resource resource_;
     Resource savedResource_;
@@ -139,7 +163,7 @@ private:
 
 /** Set of dataset generators.
  */
-class Generators {
+class Generators : public boost::noncopyable {
 public:
     struct Config : Generator::Config {
         int resourceUpdatePeriod;
@@ -159,6 +183,11 @@ public:
     /** Returns generator for requested file.
      */
     Generator::pointer generator(const FileInfo &fileInfo) const;
+
+    /** Returns generator for requested type and resourceId.
+     */
+    Generator::pointer generator(Resource::Generator::Type generatorType
+                                 , const Resource::Id &resourceId) const;
 
     /** Returns list of all generators for given referenceFrame.
      */
@@ -203,6 +232,25 @@ inline Generator::Task Generator::generateFile(const FileInfo &fileInfo
     const
 {
     return generateFile_impl(fileInfo, sink);
+}
+
+inline Generator::pointer Generators::generator(const FileInfo &fileInfo) const
+{
+    return generator(fileInfo.generatorType, fileInfo.resourceId);
+}
+
+std::shared_ptr<Generator>
+inline GeneratorFinder::findGenerator(Resource::Generator::Type generatorType
+                                      , const Resource::Id &resourceId) const
+{
+    return findGenerator_impl(generatorType, resourceId);
+}
+
+inline Generator::pointer
+Generator::otherGenerator(Resource::Generator::Type generatorType
+                          , const Resource::Id &resourceId) const
+{
+    return generatorFinder_->findGenerator(generatorType, resourceId);
 }
 
 #endif // mapproxy_generator_hpp_included_

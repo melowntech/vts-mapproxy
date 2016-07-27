@@ -1,6 +1,8 @@
 #ifndef mapproxy_generator_geodata_hpp_included_
 #define mapproxy_generator_geodata_hpp_included_
 
+#include <boost/optional.hpp>
+
 #include "geo/vectorformat.hpp"
 
 #include "../generator.hpp"
@@ -9,8 +11,7 @@ namespace generator {
 
 class GeodataVectorBase : public Generator {
 public:
-    GeodataVectorBase(const Config &config, const Resource &resource
-                      , bool tiled);
+    GeodataVectorBase(const Params &params, bool tiled);
 
     struct Definition : public DefinitionBase {
         /** Input dataset (can be remote url, interpreted as a template by tiled
@@ -22,6 +23,10 @@ public:
         boost::optional<std::vector<std::string>> layers;
         geo::VectorFormat format;
         std::string styleUrl;
+
+        /** Introspection surface.
+         */
+        boost::optional<Resource::Id> introspectionSurface;
 
         Definition() : format(geo::VectorFormat::geodataJson) {}
         bool operator==(const Definition &o) const;
@@ -36,6 +41,8 @@ public:
     };
 
 private:
+    virtual vr::FreeLayer freeLayer_impl(ResourceRoot root) const = 0;
+
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , Sink &sink) const;
 

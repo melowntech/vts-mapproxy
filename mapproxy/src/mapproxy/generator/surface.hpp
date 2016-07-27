@@ -13,7 +13,7 @@ namespace generator {
 
 class SurfaceBase : public Generator {
 public:
-    SurfaceBase(const Config &config, const Resource &resource);
+    SurfaceBase(const Params &params);
 
 protected:
     boost::filesystem::path filePath(vts::File fileType) const;

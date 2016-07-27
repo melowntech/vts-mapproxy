@@ -9,7 +9,7 @@ namespace generator {
 
 class TmsBing : public Generator {
 public:
-    TmsBing(const Config &config, const Resource &resource);
+    TmsBing(const Params &params);
 
     struct Definition : public DefinitionBase {
         std::string metadataUrl;

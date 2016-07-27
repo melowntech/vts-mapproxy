@@ -180,9 +180,47 @@ UTILITY_GENERATE_ENUM(RasterFormat,
 constexpr RasterFormat MaskFormat = RasterFormat::png;
 constexpr RasterFormat RasterMetatileFormat = RasterFormat::png;
 
+/** Resource root: used to build relative paths from given root.
+ */
+struct ResourceRoot {
+    /** Depth in the virtual filesystem tree.
+     *
+     * NB: no enum class to allow usage Resource::xxx (as it is used throughout
+     * the code.
+     */
+    enum Depth : int {
+        referenceFrame = 0, type = 1, group = 2, id = 3, none = 4
+    };
+
+    /** Root location.
+     */
+    Depth depth;
+
+    /** How many times to go up the directory tree before adding current root
+     *  directory. Each level is one ".."
+     */
+    int backup;
+
+    ResourceRoot(Depth depth = none, int backup = 0)
+        : depth(depth), backup(backup)
+    {}
+
+    operator Depth() const { return depth; }
+
+    int depthDifference(ResourceRoot::Depth other) const {
+        return depth - other;
+    }
+};
+
+/** Computes path from this resource to that resource.
+ */
+ResourceRoot resolveRoot(const Resource &thisResource
+                         , const Resource &thatResource
+                         , ResourceRoot::Depth thisDepth = ResourceRoot::none);
+
 /** What directory is resource root:
  */
-UTILITY_GENERATE_ENUM(ResourceRoot,
+UTILITY_GENERATE_ENUM_IO(ResourceRoot::Depth,
     ((referenceFrame))
     ((type))
     ((group))
@@ -209,10 +247,10 @@ void save(const boost::filesystem::path &path, const Resource &resource);
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource &resource
-                                    , ResourceRoot root);
+                                    , const ResourceRoot &root);
 
 std::string prependRoot(const std::string &path, const Resource &resource
-                        , ResourceRoot root);
+                        , const ResourceRoot &root);
 
 std::string contentType(RasterFormat format);
 
@@ -220,6 +258,10 @@ enum class RangeType { lod, tileId };
 
 bool checkRanges(const Resource &resource, const vts::TileId &tileId
                  , RangeType rangeType = RangeType::tileId);
+
+/** Combine resource with given reference frame.
+ */
+Resource::Id addReferenceFrame(Resource::Id rid, std::string referenceFrame);
 
 // inlines + IO
 
@@ -268,6 +310,13 @@ inline bool Resource::Generator::operator==(const Generator &o) const {
 inline bool Resource::operator!=(const Resource &o) const
 {
     return !operator==(o);
+}
+
+inline Resource::Id addReferenceFrame(Resource::Id rid
+                                      , std::string referenceFrame)
+{
+    rid.referenceFrame = std::move(referenceFrame);
+    return rid;
 }
 
 #endif // mapproxy_resource_hpp_included_

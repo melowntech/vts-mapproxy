@@ -53,10 +53,9 @@ namespace generator {
 namespace {
 
 struct Factory : Generator::Factory {
-    virtual Generator::pointer create(const Generator::Config &config
-                                      , const Resource &resource)
+    virtual Generator::pointer create(const Generator::Params &params)
     {
-        return std::make_shared<SurfaceDem>(config, resource);
+        return std::make_shared<SurfaceDem>(params);
     }
 
     virtual DefinitionBase::pointer definition() {
@@ -172,10 +171,9 @@ bool SurfaceDem::Definition::operator==(const Definition &o) const
     return true;
 }
 
-SurfaceDem::SurfaceDem(const Config &config
-                       , const Resource &resource)
-    : SurfaceBase(config, resource)
-    , definition_(this->resource().definition<Definition>())
+SurfaceDem::SurfaceDem(const Params &params)
+    : SurfaceBase(params)
+    , definition_(resource().definition<Definition>())
     , dataset_(absoluteDataset(definition_.dataset + "/dem"))
     , maskTree_(absoluteDatasetRf(definition_.mask))
 {
@@ -192,12 +190,12 @@ SurfaceDem::SurfaceDem(const Config &config
     } catch (const std::exception &e) {
         // not ready
     }
-    LOG(info1) << "Generator for <" << resource.id << "> not ready.";
+    LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
 void SurfaceDem::prepare_impl()
 {
-    LOG(info2) << "Preparing <" << resource().id << ">.";
+    LOG(info2) << "Preparing <" << id() << ">.";
 
     const auto &r(resource());
 

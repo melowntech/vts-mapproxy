@@ -16,7 +16,7 @@ namespace generator {
 
 class SurfaceDem : public SurfaceBase {
 public:
-    SurfaceDem(const Config &config, const Resource &resource);
+    SurfaceDem(const Params &params);
 
     struct Definition : public DefinitionBase {
         std::string dataset;

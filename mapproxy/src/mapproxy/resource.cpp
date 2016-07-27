@@ -282,26 +282,29 @@ bool Resource::operator==(const Resource &o) const
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource &resource
-                                    , ResourceRoot root)
+                                    , const ResourceRoot &root)
 {
     boost::filesystem::path out;
+
+    // back-up given number of levels up the tree
+    for (int i(root.backup); i > 0; --i) { out /= ".."; }
 
     switch (root) {
     case ResourceRoot::referenceFrame:
         out /= resource.id.referenceFrame;
-        // no fallback
+        // fall through
 
     case ResourceRoot::type:
         out /= boost::lexical_cast<std::string>(resource.generator.type);
-        // no fallback
+        // fall through
 
     case ResourceRoot::group:
         out /= resource.id.group;
-        // no fallback
+        // fall through
 
     case ResourceRoot::id:
         out /= resource.id.id;
-        // no fallback
+        // fall through
 
     case ResourceRoot::none:
         // nothing
@@ -314,10 +317,43 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
 
 std::string prependRoot(const std::string &path
                         , const Resource &resource
-                        , ResourceRoot root)
+                        , const ResourceRoot &root)
 {
     fs::path tmp(path);
     return prependRoot(tmp, resource, root).string();
+}
+
+ResourceRoot resolveRoot(const Resource &thisResource
+                         , const Resource &thatResource
+                         , ResourceRoot::Depth thisDepth)
+{
+    // compute difference between two resources
+    auto difference([&]() -> ResourceRoot
+    {
+        if (thisResource.id.referenceFrame != thisResource.id.referenceFrame) {
+            return { ResourceRoot::referenceFrame, 4 };
+        }
+
+        if (thisResource.generator.type != thatResource.generator.type) {
+            return { ResourceRoot::type, 3 };
+        }
+
+        if (thisResource.id.group != thisResource.id.group) {
+            return { ResourceRoot::group, 2 };
+        }
+
+        if (thisResource.id.id != thisResource.id.id) {
+            return { ResourceRoot::id, 1 };
+        }
+
+        // nothing more
+        return { ResourceRoot::none, 0 };
+    }());
+
+    if (thisDepth < difference.depth) {
+        difference.backup -= (difference.depth - thisDepth);
+    }
+    return difference;
 }
 
 std::string contentType(RasterFormat format)

@@ -585,8 +585,8 @@
     }
 
     , {
-        "comment": "Mapbox vector tiles",
-        "group": "mapbox",
+        "comment": "Mapzen vector tiles",
+        "group": "mapzen",
         "id": "test",
         "type": "geodata",
         "driver": "geodata-vector-tiled",
@@ -604,6 +604,10 @@
             , "format": "geodataJson"
             , "styleUrl": "http://have/no/idea"
             , "displaySize": 256
+
+            , "introspection": {
+                "surface": { "group": "melown", "id": "viewfinder" }
+            }
         }
     }
 ]

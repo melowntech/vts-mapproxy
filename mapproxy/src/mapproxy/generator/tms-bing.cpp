@@ -37,10 +37,9 @@ namespace generator {
 namespace {
 
 struct Factory : Generator::Factory {
-    virtual Generator::pointer create(const Generator::Config &config
-                                      , const Resource &resource)
+    virtual Generator::pointer create(const Generator::Params &params)
     {
-        return std::make_shared<TmsBing>(config, resource);
+        return std::make_shared<TmsBing>(params);
     }
 
     virtual DefinitionBase::pointer definition() {
@@ -112,17 +111,16 @@ bool TmsBing::Definition::operator==(const Definition&) const
     return true;
 }
 
-TmsBing::TmsBing(const Config &config
-                                 , const Resource &resource)
-    : Generator(config, resource)
-    , definition_(this->resource().definition<Definition>())
+TmsBing::TmsBing(const Params &params)
+    : Generator(params)
+    , definition_(resource().definition<Definition>())
 {
-    LOG(info1) << "Generator for <" << resource.id << "> not ready.";
+    LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
 void TmsBing::prepare_impl()
 {
-    LOG(info2) << "Preparing <" << resource().id << ">.";
+    LOG(info2) << "Preparing <" << id() << ">.";
     makeReady();
 }
 

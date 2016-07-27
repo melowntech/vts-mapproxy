@@ -32,10 +32,9 @@ namespace generator {
 namespace {
 
 struct Factory : Generator::Factory {
-    virtual Generator::pointer create(const Generator::Config &config
-                                      , const Resource &resource)
+    virtual Generator::pointer create(const Generator::Params &params)
     {
-        return std::make_shared<TmsRasterRemote>(config, resource);
+        return std::make_shared<TmsRasterRemote>(params);
     }
 
     virtual DefinitionBase::pointer definition() {
@@ -121,18 +120,17 @@ bool TmsRasterRemote::Definition::operator==(const Definition &o) const
     return true;
 }
 
-TmsRasterRemote::TmsRasterRemote(const Config &config
-                                 , const Resource &resource)
-    : Generator(config, resource)
-    , definition_(this->resource().definition<Definition>())
+TmsRasterRemote::TmsRasterRemote(const Params &params)
+    : Generator(params)
+    , definition_(resource().definition<Definition>())
     , hasMetatiles_(false)
 {
-    LOG(info1) << "Generator for <" << resource.id << "> not ready.";
+    LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
 void TmsRasterRemote::prepare_impl()
 {
-    LOG(info2) << "Preparing <" << resource().id << ">.";
+    LOG(info2) << "Preparing <" << id() << ">.";
 
     if (definition_.mask) {
         geo::GeoDataset::open(absoluteDataset(*definition_.mask));

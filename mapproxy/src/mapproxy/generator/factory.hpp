@@ -8,8 +8,7 @@
 struct Generator::Factory {
     typedef std::shared_ptr<Factory> pointer;
     virtual ~Factory() {}
-    virtual Generator::pointer create(const Config &config
-                                      , const Resource &resource) = 0;
+    virtual Generator::pointer create(const Params &params) = 0;
 
     /** Parses configuration from any value (can be json or python object).
      *  Throws in case of error.

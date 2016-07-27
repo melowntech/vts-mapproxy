@@ -49,10 +49,9 @@ fs::path SurfaceBase::filePath(vts::File fileType) const
     throw utility::makeError<InternalError>("Unsupported file");
 }
 
-SurfaceBase::SurfaceBase(const Config &config
-                       , const Resource &resource)
-    : Generator(config, resource)
-    , index_(resource.referenceFrame->metaBinaryOrder)
+SurfaceBase::SurfaceBase(const Params &params)
+    : Generator(params)
+    , index_(resource().referenceFrame->metaBinaryOrder)
 {}
 
 Generator::Task SurfaceBase

@@ -279,7 +279,7 @@ TmsFileInfo::TmsFileInfo(const FileInfo &fi)
         return;
     }
 
-    if (constants::BoundLayerDefinition == fi.filename) {
+    if (constants::FreeLayerDefinition == fi.filename) {
         type = Type::definition;
         return;
     }
