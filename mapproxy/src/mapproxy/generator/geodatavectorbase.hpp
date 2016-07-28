@@ -23,12 +23,14 @@ public:
         boost::optional<std::vector<std::string>> layers;
         geo::VectorFormat format;
         std::string styleUrl;
+        int displaySize;
 
         /** Introspection surface.
          */
         boost::optional<Resource::Id> introspectionSurface;
 
-        Definition() : format(geo::VectorFormat::geodataJson) {}
+        Definition()
+            : format(geo::VectorFormat::geodataJson) , displaySize(256) {}
         bool operator==(const Definition &o) const;
 
         virtual void from_impl(const boost::any &value);

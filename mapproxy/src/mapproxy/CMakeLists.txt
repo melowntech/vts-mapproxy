@@ -39,6 +39,7 @@ set(mapproxy_SOURCES
 
   generator/geodatavectorbase.hpp generator/geodatavectorbase.cpp
   generator/geodata-vector-tiled.hpp generator/geodata-vector-tiled.cpp
+  generator/geodata-vector.hpp generator/geodata-vector.cpp
 
   sink.hpp sink.cpp
 

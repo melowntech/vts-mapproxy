@@ -158,7 +158,7 @@ SurfaceSpheroid::SurfaceSpheroid(const Params &params)
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
-void SurfaceSpheroid::prepare_impl()
+void SurfaceSpheroid::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
 

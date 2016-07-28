@@ -128,7 +128,7 @@ TmsRasterRemote::TmsRasterRemote(const Params &params)
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
-void TmsRasterRemote::prepare_impl()
+void TmsRasterRemote::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
 

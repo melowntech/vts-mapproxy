@@ -58,6 +58,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
     }
 
     Json::get(def.styleUrl, value, "styleUrl");
+    Json::get(def.displaySize, value, "displaySize");
 
     if (value.isMember("introspection")) {
         const auto &introspection(value["introspection"]);
@@ -87,6 +88,7 @@ void buildDefinition(Json::Value &value
     }
 
     value["format"] = boost::lexical_cast<std::string>(def.format);
+    value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
 }
 
@@ -123,6 +125,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
         }
     }
 
+    def.displaySize = boost::python::extract<int>(value["displaySize"]);
     def.styleUrl = py2utf8(value["styleUrl"]);
 }
 
@@ -162,6 +165,7 @@ bool GeodataVectorBase::Definition::operator==(const Definition &o) const
     if (layers != o.layers) { return false; }
 
     // format can change
+    // displaySize can change
     // introspection can change
     return true;
 }

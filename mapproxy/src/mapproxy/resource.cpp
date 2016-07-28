@@ -73,6 +73,9 @@ Resource::list parseResource(const Json::Value &value)
     Json::get(tmp, value, "type");
     r.generator.type = boost::lexical_cast<Resource::Generator::Type>(tmp);
     Json::get(r.generator.driver, value, "driver");
+    if (value.isMember("comment")) {
+        Json::get(r.comment, value, "comment");
+    }
 
     parseCredits(r.credits, value, "credits");
 
@@ -185,6 +188,7 @@ void buildResource(Json::Value &value, const Resource &r)
     value["id"] = r.id.id;
     value["type"] = boost::lexical_cast<std::string>(r.generator.type);
     value["driver"] = r.generator.driver;
+    value["comment"] = r.comment;
 
     auto &credits(value["credits"] = Json::arrayValue);
     for (auto cid : r.credits) { credits.append(cid.id); }

@@ -193,7 +193,7 @@ SurfaceDem::SurfaceDem(const Params &params)
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
-void SurfaceDem::prepare_impl()
+void SurfaceDem::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
 

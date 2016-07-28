@@ -97,7 +97,7 @@ public:
 
     /** Prepares generator for serving.
      */
-    void prepare();
+    void prepare(Arsenal &arsenal);
 
     const Resource& resource() const { return resource_; }
     const Resource::Id& id() const { return resource_.id; }
@@ -155,7 +155,7 @@ protected:
                      , const Sink::FileInfo &fileInfo) const;
 
 private:
-    virtual void prepare_impl() = 0;
+    virtual void prepare_impl(Arsenal &arsenal) = 0;
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
 
     virtual Task generateFile_impl(const FileInfo &fileInfo
@@ -185,6 +185,9 @@ public:
                , const ResourceBackend::pointer &resourceBackend);
 
     ~Generators();
+
+    void start(Arsenal &arsenal);
+    void stop();
 
     const Config& config() const;
 
@@ -220,13 +223,13 @@ private:
 
 // inlines
 
-inline void Generator::prepare()
+inline void Generator::prepare(Arsenal &arsenal)
 {
     // prepare only when ready
     if (ready_) { return; }
 
     // prepare and make ready
-    prepare_impl();
+    prepare_impl(arsenal);
     makeReady();
 }
 

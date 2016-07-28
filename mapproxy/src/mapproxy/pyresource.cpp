@@ -62,6 +62,7 @@ Resource::list parseResource(const python::object &value)
     std::string tmp(py2utf8(value["type"]));
     r.generator.type = boost::lexical_cast<Resource::Generator::Type>(tmp);
     r.generator.driver = py2utf8(value["driver"]);
+    r.comment = py2utf8(value["comment"]);
 
     parseCredits(r.credits, value, "credits");
 

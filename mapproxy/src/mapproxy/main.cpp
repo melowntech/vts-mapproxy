@@ -288,6 +288,7 @@ service::Service::Cleanup Daemon::start()
 
 void Daemon::cleanup()
 {
+    // TODO: stop machinery
     // destroy, in reverse order
     http_ = boost::none;
     core_ = boost::none;

@@ -24,23 +24,6 @@ cv::Mat* allocateMat(ManagedBuffer &mb
                              , raw + sizeof(cv::Mat));
 }
 
-GdalWarper::MemBlock* allocateBlock(ManagedBuffer &mb
-                                    , const std::string &data)
-{
-    // create raw memory to hold block and data
-    char *raw(static_cast<char*>
-              (mb.allocate(sizeof(GdalWarper::MemBlock) + data.size())));
-
-    // poiter to output data
-    auto *dataPtr(raw + sizeof(GdalWarper::MemBlock));
-
-    // copy data into block
-    std::copy(data.begin(), data.end(), dataPtr);
-
-    // allocate block in raw data block
-    return new (raw) GdalWarper::MemBlock(dataPtr, data.size());
-}
-
 cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
                    , const std::string &dataset
                    , const geo::SrsDefinition &srs
@@ -275,6 +258,8 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
     throw;
 }
 
+namespace {
+
 typedef std::shared_ptr< ::GDALDataset> VectorDataset;
 
 VectorDataset openVectorDataset(const std::string &dataset)
@@ -291,17 +276,46 @@ VectorDataset openVectorDataset(const std::string &dataset)
                          , [](::GDALDataset *ds) { delete ds; });
 }
 
-GdalWarper::MemBlock* heightcode(DatasetCache &cache, ManagedBuffer &mb
-                                 , const std::string &vectorDs
-                                 , const std::string &rasterDs
-                                 , const geo::HeightCodingConfig &config)
+GdalWarper::Heighcoded*
+allocateHc(ManagedBuffer &mb
+           , const std::string &data
+           , const geo::heightcoding::Metadata &metadata)
+{
+    // create raw memory to hold block and data
+    char *raw(static_cast<char*>
+              (mb.allocate(sizeof(GdalWarper::Heighcoded) + data.size())));
+
+    // poiter to output data
+    auto *dataPtr(raw + sizeof(GdalWarper::Heighcoded));
+
+    // copy data into block
+    std::copy(data.begin(), data.end(), dataPtr);
+
+    // allocate block in raw data block
+    return new (raw) GdalWarper::Heighcoded
+        (dataPtr, data.size(), metadata);
+}
+
+}
+
+GdalWarper::Heighcoded*
+heightcode(DatasetCache &cache, ManagedBuffer &mb
+           , const std::string &vectorDs
+           , const std::string &rasterDs
+           , geo::heightcoding::Config config
+           , const boost::optional<std::string> &geoidGrid)
 {
     // open vector dataset
     auto vds(openVectorDataset(vectorDs));
     auto &rds(cache(rasterDs));
 
-    std::ostringstream os;
-    geo::heightCode(*vds, rds, os, config);
+    if (geoidGrid) {
+        // apply geoid grid to SRS of rasterDs and set to rasterDsSrs
+        config.rasterDsSrs = geo::setGeoid(rds.srs(), *geoidGrid);
+    }
 
-    return allocateBlock(mb, os.str());
+    std::ostringstream os;
+    auto metadata(geo::heightcoding::heightCode(*vds, rds, os, config));
+
+    return allocateHc(mb, os.str(), metadata);
 }

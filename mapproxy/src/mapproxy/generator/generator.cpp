@@ -224,8 +224,7 @@ public:
     Detail(const Generators::Config &config
            , const ResourceBackend::pointer &resourceBackend)
         : config_(config), resourceBackend_(resourceBackend)
-        , running_(false), ready_(false)
-        , work_(ios_)
+        , arsenal_(), running_(false), ready_(false), work_(ios_)
     {}
 
     void checkReady() const;
@@ -243,7 +242,7 @@ public:
                                      , Resource::Generator::Type type
                                      , const std::string &group) const;
 
-    void start();
+    void start(Arsenal &arsenal);
     void stop();
 
     inline const Config& config() const { return config_; }
@@ -261,6 +260,7 @@ private:
 
     const Config config_;
     ResourceBackend::pointer resourceBackend_;
+    Arsenal *arsenal_;
 
     // resource updater stuff
     std::thread updater_;
@@ -325,7 +325,7 @@ void Generators::Detail::checkReady() const
     throw Unavailable("Server not ready.");
 }
 
-void Generators::Detail::start()
+void Generators::Detail::start(Arsenal &arsenal)
 {
     // make sure threads are released when something goes wrong
     struct Guard {
@@ -340,6 +340,7 @@ void Generators::Detail::start()
     std::thread updater(&Detail::updater, this);
     updater_.swap(updater);
 
+    arsenal_ = &arsenal;
     // TODO: make configurable
     std::size_t count(5);
     // start workers
@@ -364,6 +365,7 @@ void Generators::Detail::stop()
         workers_.back().join();
         workers_.pop_back();
     }
+    arsenal_ = {};
 }
 
 struct Aborted {};
@@ -419,7 +421,7 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
     ios_.post([=]()
     {
         try {
-            generator->prepare();
+            generator->prepare(*arsenal_);
         } catch (const std::exception &e) {
             LOG(warn2)
                 << "Failed to prepare generator for <"
@@ -436,11 +438,19 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
 Generators::Generators(const Config &config
                        , const ResourceBackend::pointer &resourceBackend)
     : detail_(std::make_shared<Detail>(config, resourceBackend))
-{
-    detail().start();
-}
+{}
 
 Generators::~Generators()
+{
+    detail().stop();
+}
+
+void Generators::start(Arsenal &arsenal)
+{
+    detail().start(arsenal);
+}
+
+void Generators::stop()
 {
     detail().stop();
 }

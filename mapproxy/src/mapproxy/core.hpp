@@ -9,8 +9,8 @@ class Core : boost::noncopyable
            , public http::ContentGenerator
 {
 public:
-    Core(Generators &generators, GdalWarper &warper, unsigned int threadCount
-         , http::ContentFetcher &contentFetcher);
+    Core(Generators &generators, GdalWarper &warper
+         , unsigned int threadCount, http::ContentFetcher &contentFetcher);
 
     struct Detail;
 

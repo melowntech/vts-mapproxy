@@ -128,6 +128,7 @@ struct Resource {
 
     Id id;
     Generator generator;
+    std::string comment;
 
     /** Data root from configuration.
      */

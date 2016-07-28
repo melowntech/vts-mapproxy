@@ -28,11 +28,13 @@ public:
         , arsenal_(warper, resourceFetcher_)
         , work_(ios_)
     {
+        generators_.start(arsenal_);
         start(threadCount);
     }
 
     ~Detail() {
         stop();
+        generators_.stop();
     }
 
     void generate(const http::Request &request, Sink sink);

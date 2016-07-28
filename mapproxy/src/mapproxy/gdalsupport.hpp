@@ -98,16 +98,19 @@ public:
         {}
     };
 
-    Raster warp(const RasterRequest &request, Sink &sink);
+    Raster warp(const RasterRequest &request, Aborter &sink);
 
-    struct MemBlock {
-        typedef std::shared_ptr<MemBlock> pointer;
+    struct Heighcoded {
+        typedef std::shared_ptr<Heighcoded> pointer;
 
         const char *data;
         std::size_t size;
 
-        MemBlock(const char *data, std::size_t size)
-            : data(data), size(size)
+        geo::heightcoding::Metadata metadata;
+
+        Heighcoded(const char *data, std::size_t size
+                   , const geo::heightcoding::Metadata &metadata)
+            : data(data), size(size), metadata(metadata)
         {}
     };
 
@@ -115,10 +118,12 @@ public:
 
     /** Heightcode vector ds using raster ds
      */
-    MemBlock::pointer heightcode(const std::string &vectorDs
-                                 , const std::string &rasterDs
-                                 , const geo::HeightCodingConfig &config
-                                 , Sink &sink);
+    Heighcoded::pointer
+    heightcode(const std::string &vectorDs
+               , const std::string &rasterDs
+               , const geo::heightcoding::Config &config
+               , const boost::optional<std::string> &geoidGrid
+               , Aborter &aborter);
 
     /** Do housekeeping. Must be called in the process where internals are being
      * run.

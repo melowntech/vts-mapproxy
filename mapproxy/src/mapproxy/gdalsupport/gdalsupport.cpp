@@ -127,7 +127,8 @@ private:
 class ShHeightCode : boost::noncopyable {
 public:
     ShHeightCode(const std::string &vectorDs, const std::string &rasterDs
-                 , const geo::HeightCodingConfig &config
+                 , const geo::heightcoding::Config &config
+                 , const boost::optional<std::string> &geoidGrid
                  , ManagedBuffer &sm, ShRequest *owner)
         : sm_(sm), owner_(owner)
         , vectorDs_(vectorDs.data(), vectorDs.size()
@@ -141,8 +142,10 @@ public:
         , outputSrs_(sm.get_allocator<char>())
         , outputSrsType_()
 
-        , clipExtents_(config.clipExtents)
+        , clipWorkingExtents_(config.clipWorkingExtents)
         , format_(config.format)
+
+        , geoidGrid_(sm.get_allocator<char>())
 
         , response_()
     {
@@ -167,6 +170,10 @@ public:
                                           , sm.get_allocator<char>()));
             }
         }
+
+        if (geoidGrid) {
+            geoidGrid_.assign(geoidGrid->data(), geoidGrid->size());
+        }
     }
 
     ~ShHeightCode() {
@@ -177,11 +184,11 @@ public:
 
     std::string rasterDs() const { return asString(rasterDs_); }
 
-    geo::HeightCodingConfig config() const {
-        geo::HeightCodingConfig config;
+    geo::heightcoding::Config config() const {
+        geo::heightcoding::Config config;
         config.workingSrs = asOptional(workingSrs_, workingSrsType_);
         config.outputSrs = asOptional(outputSrs_, outputSrsType_);
-        config.clipExtents = clipExtents_;
+        config.clipWorkingExtents = clipWorkingExtents_;
 
         if (layers_) {
             config.layers = boost::in_place();
@@ -195,17 +202,20 @@ public:
         return config;
     }
 
+    boost::optional<std::string> geoidGrid() const {
+        return asOptional(geoidGrid_);
+    }
 
     /** Steals response.
      */
-    GdalWarper::MemBlock* response() {
+    GdalWarper::Heighcoded* response() {
         auto response(response_);
         response_ = 0;
         return response;
     }
 
     void response(bi::interprocess_mutex &mutex
-                  , GdalWarper::MemBlock *response);
+                  , GdalWarper::Heighcoded *response);
 
 private:
     ManagedBuffer &sm_;
@@ -222,12 +232,14 @@ private:
 
     boost::optional<StringVector> layers_;
 
-    boost::optional<math::Extents2> clipExtents_;
+    boost::optional<math::Extents2> clipWorkingExtents_;
 
     geo::VectorFormat format_;
 
+    String geoidGrid_;
+
     // response memory block
-    GdalWarper::MemBlock *response_;
+    GdalWarper::Heighcoded *response_;
 };
 
 class ShRequest : boost::noncopyable {
@@ -251,13 +263,14 @@ public:
 
     ShRequest(const std::string &vectorDs
               , const std::string &rasterDs
-              , const geo::HeightCodingConfig &config
+              , const geo::heightcoding::Config &config
+              , const boost::optional<std::string> &geoidGrid
               , ManagedBuffer &sm)
         : sm_(sm)
         , raster_()
         , heightcode_(sm.construct<ShHeightCode>
                       (bi::anonymous_instance)
-                      (vectorDs, rasterDs, config, sm, this))
+                      (vectorDs, rasterDs, config, geoidGrid, sm, this))
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
@@ -279,8 +292,8 @@ public:
     GdalWarper::Raster getRaster(Lock &lock);
     GdalWarper::Raster getRaster(bi::interprocess_mutex &mutex);
 
-    GdalWarper::MemBlock::pointer getMemBlock(Lock &lock);
-    GdalWarper::MemBlock::pointer getMemBlock(bi::interprocess_mutex &mutex);
+    GdalWarper::Heighcoded::pointer getHeighcoded(Lock &lock);
+    GdalWarper::Heighcoded::pointer getHeighcoded(bi::interprocess_mutex &mutex);
 
     void done();
     void process(bi::interprocess_mutex &mutex, DatasetCache &cache);
@@ -296,11 +309,13 @@ public:
 
     static pointer create(const std::string &vectorDs
                           , const std::string &rasterDs
-                          , const geo::HeightCodingConfig &config
+                          , const geo::heightcoding::Config &config
+                          , const boost::optional<std::string> &geoidGrid
                           , ManagedBuffer &mb)
     {
         return pointer(mb.construct<ShRequest>
-                       (bi::anonymous_instance)(vectorDs, rasterDs, config, mb)
+                       (bi::anonymous_instance)
+                       (vectorDs, rasterDs, config, geoidGrid, mb)
                        , mb.get_allocator<void>()
                        , mb.get_deleter<ShRequest>());
     }
@@ -336,7 +351,8 @@ void ShRequest::process(bi::interprocess_mutex &mutex
             (mutex, ::heightcode(cache, sm_
                                  , heightcode_->vectorDs()
                                  , heightcode_->rasterDs()
-                                 , heightcode_->config()));
+                                 , heightcode_->config()
+                                 , heightcode_->geoidGrid()));
         return;
     }
 
@@ -359,7 +375,7 @@ void ShRaster::response(bi::interprocess_mutex &mutex, cv::Mat *response)
 }
 
 void ShHeightCode::response(bi::interprocess_mutex &mutex
-                            , GdalWarper::MemBlock *response)
+                            , GdalWarper::Heighcoded *response)
 {
     Lock lock(mutex);
     if (response_) { return; }
@@ -446,7 +462,7 @@ GdalWarper::Raster ShRequest::getRaster(bi::interprocess_mutex &mutex)
     return getRaster(lock);
 }
 
-GdalWarper::MemBlock::pointer ShRequest::getMemBlock(Lock &lock)
+GdalWarper::Heighcoded::pointer ShRequest::getHeighcoded(Lock &lock)
 {
     cond_.wait(lock, [&]()
     {
@@ -461,8 +477,8 @@ GdalWarper::MemBlock::pointer ShRequest::getMemBlock(Lock &lock)
     }
 
     if (auto *response = heightcode_->response()) {
-        return GdalWarper::MemBlock::pointer
-            (response, [&sm_](GdalWarper::MemBlock *block)
+        return GdalWarper::Heighcoded::pointer
+            (response, [&sm_](GdalWarper::Heighcoded *block)
         {
             // deallocate data
             sm_.deallocate(block);
@@ -481,11 +497,11 @@ GdalWarper::MemBlock::pointer ShRequest::getMemBlock(Lock &lock)
     throw std::runtime_error("Unknown exception!");
 }
 
-GdalWarper::MemBlock::pointer
-ShRequest::getMemBlock(bi::interprocess_mutex &mutex)
+GdalWarper::Heighcoded::pointer
+ShRequest::getHeighcoded(bi::interprocess_mutex &mutex)
 {
     Lock lock(mutex);
-    return getMemBlock(lock);
+    return getHeighcoded(lock);
 }
 
 struct Worker {
@@ -551,12 +567,14 @@ public:
     Detail(const Options &options);
     ~Detail();
 
-    Raster warp(const RasterRequest &req, Sink &sink);
+    Raster warp(const RasterRequest &req, Aborter &aborter);
 
-    MemBlock::pointer heightcode(const std::string &vectorDs
-                                 , const std::string &rasterDs
-                                 , const geo::HeightCodingConfig &config
-                                 , Sink &sink);
+    Heighcoded::pointer
+    heightcode(const std::string &vectorDs
+               , const std::string &rasterDs
+               , const geo::heightcoding::Config &config
+               , const boost::optional<std::string> &geoidGrid
+               , Aborter &aborter);
 
     void housekeeping();
 
@@ -594,18 +612,19 @@ GdalWarper::GdalWarper(const Options &options)
     : detail_(std::make_shared<Detail>(options))
 {}
 
-GdalWarper::Raster GdalWarper::warp(const RasterRequest &req, Sink &sink)
+GdalWarper::Raster GdalWarper::warp(const RasterRequest &req, Aborter &aborter)
 {
-    return detail().warp(req, sink);
+    return detail().warp(req, aborter);
 }
 
-GdalWarper::MemBlock::pointer
+GdalWarper::Heighcoded::pointer
 GdalWarper::heightcode(const std::string &vectorDs
                        , const std::string &rasterDs
-                       , const geo::HeightCodingConfig &config
-                       , Sink &sink)
+                       , const geo::heightcoding::Config &config
+                       , const boost::optional<std::string> &geoidGrid
+                       , Aborter &aborter)
 {
-    return detail().heightcode(vectorDs, rasterDs, config, sink);
+    return detail().heightcode(vectorDs, rasterDs, config, geoidGrid, aborter);
 }
 
 void GdalWarper::housekeeping()
@@ -848,7 +867,7 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
 }
 
 GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
-                                               , Sink &sink)
+                                               , Aborter &aborter)
 {
     Lock lock(mutex());
     ShRequest::pointer shReq(ShRequest::create(req, mb_));
@@ -858,7 +877,7 @@ GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
     {
         // set aborter for this request
         ShRequest::wpointer wreq(shReq);
-        sink.setAborter([wreq, this]()
+        aborter.setAborter([wreq, this]()
         {
             if (auto r = wreq.lock()) {
                 r->setError
@@ -870,22 +889,23 @@ GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
     return shReq->getRaster(lock);
 }
 
-GdalWarper::MemBlock::pointer
+GdalWarper::Heighcoded::pointer
 GdalWarper::Detail::heightcode(const std::string &vectorDs
                                , const std::string &rasterDs
-                               , const geo::HeightCodingConfig &config
-                               , Sink &sink)
+                               , const geo::heightcoding::Config &config
+                               , const boost::optional<std::string> &geoidGrid
+                               , Aborter &aborter)
 {
     Lock lock(mutex());
     ShRequest::pointer shReq
-        (ShRequest::create(vectorDs, rasterDs, config, mb_));
+        (ShRequest::create(vectorDs, rasterDs, config, geoidGrid, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 
     {
         // set aborter for this request
         ShRequest::wpointer wreq(shReq);
-        sink.setAborter([wreq, this]()
+        aborter.setAborter([wreq, this]()
         {
             if (auto r = wreq.lock()) {
                 r->setError
@@ -894,5 +914,5 @@ GdalWarper::Detail::heightcode(const std::string &vectorDs
         });
     }
 
-    return shReq->getMemBlock(lock);
+    return shReq->getHeighcoded(lock);
 }

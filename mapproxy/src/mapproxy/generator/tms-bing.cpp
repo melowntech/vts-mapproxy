@@ -118,7 +118,7 @@ TmsBing::TmsBing(const Params &params)
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
-void TmsBing::prepare_impl()
+void TmsBing::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
     makeReady();

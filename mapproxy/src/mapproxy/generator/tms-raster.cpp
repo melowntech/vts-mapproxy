@@ -147,7 +147,7 @@ TmsRaster::TmsRaster(const Params &params)
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
-void TmsRaster::prepare_impl()
+void TmsRaster::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
 

@@ -12,9 +12,21 @@
 
 namespace vs = vadstena::storage;
 
+/** Aborter helper.
+ */
+struct Aborter {
+    typedef http::ServerSink::AbortedCallback AbortedCallback;
+
+    virtual ~Aborter() {}
+
+    /** Defaults to dummy aborter
+     */
+    virtual void setAborter(const AbortedCallback&) {};
+};
+
 /** Wraps libhttp's sink.
  */
-class Sink {
+class Sink : public Aborter {
 public:
     typedef http::ServerSink::AbortedCallback AbortedCallback;
     typedef http::ServerSink::FileInfo FileInfo;
@@ -86,7 +98,7 @@ public:
 
     /** Sets aborted callback.
      */
-    void setAborter(const AbortedCallback &ac) {
+    virtual void setAborter(const AbortedCallback &ac) {
         sink_->setAborter(ac);
     }
 

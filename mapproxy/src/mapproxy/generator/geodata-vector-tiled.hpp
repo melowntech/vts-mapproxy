@@ -12,22 +12,8 @@ class GeodataVectorTiled : public GeodataVectorBase {
 public:
     GeodataVectorTiled(const Params &params);
 
-    struct Definition : public GeodataVectorBase::Definition {
-        int displaySize;
-
-        Definition() : displaySize() {}
-        bool operator==(const Definition &o) const;
-
-    private:
-        virtual void from_impl(const boost::any &value);
-        virtual void to_impl(boost::any &value) const;
-        virtual bool same_impl(const DefinitionBase &other) const {
-            return (*this == other.as<Definition>());
-        }
-    };
-
 private:
-    virtual void prepare_impl();
+    virtual void prepare_impl(Arsenal &arsenal);
 
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
     virtual vr::FreeLayer freeLayer_impl(ResourceRoot root) const;
