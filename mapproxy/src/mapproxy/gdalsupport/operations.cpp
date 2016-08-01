@@ -262,10 +262,38 @@ namespace {
 
 typedef std::shared_ptr< ::GDALDataset> VectorDataset;
 
-VectorDataset openVectorDataset(const std::string &dataset)
+class OptionsWrapper {
+public:
+    OptionsWrapper() : opts_() {}
+
+    ~OptionsWrapper() { ::CSLDestroy(opts_); }
+
+    operator char**() const { return opts_; }
+
+    OptionsWrapper& operator()(const char *name, const char *value) {
+        opts_ = ::CSLSetNameValue(opts_, name, value);
+        return *this;
+    }
+
+    template <typename T>
+    OptionsWrapper& operator()(const char *name, const T &value) {
+        return operator()
+            (name, boost::lexical_cast<std::string>(value).c_str());
+    }
+
+    OptionsWrapper& operator()(const char *name, bool value) {
+        return operator()(name, value ? "YES" : "NO");
+    }
+
+private:
+    char **opts_;
+};
+
+VectorDataset openVectorDataset(const std::string &dataset
+                                , const OptionsWrapper &openOptions)
 {
     auto ds(::GDALOpenEx(dataset.c_str(), (GDAL_OF_VECTOR | GDAL_OF_READONLY)
-                         , nullptr, nullptr, nullptr));
+                         , nullptr, openOptions, nullptr));
 
     if (!ds) {
         LOGTHROW(err2, std::runtime_error)
@@ -296,7 +324,7 @@ allocateHc(ManagedBuffer &mb
         (dataPtr, data.size(), metadata);
 }
 
-}
+} //namespace
 
 GdalWarper::Heighcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
@@ -306,7 +334,16 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const boost::optional<std::string> &geoidGrid)
 {
     // open vector dataset
-    auto vds(openVectorDataset(vectorDs));
+    OptionsWrapper openOptions;
+    if (config.clipWorkingExtents) {
+        openOptions("@MVT_EXTENTS", *config.clipWorkingExtents);
+    }
+
+    if (config.workingSrs) {
+        openOptions("@MVT_SRS", *config.workingSrs);
+    }
+
+    auto vds(openVectorDataset(vectorDs, openOptions));
     auto &rds(cache(rasterDs));
 
     if (geoidGrid) {

@@ -27,6 +27,9 @@ find_package(PNG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(magic REQUIRED)
 
+find_package(Protobuf REQUIRED)
+include_directories(${PROTOBUF_INCLUDE_DIRS})
+
 find_package(OpenMesh 2.3.1 REQUIRED)
 include_directories(${OPENMESH_INCLUDE_DIR})
 link_directories(${OPENMESH_LIBRARY_DIR})

@@ -602,7 +602,7 @@
             , "demDataset": "viewfinder"
             , "geoidGrid": "egm96_15.gtx"
             , "format": "geodataJson"
-            , "styleUrl": "http://have/no/idea"
+            , "styleUrl": "http://pomerol.internal:8870/plain/dummy-stylesheet.json"
             , "displaySize": 256
 
             , "introspection": {
@@ -629,7 +629,7 @@
             , "demDataset": "viewfinder"
             , "geoidGrid": "egm96_15.gtx"
             , "format": "geodataJson"
-            , "styleUrl": "http://have/no/idea"
+            , "styleUrl": "http://pomerol.internal:8870/plain/dummy-stylesheet.json"
             , "displaySize": 256
 
             , "introspection": {
