@@ -57,7 +57,7 @@ public:
         generatorsConfig_.variables = &variables_;
 
         variables_["VTS_BUILTIN_BROWSER_URL"]
-            = "https://cdn.iris-test.citationtech.net/libs/melownjs/builtin/devel";
+            = "//cdn.melown.com/libs/melownjs/builtin/stable";
     }
 
 private:
