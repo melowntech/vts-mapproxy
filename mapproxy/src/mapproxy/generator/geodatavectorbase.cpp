@@ -223,8 +223,7 @@ Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
         break;
 
     default:
-        sink.error(utility::makeError<InternalError>
-                    ("Not implemented yet."));
+        sink.error(utility::makeError<NotFound>("Not Found."));
         break;
     }
 
