@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.6) citationtech-wheezy; urgency=low
+
+  * Python backend. 
+
+ -- Tomas Kavan <tomas.kavan@citationtech.net>  Wed, 10 Aug 2016 11:33:06 +0200
+
 ctt-vts-mapproxy (0.5) citationtech-wheezy; urgency=low
 
   * Added 2D interface.
