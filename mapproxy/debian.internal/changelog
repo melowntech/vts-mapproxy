@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.7) citationtech-wheezy; urgency=low
+
+  * Bing mime type. 
+
+ -- Tomas Kavan <tomas.kavan@citationtech.net>  Thu, 11 Aug 2016 14:13:18 +0200
+
 ctt-vts-mapproxy (0.6) citationtech-wheezy; urgency=low
 
   * Python backend. 
