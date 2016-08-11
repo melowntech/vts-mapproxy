@@ -11,7 +11,8 @@ struct ResourceBackend::Factory {
     virtual ResourceBackend::pointer create(const TypedConfig &config) = 0;
 
     virtual service::UnrecognizedParser::optional
-    configure(const std::string &prefix, TypedConfig &config) = 0;
+    configure(const std::string &prefix, TypedConfig &config
+              , const service::UnrecognizedOptions &unrecognized) = 0;
 
     virtual void printConfig(std::ostream &os, const std::string &prefix
                              , const TypedConfig &config) = 0;

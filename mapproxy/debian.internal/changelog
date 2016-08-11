@@ -1,6 +1,25 @@
+ctt-vts-mapproxy (0.7) citationtech-wheezy; urgency=low
+
+  * Bing mime type. 
+
+ -- Tomas Kavan <tomas.kavan@citationtech.net>  Thu, 11 Aug 2016 14:13:18 +0200
+
+ctt-vts-mapproxy (0.6) citationtech-wheezy; urgency=low
+
+  * Python backend. 
+
+ -- Tomas Kavan <tomas.kavan@citationtech.net>  Wed, 10 Aug 2016 11:33:06 +0200
+
+ctt-vts-mapproxy (0.5) citationtech-wheezy; urgency=low
+
+  * Added 2D interface.
+  * Added tms-bing driver.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 21 Jul 2016 17:19:38 +0200
+
 ctt-vts-mapproxy (0.4) citationtech-wheezy; urgency=low
 
-  * Fixed navtile ranges. 
+  * Fixed navtile ranges.
 
  -- Ladislav Horky <ladislav.horky@citationtech.net>  Mon, 27 Jun 2016 18:02:09 +0200
 

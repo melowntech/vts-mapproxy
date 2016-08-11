@@ -30,9 +30,10 @@ void ResourceBackend::registerType(const std::string &type
 }
 
 service::UnrecognizedParser::optional
-ResourceBackend::configure(const std::string &prefix, TypedConfig &config)
+ResourceBackend::configure(const std::string &prefix, TypedConfig &config
+                           , const service::UnrecognizedOptions &unrecognized)
 {
-    return findFactory(config.type)->configure(prefix, config);
+    return findFactory(config.type)->configure(prefix, config, unrecognized);
 }
 
 void ResourceBackend::printConfig(std::ostream &os, const std::string &prefix

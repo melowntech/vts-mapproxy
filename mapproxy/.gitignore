@@ -6,4 +6,5 @@ core
 tmp
 *.log
 gdalwmscache
+.gdb_history
 debian

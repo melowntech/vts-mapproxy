@@ -10,8 +10,10 @@
 
 #include "geo/srsdef.hpp"
 #include "geo/geodataset.hpp"
+#include "geo/vectorformat.hpp"
+#include "geo/heightcoding.hpp"
 
-#include "./contentgenerator.hpp"
+#include "./sink.hpp"
 
 class GdalWarper {
 public:
@@ -96,12 +98,37 @@ public:
         {}
     };
 
-    Raster warp(const RasterRequest &request, const Sink::pointer &sink);
+    Raster warp(const RasterRequest &request, Aborter &sink);
+
+    struct Heighcoded {
+        typedef std::shared_ptr<Heighcoded> pointer;
+
+        const char *data;
+        std::size_t size;
+
+        geo::heightcoding::Metadata metadata;
+
+        Heighcoded(const char *data, std::size_t size
+                   , const geo::heightcoding::Metadata &metadata)
+            : data(data), size(size), metadata(metadata)
+        {}
+    };
+
+    // Vector operations
+
+    /** Heightcode vector ds using raster ds
+     */
+    Heighcoded::pointer
+    heightcode(const std::string &vectorDs
+               , const std::string &rasterDs
+               , const geo::heightcoding::Config &config
+               , const boost::optional<std::string> &geoidGrid
+               , Aborter &aborter);
 
     /** Do housekeeping. Must be called in the process where internals are being
      * run.
      */
-     void housekeeping();
+    void housekeeping();
 
     struct Detail;
 

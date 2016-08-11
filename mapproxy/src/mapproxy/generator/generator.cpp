@@ -48,23 +48,26 @@ void Generator::registerType(const Resource::Generator &type
     registry.insert(Registry::value_type(type, factory));
 }
 
-Generator::pointer Generator::create(const Config &config
-                                     , const Resource::Generator &type
-                                     , const Resource &resource)
+DefinitionBase::pointer Generator::definition(const Resource::Generator &type)
+{
+    return findFactory(type)->definition();
+}
+
+Generator::pointer Generator::create(const Params &params)
 {
     try {
-        return findFactory(type)->create(config, resource);
+        return findFactory(params.resource.generator)->create(params);
     } catch (const boost::bad_any_cast&) {
         LOGTHROW(err2, InvalidConfiguration)
             << "Passed resource does not match generator <"
-            << type << ">.";
+            << params.resource.generator << ">.";
     }
     throw;
 }
 
-Generator::Generator(const Config &config
-                     , const Resource &resource)
-    : config_(config), resource_(resource), savedResource_(resource)
+Generator::Generator(const Params &params)
+    : generatorFinder_(params.generatorFinder), config_(params.config)
+    , resource_(params.resource), savedResource_(params.resource)
     , fresh_(false), ready_(false)
 {
     config_.root = (config_.root / resource_.id.referenceFrame
@@ -76,13 +79,13 @@ Generator::Generator(const Config &config
     if (create_directories(root())) {
         // new resource
         fresh_ = true;
-        save(rfile, resource);
+        save(rfile, resource_);
     } else {
         // reopen of existing dataset
         savedResource_ = loadResource(rfile).front();
-        if (savedResource_ != resource) {
+        if (savedResource_ != resource_) {
             LOG(warn3)
-                << "Definition of resource <" << resource.id
+                << "Definition of resource <" << resource_.id
                 << "> differs from the one stored in store at "
                 << root() << "; using stored definition.";
             resource_ = savedResource_;
@@ -109,7 +112,8 @@ void Generator::makeReady()
                << "> (type <" << resource().generator << ">).";
 }
 
-void Generator::mapConfig(std::ostream &os, ResourceRoot root) const
+void Generator::mapConfig(std::ostream &os, ResourceRoot root)
+    const
 {
     vts::MapConfig mc(mapConfig(root));
     vts::saveMapConfig(mc, os);
@@ -212,18 +216,21 @@ GroupKey extractGroupKey(const Generator &generator)
 
 } // namespace
 
-class Generators::Detail {
+class Generators::Detail
+    : public boost::noncopyable
+    , public GeneratorFinder
+{
 public:
     Detail(const Generators::Config &config
            , const ResourceBackend::pointer &resourceBackend)
         : config_(config), resourceBackend_(resourceBackend)
-        , running_(false), ready_(false)
-        , work_(ios_)
+        , arsenal_(), running_(false), ready_(false), work_(ios_)
     {}
 
     void checkReady() const;
 
-    Generator::pointer generator(const FileInfo &fileInfo) const;
+    Generator::pointer generator(Resource::Generator::Type generatorType
+                                 , const Resource::Id &resourceId) const;
 
     Generator::list referenceFrame(const std::string &referenceFrame) const;
 
@@ -235,7 +242,7 @@ public:
                                      , Resource::Generator::Type type
                                      , const std::string &group) const;
 
-    void start();
+    void start(Arsenal &arsenal);
     void stop();
 
     inline const Config& config() const { return config_; }
@@ -247,8 +254,13 @@ private:
     void worker(std::size_t id);
     void prepare(const Generator::pointer &generator);
 
+    virtual Generator::pointer
+    findGenerator_impl(Resource::Generator::Type generatorType
+                       , const Resource::Id &resourceId) const;
+
     const Config config_;
     ResourceBackend::pointer resourceBackend_;
+    Arsenal *arsenal_;
 
     // resource updater stuff
     std::thread updater_;
@@ -313,7 +325,7 @@ void Generators::Detail::checkReady() const
     throw Unavailable("Server not ready.");
 }
 
-void Generators::Detail::start()
+void Generators::Detail::start(Arsenal &arsenal)
 {
     // make sure threads are released when something goes wrong
     struct Guard {
@@ -328,6 +340,7 @@ void Generators::Detail::start()
     std::thread updater(&Detail::updater, this);
     updater_.swap(updater);
 
+    arsenal_ = &arsenal;
     // TODO: make configurable
     std::size_t count(5);
     // start workers
@@ -352,6 +365,7 @@ void Generators::Detail::stop()
         workers_.back().join();
         workers_.pop_back();
     }
+    arsenal_ = {};
 }
 
 struct Aborted {};
@@ -407,7 +421,7 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
     ios_.post([=]()
     {
         try {
-            generator->prepare();
+            generator->prepare(*arsenal_);
         } catch (const std::exception &e) {
             LOG(warn2)
                 << "Failed to prepare generator for <"
@@ -424,11 +438,19 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
 Generators::Generators(const Config &config
                        , const ResourceBackend::pointer &resourceBackend)
     : detail_(std::make_shared<Detail>(config, resourceBackend))
-{
-    detail().start();
-}
+{}
 
 Generators::~Generators()
+{
+    detail().stop();
+}
+
+void Generators::start(Arsenal &arsenal)
+{
+    detail().start(arsenal);
+}
+
+void Generators::stop()
 {
     detail().stop();
 }
@@ -439,10 +461,11 @@ Generator::list Generators::referenceFrame(const std::string &referenceFrame)
     return detail().referenceFrame(referenceFrame);
 }
 
-Generator::pointer Generators::generator(const FileInfo &fileInfo)
-    const
+Generator::pointer
+Generators::generator(Resource::Generator::Type generatorType
+                      , const Resource::Id &resourceId) const
 {
-    return detail().generator(fileInfo);
+    return detail().generator(generatorType, resourceId);
 }
 
 void Generators::Detail::update(const Resource::map &resources)
@@ -462,9 +485,12 @@ void Generators::Detail::update(const Resource::map &resources)
             throw Aborted{};
         }
         try {
-            Generator::Config config(config_);
-            config.root = config_.root;
-            toAdd.push_back(Generator::create(config, res.generator, res));
+            Generator::Params params;
+            params.config = config_;
+            params.config.root = config_.root;
+            params.resource = res;
+            params.generatorFinder = this;
+            toAdd.push_back(Generator::create(params));
         } catch (const std::exception &e) {
             LOG(err2) << "Failed to create generator for resource <"
                       << iresources->first << ">: <" << e.what() << ">.";
@@ -551,7 +577,9 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
     return out;
 }
 
-Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
+Generator::pointer
+Generators::Detail::generator(Resource::Generator::Type generatorType
+                              , const Resource::Id &resourceId)
     const
 {
     checkReady();
@@ -561,7 +589,7 @@ Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
     {
         std::unique_lock<std::mutex> lock(lock_);
         auto &idx(serving_.get<ResourceIdIdx>());
-        auto fserving(idx.find(fileInfo.resourceId));
+        auto fserving(idx.find(resourceId));
         if (fserving == idx.end()) { return {}; }
         return *fserving;
     }());
@@ -571,11 +599,20 @@ Generator::pointer Generators::Detail::generator(const FileInfo &fileInfo)
     const auto &resource(generator->resource());
 
     // check generator type
-    if (fileInfo.generatorType != resource.generator.type) {
+    if (generatorType != resource.generator.type) {
         return {};
     }
 
     return generator;
+}
+
+Generator::pointer
+Generators::Detail::findGenerator_impl(Resource::Generator::Type generatorType
+                                       , const Resource::Id &resourceId) const
+{
+    auto g(generator(generatorType, resourceId));
+    if (!g || !g->ready()) { return {}; }
+    return g;
 }
 
 const Generators::Config& Generators::config() const {
@@ -645,4 +682,17 @@ Generators::listIds(const std::string &referenceFrame
                     , const std::string &group) const
 {
     return detail().listIds(referenceFrame, type, group);
+}
+
+void Generator::supportFile(const vs::SupportFile &support, Sink &sink
+                            , const Sink::FileInfo &fileInfo) const
+{
+    if (!support.isTemplate) {
+        sink.content(support.data, support.size, fileInfo, false);
+        return;
+    }
+
+    // expand and send
+    sink.content(support.expand(config_.variables, config_.defaults)
+                 , fileInfo);
 }

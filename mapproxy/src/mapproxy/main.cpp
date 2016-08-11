@@ -18,10 +18,11 @@
 
 #include "vts-libs/registry/po.hpp"
 
+#include "http/http.hpp"
+
 #include "./error.hpp"
 #include "./resourcebackend.hpp"
 #include "./generator.hpp"
-#include "./http.hpp"
 #include "./core.hpp"
 #include "./gdalsupport.hpp"
 
@@ -39,6 +40,7 @@ public:
                            | service::ENABLE_UNRECOGNIZED_OPTIONS)
         , httpListen_(3070)
         , httpThreadCount_(boost::thread::hardware_concurrency())
+        , httpClientThreadCount_(1)
         , coreThreadCount_(boost::thread::hardware_concurrency())
         , httpEnableBrowser_(false)
     {
@@ -51,6 +53,11 @@ public:
         gdalWarperOptions_.tmpRoot
             = utility::buildsys::installPath("var/mapproxy/tmp");
         generatorsConfig_.resourceUpdatePeriod = 300;
+
+        generatorsConfig_.variables = &variables_;
+
+        variables_["VTS_BUILTIN_BROWSER_URL"]
+            = "//cdn.melown.com/libs/melownjs/builtin/stable";
     }
 
 private:
@@ -59,7 +66,8 @@ private:
                        , po::positional_options_description &pd);
 
     service::UnrecognizedParser::optional
-    configure(const po::variables_map &vars, const std::vector<std::string>&);
+    configure(const po::variables_map &vars
+              , const service::UnrecognizedOptions &unrecognized);
 
     void configure(const po::variables_map &vars);
 
@@ -88,9 +96,11 @@ private:
 
     utility::TcpEndpoint httpListen_;
     unsigned int httpThreadCount_;
+    unsigned int httpClientThreadCount_;
     unsigned int coreThreadCount_;
     bool httpEnableBrowser_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
+    vs::SupportFile::Vars variables_;
     Generators::Config generatorsConfig_;
     GdalWarper::Options gdalWarperOptions_;
 
@@ -98,7 +108,7 @@ private:
     boost::optional<GdalWarper> gdalWarper_;
     boost::optional<Generators> generators_;
     boost::optional<Core> core_;
-    boost::optional<Http> http_;
+    boost::optional<http::Http> http_;
 };
 
 void Daemon::configuration(po::options_description &cmdline
@@ -117,7 +127,10 @@ void Daemon::configuration(po::options_description &cmdline
          , "TCP endpoint where to listen at.")
         ("http.threadCount", po::value(&httpThreadCount_)
          ->default_value(httpThreadCount_)->required()
-         , "Number of HTTP threads.")
+         , "Number of server HTTP threads.")
+        ("http.client.threadCount", po::value(&httpClientThreadCount_)
+         ->default_value(httpClientThreadCount_)->required()
+         , "Number of client HTTP threads.")
         ("http.enableBrowser", po::value(&httpEnableBrowser_)
          ->default_value(httpEnableBrowser_)->required()
          , "Enables resource browsering functionaly if set to true.")
@@ -147,6 +160,10 @@ void Daemon::configuration(po::options_description &cmdline
          , po::value(&generatorsConfig_.resourceRoot)
          ->default_value(generatorsConfig_.resourceRoot)->required()
          , "Root of datasets defined as relative path.")
+
+        ("vts.builtinBrowserUrl"
+         , po::value(&variables_["VTS_BUILTIN_BROWSER_URL"])
+         , "URL of built in browser.");
         ;
 
     (void) cmdline;
@@ -158,7 +175,7 @@ const std::string RBPrefixDotted(RBPrefix + ".");
 
 service::UnrecognizedParser::optional
 Daemon::configure(const po::variables_map &vars
-                  , const std::vector<std::string>&)
+                  , const service::UnrecognizedOptions &unrecognized)
 {
     // configure resource backend
     const auto RBType(RBPrefixDotted + "type");
@@ -168,7 +185,7 @@ Daemon::configure(const po::variables_map &vars
         resourceBackendConfig_.type = vars[RBType].as<std::string>();
         // and configure
         return ResourceBackend::configure
-            (RBPrefixDotted, resourceBackendConfig_);
+            (RBPrefixDotted, resourceBackendConfig_, unrecognized);
     } catch (const UnknownResourceBackend&) {
         throw po::validation_error
             (po::validation_error::invalid_option_value, RBType);
@@ -191,6 +208,7 @@ void Daemon::configure(const po::variables_map &vars)
         << "\n\tstore.path = " << generatorsConfig_.root
         << "\n\thttp.listen = " << httpListen_
         << "\n\thttp.threadCount = " << httpThreadCount_
+        << "\n\thttp.client.threadCount = " << httpClientThreadCount_
         << "\n\thttp.enableBrowser = " << std::boolalpha << httpEnableBrowser_
         << "\n\tcore.threadCount = " << coreThreadCount_
         << "\n\tgdal.processCount = " << gdalWarperOptions_.processCount
@@ -228,7 +246,8 @@ bool Daemon::help(std::ostream &out, const std::string &what) const
     // check for resource backend snippet help
     if (ba::starts_with(what, RBHelpPrefix)) {
         ResourceBackend::TypedConfig config(what.substr(RBHelpPrefix.size()));
-        auto parser(ResourceBackend::configure(RBPrefixDotted, config));
+        auto parser(ResourceBackend::configure(RBPrefixDotted, config
+                                               , {}));
         if (parser) {
             out << parser->options;
             return true;
@@ -251,17 +270,25 @@ service::Service::Cleanup Daemon::start()
     gdalWarper_ = boost::in_place(gdalWarperOptions_);
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
-    generators_ = boost::in_place
-        (generatorsConfig_, resourceBackend_);
+    generators_ = boost::in_place(generatorsConfig_, resourceBackend_);
+
+    http_ = boost::in_place();
+    http_->startClient(httpClientThreadCount_);
+
+    // starts core + generators
     core_ = boost::in_place(std::ref(*generators_), std::ref(*gdalWarper_)
-                            , coreThreadCount_);
-    http_ = boost::in_place(httpListen_, httpThreadCount_, std::ref(*core_));
+                            , coreThreadCount_
+                            , std::ref(http_->fetcher()));
+
+    http_->listen(httpListen_, std::ref(*core_));
+    http_->startServer(httpThreadCount_);
 
     return guard;
 }
 
 void Daemon::cleanup()
 {
+    // TODO: stop machinery
     // destroy, in reverse order
     http_ = boost::none;
     core_ = boost::none;
@@ -293,5 +320,7 @@ int Daemon::run()
 int main(int argc, char *argv[])
 {
     gdal_drivers::registerAll();
+    ::OGRRegisterAll();
+
     return Daemon()(argc, argv);
 }

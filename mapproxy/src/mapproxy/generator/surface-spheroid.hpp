@@ -12,39 +12,44 @@ namespace generator {
 
 class SurfaceSpheroid : public SurfaceBase {
 public:
-    SurfaceSpheroid(const Config &config, const Resource &resource);
+    SurfaceSpheroid(const Params &params);
+
+    struct Definition : public DefinitionBase {
+        unsigned int textureLayerId;
+        boost::optional<std::string> geoidGrid;
+
+        Definition() : textureLayerId() {}
+        bool operator==(const Definition &o) const;
+
+    private:
+        virtual void from_impl(const boost::any &value);
+        virtual void to_impl(boost::any &value) const;
+        virtual bool same_impl(const DefinitionBase &other) const {
+            return (*this == other.as<Definition>());
+        }
+    };
 
 private:
-    virtual void prepare_impl();
+    virtual void prepare_impl(Arsenal &arsenal);
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
     virtual void generateMetatile(const vts::TileId &tileId
-                                  , const Sink::pointer &sink
+                                  , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
-                                  , GdalWarper &warper) const;
+                                  , Arsenal &arsenal) const;
 
     virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , const Sink::pointer &sink
+                                       , Sink &sink
                                        , const SurfaceFileInfo &fileInfo
-                                       , GdalWarper &warper
+                                       , Arsenal &arsenal
                                        , bool withMask) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
-                                 , GdalWarper &warper) const;
+                                 , Arsenal &arsenal) const;
 
-    virtual void generate2dMetatile(const vts::TileId &tileId
-                                    , const Sink::pointer &sink
-                                    , const SurfaceFileInfo &fileInfo
-                                    , GdalWarper &warper) const;
-
-    virtual void generate2dCredits(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fileInfo
-                                   , GdalWarper &warper) const;
-
-    const resdef::SurfaceSpheroid &definition_;
+    const Definition &definition_;
 };
 
 } // namespace generator

@@ -1,16 +1,60 @@
 #ifndef mapproxy_resource_hpp_included_
 #define mapproxy_resource_hpp_included_
 
+#include <memory>
 #include <iostream>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/any.hpp>
 #include <boost/optional.hpp>
 
+#include "dbglog/dbglog.hpp"
+
 #include "utility/enum-io.hpp"
 
 #include "vts-libs/registry.hpp"
 #include "vts-libs/vts/basetypes.hpp"
+
+#include "./error.hpp"
+
+/** Base of all resource definitions.
+ */
+class DefinitionBase {
+public:
+    typedef std::shared_ptr<DefinitionBase> pointer;
+    virtual ~DefinitionBase() {}
+
+    void from(const boost::any &value) { from_impl(value); }
+    void to(boost::any &value) const { to_impl(value); }
+    bool same(const DefinitionBase &other) const { return same_impl(other); }
+
+    template <typename T> const T& as() const {
+        if (const auto *value = dynamic_cast<const T*>(this)) {
+            return *value;
+        }
+        LOGTHROW(err1, Error)
+            << "Incompatible resource definitions: cannot convert <"
+            << typeid(*this).name() << "> into <" << typeid(T).name() << ">.";
+        throw;
+    }
+
+private:
+    /** Fills in this definition from given input value.
+     *  Value can be either Json::Value or boost::python::dict.
+     */
+    virtual void from_impl(const boost::any &value) = 0;
+
+    /** Fills in this definition into given output value.
+     *  Value can be either Json::Value or boost::python::dict.
+     */
+    virtual void to_impl(boost::any &value) const = 0;
+
+    /** Compares this resource definition the other one and check whether they
+     *  are basically the same. The definitions can differ but the difference
+     *  must not affect resource generation.
+     */
+    virtual bool same_impl(const DefinitionBase &other) const = 0;
+};
 
 namespace vr = vadstena::registry;
 namespace vts = vadstena::vts;
@@ -71,7 +115,7 @@ struct Resource {
     };
 
     struct Generator {
-        enum Type { tms, surface };
+        enum Type { tms, surface, geodata };
         Type type;
         std::string driver;
 
@@ -84,6 +128,7 @@ struct Resource {
 
     Id id;
     Generator generator;
+    std::string comment;
 
     /** Data root from configuration.
      */
@@ -95,12 +140,16 @@ struct Resource {
     vr::LodRange lodRange;
     vr::TileRange tileRange;
 
-    template <typename T> const T& definition() const {
-        return boost::any_cast<const T&>(definition_);
+    DefinitionBase::pointer definition() const {
+        return definition_;
     }
 
-    template <typename T> T& assignDefinition(const T &definition = T()) {
-        return boost::any_cast<T&>(definition_ = definition);
+    template <typename T> const T& definition() const {
+        return definition_->as<T>();
+    }
+
+    void definition(const DefinitionBase::pointer &definition) {
+        definition_ = definition;
     }
 
     typedef std::map<Id, Resource> map;
@@ -115,12 +164,13 @@ private:
     /** Definition: based on type and driver, created by resource
      *  parser/generator and interpreted by driver.
      */
-    boost::any definition_;
+    DefinitionBase::pointer definition_;
 };
 
 UTILITY_GENERATE_ENUM_IO(Resource::Generator::Type,
     ((tms))
     ((surface))
+    ((geodata))
 )
 
 UTILITY_GENERATE_ENUM(RasterFormat,
@@ -131,52 +181,53 @@ UTILITY_GENERATE_ENUM(RasterFormat,
 constexpr RasterFormat MaskFormat = RasterFormat::png;
 constexpr RasterFormat RasterMetatileFormat = RasterFormat::png;
 
+/** Resource root: used to build relative paths from given root.
+ */
+struct ResourceRoot {
+    /** Depth in the virtual filesystem tree.
+     *
+     * NB: no enum class to allow usage Resource::xxx (as it is used throughout
+     * the code.
+     */
+    enum Depth : int {
+        referenceFrame = 0, type = 1, group = 2, id = 3, none = 4
+    };
+
+    /** Root location.
+     */
+    Depth depth;
+
+    /** How many times to go up the directory tree before adding current root
+     *  directory. Each level is one ".."
+     */
+    int backup;
+
+    ResourceRoot(Depth depth = none, int backup = 0)
+        : depth(depth), backup(backup)
+    {}
+
+    operator Depth() const { return depth; }
+
+    int depthDifference(ResourceRoot::Depth other) const {
+        return depth - other;
+    }
+};
+
+/** Computes path from this resource to that resource.
+ */
+ResourceRoot resolveRoot(const Resource &thisResource
+                         , const Resource &thatResource
+                         , ResourceRoot::Depth thisDepth = ResourceRoot::none);
+
 /** What directory is resource root:
  */
-UTILITY_GENERATE_ENUM(ResourceRoot,
+UTILITY_GENERATE_ENUM_IO(ResourceRoot::Depth,
     ((referenceFrame))
     ((type))
     ((group))
     ((id))
     ((none))
 )
-
-namespace resdef {
-
-struct TmsRaster {
-    static Resource::Generator generator;
-
-    std::string dataset;
-    boost::optional<std::string> mask;
-    RasterFormat format;
-
-    TmsRaster(): format(RasterFormat::jpg) {}
-    bool operator==(const TmsRaster &o) const;
-};
-
-struct SurfaceSpheroid {
-    static Resource::Generator generator;
-
-    unsigned int textureLayerId;
-    boost::optional<std::string> geoidGrid;
-
-    SurfaceSpheroid() : textureLayerId() {}
-    bool operator==(const SurfaceSpheroid &o) const;
-};
-
-struct SurfaceDem {
-    static Resource::Generator generator;
-
-    std::string dataset;
-    boost::optional<boost::filesystem::path> mask;
-    unsigned int textureLayerId;
-    boost::optional<std::string> geoidGrid;
-
-    SurfaceDem() : textureLayerId() {}
-    bool operator==(const SurfaceDem &o) const;
-};
-
-} // namespace resdef
 
 /** Load resources from given path.
  */
@@ -186,16 +237,21 @@ Resource::map loadResources(const boost::filesystem::path &path);
  */
 Resource::list loadResource(const boost::filesystem::path &path);
 
+/** Load resources from Python list (passed as a boost::any to hide
+ *  implementation)
+ */
+Resource::map loadResourcesFromPython(const boost::any &pylist);
+
 /** Save single resource to given path.
  */
 void save(const boost::filesystem::path &path, const Resource &resource);
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource &resource
-                                    , ResourceRoot root);
+                                    , const ResourceRoot &root);
 
 std::string prependRoot(const std::string &path, const Resource &resource
-                        , ResourceRoot root);
+                        , const ResourceRoot &root);
 
 std::string contentType(RasterFormat format);
 
@@ -203,6 +259,10 @@ enum class RangeType { lod, tileId };
 
 bool checkRanges(const Resource &resource, const vts::TileId &tileId
                  , RangeType rangeType = RangeType::tileId);
+
+/** Combine resource with given reference frame.
+ */
+Resource::Id addReferenceFrame(Resource::Id rid, std::string referenceFrame);
 
 // inlines + IO
 
@@ -251,6 +311,13 @@ inline bool Resource::Generator::operator==(const Generator &o) const {
 inline bool Resource::operator!=(const Resource &o) const
 {
     return !operator==(o);
+}
+
+inline Resource::Id addReferenceFrame(Resource::Id rid
+                                      , std::string referenceFrame)
+{
+    rid.referenceFrame = std::move(referenceFrame);
+    return rid;
 }
 
 #endif // mapproxy_resource_hpp_included_

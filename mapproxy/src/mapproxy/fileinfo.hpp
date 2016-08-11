@@ -1,12 +1,14 @@
 #ifndef mapproxy_fileinfo_hpp_included_
 #define mapproxy_fileinfo_hpp_included_
 
+#include "geo/vectorformat.hpp"
+
 #include "vts-libs/storage/support.hpp"
 #include "vts-libs/vts/basetypes.hpp"
 #include "vts-libs/vts/tileop.hpp"
 
 #include "./resource.hpp"
-#include "./contentgenerator.hpp"
+#include "./sink.hpp"
 
 namespace vs = vadstena::storage;
 namespace vts = vadstena::vts;
@@ -19,11 +21,15 @@ namespace FileFlags { enum {
 /** Parsed file information.
  */
 struct FileInfo {
-    FileInfo(const std::string &url);
+    FileInfo(const http::Request &request, int flags = FileFlags::none);
 
     /** Full url.
      */
     std::string url;
+
+    /** Delivery flags.
+     */
+    int flags;
 
     enum class Type {
         dirRedir
@@ -62,7 +68,7 @@ struct FileInfo {
 /** Parsed TMS file information.
  */
 struct TmsFileInfo {
-    TmsFileInfo(const FileInfo &fi, int flags = FileFlags::none);
+    TmsFileInfo(const FileInfo &fi);
 
     Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
 
@@ -93,7 +99,7 @@ struct TmsFileInfo {
 /** Parsed surface file information.
  */
 struct SurfaceFileInfo {
-    SurfaceFileInfo(const FileInfo &fi, int flags = FileFlags::none);
+    SurfaceFileInfo(const FileInfo &fi);
 
     Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
 
@@ -101,7 +107,7 @@ struct SurfaceFileInfo {
      */
     FileInfo fileInfo;
 
-    enum class Type { unknown, file, tile, support, registry };
+    enum class Type { unknown, file, tile, definition, support, registry };
 
     /** File type.
      */
@@ -135,6 +141,42 @@ struct SurfaceFileInfo {
     /** Valid only when type == Type::registry;
      */
     const vr::DataFile *registry;
+};
+
+/** Parsed surface file information.
+ */
+struct GeodataFileInfo {
+    GeodataFileInfo(const FileInfo &fi, bool tiled, geo::VectorFormat format);
+
+    Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
+
+    /** Parent information.
+     */
+    FileInfo fileInfo;
+
+    enum class Type {
+        unknown, config, definition, geo, metatile, support, registry
+    };
+
+    /** File type.
+     */
+    Type type;
+
+    /** Valid only when type in (Type::geo, Type::metatile)
+     */
+    vts::TileId tileId;
+
+    /** Valid only when type == Type::support;
+     */
+    const vs::SupportFile *support;
+
+    /** Valid only when type == Type::registry;
+     */
+    const vr::DataFile *registry;
+
+    /** File format. Passed in ctor.
+     */
+    geo::VectorFormat format;
 };
 
 #endif // mapproxy_fileinfo_hpp_included_

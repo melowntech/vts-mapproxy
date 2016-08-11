@@ -1,6 +1,7 @@
 #include "dbglog/dbglog.hpp"
 
 #include "utility/premain.hpp"
+#include "service/program.hpp"
 
 #include "../error.hpp"
 #include "./conffile.hpp"
@@ -20,7 +21,8 @@ struct Factory : ResourceBackend::Factory {
     }
 
     virtual service::UnrecognizedParser::optional
-    configure(const std::string &prefix, TypedConfig &typedConfig)
+    configure(const std::string &prefix, TypedConfig &typedConfig
+              , const service::UnrecognizedOptions&)
     {
         auto &config(typedConfig.assign<Conffile::Config>());
 

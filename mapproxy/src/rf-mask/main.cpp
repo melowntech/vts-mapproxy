@@ -545,7 +545,7 @@ void RfMask::rasterize(imgproc::quadtree::RasterMask &mask
 
 int RfMask::run()
 {
-    auto rf(vr::Registry::referenceFrame(referenceFrame_));
+    auto rf(vr::system.referenceFrames(referenceFrame_));
 
     LOG(info3) << "Opening " << dataset_ << ".";
     auto in(geo::openVectorDataset(dataset_));

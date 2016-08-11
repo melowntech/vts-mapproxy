@@ -12,6 +12,9 @@ vts::CsConvertor sds2phys(const vts::NodeInfo &nodeInfo
                           , const boost::optional<std::string> &geoidGrid);
 
 vts::CsConvertor sds2nav(const vts::NodeInfo &nodeInfo
-                          , const boost::optional<std::string> &geoidGrid);
+                         , const boost::optional<std::string> &geoidGrid);
+
+geo::SrsDefinition sds(const vts::NodeInfo &nodeInfo
+                       , const boost::optional<std::string> &geoidGrid);
 
 #endif // mapproxy_support_srs_hpp_included_

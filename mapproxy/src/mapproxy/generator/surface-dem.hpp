@@ -16,43 +16,50 @@ namespace generator {
 
 class SurfaceDem : public SurfaceBase {
 public:
-    SurfaceDem(const Config &config, const Resource &resource);
+    SurfaceDem(const Params &params);
+
+    struct Definition : public DefinitionBase {
+        std::string dataset;
+        boost::optional<boost::filesystem::path> mask;
+        unsigned int textureLayerId;
+        boost::optional<std::string> geoidGrid;
+
+        Definition() : textureLayerId() {}
+        bool operator==(const Definition &o) const;
+
+    private:
+        virtual void from_impl(const boost::any &value);
+        virtual void to_impl(boost::any &value) const;
+        virtual bool same_impl(const DefinitionBase &other) const {
+            return (*this == other.as<Definition>());
+        }
+    };
 
 private:
-    virtual void prepare_impl();
+    virtual void prepare_impl(Arsenal &arsenal);
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
     virtual void generateMetatile(const vts::TileId &tileId
-                                  , const Sink::pointer &sink
+                                  , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
-                                  , GdalWarper &warper) const;
+                                  , Arsenal &arsenal) const;
 
     virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , const Sink::pointer &sink
+                                       , Sink &sink
                                        , const SurfaceFileInfo &fileInfo
-                                       , GdalWarper &warper
+                                       , Arsenal &arsenal
                                        , bool withMask) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
-                                 , GdalWarper &warper) const;
-
-    virtual void generate2dMetatile(const vts::TileId &tileId
-                                    , const Sink::pointer &sink
-                                    , const SurfaceFileInfo &fileInfo
-                                    , GdalWarper &warper) const;
-
-    virtual void generate2dCredits(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fileInfo
-                                   , GdalWarper &warper) const;
+                                 , Arsenal &arsenal) const;
 
     vts::MetaTile generateMetatileImpl(const vts::TileId &tileId
-                                       , const Sink::pointer &sink
-                                       , GdalWarper &warper) const;
+                                       , Sink &sink
+                                       , Arsenal &arsenal) const;
 
-    const resdef::SurfaceDem &definition_;
+    const Definition &definition_;
 
     /** Path to original dataset (must contain overviews)
      */

@@ -13,7 +13,7 @@ namespace generator {
 
 class SurfaceBase : public Generator {
 public:
-    SurfaceBase(const Config &config, const Resource &resource);
+    SurfaceBase(const Params &params);
 
 protected:
     boost::filesystem::path filePath(vts::File fileType) const;
@@ -24,44 +24,44 @@ protected:
 
 private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , const Sink::pointer &sink) const;
+                                   , Sink &sink) const;
 
     virtual void generateMetatile(const vts::TileId &tileId
-                                  , const Sink::pointer &sink
+                                  , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
-                                  , GdalWarper &warper) const = 0;
+                                  , Arsenal &arsenal) const = 0;
 
     void generateMesh(const vts::TileId &tileId
-                      , const Sink::pointer &sink
+                      , Sink &sink
                       , const SurfaceFileInfo &fileInfo
-                      , GdalWarper &warper) const;
+                      , Arsenal &arsenal) const;
 
     void generate2dMask(const vts::TileId &tileId
-                        , const Sink::pointer &sink
+                        , Sink &sink
                         , const SurfaceFileInfo &fileInfo
-                        , GdalWarper &warper) const;
+                        , Arsenal &arsenal) const;
+
+    void generate2dMetatile(const vts::TileId &tileId
+                            , Sink &sink
+                            , const SurfaceFileInfo &fileInfo
+                            , Arsenal &arsenal) const;
+
+    void generateCredits(const vts::TileId &tileId
+                         , Sink &sink
+                         , const SurfaceFileInfo &fileInfo
+                         , Arsenal &arsenal) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
-                                 , const Sink::pointer &sink
+                                 , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
-                                 , GdalWarper &warper) const = 0;
-
-    virtual void generate2dMetatile(const vts::TileId &tileId
-                                    , const Sink::pointer &sink
-                                    , const SurfaceFileInfo &fileInfo
-                                    , GdalWarper &warper) const = 0;
-
-    virtual void generate2dCredits(const vts::TileId &tileId
-                                   , const Sink::pointer &sink
-                                   , const SurfaceFileInfo &fileInfo
-                                   , GdalWarper &warper) const = 0;
+                                 , Arsenal &arsenal) const = 0;
 
     enum MeshRequest { full, mesh, mask };
 
     virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , const Sink::pointer &sink
+                                       , Sink &sink
                                        , const SurfaceFileInfo &fileInfo
-                                       , GdalWarper &warper
+                                       , Arsenal &arsenal
                                        , bool withMesh) const = 0;
 };
 

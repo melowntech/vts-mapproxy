@@ -1,34 +1,47 @@
 # test program
 define_module(BINARY mapproxy
-  DEPENDS vts-libs service gdal-drivers geometry
+  DEPENDS
+  pysupport pydbglog
+  vts-libs http service gdal-drivers geometry
+
+  Boost_SERIALIZATION
   Boost_FILESYSTEM
-  Boost_PROGRAM_OPTIONS)
+  Boost_PROGRAM_OPTIONS
+  Boost_PYTHON
+  )
 
 set(mapproxy_SOURCES
   error.hpp
-  resource.hpp resource.cpp
+  resource.hpp resource.cpp pyresource.cpp
   support/metatile.hpp support/metatile.cpp
   support/mesh.hpp support/mesh.cpp
   support/geo.hpp support/geo.cpp
   support/coverage.hpp support/coverage.cpp
+  support/tileindex.hpp support/tileindex.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp
   resourcebackend/factory.hpp
   resourcebackend/conffile.hpp resourcebackend/conffile.cpp
-  resourcebackend/mysql.hpp resourcebackend/mysql.cpp
+  resourcebackend/python.hpp resourcebackend/python.cpp
 
   generator.hpp
+  generator/metatile.hpp generator/metatile.cpp
   generator/generator.cpp
   generator/factory.hpp
   generator/tms-raster.hpp generator/tms-raster.cpp
+  generator/tms-raster-remote.hpp generator/tms-raster-remote.cpp
+  generator/tms-bing.hpp generator/tms-bing.cpp
 
   generator/surface.hpp generator/surface.cpp
   generator/surface-spheroid.hpp generator/surface-spheroid.cpp
   generator/surface-dem.hpp generator/surface-dem.cpp
 
-  http.hpp http.cpp
-  contentgenerator.hpp contentgenerator.cpp
+  generator/geodatavectorbase.hpp generator/geodatavectorbase.cpp
+  generator/geodata-vector-tiled.hpp generator/geodata-vector-tiled.cpp
+  generator/geodata-vector.hpp generator/geodata-vector.cpp
+
+  sink.hpp sink.cpp
 
   fileinfo.hpp fileinfo.cpp
   core.hpp core.cpp

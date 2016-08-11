@@ -12,6 +12,9 @@
 
 #include "geo/coordinates.hpp"
 
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
+
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
@@ -27,6 +30,7 @@
 #include "../support/mesh.hpp"
 #include "../support/srs.hpp"
 #include "../support/grid.hpp"
+#include "../support/python.hpp"
 
 #include "./surface-spheroid.hpp"
 #include "./factory.hpp"
@@ -41,10 +45,13 @@ namespace generator {
 namespace {
 
 struct Factory : Generator::Factory {
-    virtual Generator::pointer create(const Generator::Config &config
-                                      , const Resource &resource)
+    virtual Generator::pointer create(const Generator::Params &params)
     {
-        return std::make_shared<SurfaceSpheroid>(config, resource);
+        return std::make_shared<SurfaceSpheroid>(params);
+    }
+
+    virtual DefinitionBase::pointer definition() {
+        return std::make_shared<SurfaceSpheroid::Definition>();
     }
 
 private:
@@ -54,15 +61,86 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        (resdef::SurfaceSpheroid::generator, std::make_shared<Factory>());
+        (Resource::Generator(Resource::Generator::Type::surface
+                             , "surface-spheroid")
+         , std::make_shared<Factory>());
 });
+
+void parseDefinition(SurfaceSpheroid::Definition &def
+                     , const Json::Value &value)
+{
+    if (value.isMember("textureLayerId")) {
+        Json::get(def.textureLayerId, value, "textureLayerId");
+    }
+    if (value.isMember("geoidGrid")) {
+        std::string s;
+        Json::get(s, value, "geoidGrid");
+        def.geoidGrid = s;
+    }
+}
+
+void buildDefinition(Json::Value &value
+                     , const SurfaceSpheroid::Definition &def)
+{
+    if (def.textureLayerId) {
+        value["textureLayerId"] = def.textureLayerId;
+    }
+    if (def.geoidGrid) {
+        value["geoidGrid"] = *def.geoidGrid;
+    }
+}
+
+void parseDefinition(SurfaceSpheroid::Definition &def
+                     , const boost::python::dict &value)
+{
+    namespace python = boost::python;
+    if (value.has_key("textureLayerId")) {
+        def.textureLayerId = python::extract<int>(value["textureLayerId"]);
+    }
+
+    if (value.has_key("geoidGrid")) {
+        def.geoidGrid = py2utf8(value["geoidGrid"]);
+    }
+}
 
 } // namespace
 
-SurfaceSpheroid::SurfaceSpheroid(const Config &config
-                                 , const Resource &resource)
-    : SurfaceBase(config, resource)
-    , definition_(this->resource().definition<resdef::SurfaceSpheroid>())
+void SurfaceSpheroid::Definition::from_impl(const boost::any &value)
+{
+    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
+        parseDefinition(*this, *json);
+    } else if (const auto *py
+               = boost::any_cast<boost::python::dict>(&value))
+    {
+        parseDefinition(*this, *py);
+    } else {
+        LOGTHROW(err1, Error)
+            << "SurfaceSpheroid: Unsupported configuration from: <"
+            << value.type().name() << ">.";
+    }
+}
+
+void SurfaceSpheroid::Definition::to_impl(boost::any &value) const
+{
+    if (auto *json = boost::any_cast<Json::Value>(&value)) {
+        buildDefinition(*json, *this);
+    } else {
+        LOGTHROW(err1, Error)
+            << "SurfaceSpheroid:: Unsupported serialization into: <"
+            << value.type().name() << ">.";
+    }
+}
+
+bool SurfaceSpheroid::Definition::operator==(const Definition &o) const
+{
+    if (textureLayerId != o.textureLayerId) { return false; }
+    if (geoidGrid != o.geoidGrid) { return false; }
+    return true;
+}
+
+SurfaceSpheroid::SurfaceSpheroid(const Params &params)
+    : SurfaceBase(params)
+    , definition_(resource().definition<Definition>())
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));
@@ -77,12 +155,12 @@ SurfaceSpheroid::SurfaceSpheroid(const Config &config
     } catch (const std::exception &e) {
         // not ready
     }
-    LOG(info1) << "Generator for <" << resource.id << "> not ready.";
+    LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
-void SurfaceSpheroid::prepare_impl()
+void SurfaceSpheroid::prepare_impl(Arsenal&)
 {
-    LOG(info2) << "Preparing <" << resource().id << ">.";
+    LOG(info2) << "Preparing <" << id() << ">.";
 
     const auto &r(resource());
 
@@ -208,21 +286,21 @@ bool special(const vr::ReferenceFrame &referenceFrame
 } // namespace
 
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
-                                       , const Sink::pointer &sink
+                                       , Sink &sink
                                        , const SurfaceFileInfo &fi
-                                       , GdalWarper&) const
+                                       , Arsenal&) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     if (!index_.meta(tileId)) {
-        sink->error(utility::makeError<NotFound>("Metatile not found."));
+        sink.error(utility::makeError<NotFound>("Metatile not found."));
         return;
     }
 
     auto blocks(metatileBlocks(resource(), tileId));
 
     if (blocks.empty()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("Metatile completely outside of configured range."));
         return;
     }
@@ -391,20 +469,20 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
     // write metatile to stream
     std::ostringstream os;
     metatile.save(os);
-    sink->content(os.str(), fi.sinkFileInfo());
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                            , const Sink::pointer &sink
+                                            , Sink &sink
                                             , const SurfaceFileInfo&
-                                            , GdalWarper&
+                                            , Arsenal&
                                             , bool withMask) const
 {
     // TODO: calculate tile sampling
     const int samplesPerSide(128);
     const TileFacesCalculator tileFacesCalculator;
 
-    sink->checkAborted();
+    sink.checkAborted();
 
     // generate mesh
     auto meshInfo
@@ -434,22 +512,22 @@ vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
 }
 
 void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
-                                      , const Sink::pointer &sink
+                                      , Sink &sink
                                       , const SurfaceFileInfo &fi
-                                      , GdalWarper&) const
+                                      , Arsenal&) const
 {
-    sink->checkAborted();
+    sink.checkAborted();
 
     const auto &rf(referenceFrame());
 
     if (!index_.tileIndex.navtile(tileId)) {
-        sink->error(utility::makeError<NotFound>("No navtile for this tile."));
+        sink.error(utility::makeError<NotFound>("No navtile for this tile."));
         return;
     }
 
     vts::NodeInfo nodeInfo(rf, tileId);
     if (!nodeInfo.valid()) {
-        sink->error(utility::makeError<NotFound>
+        sink.error(utility::makeError<NotFound>
                     ("TileId outside of valid reference frame tree."));
         return;
     }
@@ -520,32 +598,7 @@ void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
         nt.serializeNavtileProper(os);
     }
 
-    sink->content(os.str(), fi.sinkFileInfo());
-}
-
-void SurfaceSpheroid::generate2dMetatile(const vts::TileId &tileId
-                                         , const Sink::pointer &sink
-                                         , const SurfaceFileInfo &fileInfo
-                                         , GdalWarper &warper) const
-
-{
-    (void) tileId;
-    (void) sink;
-    (void) fileInfo;
-    (void) warper;
-    throw utility::makeError<InternalError>("Unsupported file");
-}
-
-void SurfaceSpheroid::generate2dCredits(const vts::TileId &tileId
-                                        , const Sink::pointer &sink
-                                        , const SurfaceFileInfo &fileInfo
-                                        , GdalWarper &warper) const
-{
-    (void) tileId;
-    (void) sink;
-    (void) fileInfo;
-    (void) warper;
-    throw utility::makeError<InternalError>("Unsupported file");
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 } // namespace generator

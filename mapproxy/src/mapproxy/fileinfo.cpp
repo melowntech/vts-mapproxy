@@ -20,13 +20,17 @@ namespace vr = vadstena::registry;
 namespace constants {
     const std::string Config("mapConfig.json");
     const std::string BoundLayerDefinition("boundlayer.json");
+    const std::string FreeLayerDefinition("freelayer.json");
     const std::string Self("");
     const std::string Index("index.html");
+    const std::string Geo("geo");
 
     namespace tileset {
         const std::string Config("tileset.conf");
         const std::string Index("tileset.index");
     } // namespace tileset
+
+    const std::string DisableBrowserHeader("X-Mapproxy-Disable-Browser");
 } // namesapce constants
 
 namespace {
@@ -53,7 +57,7 @@ void asEnumChecked(const std::string &str, E &value, const std::string message)
 
 const std::string& checkReferenceFrame(const std::string &referenceFrame)
 {
-    if (vr::Registry::referenceFrame(referenceFrame, std::nothrow)) {
+    if (vr::system.referenceFrames(referenceFrame, std::nothrow)) {
         return referenceFrame;
     }
 
@@ -64,9 +68,16 @@ const std::string& checkReferenceFrame(const std::string &referenceFrame)
 
 } // namespace
 
-FileInfo::FileInfo(const std::string &url)
-    : url(url), type(Type::resourceFile)
+FileInfo::FileInfo(const http::Request &request, int f)
+    : url(request.uri), flags(f), type(Type::resourceFile)
 {
+    if (flags & FileFlags::browserEnabled) {
+        // browsing enabled, check for disable header
+        if (request.hasHeader(constants::DisableBrowserHeader)) {
+            flags &= ~FileFlags::browserEnabled;
+        }
+    }
+
     auto end(url.end());
     auto qm(url.find('?'));
     if (qm != std::string::npos) {
@@ -229,7 +240,7 @@ inline const char* parsePart(const char *p, T &value)
 
 } // namespace
 
-TmsFileInfo::TmsFileInfo(const FileInfo &fi, int flags)
+TmsFileInfo::TmsFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), support()
 {
     if ([&]() -> bool
@@ -273,7 +284,7 @@ TmsFileInfo::TmsFileInfo(const FileInfo &fi, int flags)
         return;
     }
 
-    if (flags & FileFlags::browserEnabled) {
+    if (fi.flags & FileFlags::browserEnabled) {
         LOG(debug) << "Browser enabled, checking browser files.";
 
         auto path(fi.filename);
@@ -313,7 +324,7 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
     return {};
 }
 
-SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
+SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), fileType(vs::File::config)
     , tileType(vts::TileFile::meta), raw(false), support(), registry()
 {
@@ -331,6 +342,11 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
         return;
     }
 
+    if (constants::FreeLayerDefinition == fi.filename) {
+        type = Type::definition;
+        return;
+    }
+
     if (constants::tileset::Config == fi.filename) {
         type = Type::file;
         fileType = vs::File::config;
@@ -345,7 +361,7 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
         return;
     }
 
-    if (flags & FileFlags::browserEnabled) {
+    if (fi.flags & FileFlags::browserEnabled) {
         LOG(debug) << "Browser enabled, checking browser files.";
 
         auto path(fi.filename);
@@ -363,8 +379,8 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi, int flags)
     }
 
     // extra files, unknown to common machinery
-    registry = vr::Registry::dataFile
-        (fi.filename, vr::Registry::DataFileKey::filename, std::nothrow);
+    registry = vr::dataFile
+        (fi.filename, vr::DataFile::Key::filename, std::nothrow);
     if (registry) {
         type = Type::registry;
         return;
@@ -375,38 +391,11 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
 {
     switch (type) {
     case Type::file:
-        switch (fileType) {
-        case vts::File::config:
-            return { vts::MapConfig::contentType, lastModified };
-
-        case vts::File::tileIndex:
-            return { "application/octet-stream", lastModified };
-
-        default:
-            return {};
-        }
+        return { vs::contentType(fileType), lastModified };
         break;
 
     case Type::tile:
-        switch (tileType) {
-        case vts::TileFile::meta:
-            return { "application/octet-stream", lastModified };
-        case vts::TileFile::mesh:
-            return { "application/octet-stream", lastModified };
-        case vts::TileFile::atlas:
-            return { "image/jpeg", lastModified };
-        case vts::TileFile::navtile:
-            return { "image/jpeg", lastModified };
-
-        case vts::TileFile::meta2d:
-            return { "image/png", lastModified };
-        case vts::TileFile::mask:
-            return { "image/png", lastModified };
-        case vts::TileFile::ortho:
-            return { "image/jpeg", lastModified };
-        case vts::TileFile::credits:
-            return { "application/json", lastModified };
-        }
+        return { vs::contentType(tileType), lastModified };
         break;
 
     case Type::support:
@@ -414,6 +403,110 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
 
     case Type::registry:
         return { registry->contentType, lastModified };
+
+    case Type::definition:
+        return { "application/json", lastModified };
+
+    case Type::unknown:
+        return {};
+    }
+
+    return {};
+}
+
+GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled
+                                 , geo::VectorFormat format)
+    : fileInfo(fi), type(Type::unknown), support()
+    , format(format)
+{
+    if (tiled && [&]() -> bool
+    {
+        const char *p(fi.filename.c_str());
+
+        if (!(p = parsePart<1>(p, tileId.lod))) { return false; }
+        if (*p++ != '-') { return false; }
+
+        if (!(p = parsePart<1>(p, tileId.x))) { return false; }
+        if (*p++ != '-') { return false; }
+
+        if (!(p = parsePart<1>(p, tileId.y))) { return false; }
+        if (*p++ != '.') { return false; }
+
+        std::string ext(p);
+        if (ext == "geo") {
+            // mask file
+            type = Type::geo;
+        } else if (ext == "meta") {
+            // mask file
+            type = Type::metatile;
+        }
+
+        return true;
+    }()) {
+        return;
+    }
+
+    if (constants::Config == fi.filename) {
+        type = Type::config;
+        return;
+    }
+
+    if (!tiled && constants::Geo == fi.filename) {
+        type = Type::geo;
+        return;
+    }
+
+    if (constants::FreeLayerDefinition == fi.filename) {
+        type = Type::definition;
+        return;
+    }
+
+    if (fi.flags & FileFlags::browserEnabled) {
+        LOG(debug) << "Browser enabled, checking browser files.";
+
+        auto path(fi.filename);
+        if (constants::Self == path) { path = constants::Index; }
+
+        // support files
+        auto fsupport(vts::supportFiles.find(path));
+        if (fsupport != vts::supportFiles.end()) {
+            type = Type::support;
+            support = &fsupport->second;
+            return;
+        }
+    } else {
+        LOG(debug) << "Browser disabled, skipping browser files.";
+    }
+
+    // extra files, unknown to common machinery
+    registry = vr::dataFile
+        (fi.filename, vr::DataFile::Key::filename, std::nothrow);
+    if (registry) {
+        type = Type::registry;
+        return;
+    }
+}
+
+Sink::FileInfo GeodataFileInfo::sinkFileInfo(std::time_t lastModified) const
+{
+    switch (type) {
+    case Type::geo:
+        return { contentType(format), lastModified };
+
+    case Type::metatile:
+        return { vs::contentType(vs::TileFile::meta), lastModified };
+
+    case Type::support:
+        return { support->contentType, support->lastModified };
+
+    case Type::registry:
+        return { registry->contentType, lastModified };
+
+    case Type::config:
+        return { vts::MapConfig::contentType, lastModified };
+
+    case Type::definition:
+        return { "application/json; charset=utf-8", lastModified };
 
     case Type::unknown:
         return {};

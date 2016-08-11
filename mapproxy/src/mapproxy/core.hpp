@@ -1,21 +1,22 @@
 #ifndef mapproxy_core_hpp_included_
 #define mapproxy_core_hpp_included_
 
-#include "./contentgenerator.hpp"
+#include "http/contentgenerator.hpp"
+
 #include "./generator.hpp"
 
 class Core : boost::noncopyable
-           , public ContentGenerator
+           , public http::ContentGenerator
 {
 public:
     Core(Generators &generators, GdalWarper &warper
-         , unsigned int threadCount);
+         , unsigned int threadCount, http::ContentFetcher &contentFetcher);
 
     struct Detail;
 
 private:
-    virtual void generate_impl(const std::string &location
-                               , const Sink::pointer &sink);
+    virtual void generate_impl(const http::Request &request
+                               , const http::ServerSink::pointer &sink);
 
     std::shared_ptr<Detail> detail_;
     Detail& detail() { return *detail_; }

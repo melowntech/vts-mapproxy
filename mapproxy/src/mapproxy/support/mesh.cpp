@@ -172,7 +172,7 @@ void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
 {
     const auto size(vts::Mesh::coverageSize());
     if (fullyCovered) {
-        mask = vts::Mesh::CoverageMask(size, vts::Mesh::CoverageMask::FULL);
+        mask.recreate(vts::Mesh::coverageOrder, 1);
         return;
     }
 
@@ -195,7 +195,7 @@ void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
         trafo(1, 3) = gridSize.height / 2.0 - 0.5;
     }
 
-    mask = vts::Mesh::CoverageMask(size, vts::Mesh::CoverageMask::EMPTY);
+    mask.recreate(vts::Mesh::coverageOrder, 0);
     std::vector<imgproc::Scanline> scanlines;
     cv::Point3f tri[3];
     for (const auto &face : mesh.faces) {
@@ -215,7 +215,7 @@ void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
             imgproc::processScanline(sl, 0, size.width
                                      , [&](int x, int y, float)
             {
-                mask.set(x, y);
+                mask.set(x, y, 1);
             });
         }
     }
@@ -241,7 +241,7 @@ vts::CsConvertor sds2srs(const std::string &sds, const std::string &dst
 
     // force given geoid
     return vts::CsConvertor
-        (geo::setGeoid(vr::Registry::srs(sds).srsDef, *geoidGrid)
+        (geo::setGeoid(vr::system.srs(sds).srsDef, *geoidGrid)
          , dst);
 }
 
@@ -259,6 +259,15 @@ vts::CsConvertor sds2nav(const vts::NodeInfo &nodeInfo
     return sds2srs(nodeInfo.srs()
                    , nodeInfo.referenceFrame().model.navigationSrs
                    , geoidGrid);
+}
+
+geo::SrsDefinition sds(const vts::NodeInfo &nodeInfo
+                       , const boost::optional<std::string> &geoidGrid)
+{
+    if (!geoidGrid) { return nodeInfo.srsDef(); }
+
+    // force given geoid
+    return geo::setGeoid(nodeInfo.srsDef(), *geoidGrid);
 }
 
 namespace {

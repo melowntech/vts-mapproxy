@@ -1,32 +1,5 @@
 [
     {
-        "comment": "Global 15m Landsat99-03 mosaic",
-        "group": "melown",
-        "id": "trueplanet",
-        "type": "tms",
-        "driver": "tms-raster",
-        "referenceFrames": {
-            "melown2015": {
-                "lodRange": [1, 14],
-                "tileRange": [[0, 0], [0, 0]]
-            },
-            "webmerc-projected": {
-                "lodRange": [0, 13],
-                "tileRange": [[0, 0], [0, 0]]
-            },
-            "webmerc-unprojected": {
-                "lodRange": [0, 13],
-                "tileRange": [[0, 0], [0, 0]]
-            }
-        },
-        "credits": ["citationtech"],
-        "definition": {
-           "dataset": "melown/trueplanet",
-           "format":"jpg"
-        }
-    },
-
-    {
         "comment": "Geoland Basemap 30cm orthophoto of Austria",
         "group": "basemap-at",
         "id": "orthophoto",
@@ -76,7 +49,7 @@
         },
         "credits": ["citationtech"],
         "definition": {
-           "dataset": "melown/trueplanet",
+           "dataset": "melown/tpe",
            "mask": "melown/cz.qm",
            "format":"jpg"
         }
@@ -239,12 +212,32 @@
                 "tileRange": [[275, 171], [278, 174]]
             }
         },
-        "credits": [],
+        "credits": [ "usgs" ],
         "definition": {
             "dataset": "aster/ASTGTM2_N50E014",
             "mask": "masks/cz.mask",
             "geoidGrid": "egm96_15.gtx",
             "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Aster 1 degree tile at 50 N/15 E",
+        "group": "melown",
+        "id": "asterpp",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "ppspace": {
+                "lodRange": [9,15],
+                "tileRange": [[0, 0], [511, 511]]
+            }
+        },
+        "credits": [ "usgs" ],
+        "definition": {
+            "dataset": "aster/ASTGTM2_N50E014.tmp",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 121
         }
     },
 
@@ -326,6 +319,322 @@
         "definition": {
             "dataset": "matterhorn",
             "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Matterhorn (SRTM version)",
+        "group": "melown",
+        "id": "matterhorn2-srtm",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "webmerc-projected": {
+                "lodRange": [2,20],
+                "tileRange": [[0,0],[3,3]]
+            }
+            , "melown2015": {
+                "lodRange": [2,21],
+                "tileRange": [[0,0],[1,1]]
+            }
+        },
+        "credits": ["usgs-asc"],
+        "definition": {
+            "dataset": "matterhorn2",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Matterhorn (SRTM version) placed in the Sea of Nonsense",
+        "group": "melown",
+        "id": "matterhorn-in-the-sea",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "webmerc-projected": {
+                "lodRange": [2,16],
+                "tileRange": [[0,0],[3,3]]
+            }
+        },
+        "credits": ["usgs-asc"],
+        "definition": {
+            "dataset": "matterhorn-in-the-sea",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Matterhorn (SRTM version)",
+        "group": "melown",
+        "id": "matterhorn3-srtm",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "webmerc-projected": {
+                "lodRange": [2,16],
+                "tileRange": [[0,0],[3,3]]
+            }
+        },
+        "credits": ["usgs-asc"],
+        "definition": {
+            "dataset": "matterhorn3",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Blue Marble NG",
+        "group": "melown",
+        "id": "bmng",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 14],
+                "tileRange": [[0, 0], [1, 1]]
+            },
+            "webmerc-projected": {
+                "lodRange": [0, 13],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [0, 13],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": ["usgs"],
+        "definition": {
+           "dataset": "melown/bmng",
+           "format":"jpg"
+        }
+    },
+
+    {
+        "comment": "Trueplanet Europe",
+        "group": "melown",
+        "id": "tpe",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 14],
+                "tileRange": [[0, 0], [1, 1]]
+            },
+            "webmerc-projected": {
+                "lodRange": [0, 13],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [0, 13],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": ["usgs"],
+        "definition": {
+           "dataset": "melown/tpe",
+           "format":"jpg"
+        }
+    },
+
+    {
+        "comment": "Czech Republic",
+        "group": "melown",
+        "id": "cz",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "webmerc-projected": {
+                "lodRange": [0,20],
+                "tileRange": [[0,0],[0,0]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [0,20],
+                "tileRange": [[0,0],[0,0]]
+            },
+            "melown2015": {
+                "lodRange": [0,21],
+                "tileRange": [[0,0],[0,0]]
+            }
+        },
+        "credits": ["melown"],
+        "definition": {
+            "dataset": "/mnt/media/derivatives/mapproxy/cz",
+            "mask": "/mnt/media/derivatives/mask/osm-boundaries/cz/cz.mask",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "viewfinder",
+        "group": "melown",
+        "id": "viewfinder",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [4,21],
+                "tileRange": [[0,0], [15,15]]
+            }
+        },
+        "credits": ["jonathan"],
+        "definition": {
+            "dataset": "viewfinder",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Mapy.cz, latest 12.5cm orthophoto (Czech)",
+        "group": "mapycz",
+        "id": "ophoto-czech-remote",
+        "type": "tms",
+        "driver": "tms-raster-remote",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [10, 21],
+                "tileRange": [[273, 171], [282, 176]]
+            },
+            "webmerc-projected": {
+                "lodRange": [9, 20],
+                "tileRange": [[273, 171], [282, 176]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [9, 20],
+                "tileRange": [[273, 171], [282, 176]]
+            }
+        },
+        "credits": ["seznamcz"],
+        "definition": {
+           "dataset": "mapycz/mapycz-ophoto.xml",
+            "mask": "mapycz/cz.qm",
+            "remoteUrl": "http://m{alt(1,2,3,4)}.mapserver.mapy.cz/ophoto-m/{loclod}-{locx}-{locy}"
+        }
+    },
+
+    {
+        "comment": "Czech Republic",
+        "group": "melown",
+        "id": "cz15",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0,8],
+                "tileRange": [[0,0],[0,0]]
+            }
+        },
+        "credits": ["melown"],
+        "definition": {
+            "dataset": "/mnt/media/derivatives/mapproxy/cz",
+            "mask": "/mnt/media/derivatives/mask/osm-boundaries/cz/cz.mask",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "viewfinder",
+        "group": "melown",
+        "id": "world15",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [4,8],
+                "tileRange": [[0,0], [15,15]]
+            }
+        },
+        "credits": ["jonathan"],
+        "definition": {
+            "dataset": "viewfinder",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    },
+
+    {
+        "comment": "Bing maps",
+        "group": "microsoft",
+        "id": "bing",
+        "type": "tms",
+        "driver": "tms-bing",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 21],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-projected": {
+                "lodRange": [0, 20],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [0, 20],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": ["microsoft"],
+        "definition": {
+           "metadataUrl": "http://dev.virtualearth.net/REST/v1/Imagery/Metadata/Aerial?key=Ag7PO7bUdf-l6FrOjQT9w1ZOdyz1Y8QJyenAdOn5--QHj7W50wuwG14HSdvdNFke"
+        }
+    }
+
+    , {
+        "comment": "Mapzen vector tiles",
+        "group": "mapzen",
+        "id": "test",
+        "type": "geodata",
+        "driver": "geodata-vector-tiled",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 21],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "https://vector.mapzen.com/osm/all/{loclod}/{locx}/{locy}.json?api_key=vector-tiles-mJRqnWb"
+            , "demDataset": "viewfinder"
+            , "geoidGrid": "egm96_15.gtx"
+            , "format": "geodataJson"
+            , "styleUrl": "http://pomerol.internal:8870/plain/dummy-stylesheet.json"
+            , "displaySize": 256
+
+            , "introspection": {
+                "surface": { "group": "melown", "id": "viewfinder" }
+            }
+        }
+    }
+
+    , {
+        "comment": "Tetin verejne osvetleni",
+        "group": "melown",
+        "id": "tetin-vo",
+        "type": "geodata",
+        "driver": "geodata-vector",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0, 0],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "VO_rozvody.json"
+            , "demDataset": "viewfinder"
+            , "geoidGrid": "egm96_15.gtx"
+            , "format": "geodataJson"
+            , "styleUrl": "http://pomerol.internal:8870/plain/dummy-stylesheet.json"
+            , "displaySize": 256
+
+            , "introspection": {
+                "surface": { "group": "melown", "id": "viewfinder" }
+            }
         }
     }
 ]

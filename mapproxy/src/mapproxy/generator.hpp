@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <map>
 #include <iostream>
 #include <atomic>
 
@@ -10,15 +11,44 @@
 #include <boost/any.hpp>
 #include <boost/filesystem/path.hpp>
 
+#include "utility/resourcefetcher.hpp"
+
+#include "vts-libs/storage/support.hpp"
 #include "vts-libs/vts/mapconfig.hpp"
 
 #include "./resource.hpp"
 #include "./resourcebackend.hpp"
 #include "./fileinfo.hpp"
-#include "./contentgenerator.hpp"
 #include "./gdalsupport.hpp"
+#include "./sink.hpp"
 
+namespace vs = vadstena::storage;
 namespace vts = vadstena::vts;
+
+struct Arsenal {
+    GdalWarper &warper;
+    const utility::ResourceFetcher &fetcher;
+
+    Arsenal(GdalWarper &warper, const utility::ResourceFetcher &fetcher)
+        : warper(warper), fetcher(fetcher)
+    {}
+};
+
+class Generator;
+
+class GeneratorFinder {
+public:
+    virtual ~GeneratorFinder() {}
+
+    std::shared_ptr<Generator>
+    findGenerator(Resource::Generator::Type generatorType
+                  , const Resource::Id &resourceId) const;
+
+private:
+    virtual std::shared_ptr<Generator>
+    findGenerator_impl(Resource::Generator::Type generatorType
+                       , const Resource::Id &resourceId) const = 0;
+};
 
 /** Dataset generator.
  */
@@ -27,7 +57,7 @@ public:
     typedef std::shared_ptr<Generator> pointer;
     typedef std::vector<pointer> list;
     typedef std::map<Resource::Id, pointer> map;
-    typedef std::function<void(GdalWarper&)> Task;
+    typedef std::function<void(Sink&, Arsenal&)> Task;
 
     /** Configuration
      */
@@ -35,15 +65,23 @@ public:
         boost::filesystem::path root;
         boost::filesystem::path resourceRoot;
         int fileFlags;
+        const vs::SupportFile::Vars *variables;
+        const vs::SupportFile::Vars *defaults;
 
-        Config() : fileFlags() {}
+        Config() : fileFlags(), variables(), defaults() {}
     };
 
     virtual ~Generator() {}
 
-    static Generator::pointer create(const Config &config
-                                     , const Resource::Generator &type
-                                     , const Resource &resource);
+    struct Params {
+        Config config;
+        Resource resource;
+        const GeneratorFinder *generatorFinder;
+    };
+
+    static Generator::pointer create(const Params &params);
+
+    static DefinitionBase::pointer definition(const Resource::Generator &type);
 
     struct Factory;
     static void registerType(const Resource::Generator &type
@@ -59,7 +97,7 @@ public:
 
     /** Prepares generator for serving.
      */
-    void prepare();
+    void prepare(Arsenal &arsenal);
 
     const Resource& resource() const { return resource_; }
     const Resource::Id& id() const { return resource_.id; }
@@ -82,11 +120,10 @@ public:
 
     vts::MapConfig mapConfig(ResourceRoot root) const;
 
-    Task generateFile(const FileInfo &fileInfo
-                      , const Sink::pointer &sink) const;
+    Task generateFile(const FileInfo &fileInfo, Sink sink) const;
 
 protected:
-    Generator(const Config &config, const Resource &resource);
+    Generator(const Params &params);
 
     void makeReady();
     bool fresh() const { return fresh_; }
@@ -111,13 +148,20 @@ protected:
     absoluteDatasetRf(const boost::optional<boost::filesystem::path> &path)
         const;
 
+    Generator::pointer otherGenerator(Resource::Generator::Type generatorType
+                                      , const Resource::Id &resourceId) const;
+
+    void supportFile(const vs::SupportFile &support, Sink &sink
+                     , const Sink::FileInfo &fileInfo) const;
+
 private:
-    virtual void prepare_impl() = 0;
+    virtual void prepare_impl(Arsenal &arsenal) = 0;
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
 
     virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , const Sink::pointer &sink) const = 0;
+                                   , Sink &sink) const = 0;
 
+    const GeneratorFinder *generatorFinder_;
     Config config_;
     Resource resource_;
     Resource savedResource_;
@@ -127,7 +171,7 @@ private:
 
 /** Set of dataset generators.
  */
-class Generators {
+class Generators : public boost::noncopyable {
 public:
     struct Config : Generator::Config {
         int resourceUpdatePeriod;
@@ -142,11 +186,19 @@ public:
 
     ~Generators();
 
+    void start(Arsenal &arsenal);
+    void stop();
+
     const Config& config() const;
 
     /** Returns generator for requested file.
      */
     Generator::pointer generator(const FileInfo &fileInfo) const;
+
+    /** Returns generator for requested type and resourceId.
+     */
+    Generator::pointer generator(Resource::Generator::Type generatorType
+                                 , const Resource::Id &resourceId) const;
 
     /** Returns list of all generators for given referenceFrame.
      */
@@ -171,13 +223,13 @@ private:
 
 // inlines
 
-inline void Generator::prepare()
+inline void Generator::prepare(Arsenal &arsenal)
 {
     // prepare only when ready
     if (ready_) { return; }
 
     // prepare and make ready
-    prepare_impl();
+    prepare_impl(arsenal);
     makeReady();
 }
 
@@ -187,10 +239,29 @@ inline vts::MapConfig Generator::mapConfig(ResourceRoot root) const
 }
 
 inline Generator::Task Generator::generateFile(const FileInfo &fileInfo
-                                               , const Sink::pointer &sink)
+                                               , Sink sink)
     const
 {
     return generateFile_impl(fileInfo, sink);
+}
+
+inline Generator::pointer Generators::generator(const FileInfo &fileInfo) const
+{
+    return generator(fileInfo.generatorType, fileInfo.resourceId);
+}
+
+std::shared_ptr<Generator>
+inline GeneratorFinder::findGenerator(Resource::Generator::Type generatorType
+                                      , const Resource::Id &resourceId) const
+{
+    return findGenerator_impl(generatorType, resourceId);
+}
+
+inline Generator::pointer
+Generator::otherGenerator(Resource::Generator::Type generatorType
+                          , const Resource::Id &resourceId) const
+{
+    return generatorFinder_->findGenerator(generatorType, resourceId);
 }
 
 #endif // mapproxy_generator_hpp_included_
