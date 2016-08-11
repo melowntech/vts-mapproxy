@@ -209,9 +209,10 @@ vr::BoundLayer TmsBing::boundLayer(ResourceRoot, const std::string &url)
     bl.tileRange = res.tileRange;
     bl.credits = asInlineCredits(res.credits);
 
+    // availability: available images are all images except PNGs
     bl.availability = boost::in_place();
     bl.availability->type = vr::BoundLayer::Availability::Type::negativeType;
-    bl.availability->mime = "negative-type";
+    bl.availability->mime = "image/png";
 
     // done
     return bl;
