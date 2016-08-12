@@ -32,10 +32,12 @@ private:
                                    , Sink &sink) const;
 
     void generateTileMask(const vts::TileId &tileId
+                          , const TmsFileInfo &fi
                           , Sink &sink
                           , Arsenal &arsenal) const;
 
     void generateMetatile(const vts::TileId &tileId
+                          , const TmsFileInfo &fi
                           , Sink &sink
                           , Arsenal &arsenal) const;
 

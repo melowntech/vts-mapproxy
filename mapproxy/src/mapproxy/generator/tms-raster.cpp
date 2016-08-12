@@ -253,6 +253,7 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
         std::ostringstream os;
         mapConfig(os, ResourceRoot::none);
         sink.content(os.str(), fi.sinkFileInfo());
+        break;
     };
 
     case TmsFileInfo::Type::definition: {
@@ -276,18 +277,18 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
         }
 
         return[=](Sink &sink, Arsenal &arsenal) {
-            generateTileImage(fi.tileId, sink, arsenal);
+            generateTileImage(fi.tileId, fi, sink, arsenal);
         };
     }
 
     case TmsFileInfo::Type::mask:
         return [=](Sink &sink, Arsenal &arsenal)  {
-            generateTileMask(fi.tileId, sink, arsenal);
+            generateTileMask(fi.tileId, fi, sink, arsenal);
         };
 
     case TmsFileInfo::Type::metatile:
         return [=](Sink &sink, Arsenal &arsenal) {
-            generateMetatile(fi.tileId, sink, arsenal);
+            generateMetatile(fi.tileId, fi, sink, arsenal);
         };
     }
 
@@ -295,6 +296,7 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
 }
 
 void TmsRaster::generateTileImage(const vts::TileId &tileId
+                                  , const TmsFileInfo &fi
                                   , Sink &sink
                                   , Arsenal &arsenal) const
 {
@@ -321,14 +323,24 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
 
     // serialize
     std::vector<unsigned char> buf;
-    // TODO: configurable quality
-    cv::imencode(".jpg", *tile, buf
-                 , { cv::IMWRITE_JPEG_QUALITY, 75 });
+    switch (fi.format) {
+    case RasterFormat::jpg:
+        // TODO: configurable quality
+        cv::imencode(".jpg", *tile, buf
+                     , { cv::IMWRITE_JPEG_QUALITY, 75 });
+        break;
 
-    sink.content(buf, Sink::FileInfo(contentType(definition_.format)));
+    case RasterFormat::png:
+        cv::imencode(".png", *tile, buf
+                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+        break;
+    }
+
+    sink.content(buf, fi.sinkFileInfo());
 }
 
 void TmsRaster::generateTileMask(const vts::TileId &tileId
+                                 , const TmsFileInfo &fi
                                  , Sink &sink
                                  , Arsenal &arsenal) const
 {
@@ -360,7 +372,7 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
     cv::imencode(".png", *mask, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
-    sink.content(buf, Sink::FileInfo(contentType(MaskFormat)));
+    sink.content(buf, fi.sinkFileInfo());
 }
 
 namespace Constants {
@@ -376,6 +388,7 @@ namespace MetaFlags {
 }
 
 void TmsRaster::generateMetatile(const vts::TileId &tileId
+                                 , const TmsFileInfo &fi
                                  , Sink &sink
                                  , Arsenal &arsenal) const
 {
@@ -455,7 +468,7 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
     // write as png file
     cv::imencode(".png", metatile, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-    sink.content(buf, Sink::FileInfo(contentType(RasterMetatileFormat)));
+    sink.content(buf, fi.sinkFileInfo());
 }
 
 } // namespace generator

@@ -164,23 +164,8 @@ void GeodataVector::generateGeodata(Sink &sink
                                     , Arsenal&) const
 {
     auto sfi(fi.sinkFileInfo());
-    sink.content(vs::fileIStream(sfi.contentType.c_str(), dataPath_));
-
-#if 0
-    geo::heightcoding::Config config;
-    config.workingSrs = sds(nodeInfo, definition_.geoidGrid);
-    config.outputSrs = physicalSrs_.srsDef;
-    config.outputVerticalAdjust = physicalSrs_.adjustVertical();
-    config.layers = definition_.layers;
-    config.clipWorkingExtents = nodeInfo.extents();
-    config.format = definition_.format;
-
-    // heightcode data using warper's machinery
-    auto mb(arsenal.warper.heightcode(tileUrl, demDataset_, config, sink));
-
-    sink.content(mb->data, mb->size, fi.sinkFileInfo(), true);
-
-#endif
+    sink.content(vs::fileIStream(sfi.contentType.c_str(), dataPath_)
+                 , Sink::FileInfo::FileClass::data);
 }
 
 } // namespace generator

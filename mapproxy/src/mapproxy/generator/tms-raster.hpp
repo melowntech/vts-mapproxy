@@ -33,12 +33,15 @@ private:
                                    , Sink &sink) const;
 
     void generateTileImage(const vts::TileId &tileId
+                           , const TmsFileInfo &fi
                            , Sink &sink, Arsenal &arsenal) const;
 
     void generateTileMask(const vts::TileId &tileId
+                          , const TmsFileInfo &fi
                           , Sink &sink, Arsenal &arsenal) const;
 
     void generateMetatile(const vts::TileId &tileId
+                          , const TmsFileInfo &fi
                           , Sink &sink, Arsenal &arsenal) const;
 
     vr::BoundLayer boundLayer(ResourceRoot root) const;

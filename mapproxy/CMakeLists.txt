@@ -26,6 +26,7 @@ find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(magic REQUIRED)
+find_package(URIPARSER REQUIRED)
 
 find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})

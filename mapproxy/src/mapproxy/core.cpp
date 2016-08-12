@@ -248,7 +248,8 @@ void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
 
     std::ostringstream os;
     vts::saveMapConfig(mapConfig, os);
-    sink.content(os.str(), http::SinkBase::FileInfo("application/json"));
+    sink.content(os.str(), Sink::FileInfo("application/json")
+                 .setFileClass(Sink::FileInfo::FileClass::config));
 }
 
 void Core::Detail::generateResourceFile(const FileInfo &fi, Sink &sink)

@@ -249,12 +249,12 @@ Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
 
     case TmsFileInfo::Type::mask:
         return [=](Sink &sink, Arsenal &arsenal) {
-            generateTileMask(fi.tileId, sink, arsenal);
+            generateTileMask(fi.tileId, fi, sink, arsenal);
         };
 
     case TmsFileInfo::Type::metatile:
         return [=](Sink &sink, Arsenal &arsenal) {
-            generateMetatile(fi.tileId, sink, arsenal);
+            generateMetatile(fi.tileId, fi, sink, arsenal);
         };
     }
 
@@ -262,6 +262,7 @@ Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
 }
 
 void TmsRasterRemote::generateTileMask(const vts::TileId &tileId
+                                       , const TmsFileInfo &fi
                                        , Sink &sink
                                        , Arsenal &arsenal) const
 {
@@ -292,7 +293,7 @@ void TmsRasterRemote::generateTileMask(const vts::TileId &tileId
     cv::imencode(".png", *mask, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
-    sink.content(buf, Sink::FileInfo(contentType(MaskFormat)));
+    sink.content(buf, fi.sinkFileInfo());
 }
 
 namespace Constants {
@@ -308,6 +309,7 @@ namespace MetaFlags {
 }
 
 void TmsRasterRemote::generateMetatile(const vts::TileId &tileId
+                                       , const TmsFileInfo &fi
                                        , Sink &sink
                                        , Arsenal &arsenal) const
 {
@@ -375,7 +377,7 @@ void TmsRasterRemote::generateMetatile(const vts::TileId &tileId
     // write as png file
     cv::imencode(".png", metatile, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-    sink.content(buf, Sink::FileInfo(contentType(RasterMetatileFormat)));
+    sink.content(buf, fi.sinkFileInfo());
 }
 
 } // namespace generator

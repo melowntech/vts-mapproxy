@@ -1,4 +1,8 @@
+#include <boost/lexical_cast.hpp>
+
 #include <opencv2/highgui/highgui.hpp>
+
+#include "dbglog/dbglog.hpp"
 
 #include "http/error.hpp"
 
@@ -18,15 +22,18 @@ const std::vector<unsigned char> emptyImage([]() -> std::vector<unsigned char>
 
 class IStreamDataSource : public http::ServerSink::DataSource {
 public:
-    IStreamDataSource(const vs::IStream::pointer &stream)
+    IStreamDataSource(const vs::IStream::pointer &stream
+                      , Sink::FileInfo::FileClass fileClass)
         : stream_(stream), stat_(stream->stat())
+        , fs_(Sink::FileInfo(stat_.contentType, stat_.lastModified)
+              .setFileClass(fileClass))
     {
         // do not fail on eof
         stream->get().exceptions(std::ios::badbit);
     }
 
     virtual http::SinkBase::FileInfo stat() const {
-        return { stat_.contentType, stat_.lastModified };
+        return {  };
     }
 
     virtual std::size_t read(char *buf, std::size_t size
@@ -41,19 +48,21 @@ public:
 
     virtual long size() const { return stat_.size; }
 
+    virtual const http::Header::list *headers() const { return &fs_.headers; }
+
 private:
     vs::IStream::pointer stream_;
     vs::FileStat stat_;
+    Sink::FileInfo fs_;
 };
 
 } //namesapce
 
-void Sink::content(const vs::IStream::pointer &stream)
+void Sink::content(const vs::IStream::pointer &stream
+                   , FileInfo::FileClass fileClass)
 {
-    sink_->content(std::make_shared<IStreamDataSource>(stream));
+    sink_->content(std::make_shared<IStreamDataSource>(stream, fileClass));
 }
-
-const Sink::FileInfo emptyImageInfo("image/png");
 
 void Sink::error(const std::exception_ptr &exc)
 {
@@ -62,8 +71,16 @@ void Sink::error(const std::exception_ptr &exc)
     } catch (const EmptyImage &e) {
         // special "error" -> send "empty" image
         sink_->content(emptyImage.data(), emptyImage.size()
-                       , emptyImageInfo, false);
+                       , Sink::FileInfo("image/png")
+                       .setFileClass(Sink::FileInfo::FileClass::data)
+                       , false);
     } catch (...) {
         sink_->error(std::current_exception());
     }
+}
+
+Sink::FileInfo& Sink::FileInfo::setFileClass(FileClass fc) {
+    headers.emplace_back("X-MapProxy-File-Class"
+                         , boost::lexical_cast<std::string>(fc));
+    return *this;
 }

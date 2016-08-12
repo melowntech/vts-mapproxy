@@ -219,7 +219,8 @@ Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
 
     case GeodataFileInfo::Type::registry:
         sink.content(vs::fileIStream
-                      (fi.registry->contentType, fi.registry->path));
+                      (fi.registry->contentType, fi.registry->path)
+                     , Sink::FileInfo::FileClass::registry);
         break;
 
     default:
