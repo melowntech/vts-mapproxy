@@ -38,7 +38,7 @@ public:
 
     struct FileInfo : http::SinkBase::FileInfo {
         enum class FileClass {
-            unknown, config, browser, support, registry, data
+            unknown, config, support, registry, data
         };
 
         FileInfo(const std::string &contentType = "application/octet-stream"
@@ -152,7 +152,6 @@ inline void Sink::content(const void *data, std::size_t size
 UTILITY_GENERATE_ENUM_IO(Sink::FileInfo::FileClass,
     ((unknown))
     ((config))
-    ((browser))
     ((support))
     ((registry))
     ((data))
