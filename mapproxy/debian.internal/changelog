@@ -1,3 +1,15 @@
+ctt-vts-mapproxy (0.9) citationtech-wheezy; urgency=low
+
+  * Bing URL scheme fix. 
+
+ -- Tomas Kavan <tomas.kavan@citationtech.net>  Wed, 17 Aug 2016 17:21:41 +0200
+
+ctt-vts-mapproxy (0.8) citationtech-wheezy; urgency=low
+
+  * Resource type header. 
+
+ -- Tomas Kavan <tomas.kavan@citationtech.net>  Tue, 16 Aug 2016 12:08:59 +0200
+
 ctt-vts-mapproxy (0.7) citationtech-wheezy; urgency=low
 
   * Bing mime type. 
