@@ -180,8 +180,16 @@ void generateTileUrl(Sink sink, Arsenal &arsenal
 
             auto url(jurl.asString());
 
+            // replace expandable strings
             ba::replace_all(url, "{quadkey}", "{quad(loclod,locx,locy)}");
             ba::replace_all(url, "{subdomain}", subdomains());
+
+            // cut-off scheme
+            if (ba::istarts_with(url, "http:")) {
+                url = url.substr(5);
+            } else if (ba::istarts_with(url, "https:")) {
+                url = url.substr(6);
+            }
 
             callback(sink, url);
         } catch (...) {
