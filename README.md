@@ -10,7 +10,7 @@ Dataset format (directory):
 * 0-N: directory with overview level
  * ovr.vrt: virtual dataset encapsulating individual tiles
  * x-y.tif: file with tile at (x, y)
- * bg.solid: (optional) dataset with uniform vaulu used in place of missing tiles
+ * bg.solid: (optional) dataset with uniform value used in place of missing tiles
 
 NB: symlink to original dataset is used to ease remapping of "vrtwo" dataset
 when moving around filesystems/machines.
