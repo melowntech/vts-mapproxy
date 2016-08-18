@@ -99,7 +99,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
     def.demDataset = py2utf8(value["demDataset"]);
 
     if (value.has_key("geoidGrid")) {
-        def.geoidGrid = py2utf8(value["mask"]);
+        def.geoidGrid = py2utf8(value["geoidGrid"]);
     }
 
     if (value.has_key("layers")) {
