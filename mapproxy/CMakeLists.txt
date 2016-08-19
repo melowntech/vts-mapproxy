@@ -60,6 +60,7 @@ add_subdirectory(src/pydbglog)
 add_subdirectory(src/pysupport)
 
 # vts libraries
+set(VTS_REGISTRY_PYTHON true)
 add_subdirectory(src/vts-libs)
 # force build of vts tool
 add_custom_target(.vts ALL DEPENDS vts vts02vts vts2vts ts2vts0 vts0)

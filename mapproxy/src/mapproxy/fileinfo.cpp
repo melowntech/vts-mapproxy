@@ -28,6 +28,7 @@ namespace constants {
     namespace tileset {
         const std::string Config("tileset.conf");
         const std::string Index("tileset.index");
+        const std::string Registry("tileset.registry");
     } // namespace tileset
 
     const std::string DisableBrowserHeader("X-Mapproxy-Disable-Browser");
@@ -370,6 +371,12 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
     if (constants::tileset::Index == fi.filename) {
         type = Type::file;
         fileType = vs::File::tileIndex;
+        return;
+    }
+
+    if (constants::tileset::Registry == fi.filename) {
+        type = Type::file;
+        fileType = vs::File::registry;
         return;
     }
 

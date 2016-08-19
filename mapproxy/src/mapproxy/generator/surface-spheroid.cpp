@@ -236,7 +236,7 @@ vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
     const
 {
     auto mc(vts::mapConfig
-            (properties_, vts::ExtraTileSetProperties()
+            (properties_, resource().registry, vts::ExtraTileSetProperties()
              , prependRoot(fs::path(), resource(), root)));
 
     return mc;

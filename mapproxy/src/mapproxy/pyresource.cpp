@@ -8,6 +8,7 @@
 #include "utility/raise.hpp"
 
 #include "vts-libs/vts/tileop.hpp"
+#include "vts-libs/registry/py.hpp"
 
 #include "./error.hpp"
 #include "./resource.hpp"
@@ -22,27 +23,31 @@ namespace vs = vadstena::storage;
 
 namespace detail {
 
-void parseCredits(DualId::set &ids, const python::object &object
+void parseCredits(Resource &r, const python::object &object
                   , const char *name)
 {
-    const auto &value(object[name]);
+    const auto value(object[name]);
 
     for (python::stl_input_iterator<python::object> ivalue(value), evalue;
          ivalue != evalue; ++ivalue)
     {
-        const auto &element(*ivalue);
+        const auto element(*ivalue);
 
         const auto &credit([&]() -> const vr::Credit&
         {
             python::extract<int> asInt(element);
             if (asInt.check()) {
-                return vr::system.credits(asInt);
+                int key(asInt);
+                const auto credit(r.registry.credits(key, std::nothrow));
+                return (credit ? *credit : vr::system.credits(key));
             }
 
-            return vr::system.credits(py2utf8(element));
+            auto key(py2utf8(*ivalue));
+            const auto credit(r.registry.credits(key, std::nothrow));
+            return (credit ? *credit : vr::system.credits(key));
         }());
 
-        ids.insert(DualId(credit.id, credit.numericId));
+        r.credits.insert(DualId(credit.id, credit.numericId));
     }
 }
 
@@ -53,7 +58,7 @@ void parseDefinition(Resource &r, const python::dict &value)
     r.definition(definition);
 }
 
-Resource::list parseResource(const python::object &value)
+Resource::list parseResource(const python::dict &value)
 {
     Resource r;
     r.id.group = py2utf8(value["group"]);
@@ -64,9 +69,13 @@ Resource::list parseResource(const python::object &value)
     r.generator.driver = py2utf8(value["driver"]);
     r.comment = py2utf8(value["comment"]);
 
-    parseCredits(r.credits, value, "credits");
+    if (value.has_key("registry")) {
+        fromPython(r.registry, python::dict(value["registry"]));
+    }
 
-    const auto &referenceFrames(value["referenceFrames"]);
+    parseCredits(r, value, "credits");
+
+    const auto referenceFrames(value["referenceFrames"]);
 
     parseDefinition(r, python::dict(value["definition"]));
 
@@ -76,8 +85,8 @@ Resource::list parseResource(const python::object &value)
              ireferenceFrames(referenceFrames), ereferenceFrames;
          ireferenceFrames != ereferenceFrames; ++ireferenceFrames)
     {
-        const auto &name(py2utf8(*ireferenceFrames));
-        const auto &content(referenceFrames[*ireferenceFrames]);
+        const auto name(py2utf8(*ireferenceFrames));
+        const auto content(referenceFrames[*ireferenceFrames]);
 
         out.push_back(r);
         auto &rr(out.back());
@@ -86,16 +95,16 @@ Resource::list parseResource(const python::object &value)
         // NB: function either returns valid reference of throws
         rr.referenceFrame = &vr::system.referenceFrames(name);
 
-        const auto &lodRange(content["lodRange"]);
+        const auto lodRange(content["lodRange"]);
         rr.lodRange.min = python::extract<vts::Lod>(lodRange[0]);
         rr.lodRange.max = python::extract<vts::Lod>(lodRange[1]);
 
-        const auto &tileRange(content["tileRange"]);
-        const auto &tileRange_min(tileRange[0]);
+        const auto tileRange(content["tileRange"]);
+        const auto tileRange_min(tileRange[0]);
         rr.tileRange.ll(0) = python::extract<unsigned int>(tileRange_min[0]);
         rr.tileRange.ll(1) = python::extract<unsigned int>(tileRange_min[1]);
 
-        const auto &tileRange_max(tileRange[1]);
+        const auto tileRange_max(tileRange[1]);
         rr.tileRange.ur(0) = python::extract<unsigned int>(tileRange_max[0]);
         rr.tileRange.ur(1) = python::extract<unsigned int>(tileRange_max[1]);
     }

@@ -461,6 +461,13 @@
             }
         },
         "credits": ["melown"],
+        "registry": {
+            "credits": {
+                "bum" : {
+                    "id": 444, "notice": "bac"
+                }
+            }
+        },
         "definition": {
             "dataset": "/mnt/media/derivatives/mapproxy/cz",
             "mask": "/mnt/media/derivatives/mask/osm-boundaries/cz/cz.mask",
@@ -578,7 +585,17 @@
                 "tileRange": [[0, 0], [0, 0]]
             }
         },
-        "credits": ["microsoft"],
+        "credits": ["microsoft", "hillbilly", "bum"],
+        "registry": {
+            "credits": {
+                "hillbilly" : {
+                    "id": 5555, "notice": "{copy}1955-{Y} William Henry \"Bill\" Gates III"
+                },
+                "bum" : {
+                    "id": 5556, "notice": "bac"
+                }
+            }
+        },
         "definition": {
            "metadataUrl": "http://dev.virtualearth.net/REST/v1/Imagery/Metadata/Aerial?key=Ag7PO7bUdf-l6FrOjQT9w1ZOdyz1Y8QJyenAdOn5--QHj7W50wuwG14HSdvdNFke"
         }

@@ -28,6 +28,10 @@ public:
     void to(boost::any &value) const { to_impl(value); }
     bool same(const DefinitionBase &other) const { return same_impl(other); }
 
+    /** Are credits frozen in the resources's dataset?
+     */
+    bool frozenCredits() const { return frozenCredits_impl(); }
+
     template <typename T> const T& as() const {
         if (const auto *value = dynamic_cast<const T*>(this)) {
             return *value;
@@ -54,6 +58,11 @@ private:
      *  must not affect resource generation.
      */
     virtual bool same_impl(const DefinitionBase &other) const = 0;
+
+    /** If generated dataset freezes credit info into its published data then
+     *  credits cannot be changed.
+     */
+    virtual bool frozenCredits_impl() const { return true; }
 };
 
 namespace vr = vadstena::registry;
@@ -90,8 +99,6 @@ inline vr::Credits asCredits(const DualId::set &set)
     }
     return credits;
 }
-
-vr::Credits asInlineCredits(const DualId::set &set);
 
 inline vr::IdSet asIntSet(const DualId::set &set)
 {
@@ -140,6 +147,8 @@ struct Resource {
     vr::LodRange lodRange;
     vr::TileRange tileRange;
 
+    vr::RegistryBase registry;
+
     DefinitionBase::pointer definition() const {
         return definition_;
     }
@@ -166,6 +175,8 @@ private:
      */
     DefinitionBase::pointer definition_;
 };
+
+vr::Credits asInlineCredits(const Resource &res);
 
 UTILITY_GENERATE_ENUM_IO(Resource::Generator::Type,
     ((tms))

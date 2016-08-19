@@ -215,7 +215,7 @@ vr::BoundLayer TmsBing::boundLayer(ResourceRoot, const std::string &url)
 
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
-    bl.credits = asInlineCredits(res.credits);
+    bl.credits = asInlineCredits(res);
 
     // availability: available images are all images except PNGs
     bl.availability = boost::in_place();

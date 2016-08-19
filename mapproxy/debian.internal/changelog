@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.10) citationtech-wheezy; urgency=low
+
+  * Fixed typo in geodata driver.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 18 Aug 2016 16:20:34 +0200
+
 ctt-vts-mapproxy (0.9) citationtech-wheezy; urgency=low
 
   * Bing URL scheme fix. 

@@ -23,6 +23,7 @@ public:
         virtual bool same_impl(const DefinitionBase &other) const {
             return (*this == other.as<Definition>());
         }
+        virtual bool frozenCredits_impl() const { return false; }
     };
 
 private:

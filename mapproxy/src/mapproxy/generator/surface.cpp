@@ -97,6 +97,12 @@ Generator::Task SurfaceBase
                          , Sink::FileInfo::FileClass::data);
             break;
 
+        case vts::File::registry: {
+            std::ostringstream os;
+            save(os, resource().registry);
+            sink.content(os.str(), fi.sinkFileInfo());
+            break; }
+
         default:
             sink.error(utility::makeError<NotFound>("Not found"));
             break;
@@ -247,7 +253,7 @@ void SurfaceBase::generateCredits(const vts::TileId&
                                   , Arsenal&) const
 {
     vts::CreditTile creditTile;
-    creditTile.credits = asInlineCredits(resource().credits);
+    creditTile.credits = asInlineCredits(resource());
 
     std::ostringstream os;
     saveCreditTile(os, creditTile, true);

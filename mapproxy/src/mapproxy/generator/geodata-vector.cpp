@@ -32,7 +32,7 @@ struct Factory : Generator::Factory {
     }
 
     virtual DefinitionBase::pointer definition() {
-        return std::make_shared<GeodataVectorBase::Definition>();
+        return std::make_shared<GeodataVector::Definition>();
     }
 
 private:
@@ -58,6 +58,7 @@ GeodataVector::GeodataVector(const Params &params)
         metadata_ = geo::heightcoding::loadMetadata(root() / "metadata.json");
         if (fs::file_size(dataPath_) == metadata_.fileSize) {
             // valid file
+            makeReady();
             return;
         }
         LOG(info1) << "Sizes differ, regenerate.";

@@ -19,7 +19,7 @@ namespace vs = vadstena::storage;
 
 namespace detail {
 
-void parseCredits(DualId::set &ids, const Json::Value &object
+void parseCredits(Resource &r, const Json::Value &object
                   , const char *name)
 {
     const Json::Value &value(object[name]);
@@ -30,17 +30,21 @@ void parseCredits(DualId::set &ids, const Json::Value &object
     }
 
     for (const auto &element : value) {
-        const auto &credit([&]() -> const vr::Credit&
+        const auto credit([&]() -> const vr::Credit&
         {
             if (element.isIntegral()) {
-                return vr::system.credits(element.asInt());
+                auto value(element.asInt());
+                const auto credit(r.registry.credits(value, std::nothrow));
+                return (credit ? *credit : vr::system.credits(value));
             }
 
             Json::check(element, Json::stringValue);
-            return vr::system.credits(element.asString());
+            auto value(element.asString());
+            const auto credit(r.registry.credits(value, std::nothrow));
+            return (credit ? *credit : vr::system.credits(value));
         }());
 
-        ids.insert(DualId(credit.id, credit.numericId));
+        r.credits.insert(DualId(credit.id, credit.numericId));
     }
 }
 
@@ -77,7 +81,10 @@ Resource::list parseResource(const Json::Value &value)
         Json::get(r.comment, value, "comment");
     }
 
-    parseCredits(r.credits, value, "credits");
+    if (value.isMember("registry")) {
+        fromJson(r.registry, value["registry"]);
+    }
+    parseCredits(r, value, "credits");
 
     const Json::Value &referenceFrames(value["referenceFrames"]);
     if (!referenceFrames.isObject()) {
@@ -190,6 +197,8 @@ void buildResource(Json::Value &value, const Resource &r)
     value["driver"] = r.generator.driver;
     value["comment"] = r.comment;
 
+    value["registry"] = vr::asJson(r.registry);
+
     auto &credits(value["credits"] = Json::arrayValue);
     for (auto cid : r.credits) { credits.append(cid.id); }
 
@@ -274,12 +283,18 @@ bool Resource::operator==(const Resource &o) const
 {
     if (!(id == o.id)) { return false; }
     if (!(generator == o.generator)) { return false; }
-    if (credits != o.credits) { return false; }
 
     if (lodRange != o.lodRange) { return false; }
     if (tileRange != o.tileRange) { return false; }
 
+    // compare credits only if frozen
+    if (definition_->frozenCredits() && (credits != o.credits)) {
+        return false;
+    }
+
     if (!definition_->same(*o.definition())) { return false; }
+
+    // registry is not checked
 
     return true;
 }
@@ -388,13 +403,13 @@ bool checkRanges(const Resource &resource, const vts::TileId &tileId
     return true;
 }
 
-vr::Credits asInlineCredits(const DualId::set &set)
+vr::Credits asInlineCredits(const Resource &res)
 {
     vr::Credits credits;
-    for (auto &id : set) {
-        if (const auto *credit = vr::system.credits(id.id, std::nothrow)) {
-            credits.set(id, *credit);
-        }
+    for (auto &id : res.credits) {
+        const auto *credit(res.registry.credits(id.id, std::nothrow));
+        if (!credit) { credit = vr::system.credits(id.id, std::nothrow); }
+        if (credit) { credits.set(id, *credit); }
     }
     return credits;
 }

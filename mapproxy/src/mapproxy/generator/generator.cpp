@@ -89,6 +89,9 @@ Generator::Generator(const Params &params)
                 << "> differs from the one stored in store at "
                 << root() << "; using stored definition.";
             resource_ = savedResource_;
+        } else {
+            // something non-destructive can changed -> re-save
+            save(rfile, resource_);
         }
     }
 }
