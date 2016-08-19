@@ -22,6 +22,9 @@ public:
 
     Resource::map load() const;
 
+    void error(const Resource::Id &resourceId, const std::string &message)
+        const;
+
     class TypedConfig {
     public:
         /** Resource backend type.
@@ -70,11 +73,19 @@ protected:
     ResourceBackend() {}
 
     virtual Resource::map load_impl() const = 0;
+
+    virtual void error_impl(const Resource::Id&, const std::string&) const {}
 };
 
 inline Resource::map ResourceBackend::load() const
 {
     return load_impl();
+}
+
+inline void ResourceBackend::error(const Resource::Id &resourceId
+                                   , const std::string &message) const
+{
+    return error_impl(resourceId, message);
 }
 
 // inlines

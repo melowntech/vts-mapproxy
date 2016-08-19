@@ -240,9 +240,13 @@ UTILITY_GENERATE_ENUM_IO(ResourceRoot::Depth,
     ((none))
 )
 
+typedef boost::function<void(const Resource::Id&, const std::string&)>
+ResourceLoadErrorCallback;
+
 /** Load resources from given path.
  */
-Resource::map loadResources(const boost::filesystem::path &path);
+Resource::map loadResources(const boost::filesystem::path &path
+                            , ResourceLoadErrorCallback error);
 
 /** Load single resource from given path.
  */
@@ -251,7 +255,8 @@ Resource::list loadResource(const boost::filesystem::path &path);
 /** Load resources from Python list (passed as a boost::any to hide
  *  implementation)
  */
-Resource::map loadResourcesFromPython(const boost::any &pylist);
+Resource::map loadResourcesFromPython(const boost::any &pylist
+                                      , ResourceLoadErrorCallback error);
 
 /** Save single resource to given path.
  */

@@ -58,11 +58,25 @@ void parseDefinition(Resource &r, const python::dict &value)
     r.definition(definition);
 }
 
-Resource::list parseResource(const python::dict &value)
+boost::optional<Resource::Id> parseResourceId(const python::dict &value)
+{
+    try {
+        Resource::Id id;
+        id.referenceFrame = "*";
+        id.group = py2utf8(value["group"]);
+        id.id = py2utf8(value["id"]);
+        return id;
+    } catch (const std::exception &e) {
+        LOG(info2) << "Failed to parse resource ID from python object "
+                   << ": <" << e.what() << ">.";
+    }
+    return boost::none;
+}
+
+Resource::list parseResource(const Resource::Id &id, const python::dict &value)
 {
     Resource r;
-    r.id.group = py2utf8(value["group"]);
-    r.id.id = py2utf8(value["id"]);
+    r.id = id;
 
     std::string tmp(py2utf8(value["type"]));
     r.generator.type = boost::lexical_cast<Resource::Generator::Type>(tmp);
@@ -112,32 +126,46 @@ Resource::list parseResource(const python::dict &value)
     return out;
 }
 
-void parseResources(Resource::map &resources, const python::list &value)
+void parseResources(Resource::map &resources, const python::list &value
+                    , ResourceLoadErrorCallback error)
 {
     // process all definitions
     for (python::stl_input_iterator<python::dict> ivalue(value), evalue;
          ivalue != evalue; ++ivalue)
     {
-        auto resList(parseResource(python::dict(*ivalue)));
+        python::dict dict(*ivalue);
+        auto id(parseResourceId(dict));
+        if (!id) { continue; }
 
-        for (const auto &res : resList) {
-            if (!resources.insert(Resource::map::value_type(res.id, res))
-                .second)
-            {
-                LOGTHROW(err1, Error)
-                    << "Duplicate entry for <" << res.id << ">.";
+        try {
+            auto resList(parseResource(*id, dict));
+            for (const auto &res : resList) {
+                if (!resources.insert(Resource::map::value_type(res.id, res))
+                    .second)
+                {
+                    auto message(utility::format
+                                 ("Duplicate entry for <%s>.", res.id));
+                    LOG(warn1) << message;
+                    if (error) { error(res.id, message); }
+                }
             }
+        } catch (const std::exception &e) {
+            LOG(warn1) << "Failed to parse resource "
+                       << *id << ": <" << e.what() << ">.";
+            if (error) { error(*id, e.what()); }
         }
+
     }
 }
 
 } // namespace detail
 
-Resource::map loadResourcesFromPython(const boost::any &pylist)
+Resource::map loadResourcesFromPython(const boost::any &pylist
+                                      , ResourceLoadErrorCallback error)
 {
     const auto &list(boost::any_cast<const python::list&>(pylist));
 
     Resource::map resources;
-    detail::parseResources(resources, list);
+    detail::parseResources(resources, list, error);
     return resources;
 }

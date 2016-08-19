@@ -431,6 +431,8 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
                 << generator->resource().id << "> (" << e.what()
                 << "); removing from set of known generators.";
 
+            resourceBackend_->error(generator->resource().id, e.what());
+
             // erease from map (under lock)
             std::unique_lock<std::mutex> lock(lock_);
             serving_.erase(generator);

@@ -65,7 +65,7 @@ Conffile::Conffile(const Config &config)
 
 Resource::map Conffile::load_impl() const
 {
-    return loadResources(config_.path);
+    return loadResources(config_.path, {});
 }
 
 } // namespace resource_backend

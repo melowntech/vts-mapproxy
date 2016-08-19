@@ -119,7 +119,7 @@ utility::PreMain Factory::register_([]()
 } // namespace
 
 Python::Python(const Config &config)
-    : run_()
+    : run_(), error_()
 {
     try {
         python::dict options;
@@ -129,6 +129,9 @@ Python::Python(const Config &config)
 
         run_ = pysupport::import(config.script)
             .attr("resource_backend")(options);
+        if (PyObject_HasAttrString(run_.ptr(), "error")) {
+            error_ = run_.attr("error");
+        }
     } catch (const python::error_already_set&) {
         // TODO: handle exceptions
         ::PyErr_Print();
@@ -139,8 +142,13 @@ Python::Python(const Config &config)
 
 Resource::map Python::load_impl() const
 {
+    std::unique_lock<std::mutex> lock(mutex_);
     try {
-        return loadResourcesFromPython(python::list(run_()));
+        return loadResourcesFromPython
+            (python::list(run_())
+             , [this](const Resource::Id &id, const std::string &error) {
+                error_impl(id, error);
+            });
     } catch (const python::error_already_set&) {
         // TODO: handle exceptions
         LOG(err3) << "Resource backend run failed, py exception follows:";
@@ -152,6 +160,33 @@ Resource::map Python::load_impl() const
         LOGTHROW(err3, Error)
             << "Run failed.";
         throw;
+    }
+}
+
+void Python::error_impl(const Resource::Id &resourceId
+                        , const std::string &message) const
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+    return errorRaw(resourceId, message);
+}
+
+void Python::errorRaw(const Resource::Id &resourceId
+                      , const std::string &message) const
+{
+    if (error_) {
+        try {
+            error_(resourceId.referenceFrame, resourceId.group
+                   , resourceId.id, message);
+        } catch (const python::error_already_set&) {
+            // TODO: handle exceptions
+            LOG(err3) << "Resource backend error report failed, "
+                "py exception follows:";
+
+            // NB: Do not set system error indicators (sys.last_*) otherwise
+            // leak to next exception exists -> we must call PyErr_PrintEx with
+            // false!
+            ::PyErr_PrintEx(false);
+        }
     }
 }
 

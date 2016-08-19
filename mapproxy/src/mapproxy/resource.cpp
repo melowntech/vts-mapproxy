@@ -231,7 +231,8 @@ void saveResource(std::ostream &out, const Resource &resource)
 
 } // namespace detail
 
-Resource::map loadResources(const boost::filesystem::path &path)
+Resource::map loadResources(const boost::filesystem::path &path
+                            , ResourceLoadErrorCallback)
 {
     std::ifstream f;
     f.exceptions(std::ios::badbit | std::ios::failbit);
