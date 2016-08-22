@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.11) citationtech-wheezy; urgency=low
+
+  * Fixed MVT parsing (setting numeric fields as 64bit numbers).
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Mon, 22 Aug 2016 19:18:54 +0200
+
 ctt-vts-mapproxy (0.10) citationtech-wheezy; urgency=low
 
   * Fixed typo in geodata driver.
