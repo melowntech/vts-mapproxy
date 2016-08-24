@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.12) citationtech-wheezy; urgency=low
+
+  * Fixed metatile generation in surface-dem.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 24 Aug 2016 17:43:54 +0200
+
 ctt-vts-mapproxy (0.11) citationtech-wheezy; urgency=low
 
   * Fixed MVT parsing (setting numeric fields as 64bit numbers).
