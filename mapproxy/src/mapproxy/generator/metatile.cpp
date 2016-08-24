@@ -284,8 +284,16 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 // TODO: let tileindex generate validity flag for all children
                 // in this block
                 for (const auto &child : vts::children(nodeId)) {
-                    node.setChildFromId
-                        (child, tileIndex.validSubtree(child));
+                    /** some subtrees may have false positives
+                     * (i.e. melown2015 polar caps)
+                     *
+                     * Combine tile index with node validity.
+                     *
+                     * TODO: optimize
+                     */
+                    bool valid(tileIndex.validSubtree(child));
+                    valid = valid && vts::NodeInfo(rf, child).valid();
+                    node.setChildFromId(child, valid);
                 }
 
                 // set extents

@@ -3,6 +3,7 @@
 
 #include "vts-libs/registry.hpp"
 #include "vts-libs/vts/basetypes.hpp"
+#include "vts-libs/vts/tileop.hpp"
 
 #include "../resource.hpp"
 
@@ -44,6 +45,22 @@ MetatileBlock::list metatileBlocks(const Resource &resource
                                    , const vts::TileId &tileId
                                    , unsigned int metaBinaryOrder = 0
                                    , bool includeInvalid = false);
+
+inline bool special(const vr::ReferenceFrame &referenceFrame
+                    , const vts::TileId &tileId)
+{
+    if (const auto *node
+        = referenceFrame.find(vts::rfNodeId(tileId), std::nothrow))
+    {
+        switch (node->partitioning.mode) {
+        case vr::PartitioningMode::manual:
+            return true;
+        default:
+            return false;
+        }
+    }
+    return false;
+}
 
 class ShiftMask {
 public:

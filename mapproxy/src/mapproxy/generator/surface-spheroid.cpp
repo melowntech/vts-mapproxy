@@ -267,22 +267,6 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
  */
 const int metatileSamplesPerTile(8);
 
-bool special(const vr::ReferenceFrame &referenceFrame
-             , const vts::TileId &tileId)
-{
-    if (const auto *node
-        = referenceFrame.find(vts::rfNodeId(tileId), std::nothrow))
-    {
-        switch (node->partitioning.mode) {
-        case vr::PartitioningMode::manual:
-            return true;
-        default:
-            return false;
-        }
-    }
-    return false;
-}
-
 } // namespace
 
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
