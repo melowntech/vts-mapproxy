@@ -213,8 +213,13 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
                 // This is lesser evil than to construct gargantuan tileindex
                 // that would not fit in any imaginable memory)
                 vts::TileIndex::Flag::value_type flags
-                    (vts::TileIndex::Flag::mesh
-                     | vts::TileIndex::Flag::navtile);
+                    (vts::TileIndex::Flag::mesh);
+
+                // generate navtiles only to LOD 10 (arbitrary) but at least for
+                // top-level LOD;
+                if ((lod == r.lodRange.min) || (lod <= 10)) {
+                    flags |= vts::TileIndex::Flag::navtile;
+                }
 
                 if (!block.partial()) {
                     // fully covered block -> watertight tiles
