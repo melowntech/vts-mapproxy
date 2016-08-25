@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.13) citationtech-wheezy; urgency=low
+
+  * Fixed navtile limit for surface-spheroid.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 25 Aug 2016 18:29:50 +0200
+
 ctt-vts-mapproxy (0.12) citationtech-wheezy; urgency=low
 
   * Fixed metatile generation in surface-dem.
