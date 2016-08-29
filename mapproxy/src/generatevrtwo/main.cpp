@@ -106,6 +106,10 @@ struct Config {
     boost::optional<int> wrapx;
     bool overwrite;
     Color::optional background;
+    std::vector<std::string> co;
+
+    // derived
+    geo::Options createOptions;
 
     Config()
         : minOvrSize(256, 256), overwrite(false)
@@ -161,7 +165,9 @@ void VrtWo::configuration(po::options_description &cmdline
         , "Optional background. If whole warped tile contains this "
          "color it is left empty in the output. Solid dataset with this color "
          "is created and places as a first source for each band in "
-         "all overvies.")
+         "all overviews.")
+        ("co", po::value(&config_.co)
+        , "GTiff extra create option; can be used multiple times.")
         ;
 
     pd.add("input", 1)
@@ -184,6 +190,18 @@ void VrtWo::configure(const po::variables_map &vars)
     config_.input = fs::absolute(config_.input);
     config_.outputDataset = config_.output / "dataset";
 
+    // prepare create options
+    config_.createOptions("TILED", true);
+    for (const auto &option : config_.co) {
+        auto split(option.find('='));
+        if (split == std::string::npos) {
+            config_.createOptions(option, "");
+        } else {
+            config_.createOptions(option.substr(0, split)
+                                  , option.substr(split + 1));
+        }
+    }
+
     LOG(info3, log_)
         << "Config:"
         << "\n\tinput = " << config_.input
@@ -197,6 +215,7 @@ void VrtWo::configure(const po::variables_map &vars)
                 return os << "false";
             })
         << "\n\tbackground = " << config_.background
+        << "\n\tco = " << utility::join(config_.co, ", ")
         << "\n"
         ;
 }
@@ -810,7 +829,7 @@ fs::path createOverview(const Config &config, int ovrIndex
             UTILITY_OMP(critical)
             {
                 fs::remove(tilePath);
-                tmp.copy(tilePath, "GTiff", geo::Options("TILED", true));
+                tmp.copy(tilePath, "GTiff", config.createOptions);
             }
 
             // store result
