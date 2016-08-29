@@ -807,6 +807,7 @@ fs::path createOverview(const Config &config, int ovrIndex
             }
 
             // copy data into real gtiff
+            UTILITY_OMP(critical)
             {
                 fs::remove(tilePath);
                 tmp.copy(tilePath, "GTiff", geo::Options("TILED", true));
