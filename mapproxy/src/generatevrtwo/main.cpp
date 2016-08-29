@@ -536,6 +536,10 @@ Setup buildDatasetBase(const Config &config)
         fs::create_symlink(config.input, symlink);
     }
 
+    // remove anything lying in the way of the dataset
+    boost::system::error_code ec;
+    fs::remove(config.outputDataset, ec);
+
     // create virtual output dataset
     VrtDataset out(config.outputDataset, in.srs(), setup.extents
                    , setup.size, in.getFormat(), in.rawNodataValue());
@@ -805,8 +809,7 @@ fs::path createOverview(const Config &config, int ovrIndex
             // copy data into real gtiff
             {
                 fs::remove(tilePath);
-                geo::GeoDataset::createCopy
-                    (tilePath, "GTiff", tmp, geo::Options("TILED", true));
+                tmp.copy(tilePath, "GTiff", geo::Options("TILED", true));
             }
 
             // store result
