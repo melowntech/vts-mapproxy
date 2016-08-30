@@ -2,11 +2,14 @@
 #define mapproxy_gdalsupport_hpp_included_
 
 #include <memory>
+#include <chrono>
 
 #include <boost/optional.hpp>
 #include <boost/filesystem/path.hpp>
 
 #include <opencv2/core/core.hpp>
+
+#include "utility/runnable.hpp"
 
 #include "geo/srsdef.hpp"
 #include "geo/geodataset.hpp"
@@ -22,11 +25,16 @@ public:
     struct Options {
         unsigned int processCount;
         boost::filesystem::path tmpRoot;
+        std::size_t rssCheckPeriod;
+        std::size_t rssLimit;
 
-        Options() : processCount(5) {}
+        Options()
+            : processCount(5), rssCheckPeriod(5)
+            , rssLimit(std::size_t(1) << 12)
+        {}
     };
 
-    GdalWarper(const Options &options);
+    GdalWarper(const Options &options, utility::Runnable &runnable);
 
     typedef std::shared_ptr<cv::Mat> Raster;
 

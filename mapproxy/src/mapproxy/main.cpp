@@ -139,12 +139,22 @@ void Daemon::configuration(po::options_description &cmdline
          ->default_value(coreThreadCount_)->required()
          , "Number of processing threads.")
 
-         ("gdal.processCount"
+        ("gdal.processCount"
          , po::value(&gdalWarperOptions_.processCount)
-         ->default_value(gdalWarperOptions_.processCount)->required())
+         ->default_value(gdalWarperOptions_.processCount)->required()
+         , "Number of GDAL processes.")
         ("gdal.tmpRoot"
          , po::value(&gdalWarperOptions_.tmpRoot)
-         ->default_value(gdalWarperOptions_.tmpRoot)->required())
+         ->default_value(gdalWarperOptions_.tmpRoot)->required()
+         , "Root for GDAL temporary stuff (WMTS cache etc.).")
+        ("gdal.rssLimit"
+         , po::value(&gdalWarperOptions_.rssLimit)
+         ->default_value(gdalWarperOptions_.rssLimit)->required()
+         , "Real memory limit of all GDAL processes (in MB).")
+        ("gdal.rssCheckPeriod"
+         , po::value(&gdalWarperOptions_.rssCheckPeriod)
+         ->default_value(gdalWarperOptions_.rssCheckPeriod)->required()
+         , "Memory check period (in seconds)")
 
         ("resource-backend.type"
          , po::value(&resourceBackendConfig_.type)->required()
@@ -267,7 +277,7 @@ service::Service::Cleanup Daemon::start()
     auto guard(std::make_shared<Stopper>(*this));
 
     // warper must be first since it uses processes
-    gdalWarper_ = boost::in_place(gdalWarperOptions_);
+    gdalWarper_ = boost::in_place(gdalWarperOptions_, std::ref(*this));
 
     resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
     generators_ = boost::in_place(generatorsConfig_, resourceBackend_);

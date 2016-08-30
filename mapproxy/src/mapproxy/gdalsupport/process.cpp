@@ -37,7 +37,7 @@ Process::ExitCode Process::join(bool justTry)
             if (EINTR == errno) { continue; }
 
             std::system_error e(errno, std::system_category());
-            LOG(warn1) << "waitpid(2) failed: <" << e.code()
+            LOG(warn1) << "waitpid(" << id_ << ") failed: <" << e.code()
                        << ", " << e.what() << ">";
             throw e;
         }
@@ -62,6 +62,42 @@ Process::ExitCode Process::join(bool justTry)
     return EXIT_FAILURE;
 }
 
+void Process::terminate(Id id)
+{
+    auto res(::kill(id, SIGTERM));
+
+    if (res < 0) {
+        std::system_error e(errno, std::system_category());
+        LOG(warn1) << "kill(" << id << "SIGTERM) failed: <" << e.code()
+                   << ", " << e.what() << ">";
+        throw e;
+    }
+}
+
+void Process::kill(Id id)
+{
+    auto res(::kill(id, SIGKILL));
+
+    if (res < 0) {
+        std::system_error e(errno, std::system_category());
+        LOG(warn1) << "kill(" << id << ", SIGKILL) failed: <" << e.code()
+                   << ", " << e.what() << ">";
+        throw e;
+    }
+}
+
+void Process::terminate()
+{
+    if (!joinable()) {
+        std::system_error e(EINVAL, std::system_category());
+        LOG(err3) << "Cannot join non-joinable process.";
+        throw e;
+    }
+
+    terminate(id_);
+    killed_ = true;
+}
+
 void Process::kill()
 {
     if (!joinable()) {
@@ -70,14 +106,8 @@ void Process::kill()
         throw e;
     }
 
-    auto res(::kill(id_, SIGKILL));
-
-    if (res < 0) {
-        std::system_error e(errno, std::system_category());
-        LOG(warn1) << "kill(2) failed: <" << e.code()
-                   << ", " << e.what() << ">";
-        throw e;
-    }
+    kill(id_);
+    killed_ = true;
 }
 
 Process::Id Process::run(const std::function<void()> &func

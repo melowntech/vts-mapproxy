@@ -21,7 +21,7 @@ public:
 
     struct Alive {};
 
-    Process() : id_() {}
+    Process() : id_(), killed_(false) {}
     Process(Process &&other);
 
     template<typename Function, typename ...Args>
@@ -50,14 +50,26 @@ public:
      */
     ExitCode join(bool justTry = false);
 
+    /** Terminate process (soft kill).
+     */
+    void terminate();
+
     /** Kill the process (hard kill).
      */
     void kill();
+
+    bool killed() const { return killed_; }
+
+    static void terminate(Id id);
+
+    static void kill(Id id);
 
 private:
     static Id run(const std::function<void()> &func, const Flags &flags);
 
     Id id_;
+
+    bool killed_;
 };
 
 struct ThisProcess {
@@ -68,29 +80,25 @@ struct ThisProcess {
 // inlines
 
 inline Process::Process(Process &&other)
-    : id_(other.id_)
+    : id_(other.id_), killed_(other.killed_)
 {
     other.id_ = 0;
+    other.killed_ = false;
 }
 
 inline Process& Process::operator=(Process &&other)
 {
     if (joinable()) { std::terminate(); }
     id_ = other.id_;
+    killed_ = other.killed_;
     other.id_ = 0;
+    other.killed_ = false;
     return *this;
 }
 
-// template<class Function, typename ...Args>
-// inline Process::Process(Function &&f, Args &&...args)
-// {
-//     id_ = run(std::bind<void>(std::forward<Function>(f)
-//                               , std::forward<Args>(args)...)
-//               , {});
-// }
-
 template<class Function, typename ...Args>
 inline Process::Process(const Flags &flags, Function &&f, Args &&...args)
+    : killed_(false)
 {
     id_ = run(std::bind<void>(std::forward<Function>(f)
                               , std::forward<Args>(args)...)

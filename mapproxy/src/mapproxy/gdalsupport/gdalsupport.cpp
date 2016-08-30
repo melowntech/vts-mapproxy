@@ -1,16 +1,20 @@
 #include <sys/types.h>
+#include <signal.h>
 
 #include <new>
 #include <array>
 #include <atomic>
 #include <thread>
+#include <algorithm>
 
 #include <boost/noncopyable.hpp>
 #include <boost/format.hpp>
 #include <boost/asio.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "utility/errorcode.hpp"
+#include "utility/procstat.hpp"
 
 #include "geo/gdal.hpp"
 
@@ -528,6 +532,17 @@ struct Worker {
         }
     }
 
+    void terminate() {
+        // terminate the process, ignore all errors
+        if (process_.joinable()) {
+            try {
+                process_.terminate();
+            } catch(...) {}
+        }
+    }
+
+    bool killed() const { return process_.killed(); }
+
     void associate(const ShRequest::pointer &req) { req_ = req; }
 
     void disassociate() { req_ = {}; }
@@ -564,7 +579,7 @@ private:
 class GdalWarper::Detail
 {
 public:
-    Detail(const Options &options);
+    Detail(const Options &options, utility::Runnable &runnable);
     ~Detail();
 
     Raster warp(const RasterRequest &req, Aborter &aborter);
@@ -586,6 +601,8 @@ private:
 
     void cleanup(bool join);
 
+    void killLeviathan();
+
     inline bool running() const { return *running_; }
     inline void running(bool val) { *running_ = val; }
 
@@ -593,6 +610,7 @@ private:
     inline bi::interprocess_condition& cond() { return *cond_; }
 
     Options options_;
+    utility::Runnable &runnable_;
 
     bi::mapped_region mem_;
     ManagedBuffer mb_;
@@ -608,8 +626,8 @@ private:
     Worker::map workers_;
 };
 
-GdalWarper::GdalWarper(const Options &options)
-    : detail_(std::make_shared<Detail>(options))
+GdalWarper::GdalWarper(const Options &options, utility::Runnable &runnable)
+    : detail_(std::make_shared<Detail>(options, runnable))
 {}
 
 GdalWarper::Raster GdalWarper::warp(const RasterRequest &req, Aborter &aborter)
@@ -632,8 +650,9 @@ void GdalWarper::housekeeping()
     return detail().housekeeping();
 }
 
-GdalWarper::Detail::Detail(const Options &options)
-    : options_(options)
+GdalWarper::Detail::Detail(const Options &options
+                           , utility::Runnable &runnable)
+    : options_(options), runnable_(runnable)
     , mem_(bi::anonymous_shared_memory(std::size_t(1) << 30))
     , mb_(bi::create_only, mem_.get_address(), mem_.get_size())
     , running_(mb_.construct<std::atomic<bool>>(bi::anonymous_instance)(true))
@@ -660,15 +679,19 @@ void GdalWarper::Detail::runManager(Process::Id parentId)
 
     auto isRunning([&]()
     {
-        return running() && (parentId == ThisProcess::parentId());
+        return (running() && (parentId == ThisProcess::parentId())
+                && runnable_.isRunning());
     });
 
     auto thisId(ThisProcess::id());
     asio::io_service ios;
     asio::signal_set signals(ios, SIGCHLD);
+    asio::steady_timer killTimer(ios);
 
     // handles signals
     std::function<void(const bs::error_code &e, int signo)> signalHandler;
+    std::function<void(const bs::error_code &e)> killTimeoutHandler;
+
     signalHandler = [&](const bs::error_code&, int signo)
     {
         signals.async_wait(signalHandler);
@@ -680,7 +703,13 @@ void GdalWarper::Detail::runManager(Process::Id parentId)
                 // try to join this process
                 auto id(worker->id());
                 worker->join(true);
-                LOG(warn2) << "Process " << id << " terminated unexpectedly.";
+                if (worker->killed()) {
+                    LOG(info1)
+                        << "Collected process " << id << ".";
+                } else {
+                    LOG(warn2)
+                        << "Process " << id << " terminated unexpectedly.";
+                }
                 worker->internalError(mutex());
 
                 // process terminated -> remove
@@ -692,7 +721,17 @@ void GdalWarper::Detail::runManager(Process::Id parentId)
         }
     };
 
-    signals.async_wait(signalHandler);
+    killTimeoutHandler = [&](const bs::error_code&)
+    {
+        killTimer.expires_from_now
+        (std::chrono::seconds(options_.rssCheckPeriod));
+        killTimer.async_wait(killTimeoutHandler);
+        killLeviathan();
+    };
+
+    // launch handler to let them register
+    signalHandler({}, 0);
+    killTimeoutHandler({});
 
     std::size_t idGenerator(0);
 
@@ -731,6 +770,66 @@ void GdalWarper::Detail::runManager(Process::Id parentId)
     LOG(info3) << "Stopping GDAL warper worker processes.";
     cleanup(true);
     LOG(info3) << "Stopped GDAL warper manager process.";
+}
+
+void GdalWarper::Detail::killLeviathan()
+{
+    utility::PidList pids;
+    for (const auto &item : workers_) { pids.push_back(item.first); }
+
+    auto stats(utility::getProcStat(pids));
+
+    struct Usage {
+        Process::Id pid;
+        std::size_t mem;
+
+        Usage(const utility::ProcStat &ps)
+            : pid(ps.pid), mem(ps.occupies())
+        {
+            // remove shared memory count; stop at zero
+            if (mem > ps.shared) {
+                mem -= ps.shared;
+            } else {
+                mem = 0;
+            }
+        }
+
+        bool operator<(const Usage &u) const { return mem > u.mem; }
+
+        typedef std::vector<Usage> list;
+    };
+
+    Usage::list usage;
+    std::size_t total(0);
+    for (const auto &ps : stats) {
+        usage.emplace_back(ps);
+        total += usage.back().mem;
+    }
+    std::sort(usage.begin(), usage.end());
+
+    // compute limit in kilobytes
+    const std::size_t limit(options_.rssLimit * 1024);
+
+    LOG(info1) << "Total: " << total << " KB, limit: " << limit << " KB";
+
+    // process whole process list sorted by memory usage
+    for (const auto &u : usage) {
+        if (total < limit) { return; }
+
+        // a leviathan found! kill it with fire
+        LOG(info3)
+            << "Killing large GDAL process " << u.pid
+            << " occupying " << (double(total) / 1024) << "MB of memory.";
+
+        auto fworkers(workers_.find(u.pid));
+        if (fworkers != workers_.end()) {
+            fworkers->second->terminate();
+        } else {
+            // should not happen
+            Process::kill(u.pid);
+        }
+        total -= u.mem;
+    }
 }
 
 void GdalWarper::Detail::start()
@@ -813,7 +912,8 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
 
     auto isRunning([&]()
     {
-        return running() && (parentId == ThisProcess::parentId());
+        return (running() && (parentId == ThisProcess::parentId())
+                && runnable_.isRunning());
     });
 
     while (isRunning()) {
@@ -861,9 +961,11 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
                 << "Uncaught exception in worker: <" << e.what()
                 << ">. Going on.";
         }
+
+        if (cache.worn()) { break; }
     }
 
-    LOG(info2) << "Terminated GDAL worker id:" << id << ".";
+    LOG(info2) << "GDAL worker id" << id << " finishing.";
 }
 
 GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
