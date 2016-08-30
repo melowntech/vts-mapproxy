@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.14) citationtech-wheezy; urgency=low
+
+  * Limiting GDAL processes' memory footprint.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 30 Aug 2016 14:05:39 +0200
+
 ctt-vts-mapproxy (0.13) citationtech-wheezy; urgency=low
 
   * Fixed navtile limit for surface-spheroid.
