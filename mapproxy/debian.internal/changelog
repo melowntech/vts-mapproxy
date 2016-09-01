@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.16) citationtech-wheezy; urgency=low
+
+  * Fixed spheroid watertightness. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Thu, 01 Sep 2016 14:26:08 +0200
+
 ctt-vts-mapproxy (0.15) citationtech-wheezy; urgency=low
 
   * Geo fixes. 
