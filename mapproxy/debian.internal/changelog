@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.15) citationtech-wheezy; urgency=low
+
+  * Geo fixes. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Wed, 31 Aug 2016 15:50:50 +0200
+
 ctt-vts-mapproxy (0.14) citationtech-wheezy; urgency=low
 
   * Limiting GDAL processes' memory footprint.
