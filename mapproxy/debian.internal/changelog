@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.17) citationtech-wheezy; urgency=low
+
+  * Optimized surface-spheroid driver. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Thu, 01 Sep 2016 17:01:30 +0200
+
 ctt-vts-mapproxy (0.16) citationtech-wheezy; urgency=low
 
   * Fixed spheroid watertightness. 
