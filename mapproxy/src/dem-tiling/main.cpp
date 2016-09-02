@@ -38,6 +38,7 @@ public:
     DemTiling()
         : service::Cmdline("dem-tiling", BUILD_TARGET_VERSION)
         , extentsSampling_(20), tileSampling_(128), parallel_(true)
+        , forceWatertight_(false)
     {
     }
 
@@ -61,6 +62,7 @@ private:
 
     fs::path dataset_;
     bool parallel_;
+    bool forceWatertight_;
 };
 
 void DemTiling::configuration(po::options_description &cmdline
@@ -89,6 +91,10 @@ void DemTiling::configuration(po::options_description &cmdline
         ("parallel", po::value(&parallel_)
          ->default_value(parallel_)
          , "Use OpenMP to parallelize work.")
+        ("forceWatertight", po::value(&forceWatertight_)
+         ->default_value(forceWatertight_)->implicit_value(true)
+         , "Treats all partial tiles as watertight. Will lie about the holes "
+           "in the dataset.")
         ;
 
     pd.add("input", 1)
@@ -154,7 +160,7 @@ public:
     TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                , const vts::NodeInfo &root
                , vts::LodRange lodRange, int tileSampling
-               , bool parallel);
+               , bool parallel, bool forceWatertight);
 
 private:
     void process(const vts::NodeInfo &node, bool upscaling = false);
@@ -179,15 +185,16 @@ private:
 
     std::vector<geo::GeoDataset> gds_;
     bool parallel_;
+    bool forceWatertight_;
 };
 
 
 TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                        , const vts::NodeInfo &root, vts::LodRange lodRange
-                       , int tileSampling, bool parallel)
+                       , int tileSampling, bool parallel, bool forceWatertight)
     : dataset_(dataset), ti_(ti), lodRange_(lodRange)
     , tileSampling_(tileSampling), srs_(root.srsDef())
-    , parallel_(parallel)
+    , parallel_(parallel), forceWatertight_(forceWatertight)
 {
     if (parallel_) {
         UTILITY_OMP(parallel)
@@ -293,7 +300,18 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 
         // grab mask of warped dataset
         const auto &mask(tileDs.cmask());
-        switch (node.checkMask(mask, vts::NodeInfo::CoverageType::grid, 1)) {
+
+        auto checkMask([&]() -> vts::NodeInfo::CoveredArea {
+            auto res(node.checkMask(mask, vts::NodeInfo::CoverageType::grid, 1));
+
+            if (forceWatertight_ && (res == vts::NodeInfo::CoveredArea::some)) {
+                return vts::NodeInfo::CoveredArea::whole;
+            }
+
+            return res;
+        });
+
+        switch (ckeckMask()) {
         case vts::NodeInfo::CoveredArea::whole: {
             // fully covered by dataset and by reference frame definition
 
@@ -379,7 +397,7 @@ int DemTiling::run()
     vts::TileIndex ti;
 
     TreeWalker(ti, dataset_, vts::NodeInfo(rf), lodRange_
-               , tileSampling_, parallel_);
+               , tileSampling_, parallel_, forceWatertight_);
 
     LOG(info3) << "Saving generated tile index into " << output_ << ".";
     ti.save(output_);
