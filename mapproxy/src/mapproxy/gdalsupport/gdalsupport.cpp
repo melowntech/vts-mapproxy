@@ -283,6 +283,7 @@ public:
 
     ~ShRequest() {
         if (raster_) { sm_.destroy_ptr(raster_); }
+        if (heightcode_) { sm_.destroy_ptr(heightcode_); }
     }
 
     template <typename T>
