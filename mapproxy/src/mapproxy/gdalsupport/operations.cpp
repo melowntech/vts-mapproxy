@@ -356,3 +356,36 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
 
     return allocateHc(mb, os.str(), metadata);
 }
+
+GdalWarper::Heighcoded*
+heightcode(DatasetCache &cache, ManagedBuffer &mb
+           , const std::string &vectorDs
+           , const GdalWarper::Navtile &navtile
+           , geo::heightcoding::Config config
+           , const boost::optional<std::string> &geoidGrid)
+{
+    // open vector dataset
+    OptionsWrapper openOptions;
+    if (config.clipWorkingExtents) {
+        openOptions("@MVT_EXTENTS", *config.clipWorkingExtents);
+    }
+
+    if (config.workingSrs) {
+        openOptions("@MVT_SRS", *config.workingSrs);
+    }
+
+    auto vds(openVectorDataset(vectorDs, openOptions));
+    auto &rds(cache(""));
+
+    (void) navtile;
+
+    if (geoidGrid) {
+        // apply geoid grid to SRS of rasterDs and set to rasterDsSrs
+        config.rasterDsSrs = geo::setGeoid(rds.srs(), *geoidGrid);
+    }
+
+    std::ostringstream os;
+    auto metadata(geo::heightcoding::heightCode(*vds, rds, os, config));
+
+    return allocateHc(mb, os.str(), metadata);
+}

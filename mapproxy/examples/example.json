@@ -619,7 +619,7 @@
             , "demDataset": "viewfinder"
             , "geoidGrid": "egm96_15.gtx"
             , "format": "geodataJson"
-            , "styleUrl": "http://pomerol.internal:8870/plain/dummy-stylesheet.json"
+            , "styleUrl": "http://cdn.melown.com/mario/store/melown2015/stylesheet/melown/mapzen-stylesheet"
             , "displaySize": 256
 
             , "introspection": {

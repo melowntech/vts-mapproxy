@@ -1,3 +1,6 @@
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/replace.hpp>
+
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
 
@@ -6,6 +9,8 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
+#include "vts-libs/vts/opencv/navtile.hpp"
+
 #include "../support/python.hpp"
 #include "../support/tileindex.hpp"
 #include "../support/srs.hpp"
@@ -13,6 +18,8 @@
 #include "./geodata-vector-tiled.hpp"
 #include "./factory.hpp"
 #include "./metatile.hpp"
+
+namespace ba = boost::algorithm;
 
 namespace vr = vadstena::registry;
 namespace fs = boost::filesystem;
@@ -101,8 +108,9 @@ vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
     auto &def(fl.createDefinition<vr::FreeLayer::GeodataTiles>());
     def.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
                              , resource(), root);
-    def.geodataUrl = prependRoot(std::string("{lod}-{x}-{y}.geo")
-                                , resource(), root);
+    def.geodataUrl = prependRoot
+        (std::string("{lod}-{x}-{y}.geo?navtile={geonavtile}")
+         , resource(), root);
     def.style = definition_.styleUrl;
 
     def.lodRange = res.lodRange;
@@ -168,6 +176,122 @@ void GeodataVectorTiled::generateMetatile(Sink &sink
     sink.content(os.str(), fi.sinkFileInfo());
 }
 
+namespace {
+
+typedef boost::iterator_range<std::string::const_iterator> SubString;
+typedef std::vector<SubString> Args;
+typedef std::pair<SubString, SubString> KeyValue;
+
+KeyValue splitArgument(const SubString &arg)
+{
+    auto b(std::begin(arg));
+    auto e(std::end(arg));
+    for (auto i(b); i != e; ++i) {
+        if (*i == '=') {
+            return KeyValue(SubString(b, i), SubString(std::next(i), e));
+        }
+    }
+    return KeyValue(SubString(b, e), SubString());
+}
+
+struct NavtileInfo {
+    std::string url;
+    vts::TileId tileId;
+    vts::NavTile::HeightRange heightRange;
+};
+
+boost::optional<NavtileInfo> parseNavtileInfo(const SubString &value)
+{
+    // TODO: url-decode
+
+    std::vector<std::string> parts;
+    ba::split(parts, value, ba::is_any_of(";"));
+    if (parts.size() != 4) {
+        LOG(warn1) << "Navtile info doesn't have 4 elements.";
+        return boost::none;
+    }
+
+    try {
+        NavtileInfo ni;
+        // replace .nav -> .rnavtile
+        ni.url = ba::replace_all_copy(parts[0], ".nav", ".rnavtile");
+        ni.tileId = boost::lexical_cast<vts::TileId>(parts[1]);
+        ni.heightRange.min = boost::lexical_cast<int>(parts[2]);
+        ni.heightRange.max = boost::lexical_cast<int>(parts[3]);
+        return ni;
+    } catch (const boost::bad_lexical_cast&) {
+        LOG(warn1) << "Unable to parse navtile info.";
+    }
+
+    return boost::none;
+}
+
+boost::optional<NavtileInfo> parseQuery(const std::string &query)
+{
+    Args args;
+    ba::split(args, query, ba::is_any_of("&"), ba::token_compress_on);
+
+    for (auto iargs(args.begin()), eargs(args.end()); iargs != eargs; ++iargs)
+    {
+        auto kv(splitArgument(*iargs));
+        if (ba::equals(kv.first, "navtile")) {
+            return parseNavtileInfo(kv.second);
+        }
+    }
+    return boost::none;
+}
+
+/** Build navtile descriptor from heightrange.
+ */
+GdalWarper::Navtile buildNavtile(const vts::NodeInfo &nodeInfo
+                                 , const vts::NavTile::HeightRange &heightRange
+                                 , const std::string &raw)
+{
+    GdalWarper::Navtile nt;
+    nt.raw = raw;
+    nt.extents = nodeInfo.extents();
+    nt.heightRange = heightRange;
+    nt.sdsSrs = nodeInfo.srs();
+    nt.navSrs = nodeInfo.referenceFrame().model.navigationSrs;
+    return nt;
+}
+
+void fetchNavtile(Sink &sink, const GeodataFileInfo &fi, Arsenal &arsenal
+                  , const NavtileInfo &ni, const vts::NodeInfo &nodeInfo
+                  , const GeodataVectorBase::Definition &definition
+                  , const vr::Srs &physicalSrs
+                  , const std::string &tileUrl)
+{
+    typedef utility::ResourceFetcher::Query Query;
+    typedef utility::ResourceFetcher::MultiQuery MultiQuery;
+    arsenal.fetcher.perform(Query(ni.url), [=, &arsenal](MultiQuery &&mq)
+                            mutable
+    {
+        try {
+            const auto &q(mq.front());
+
+            geo::heightcoding::Config config;
+            config.workingSrs = sds(nodeInfo, definition.geoidGrid);
+            config.outputSrs = physicalSrs.srsDef;
+            config.outputVerticalAdjust = physicalSrs.adjustVertical();
+            config.layers = definition.layers;
+            config.clipWorkingExtents = nodeInfo.extents();
+            config.format = definition.format;
+
+            // heightcode data using warper's machinery (using fetched navtile)
+            auto hc(arsenal.warper.heightcode
+                    (tileUrl, buildNavtile(nodeInfo, ni.heightRange
+                                           , q.get().data)
+                     , config, boost::none, sink));
+            sink.content(hc->data, hc->size, fi.sinkFileInfo(), true);
+        } catch (...) {
+            sink.error();
+        }
+    });
+}
+
+} // namespace
+
 void GeodataVectorTiled::generateGeodata(Sink &sink
                                          , const GeodataFileInfo &fi
                                          , Arsenal &arsenal) const
@@ -190,6 +314,25 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
                   (tileId, vts::local(nodeInfo.rootLod(), tileId))));
 
     LOG(debug) << "Using geo file: <" << tileUrl << ">.";
+
+    if (!fi.fileInfo.query.empty()) {
+        if (auto ni = parseQuery(fi.fileInfo.query)) {
+            LOG(info4) << "Received navtile info: url: <" << ni->url
+                       << ">, tileId: " << ni->tileId << ", heightRange: "
+                       << ni->heightRange << ".";
+
+            vts::NodeInfo niNodeInfo(referenceFrame(), ni->tileId);
+            if (!niNodeInfo.valid()) {
+                sink.error(utility::makeError<InternalError>
+                           ("Navtile ID is invalid."));
+                return;
+            }
+
+            fetchNavtile(sink, fi, arsenal, *ni, niNodeInfo
+                         , definition_, physicalSrs_, tileUrl);
+            return;
+        }
+    }
 
     geo::heightcoding::Config config;
     config.workingSrs = sds(nodeInfo, definition_.geoidGrid);

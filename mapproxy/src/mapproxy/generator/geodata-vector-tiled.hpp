@@ -34,7 +34,7 @@ private:
 
     vts::UrlTemplate tileUrl_;
 
-    const vr::Srs& physicalSrs_;
+    const vr::Srs &physicalSrs_;
 
     vts::tileset::Index index_;
 };

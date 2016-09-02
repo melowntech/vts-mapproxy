@@ -24,6 +24,7 @@
 #include "./datasetcache.hpp"
 #include "./types.hpp"
 #include "./operations.hpp"
+#include "./requests.hpp"
 
 namespace asio = boost::asio;
 namespace bs = boost::system;
@@ -44,209 +45,9 @@ SystemTime absTime(const Delta &delta)
     return systemTime() + delta;
 }
 
-std::string asString(const String &str) {
-    return { str.data(), str.size() };
-}
-
-boost::optional<std::string> asOptional(const String &str) {
-    if (str.empty()) { return {}; }
-    return std::string(str.data(), str.size());
-}
-
-boost::optional<geo::SrsDefinition>
-asOptional(const String &str, geo::SrsDefinition::Type type)
-{
-    if (str.empty()) { return {}; }
-    return geo::SrsDefinition(std::string(str.data(), str.size()), type);
-}
-
 typedef boost::posix_time::milliseconds milliseconds;
 
-class ShRequest;
-
-class ShRaster : boost::noncopyable {
-public:
-    ShRaster(const GdalWarper::RasterRequest &other
-                    , ManagedBuffer &sm, ShRequest *owner)
-        : sm_(sm), owner_(owner)
-        , operation_(other.operation)
-        , dataset_(other.dataset.data()
-                   , other.dataset.size()
-                   , sm.get_allocator<char>())
-        , srs_(other.srs.srs.data()
-               , other.srs.srs.size()
-               , sm.get_allocator<char>())
-        , srsType_(other.srs.type)
-        , extents_(other.extents)
-        , size_(other.size)
-        , resampling_(other.resampling)
-        , mask_(sm.get_allocator<char>())
-        , response_()
-    {
-        if (other.mask) {
-            mask_.assign(other.mask->data(), other.mask->size());
-        }
-    }
-
-    ~ShRaster() {
-        if (response_) { sm_.deallocate(response_); }
-    }
-
-    operator GdalWarper::RasterRequest() const {
-        return GdalWarper::RasterRequest
-            (operation_
-             , std::string(dataset_.data(), dataset_.size())
-             , geo::SrsDefinition(asString(srs_), srsType_)
-             , extents_, size_, resampling_
-             , asOptional(mask_));
-    }
-
-    /** Steals response.
-     */
-    cv::Mat* response() {
-        auto response(response_);
-        response_ = 0;
-        return response;
-    }
-
-    void response(bi::interprocess_mutex &mutex, cv::Mat *response);
-
-private:
-    ManagedBuffer &sm_;
-    ShRequest *owner_;
-
-    GdalWarper::RasterRequest::Operation operation_;
-    String dataset_;
-    String srs_;
-    geo::SrsDefinition::Type srsType_;
-    math::Extents2 extents_;
-    math::Size2 size_;
-    geo::GeoDataset::Resampling resampling_;
-    String mask_;
-
-    // response matrix
-    cv::Mat *response_;
-};
-
-class ShHeightCode : boost::noncopyable {
-public:
-    ShHeightCode(const std::string &vectorDs, const std::string &rasterDs
-                 , const geo::heightcoding::Config &config
-                 , const boost::optional<std::string> &geoidGrid
-                 , ManagedBuffer &sm, ShRequest *owner)
-        : sm_(sm), owner_(owner)
-        , vectorDs_(vectorDs.data(), vectorDs.size()
-                    , sm.get_allocator<char>())
-        , rasterDs_(rasterDs.data(), rasterDs.size()
-                    , sm.get_allocator<char>())
-
-        , workingSrs_(sm.get_allocator<char>())
-        , workingSrsType_()
-
-        , outputSrs_(sm.get_allocator<char>())
-        , outputSrsType_()
-
-        , clipWorkingExtents_(config.clipWorkingExtents)
-        , format_(config.format)
-
-        , geoidGrid_(sm.get_allocator<char>())
-
-        , response_()
-    {
-
-        if (config.workingSrs) {
-            workingSrs_.assign(config.workingSrs->srs.data()
-                               , config.workingSrs->srs.size());
-            workingSrsType_ = config.workingSrs->type;
-        }
-
-        if (config.outputSrs) {
-            outputSrs_.assign(config.outputSrs->srs.data()
-                              , config.outputSrs->srs.size());
-            outputSrsType_ = config.outputSrs->type;
-        }
-
-        if (config.layers) {
-            layers_ = boost::in_place(sm.get_allocator<String>());
-
-            for (const auto &str : *config.layers) {
-                layers_->push_back(String(str.data(), str.size()
-                                          , sm.get_allocator<char>()));
-            }
-        }
-
-        if (geoidGrid) {
-            geoidGrid_.assign(geoidGrid->data(), geoidGrid->size());
-        }
-    }
-
-    ~ShHeightCode() {
-        if (response_) { sm_.deallocate(response_); }
-    }
-
-    std::string vectorDs() const { return asString(vectorDs_); }
-
-    std::string rasterDs() const { return asString(rasterDs_); }
-
-    geo::heightcoding::Config config() const {
-        geo::heightcoding::Config config;
-        config.workingSrs = asOptional(workingSrs_, workingSrsType_);
-        config.outputSrs = asOptional(outputSrs_, outputSrsType_);
-        config.clipWorkingExtents = clipWorkingExtents_;
-
-        if (layers_) {
-            config.layers = boost::in_place();
-            for (const auto &str : *layers_) {
-                config.layers->emplace_back(str.data(), str.size());
-            }
-        }
-
-        config.format = format_;
-
-        return config;
-    }
-
-    boost::optional<std::string> geoidGrid() const {
-        return asOptional(geoidGrid_);
-    }
-
-    /** Steals response.
-     */
-    GdalWarper::Heighcoded* response() {
-        auto response(response_);
-        response_ = 0;
-        return response;
-    }
-
-    void response(bi::interprocess_mutex &mutex
-                  , GdalWarper::Heighcoded *response);
-
-private:
-    ManagedBuffer &sm_;
-    ShRequest *owner_;
-
-    String vectorDs_;
-    String rasterDs_;
-
-    String workingSrs_;
-    geo::SrsDefinition::Type workingSrsType_;
-
-    String outputSrs_;
-    geo::SrsDefinition::Type outputSrsType_;
-
-    boost::optional<StringVector> layers_;
-
-    boost::optional<math::Extents2> clipWorkingExtents_;
-
-    geo::VectorFormat format_;
-
-    String geoidGrid_;
-
-    // response memory block
-    GdalWarper::Heighcoded *response_;
-};
-
-class ShRequest : boost::noncopyable {
+class ShRequest : boost::noncopyable, public ShRequestBase {
 public:
     typedef bi::deleter<ShRequest, SegmentManager> Deleter;
     typedef bi::shared_ptr<ShRequest, Allocator, Deleter> pointer;
@@ -259,6 +60,7 @@ public:
         , raster_(sm.construct<ShRaster>
                   (bi::anonymous_instance)(other, sm, this))
         , heightcode_()
+        , navHeightcode_()
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
@@ -275,6 +77,24 @@ public:
         , heightcode_(sm.construct<ShHeightCode>
                       (bi::anonymous_instance)
                       (vectorDs, rasterDs, config, geoidGrid, sm, this))
+        , navHeightcode_()
+        , done_(false)
+        , error_(sm.get_allocator<char>())
+        , errorType_(ErrorType::none)
+        , ec_()
+    {}
+
+    ShRequest(const std::string &vectorDs
+              , const GdalWarper::Navtile &navtile
+              , const geo::heightcoding::Config &config
+              , const boost::optional<std::string> &geoidGrid
+              , ManagedBuffer &sm)
+        : sm_(sm)
+        , raster_()
+        , heightcode_()
+        , navHeightcode_(sm.construct<ShNavHeightCode>
+                         (bi::anonymous_instance)
+                         (vectorDs, navtile, config, geoidGrid, sm, this))
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
@@ -283,6 +103,8 @@ public:
 
     ~ShRequest() {
         if (raster_) { sm_.destroy_ptr(raster_); }
+        if (heightcode_) { sm_.destroy_ptr(heightcode_); }
+        if (navHeightcode_) { sm_.destroy_ptr(heightcode_); }
     }
 
     template <typename T>
@@ -299,7 +121,7 @@ public:
     GdalWarper::Heighcoded::pointer getHeighcoded(Lock &lock);
     GdalWarper::Heighcoded::pointer getHeighcoded(bi::interprocess_mutex &mutex);
 
-    void done();
+    virtual void done_impl();
     void process(bi::interprocess_mutex &mutex, DatasetCache &cache);
 
     static pointer create(const GdalWarper::RasterRequest &req
@@ -324,11 +146,25 @@ public:
                        , mb.get_deleter<ShRequest>());
     }
 
+    static pointer create(const std::string &vectorDs
+                          , const GdalWarper::Navtile &navtile
+                          , const geo::heightcoding::Config &config
+                          , const boost::optional<std::string> &geoidGrid
+                          , ManagedBuffer &mb)
+    {
+        return pointer(mb.construct<ShRequest>
+                       (bi::anonymous_instance)
+                       (vectorDs, navtile, config, geoidGrid, mb)
+                       , mb.get_allocator<void>()
+                       , mb.get_deleter<ShRequest>());
+    }
+
 private:
     ManagedBuffer &sm_;
 
     ShRaster *raster_;
     ShHeightCode *heightcode_;
+    ShNavHeightCode *navHeightcode_;
 
     // response condition and flag
     bi::interprocess_condition cond_;
@@ -360,31 +196,23 @@ void ShRequest::process(bi::interprocess_mutex &mutex
         return;
     }
 
+    if (navHeightcode_) {
+        navHeightcode_->response
+            (mutex, ::heightcode(cache, sm_
+                                 , navHeightcode_->vectorDs()
+                                 , navHeightcode_->navtile()
+                                 , navHeightcode_->config()
+                                 , navHeightcode_->geoidGrid()));
+        return;
+    }
+
     setError(mutex, InternalError("No associated request."));
 }
 
-void ShRequest::done()
+void ShRequest::done_impl()
 {
-
     done_ = true;
     cond_.notify_one();
-}
-
-void ShRaster::response(bi::interprocess_mutex &mutex, cv::Mat *response)
-{
-    Lock lock(mutex);
-    if (response_) { return; }
-    response_ = response;
-    owner_->done();
-}
-
-void ShHeightCode::response(bi::interprocess_mutex &mutex
-                            , GdalWarper::Heighcoded *response)
-{
-    Lock lock(mutex);
-    if (response_) { return; }
-    response_ = response;
-    owner_->done();
 }
 
 template <typename T>
@@ -475,12 +303,15 @@ GdalWarper::Heighcoded::pointer ShRequest::getHeighcoded(Lock &lock)
 
     // TODO: extend for other memblock-generating operations
 
-    if (!heightcode_) {
+    if (!(heightcode_ || navHeightcode_)) {
         throw std::logic_error("This shared request is not handling a "
                                "vector operation!");
     }
 
-    if (auto *response = heightcode_->response()) {
+    if (auto *response = (heightcode_
+                          ? heightcode_->response()
+                          : navHeightcode_->response()))
+    {
         return GdalWarper::Heighcoded::pointer
             (response, [&sm_](GdalWarper::Heighcoded *block)
         {
@@ -591,6 +422,13 @@ public:
                , const boost::optional<std::string> &geoidGrid
                , Aborter &aborter);
 
+    Heighcoded::pointer
+    heightcode(const std::string &vectorDs
+               , const Navtile &navtile
+               , const geo::heightcoding::Config &config
+               , const boost::optional<std::string> &geoidGrid
+               , Aborter &aborter);
+
     void housekeeping();
 
 private:
@@ -643,6 +481,16 @@ GdalWarper::heightcode(const std::string &vectorDs
                        , Aborter &aborter)
 {
     return detail().heightcode(vectorDs, rasterDs, config, geoidGrid, aborter);
+}
+
+GdalWarper::Heighcoded::pointer
+GdalWarper::heightcode(const std::string &vectorDs
+                       , const Navtile &navtile
+                       , const geo::heightcoding::Config &config
+                       , const boost::optional<std::string> &geoidGrid
+                       , Aborter &aborter)
+{
+    return detail().heightcode(vectorDs, navtile, config, geoidGrid, aborter);
 }
 
 void GdalWarper::housekeeping()
@@ -1001,6 +849,34 @@ GdalWarper::Detail::heightcode(const std::string &vectorDs
     Lock lock(mutex());
     ShRequest::pointer shReq
         (ShRequest::create(vectorDs, rasterDs, config, geoidGrid, mb_));
+    queue_->push_back(shReq);
+    cond().notify_one();
+
+    {
+        // set aborter for this request
+        ShRequest::wpointer wreq(shReq);
+        aborter.setAborter([wreq, this]()
+        {
+            if (auto r = wreq.lock()) {
+                r->setError
+                    (mutex(), RequestAborted("Request has been aborted"));
+            }
+        });
+    }
+
+    return shReq->getHeighcoded(lock);
+}
+
+GdalWarper::Heighcoded::pointer
+GdalWarper::Detail::heightcode(const std::string &vectorDs
+                               , const Navtile &navtile
+                               , const geo::heightcoding::Config &config
+                               , const boost::optional<std::string> &geoidGrid
+                               , Aborter &aborter)
+{
+    Lock lock(mutex());
+    ShRequest::pointer shReq
+        (ShRequest::create(vectorDs, navtile, config, geoidGrid, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 
