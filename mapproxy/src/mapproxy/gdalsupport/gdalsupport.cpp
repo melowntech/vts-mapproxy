@@ -87,14 +87,13 @@ public:
     ShRequest(const std::string &vectorDs
               , const GdalWarper::Navtile &navtile
               , const geo::heightcoding::Config &config
-              , const boost::optional<std::string> &geoidGrid
               , ManagedBuffer &sm)
         : sm_(sm)
         , raster_()
         , heightcode_()
         , navHeightcode_(sm.construct<ShNavHeightCode>
                          (bi::anonymous_instance)
-                         (vectorDs, navtile, config, geoidGrid, sm, this))
+                         (vectorDs, navtile, config, sm, this))
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
@@ -104,7 +103,7 @@ public:
     ~ShRequest() {
         if (raster_) { sm_.destroy_ptr(raster_); }
         if (heightcode_) { sm_.destroy_ptr(heightcode_); }
-        if (navHeightcode_) { sm_.destroy_ptr(heightcode_); }
+        if (navHeightcode_) { sm_.destroy_ptr(navHeightcode_); }
     }
 
     template <typename T>
@@ -149,12 +148,11 @@ public:
     static pointer create(const std::string &vectorDs
                           , const GdalWarper::Navtile &navtile
                           , const geo::heightcoding::Config &config
-                          , const boost::optional<std::string> &geoidGrid
                           , ManagedBuffer &mb)
     {
         return pointer(mb.construct<ShRequest>
                        (bi::anonymous_instance)
-                       (vectorDs, navtile, config, geoidGrid, mb)
+                       (vectorDs, navtile, config, mb)
                        , mb.get_allocator<void>()
                        , mb.get_deleter<ShRequest>());
     }
@@ -200,9 +198,9 @@ void ShRequest::process(bi::interprocess_mutex &mutex
         navHeightcode_->response
             (mutex, ::heightcode(cache, sm_
                                  , navHeightcode_->vectorDs()
-                                 , navHeightcode_->navtile()
-                                 , navHeightcode_->config()
-                                 , navHeightcode_->geoidGrid()));
+                                 , navHeightcode_->navtile(true)
+                                 , navHeightcode_->rawData()
+                                 , navHeightcode_->config()));
         return;
     }
 
@@ -426,7 +424,6 @@ public:
     heightcode(const std::string &vectorDs
                , const Navtile &navtile
                , const geo::heightcoding::Config &config
-               , const boost::optional<std::string> &geoidGrid
                , Aborter &aborter);
 
     void housekeeping();
@@ -487,10 +484,9 @@ GdalWarper::Heighcoded::pointer
 GdalWarper::heightcode(const std::string &vectorDs
                        , const Navtile &navtile
                        , const geo::heightcoding::Config &config
-                       , const boost::optional<std::string> &geoidGrid
                        , Aborter &aborter)
 {
-    return detail().heightcode(vectorDs, navtile, config, geoidGrid, aborter);
+    return detail().heightcode(vectorDs, navtile, config, aborter);
 }
 
 void GdalWarper::housekeeping()
@@ -871,12 +867,11 @@ GdalWarper::Heighcoded::pointer
 GdalWarper::Detail::heightcode(const std::string &vectorDs
                                , const Navtile &navtile
                                , const geo::heightcoding::Config &config
-                               , const boost::optional<std::string> &geoidGrid
                                , Aborter &aborter)
 {
     Lock lock(mutex());
     ShRequest::pointer shReq
-        (ShRequest::create(vectorDs, navtile, config, geoidGrid, mb_));
+        (ShRequest::create(vectorDs, navtile, config, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 

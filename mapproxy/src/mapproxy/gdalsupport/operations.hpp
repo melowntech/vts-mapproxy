@@ -19,7 +19,7 @@ GdalWarper::Heighcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
            , const GdalWarper::Navtile &navtile
-           , geo::heightcoding::Config config
-           , const boost::optional<std::string> &geoidGrid);
+           , const ConstBlock &dataBlock
+           , geo::heightcoding::Config config);
 
 #endif // mapproxy_gdalsupport_operations_hpp_included_

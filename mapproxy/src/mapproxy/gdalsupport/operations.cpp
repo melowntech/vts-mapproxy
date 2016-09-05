@@ -1,11 +1,21 @@
 #include <new>
 #include <algorithm>
 
+#include <boost/iostreams/stream_buffer.hpp>
+#include <boost/iostreams/device/array.hpp>
+
 #include "imgproc/rastermask/cvmat.hpp"
+
+#include "geo/verticaladjuster.hpp"
+
+#include "vts-libs/vts/opencv/navtile.hpp"
 
 #include "../error.hpp"
 #include "../support/geo.hpp"
 #include "./operations.hpp"
+
+namespace bio = boost::iostreams;
+namespace vr = vadstena::registry;
 
 namespace {
 
@@ -304,6 +314,22 @@ VectorDataset openVectorDataset(const std::string &dataset
                          , [](::GDALDataset *ds) { delete ds; });
 }
 
+VectorDataset openVectorDataset(const std::string &dataset
+                                , geo::heightcoding::Config config)
+{
+    // open vector dataset
+    OptionsWrapper openOptions;
+    if (config.clipWorkingExtents) {
+        openOptions("@MVT_EXTENTS", *config.clipWorkingExtents);
+    }
+
+    if (config.workingSrs) {
+        openOptions("@MVT_SRS", *config.workingSrs);
+    }
+
+    return openVectorDataset(dataset, openOptions);
+}
+
 GdalWarper::Heighcoded*
 allocateHc(ManagedBuffer &mb
            , const std::string &data
@@ -324,28 +350,11 @@ allocateHc(ManagedBuffer &mb
         (dataPtr, data.size(), metadata);
 }
 
-} //namespace
-
 GdalWarper::Heighcoded*
-heightcode(DatasetCache &cache, ManagedBuffer &mb
-           , const std::string &vectorDs
-           , const std::string &rasterDs
-           , geo::heightcoding::Config config
-           , const boost::optional<std::string> &geoidGrid)
+heightcode(ManagedBuffer &mb, const VectorDataset &vds
+           , const geo::GeoDataset &rds, geo::heightcoding::Config config
+           , const boost::optional<std::string> &geoidGrid = boost::none)
 {
-    // open vector dataset
-    OptionsWrapper openOptions;
-    if (config.clipWorkingExtents) {
-        openOptions("@MVT_EXTENTS", *config.clipWorkingExtents);
-    }
-
-    if (config.workingSrs) {
-        openOptions("@MVT_SRS", *config.workingSrs);
-    }
-
-    auto vds(openVectorDataset(vectorDs, openOptions));
-    auto &rds(cache(rasterDs));
-
     if (geoidGrid) {
         // apply geoid grid to SRS of rasterDs and set to rasterDsSrs
         config.rasterDsSrs = geo::setGeoid(rds.srs(), *geoidGrid);
@@ -357,35 +366,98 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
     return allocateHc(mb, os.str(), metadata);
 }
 
+
+
+geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
+                            , const ConstBlock &dataBlock)
+{
+    (void) ni;
+    (void) dataBlock;
+    vts::opencv::NavTile navtile;
+
+    {
+        bio::stream_buffer<bio::array_source>
+            buffer(dataBlock.data, dataBlock.data + dataBlock.size);
+        std::istream is(&buffer);
+        is.exceptions(std::ios::badbit | std::ios::failbit);
+        navtile.deserialize(ni.heightRange, is, ni.path);
+    }
+
+    // get data and mask
+    cv::Mat_<vts::opencv::NavTile::DataType> data(navtile.data());
+    auto mask(navtile.coverageMask());
+
+    /** We make various assumptions about SDS and navigation SRS.
+     *
+     * * both share the vertical coordinate system
+     *
+     * * if navigation SRS is vertically adjusted then both have the same
+     *   horizontal system
+     */
+
+    auto navSrs(vr::system.srs(ni.navSrs));
+    const math::Size2 size(data.cols, data.rows);
+
+    if (navSrs.adjustVertical()) {
+        // unudjust Z-coordinates
+        geo::VerticalAdjuster va(navSrs.srsDef);
+
+        auto es(math::size(ni.extents));
+        math::Size2f px(es.width / size.width, es.height / size.height);
+        math::Point2d origin(ul(ni.extents));
+        for (auto j(0), ej(size.height); j != ej; ++j, origin(1) += px.height)
+        {
+            auto p(origin);
+            for (auto i(0), ei(size.width); i != ei; ++i, p(0) += px.width) {
+                // get height (as reference)
+                auto &h(data(j, i));
+                // unadjust point and write again
+                try {
+                    // ignore projection errors
+                    h = va({ p(0), p(1), h }, true)(2);
+                } catch (...) {}
+            }
+        }
+    }
+
+    // merge(HCS(SDS), VCS(navSrs)) to get proper vertical system
+    const auto dsmSds(geo::merge
+                      (vr::system.srs(ni.sdsSrs).srsDef, navSrs.srsDef));
+
+    auto ds(geo::GeoDataset::create
+            ({}, dsmSds
+             , extentsPlusHalfPixel(ni.extents, size), size
+             , geo::GeoDataset::Format::dsm
+             (geo::GeoDataset::Format::Storage::memory)
+             , geo::NodataValue(-1e6)));
+
+    auto &dsData(ds.data());
+    data.convertTo(dsData, dsData.type());
+    ds.mask() = mask;
+    ds.flush();
+    return ds;
+}
+
+} // namespace
+
 GdalWarper::Heighcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
-           , const GdalWarper::Navtile &navtile
+           , const std::string &rasterDs
            , geo::heightcoding::Config config
            , const boost::optional<std::string> &geoidGrid)
 {
-    // open vector dataset
-    OptionsWrapper openOptions;
-    if (config.clipWorkingExtents) {
-        openOptions("@MVT_EXTENTS", *config.clipWorkingExtents);
-    }
+    return heightcode(mb, openVectorDataset(vectorDs, config), cache(rasterDs)
+                      , config, geoidGrid);
+}
 
-    if (config.workingSrs) {
-        openOptions("@MVT_SRS", *config.workingSrs);
-    }
-
-    auto vds(openVectorDataset(vectorDs, openOptions));
-    auto &rds(cache(""));
-
-    (void) navtile;
-
-    if (geoidGrid) {
-        // apply geoid grid to SRS of rasterDs and set to rasterDsSrs
-        config.rasterDsSrs = geo::setGeoid(rds.srs(), *geoidGrid);
-    }
-
-    std::ostringstream os;
-    auto metadata(geo::heightcoding::heightCode(*vds, rds, os, config));
-
-    return allocateHc(mb, os.str(), metadata);
+GdalWarper::Heighcoded*
+heightcode(DatasetCache&, ManagedBuffer &mb
+           , const std::string &vectorDs
+           , const GdalWarper::Navtile &navtile
+           , const ConstBlock &dataBlock
+           , geo::heightcoding::Config config)
+{
+    return heightcode(mb, openVectorDataset(vectorDs, config)
+                      , fromNavtile(navtile, dataBlock), config);
 }

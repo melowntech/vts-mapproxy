@@ -56,4 +56,13 @@ asOptional(const String &str, geo::SrsDefinition::Type type)
     return geo::SrsDefinition(std::string(str.data(), str.size()), type);
 }
 
+struct ConstBlock {
+    const char *data;
+    std::size_t size;
+
+    ConstBlock(const char *data = nullptr, std::size_t size = 0)
+        : data(data), size(size)
+    {}
+};
+
 #endif // mapproxy_gdalsupport_types_hpp_included_

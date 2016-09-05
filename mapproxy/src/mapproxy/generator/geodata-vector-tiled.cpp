@@ -200,9 +200,10 @@ struct NavtileInfo {
     vts::NavTile::HeightRange heightRange;
 };
 
-boost::optional<NavtileInfo> parseNavtileInfo(const SubString &value)
+boost::optional<NavtileInfo> parseNavtileInfo(std::string value)
 {
-    // TODO: url-decode
+    // url-decode value
+    value = utility::urlDecode(value);
 
     std::vector<std::string> parts;
     ba::split(parts, value, ba::is_any_of(";"));
@@ -235,7 +236,8 @@ boost::optional<NavtileInfo> parseQuery(const std::string &query)
     {
         auto kv(splitArgument(*iargs));
         if (ba::equals(kv.first, "navtile")) {
-            return parseNavtileInfo(kv.second);
+            return parseNavtileInfo(std::string(std::begin(kv.second)
+                                                , std::end(kv.second)));
         }
     }
     return boost::none;
@@ -245,9 +247,11 @@ boost::optional<NavtileInfo> parseQuery(const std::string &query)
  */
 GdalWarper::Navtile buildNavtile(const vts::NodeInfo &nodeInfo
                                  , const vts::NavTile::HeightRange &heightRange
-                                 , const std::string &raw)
+                                 , const std::string &raw
+                                 , const std::string &path)
 {
     GdalWarper::Navtile nt;
+    nt.path = path;
     nt.raw = raw;
     nt.extents = nodeInfo.extents();
     nt.heightRange = heightRange;
@@ -281,8 +285,8 @@ void fetchNavtile(Sink &sink, const GeodataFileInfo &fi, Arsenal &arsenal
             // heightcode data using warper's machinery (using fetched navtile)
             auto hc(arsenal.warper.heightcode
                     (tileUrl, buildNavtile(nodeInfo, ni.heightRange
-                                           , q.get().data)
-                     , config, boost::none, sink));
+                                           , q.get().data, q.location())
+                     , config, sink));
             sink.content(hc->data, hc->size, fi.sinkFileInfo(), true);
         } catch (...) {
             sink.error();

@@ -101,15 +101,18 @@ private:
 };
 
 struct ShNavtile {
-    String raw_;
-    math::Extents2 extents_;
-    String sdsSrs_;
-    String navSrs_;
+    String path;
+    String raw;
+    math::Extents2 extents;
+    String sdsSrs;
+    String navSrs;
     vts::NavTile::HeightRange heightRange;
 
     ShNavtile(const GdalWarper::Navtile &navtile, ManagedBuffer &sm);
 
-    operator GdalWarper::Navtile() const;
+    GdalWarper::Navtile navtile(bool noRaw = false) const;
+
+    ConstBlock rawData() const;
 };
 
 class ShNavHeightCode : boost::noncopyable {
@@ -117,18 +120,17 @@ public:
     ShNavHeightCode(const std::string &vectorDs
                     , const GdalWarper::Navtile &navtile
                     , const geo::heightcoding::Config &config
-                    , const boost::optional<std::string> &geoidGrid
                     , ManagedBuffer &sm, ShRequestBase *owner);
 
     ~ShNavHeightCode();
 
     std::string vectorDs() const;
 
-    GdalWarper::Navtile navtile() const;
+    GdalWarper::Navtile navtile(bool noRaw = false) const;
 
     geo::heightcoding::Config config() const;
 
-    boost::optional<std::string> geoidGrid() const;
+    ConstBlock rawData() const;
 
     /** Steals response.
      */
@@ -144,7 +146,6 @@ private:
     String vectorDs_;
     ShNavtile navtile_;
     ShHeightCodeConfig config_;
-    String geoidGrid_;
 
     // response memory block
     GdalWarper::Heighcoded *response_;

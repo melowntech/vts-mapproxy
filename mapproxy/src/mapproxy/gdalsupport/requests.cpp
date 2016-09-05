@@ -159,43 +159,45 @@ void ShHeightCode::response(bi::interprocess_mutex &mutex
 }
 
 ShNavtile::ShNavtile(const GdalWarper::Navtile &navtile, ManagedBuffer &sm)
-    : raw_(navtile.raw.data(), navtile.raw.size(), sm.get_allocator<char>())
-    , extents_(navtile.extents)
-    , sdsSrs_(navtile.sdsSrs.data(), navtile.sdsSrs.size()
-              , sm.get_allocator<char>())
-    , navSrs_(navtile.navSrs.data(), navtile.navSrs.size()
+    : path(navtile.path.data(), navtile.path.size(), sm.get_allocator<char>())
+    , raw(navtile.raw.data(), navtile.raw.size(), sm.get_allocator<char>())
+    , extents(navtile.extents)
+    , sdsSrs(navtile.sdsSrs.data(), navtile.sdsSrs.size()
+             , sm.get_allocator<char>())
+    , navSrs(navtile.navSrs.data(), navtile.navSrs.size()
               , sm.get_allocator<char>())
     , heightRange(navtile.heightRange)
 {}
 
-ShNavtile::operator GdalWarper::Navtile() const
+GdalWarper::Navtile ShNavtile::navtile(bool noRaw) const
 {
     GdalWarper::Navtile navtile;
-    navtile.raw = asString(raw_);
-    navtile.sdsSrs = asString(sdsSrs_);
-    navtile.navSrs = asString(navSrs_);
+    navtile.path = asString(path);
+    if (!noRaw) { navtile.raw = asString(raw); }
+    navtile.extents = extents;
+    navtile.sdsSrs = asString(sdsSrs);
+    navtile.navSrs = asString(navSrs);
     navtile.heightRange = heightRange;
     return navtile;
+}
+
+ConstBlock ShNavtile::rawData() const
+{
+    return { raw.data(), raw.size() };
 }
 
 ShNavHeightCode
 ::ShNavHeightCode(const std::string &vectorDs
                  , const GdalWarper::Navtile &navtile
                  , const geo::heightcoding::Config &config
-                 , const boost::optional<std::string> &geoidGrid
                  , ManagedBuffer &sm, ShRequestBase *owner)
     : sm_(sm), owner_(owner)
     , vectorDs_(vectorDs.data(), vectorDs.size()
                 , sm.get_allocator<char>())
     , navtile_(navtile, sm)
     , config_(config, sm)
-    , geoidGrid_(sm.get_allocator<char>())
     , response_()
-{
-    if (geoidGrid) {
-        geoidGrid_.assign(geoidGrid->data(), geoidGrid->size());
-    }
-}
+{}
 
 ShNavHeightCode::~ShNavHeightCode() {
     if (response_) { sm_.deallocate(response_); }
@@ -205,16 +207,16 @@ std::string ShNavHeightCode::vectorDs() const {
     return asString(vectorDs_);
 }
 
-GdalWarper::Navtile ShNavHeightCode::navtile() const {
-    return navtile_;
+GdalWarper::Navtile ShNavHeightCode::navtile(bool noRaw) const {
+    return navtile_.navtile(noRaw);
+}
+
+ConstBlock ShNavHeightCode::rawData() const {
+    return navtile_.rawData();
 }
 
 geo::heightcoding::Config ShNavHeightCode::config() const {
     return config_;
-}
-
-boost::optional<std::string> ShNavHeightCode::geoidGrid() const {
-    return asOptional(geoidGrid_);
 }
 
 /** Steals response.
