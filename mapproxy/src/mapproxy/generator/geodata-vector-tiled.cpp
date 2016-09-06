@@ -139,7 +139,7 @@ vts::MapConfig GeodataVectorTiled::mapConfig_impl(ResourceRoot root)
     mapConfig.view.freeLayers[res.id.fullId()];
 
     if (definition_.introspectionSurface) {
-        LOG(info4) << "trying to find surface";
+        LOG(info1) << "trying to find surface";
         if (auto other = otherGenerator
             (Resource::Generator::Type::surface
              , addReferenceFrame(*definition_.introspectionSurface
@@ -321,7 +321,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
 
     if (!fi.fileInfo.query.empty()) {
         if (auto ni = parseQuery(fi.fileInfo.query)) {
-            LOG(info4) << "Received navtile info: url: <" << ni->url
+            LOG(info1) << "Received navtile info: url: <" << ni->url
                        << ">, tileId: " << ni->tileId << ", heightRange: "
                        << ni->heightRange << ".";
 
