@@ -18,6 +18,7 @@ set(mapproxy_SOURCES
   support/geo.hpp support/geo.cpp
   support/coverage.hpp support/coverage.cpp
   support/tileindex.hpp support/tileindex.cpp
+  support/demconfig.hpp support/demconfig.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp

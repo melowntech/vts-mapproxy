@@ -1,10 +1,14 @@
 #ifndef mapproxy_generator_geodata_vector_tiled_hpp_included_
 #define mapproxy_generator_geodata_vector_tiled_hpp_included_
 
+#include "geo/geodataset.hpp"
+
 #include "vts-libs/vts/urltemplate.hpp"
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 
 #include "./geodatavectorbase.hpp"
+
+#include "../support/demconfig.hpp"
 
 namespace generator {
 
@@ -31,6 +35,11 @@ private:
     /** Path to /dem dataset
      */
     const std::string demDataset_;
+
+    DemConfig demConfig_;
+    geo::GeoDataset::Descriptor dem_;
+    double effectiveGsdArea_;
+    bool effectiveGsdAreaComputed_;
 
     vts::UrlTemplate tileUrl_;
 

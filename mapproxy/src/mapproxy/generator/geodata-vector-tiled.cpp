@@ -5,6 +5,7 @@
 #include "utility/raise.hpp"
 
 #include "geo/heightcoding.hpp"
+#include "geo/srsfactors.hpp"
 
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
@@ -56,11 +57,51 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
     : GeodataVectorBase(params, true)
     , definition_(this->resource().definition<Definition>())
     , demDataset_(absoluteDataset(definition_.demDataset + "/dem"))
+    , demConfig_(loadDemConfig
+                 (absoluteDataset(definition_.demDataset + "/dem.conf"), true))
+    , dem_(geo::GeoDataset::open(demDataset_).descriptor())
+    , effectiveGsdArea_(), effectiveGsdAreaComputed_(false)
     , tileUrl_(definition_.dataset)
     , physicalSrs_
       (vr::system.srs(resource().referenceFrame->model.physicalSrs))
     , index_(resource().referenceFrame->metaBinaryOrder)
 {
+    if (demConfig_.effectiveGSD) {
+        effectiveGsdArea_ =
+            (*demConfig_.effectiveGSD * *demConfig_.effectiveGSD);
+
+        LOG(info1)
+            << "<" << id() << ">: using configured effective GSD area of "
+            << definition_.demDataset << ": "
+            << effectiveGsdArea_ << " m2.";
+    } else {
+        auto esize(math::size(dem_.extents));
+        auto srs(dem_.srs.reference());
+        if (srs.IsGeographic()) {
+            // geographic coordinates system -> convert degrees to meters
+            double a(srs.GetSemiMajor());
+            // double b(srs.GetSemiMinor());
+
+            esize.width *= (a * M_PI / 180.0);
+
+            // TODO: compute length of arc between extents.ll(1) nad
+            // extents.ur(1) on the ellipsoid
+            // for now, use same calculation as on the equator
+            esize.height *= (a * M_PI / 180.0);
+        }
+
+        math::Size2f px(esize.width / dem_.size.width
+                        , esize.height / dem_.size.height);
+
+        effectiveGsdArea_ = math::area(px);
+        effectiveGsdAreaComputed_ = true;
+
+        LOG(info1)
+            << id() << ": using computed effective GSD area "
+            << definition_.demDataset << ": "
+            << effectiveGsdArea_ << " m2.";
+    }
+
     try {
         auto indexPath(root() / "tileset.index");
         if (fs::exists(indexPath)) {
@@ -294,6 +335,45 @@ void fetchNavtile(Sink &sink, const GeodataFileInfo &fi, Arsenal &arsenal
     });
 }
 
+double computeNavtileGsdArea(const vts::NodeInfo &ni)
+{
+    auto esize(math::size(ni.extents()));
+    auto size(vts::NavTile::size());
+    math::Size2f px(esize.width / size.width
+                    , esize.height / size.height);
+    auto a(math::area(px));
+    return a;
+}
+
+bool compareGsdArea(const geo::GeoDataset::Descriptor &dem
+                    , double effectiveGsdArea
+                    , bool effectiveGsdAreaComputed
+                    , const vts::NodeInfo &ni)
+{
+    // navtile srs def
+    const auto tileSrs(ni.srsDef());
+
+    // get navtile center (in tile srs)
+    auto tc(math::center(ni.extents()));
+
+    const auto tileFactors(geo::SrsFactors(tileSrs)(tc));
+
+    // compute tile GSD area and apply factors (scale down)
+    const auto tileGsdArea(computeNavtileGsdArea(ni)
+                           / (tileFactors.parallelScale
+                              * tileFactors.meridionalScale));
+
+    if (effectiveGsdAreaComputed) {
+        // DEM gsd area is computed, apply factors as well
+        const auto factors(geo::SrsFactors(dem.srs, tileSrs)(tc));
+        // apply scales to area (scale down)
+        effectiveGsdArea /= (factors.parallelScale * factors.meridionalScale);
+    }
+
+    // true if tile's GSD area is smaller than DEM's area
+    return tileGsdArea < effectiveGsdArea;
+}
+
 } // namespace
 
 void GeodataVectorTiled::generateGeodata(Sink &sink
@@ -327,14 +407,41 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
 
             vts::NodeInfo niNodeInfo(referenceFrame(), ni->tileId);
             if (!niNodeInfo.valid()) {
-                sink.error(utility::makeError<InternalError>
-                           ("Navtile ID is invalid."));
+                sink.error(utility::makeError<BadRequest>
+                           ("Geo navtile id is invalid."));
                 return;
             }
 
-            fetchNavtile(sink, fi, arsenal, *ni, niNodeInfo
-                         , definition_, physicalSrs_, tileUrl);
-            return;
+            if (ni->tileId.lod > tileId.lod) {
+                sink.error(utility::makeError<BadRequest>
+                           ("Geo navtile %s is below this geo tile (%s)."
+                            , ni->tileId, tileId));
+                return;
+            }
+
+            if ((ni->tileId.lod < tileId.lod)
+                && (ni->tileId != vts::parent
+                    (tileId, tileId.lod - ni->tileId.lod)))
+            {
+                sink.error(utility::makeError<BadRequest>
+                           ("Geo navtile %s is not above this geo tile (%s)."
+                            , ni->tileId, tileId));
+                return;
+            }
+
+            // compare GSD
+            if (compareGsdArea(dem_, effectiveGsdArea_
+                               , effectiveGsdAreaComputed_, niNodeInfo))
+            {
+                LOG(info1) << "Using navtile " << ni->tileId
+                           << " because it is better than DEM at "
+                           << tileId << ".";
+                fetchNavtile(sink, fi, arsenal, *ni, niNodeInfo
+                             , definition_, physicalSrs_, tileUrl);
+                return;
+            }
+            LOG(info1) << "Using DEM because navtile" << ni->tileId
+                       << " because is worse than DEM at " << tileId << ".";
         }
     }
 
