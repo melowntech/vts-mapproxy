@@ -626,6 +626,37 @@
                 "surface": { "group": "melown", "id": "viewfinder" }
             }
         }
+    },
+
+    {
+        "comment" : "Mapzen vector tiles (MVT)",
+        "credits" : [ ],
+        "definition" :
+        {
+                "dataset" : "http://vector.mapzen.com/osm/all/{loclod}/{locx}/{locy}.mvt?api_key=vector-tiles-mJRqnWb",
+                "demDataset" : "viewfinder",
+                "displaySize" : 1024,
+                "format" : "geodataJson",
+                "geoidGrid" : "egm96_15.gtx",
+                "styleUrl" : "//cdn.melown.com/mario/store/melown2015/stylesheet/melown/mapzen-stylesheet"
+        },
+        "driver" : "geodata-vector-tiled",
+        "group" : "melown",
+        "id" : "mapzen-all",
+        "referenceFrames" : 
+        {
+                "melown2015" : 
+                {
+                        "lodRange" : [ 1, 21 ],
+                        "tileRange" : 
+                        [
+                                [ 0, 0 ],
+                                [ 0, 0 ]
+                        ]
+                }
+        },
+        "registry" : {},
+        "type" : "geodata"
     }
 
     , {

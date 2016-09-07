@@ -305,7 +305,9 @@ void fetchNavtile(Sink &sink, const GeodataFileInfo &fi, Arsenal &arsenal
                   , const NavtileInfo &ni, const vts::NodeInfo &nodeInfo
                   , const GeodataVectorBase::Definition &definition
                   , const vr::Srs &physicalSrs
-                  , const std::string &tileUrl)
+                  , const std::string &tileUrl
+                  , const std::string &demDataset
+                  , const boost::optional<std::string> &geoidGrid)
 {
     typedef utility::ResourceFetcher::Query Query;
     typedef utility::ResourceFetcher::MultiQuery MultiQuery;
@@ -327,7 +329,7 @@ void fetchNavtile(Sink &sink, const GeodataFileInfo &fi, Arsenal &arsenal
             auto hc(arsenal.warper.heightcode
                     (tileUrl, buildNavtile(nodeInfo, ni.heightRange
                                            , q.get().data, q.location())
-                     , config, sink));
+                     , config, demDataset, geoidGrid, sink));
             sink.content(hc->data, hc->size, fi.sinkFileInfo(), true);
         } catch (...) {
             sink.error();
@@ -437,7 +439,8 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
                            << " because it is better than DEM at "
                            << tileId << ".";
                 fetchNavtile(sink, fi, arsenal, *ni, niNodeInfo
-                             , definition_, physicalSrs_, tileUrl);
+                             , definition_, physicalSrs_, tileUrl
+                             , demDataset_, definition_.geoidGrid);
                 return;
             }
             LOG(info1) << "Using DEM because navtile" << ni->tileId

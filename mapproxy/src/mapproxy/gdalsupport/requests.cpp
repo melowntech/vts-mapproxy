@@ -190,14 +190,23 @@ ShNavHeightCode
 ::ShNavHeightCode(const std::string &vectorDs
                  , const GdalWarper::Navtile &navtile
                  , const geo::heightcoding::Config &config
+                  , const std::string &fallbackDs
+                  , const boost::optional<std::string> &geoidGrid
                  , ManagedBuffer &sm, ShRequestBase *owner)
     : sm_(sm), owner_(owner)
     , vectorDs_(vectorDs.data(), vectorDs.size()
                 , sm.get_allocator<char>())
     , navtile_(navtile, sm)
     , config_(config, sm)
+    , fallbackDs_(fallbackDs.data(), fallbackDs.size()
+                  , sm.get_allocator<char>())
+    , geoidGrid_(sm.get_allocator<char>())
     , response_()
-{}
+{
+    if (geoidGrid) {
+        geoidGrid_.assign(geoidGrid->data(), geoidGrid->size());
+    }
+}
 
 ShNavHeightCode::~ShNavHeightCode() {
     if (response_) { sm_.deallocate(response_); }
@@ -217,6 +226,14 @@ ConstBlock ShNavHeightCode::rawData() const {
 
 geo::heightcoding::Config ShNavHeightCode::config() const {
     return config_;
+}
+
+std::string ShNavHeightCode::fallbackDs() const {
+    return asString(fallbackDs_);
+}
+
+boost::optional<std::string> ShNavHeightCode::geoidGrid() const {
+    return asOptional(geoidGrid_);
 }
 
 /** Steals response.

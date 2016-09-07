@@ -369,10 +369,10 @@ heightcode(ManagedBuffer &mb, const VectorDataset &vds
 
 
 geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
-                            , const ConstBlock &dataBlock)
+                            , const ConstBlock &dataBlock
+                            , const geo::GeoDataset &fallbackDs
+                            , const boost::optional<std::string> &geoidGrid)
 {
-    (void) ni;
-    (void) dataBlock;
     vts::opencv::NavTile navtile;
 
     {
@@ -398,17 +398,22 @@ geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
     auto navSrs(vr::system.srs(ni.navSrs));
     const math::Size2 size(data.cols, data.rows);
 
+    // extents size
+    const auto es(math::size(ni.extents));
+
+    // pixel size
+    const math::Point2 px(es.width / (size.width - 1)
+                          , es.height / (size.height - 1));
+
     if (navSrs.adjustVertical()) {
         // unudjust Z-coordinates
         geo::VerticalAdjuster va(navSrs.srsDef);
 
-        auto es(math::size(ni.extents));
-        math::Size2f px(es.width / size.width, es.height / size.height);
         math::Point2d origin(ul(ni.extents));
-        for (auto j(0), ej(size.height); j != ej; ++j, origin(1) += px.height)
+        for (auto j(0), ej(size.height); j != ej; ++j, origin(1) += px(1))
         {
             auto p(origin);
-            for (auto i(0), ei(size.width); i != ei; ++i, p(0) += px.width) {
+            for (auto i(0), ei(size.width); i != ei; ++i, p(0) += px(0)) {
                 // get height (as reference)
                 auto &h(data(j, i));
                 // unadjust point and write again
@@ -420,21 +425,75 @@ geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
         }
     }
 
+    // TODO: use fallbackDs to fill in holes and area around navtile
+    (void) fallbackDs;
+    (void) geoidGrid;
+
     // merge(HCS(SDS), VCS(navSrs)) to get proper vertical system
     const auto dsmSds(geo::merge
                       (vr::system.srs(ni.sdsSrs).srsDef, navSrs.srsDef));
 
+    // create 2x bigger pane
+    math::Size2 dsSize(2 * size.width, 2 * size.height);
+
+    // navtile offset with new pane
+    math::Point2i offset(size.width / 2, size.height / 2);
+
+    // expand extents
+    math::Point2 origin(ni.extents.ll(0) - px(0) * offset(0)
+                        , ni.extents.ll(1) - px(1) * offset(1));
+    math::Extents2 extents(origin(0), origin(1)
+                           , origin(0) + px(0) * dsSize.width
+                           , origin(1) + px(1) * dsSize.width);
+
+    const double ndv(-1e6);
+
     auto ds(geo::GeoDataset::create
             ({}, dsmSds
-             , extentsPlusHalfPixel(ni.extents, size), size
+             , extentsPlusHalfPixel(extents, dsSize), dsSize
              , geo::GeoDataset::Format::dsm
              (geo::GeoDataset::Format::Storage::memory)
-             , geo::NodataValue(-1e6)));
+             , geo::NodataValue(ndv)));
 
-    auto &dsData(ds.data());
-    data.convertTo(dsData, dsData.type());
-    ds.mask() = mask;
+    // write navtile into proper place in data matrix
+    {
+        cv::Mat sub(ds.data(), cv::Range(offset(1), offset(1) + data.rows)
+                    , cv::Range(offset(0), offset(0) + data.cols));
+        data.convertTo(sub, sub.type());
+    }
+
+    // convert matrix (a bit slow...)
+    // set to all black
+    typedef geo::GeoDataset::Mask Mask;
+    Mask dsMask(dsSize, Mask::InitMode::EMPTY);
+
+    // process all quads in navtile mask
+    mask.forEachQuad([&](int x, int y, int xsize, int ysize, bool)
+    {
+        // move
+        x += offset(0);
+        y += offset(1);
+
+        // TODO: break into 2^n blocks and set whole blocks
+        for (auto j(y), ej(y + ysize); j != ej; ++j) {
+            for (auto i(x), ei(x + xsize); i != ei; ++i) {
+                dsMask.set(i, j);
+            }
+        }
+    }, Mask::Filter::white);
+
+    // set mask and flush
+    ds.mask() = dsMask;
     ds.flush();
+
+    // warp fallback DS into empty space in pane using "dem" filter and only in
+    // empty space not occupied by navtile
+    geo::GeoDataset::WarpOptions wo;
+    wo.noInit = true;
+    fallbackDs.warpInto(ds, geo::GeoDataset::Resampling::dem, wo);
+
+    // TODO: convert Z component of warped dem from dem+geoid SRS to dsmSds SRS
+
     return ds;
 }
 
@@ -452,12 +511,16 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
 }
 
 GdalWarper::Heighcoded*
-heightcode(DatasetCache&, ManagedBuffer &mb
+heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
            , const GdalWarper::Navtile &navtile
            , const ConstBlock &dataBlock
-           , geo::heightcoding::Config config)
+           , geo::heightcoding::Config config
+           , const std::string &fallbackDs
+           , const boost::optional<std::string> &geoidGrid)
 {
     return heightcode(mb, openVectorDataset(vectorDs, config)
-                      , fromNavtile(navtile, dataBlock), config);
+                      , fromNavtile(navtile, dataBlock
+                                    , cache(fallbackDs), geoidGrid)
+                      , config);
 }

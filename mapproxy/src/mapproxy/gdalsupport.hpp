@@ -157,6 +157,8 @@ public:
     heightcode(const std::string &vectorDs
                , const Navtile &navtile
                , const geo::heightcoding::Config &config
+               , const std::string &fallbackDs
+               , const boost::optional<std::string> &geoidGrid
                , Aborter &aborter);
 
     /** Do housekeeping. Must be called in the process where internals are being

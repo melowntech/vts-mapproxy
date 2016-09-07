@@ -120,6 +120,8 @@ public:
     ShNavHeightCode(const std::string &vectorDs
                     , const GdalWarper::Navtile &navtile
                     , const geo::heightcoding::Config &config
+                    , const std::string &fallbackDs
+                    , const boost::optional<std::string> &geoidGrid
                     , ManagedBuffer &sm, ShRequestBase *owner);
 
     ~ShNavHeightCode();
@@ -131,6 +133,10 @@ public:
     geo::heightcoding::Config config() const;
 
     ConstBlock rawData() const;
+
+    std::string fallbackDs() const;
+
+    boost::optional<std::string> geoidGrid() const;
 
     /** Steals response.
      */
@@ -146,6 +152,8 @@ private:
     String vectorDs_;
     ShNavtile navtile_;
     ShHeightCodeConfig config_;
+    String fallbackDs_;
+    String geoidGrid_;
 
     // response memory block
     GdalWarper::Heighcoded *response_;
