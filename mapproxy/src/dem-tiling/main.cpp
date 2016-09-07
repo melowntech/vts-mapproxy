@@ -311,7 +311,7 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
             return res;
         });
 
-        switch (ckeckMask()) {
+        switch (checkMask()) {
         case vts::NodeInfo::CoveredArea::whole: {
             // fully covered by dataset and by reference frame definition
 
