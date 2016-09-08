@@ -319,8 +319,10 @@ void fetchNavtile(Sink &sink, const GeodataFileInfo &fi, Arsenal &arsenal
 {
     typedef utility::ResourceFetcher::Query Query;
     typedef utility::ResourceFetcher::MultiQuery MultiQuery;
-    arsenal.fetcher.perform(Query(ni.url), [=, &arsenal](MultiQuery &&mq)
-                            mutable
+
+    arsenal.fetcher.perform
+        (Query(ni.url).timeout(5000)
+         , [=, &arsenal](MultiQuery &&mq) mutable
     {
         try {
             const auto &q(mq.front());
