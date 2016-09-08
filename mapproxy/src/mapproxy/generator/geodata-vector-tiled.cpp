@@ -257,6 +257,10 @@ boost::optional<NavtileInfo> parseNavtileInfo(std::string value)
         NavtileInfo ni;
         // replace .nav -> .rnavtile
         ni.url = ba::replace_all_copy(parts[0], ".nav", ".rnavtile");
+        if (ba::starts_with(ni.url, "//")) {
+            // scheme-less URI, use http
+            ni.url = "http:" + ni.url;
+        }
         ni.tileId = boost::lexical_cast<vts::TileId>(parts[1]);
         ni.heightRange.min = boost::lexical_cast<int>(parts[2]);
         ni.heightRange.max = boost::lexical_cast<int>(parts[3]);
