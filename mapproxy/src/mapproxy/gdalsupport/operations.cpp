@@ -4,9 +4,12 @@
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/iostreams/device/array.hpp>
 
+#include <opencv2/highgui/highgui.hpp>
+
 #include "imgproc/rastermask/cvmat.hpp"
 
 #include "geo/verticaladjuster.hpp"
+#include "geo/csconvertor.hpp"
 
 #include "vts-libs/vts/opencv/navtile.hpp"
 
@@ -425,13 +428,9 @@ geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
         }
     }
 
-    // TODO: use fallbackDs to fill in holes and area around navtile
-    (void) fallbackDs;
-    (void) geoidGrid;
-
     // merge(HCS(SDS), VCS(navSrs)) to get proper vertical system
-    const auto dsmSds(geo::merge
-                      (vr::system.srs(ni.sdsSrs).srsDef, navSrs.srsDef));
+    const auto tileSrs(vr::system.srs(ni.sdsSrs).srsDef);
+    const auto dsmSds(geo::merge(tileSrs, navSrs.srsDef));
 
     // create 2x bigger pane
     math::Size2 dsSize(2 * size.width, 2 * size.height);
@@ -455,44 +454,52 @@ geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
              (geo::GeoDataset::Format::Storage::memory)
              , geo::NodataValue(ndv)));
 
-    // write navtile into proper place in data matrix
+    // warp fallback dataset into output
+    fallbackDs.warpInto(ds, geo::GeoDataset::Resampling::dem);
+
+    auto &dsMask(ds.mask());
+
+    // convert Z component
+    {
+        // get (rw) data from ds
+        cv::Mat_<double> fdata(ds.data());
+        // convert Z component of warped dem from dem+geoid SRS to dsmSds SRS
+        // (only pixels set in mask difference)
+
+        // source SRS: either tile SRS of tile+geoid SRS based on dem
+        // information
+        const auto srcSrs(geoidGrid
+                          ? geo::setGeoid(tileSrs, *geoidGrid)
+                          : tileSrs);
+
+        // convertor between src SRS and dataset SRS
+        geo::CsConvertor conv(srcSrs, dsmSds);
+
+        dsMask.forEach([&](int x, int y, bool)
+        {
+            // grab height at point
+            auto &h(fdata(y, x));
+
+            // compose 3D point, convert to destination SRS and then replace
+            // height
+            h = conv(ds.rowcol2geo(y, x, h))(2);
+        });
+    }
+
+    // rasterize mask into ds mask and copy navtile data
     {
         cv::Mat sub(ds.data(), cv::Range(offset(1), offset(1) + data.rows)
                     , cv::Range(offset(0), offset(0) + data.cols));
-        data.convertTo(sub, sub.type());
+        mask.forEach([&](int x, int y, bool)
+        {
+            auto xx = x + offset(0);
+            auto yy = y + offset(1);
+            dsMask.set(xx, yy);
+            sub.at<double>(yy, xx) = data(y, x);
+        }, geo::GeoDataset::Mask::Filter::white);
     }
 
-    // convert matrix (a bit slow...)
-    // set to all black
-    typedef geo::GeoDataset::Mask Mask;
-    Mask dsMask(dsSize, Mask::InitMode::EMPTY);
-
-    // process all quads in navtile mask
-    mask.forEachQuad([&](int x, int y, int xsize, int ysize, bool)
-    {
-        // move
-        x += offset(0);
-        y += offset(1);
-
-        // TODO: break into 2^n blocks and set whole blocks
-        for (auto j(y), ej(y + ysize); j != ej; ++j) {
-            for (auto i(x), ei(x + xsize); i != ei; ++i) {
-                dsMask.set(i, j);
-            }
-        }
-    }, Mask::Filter::white);
-
-    // set mask and flush
-    ds.mask() = dsMask;
     ds.flush();
-
-    // warp fallback DS into empty space in pane using "dem" filter and only in
-    // empty space not occupied by navtile
-    geo::GeoDataset::WarpOptions wo;
-    wo.noInit = true;
-    fallbackDs.warpInto(ds, geo::GeoDataset::Resampling::dem, wo);
-
-    // TODO: convert Z component of warped dem from dem+geoid SRS to dsmSds SRS
 
     return ds;
 }
@@ -519,6 +526,8 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &fallbackDs
            , const boost::optional<std::string> &geoidGrid)
 {
+    // NB: geoid is used only for navtile DS generation, not to be passed to
+    // actual heightcoding!
     return heightcode(mb, openVectorDataset(vectorDs, config)
                       , fromNavtile(navtile, dataBlock
                                     , cache(fallbackDs), geoidGrid)
