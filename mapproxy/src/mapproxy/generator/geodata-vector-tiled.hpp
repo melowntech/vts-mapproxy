@@ -8,8 +8,6 @@
 
 #include "./geodatavectorbase.hpp"
 
-#include "../support/demconfig.hpp"
-
 namespace generator {
 
 class GeodataVectorTiled : public GeodataVectorBase {
@@ -36,7 +34,6 @@ private:
      */
     const std::string demDataset_;
 
-    DemConfig demConfig_;
     geo::GeoDataset::Descriptor dem_;
     double effectiveGsdArea_;
     bool effectiveGsdAreaComputed_;

@@ -57,49 +57,53 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
     : GeodataVectorBase(params, true)
     , definition_(this->resource().definition<Definition>())
     , demDataset_(absoluteDataset(definition_.demDataset + "/dem"))
-    , demConfig_(loadDemConfig
-                 (absoluteDataset(definition_.demDataset + "/dem.conf"), true))
-    , dem_(geo::GeoDataset::open(demDataset_).descriptor())
     , effectiveGsdArea_(), effectiveGsdAreaComputed_(false)
     , tileUrl_(definition_.dataset)
     , physicalSrs_
       (vr::system.srs(resource().referenceFrame->model.physicalSrs))
     , index_(resource().referenceFrame->metaBinaryOrder)
 {
-    if (demConfig_.effectiveGSD) {
-        effectiveGsdArea_ =
-            (*demConfig_.effectiveGSD * *demConfig_.effectiveGSD);
+    {
+        // open dataset and get descriptor + metadata
+        auto ds(geo::GeoDataset::open(demDataset_));
+        dem_ = ds.descriptor();
 
-        LOG(info1)
-            << "<" << id() << ">: using configured effective GSD area of "
-            << definition_.demDataset << ": "
-            << effectiveGsdArea_ << " m2.";
-    } else {
-        auto esize(math::size(dem_.extents));
-        auto srs(dem_.srs.reference());
-        if (srs.IsGeographic()) {
-            // geographic coordinates system -> convert degrees to meters
-            double a(srs.GetSemiMajor());
-            // double b(srs.GetSemiMinor());
+        auto md(ds.getMetadata("vts"));
 
-            esize.width *= (a * M_PI / 180.0);
+        if (auto effectiveGSD = md.get<double>("effectiveGSD")) {
+            effectiveGsdArea_ = (*effectiveGSD * *effectiveGSD);
 
-            // TODO: compute length of arc between extents.ll(1) nad
-            // extents.ur(1) on the ellipsoid
-            // for now, use same calculation as on the equator
-            esize.height *= (a * M_PI / 180.0);
+            LOG(info2)
+                << "<" << id() << ">: using configured effective GSD area of "
+                << definition_.demDataset << ": "
+                << effectiveGsdArea_ << " m2.";
+        } else {
+            auto esize(math::size(dem_.extents));
+            auto srs(dem_.srs.reference());
+            if (srs.IsGeographic()) {
+                // geographic coordinates system -> convert degrees to meters
+                double a(srs.GetSemiMajor());
+                // double b(srs.GetSemiMinor());
+
+                esize.width *= (a * M_PI / 180.0);
+
+                // TODO: compute length of arc between extents.ll(1) nad
+                // extents.ur(1) on the ellipsoid
+                // for now, use same calculation as on the equator
+                esize.height *= (a * M_PI / 180.0);
+            }
+
+            math::Size2f px(esize.width / dem_.size.width
+                            , esize.height / dem_.size.height);
+
+            effectiveGsdArea_ = math::area(px);
+            effectiveGsdAreaComputed_ = true;
+
+            LOG(info2)
+                << id() << ": using computed effective GSD area "
+                << definition_.demDataset << ": "
+                << effectiveGsdArea_ << " m2.";
         }
-
-        math::Size2f px(esize.width / dem_.size.width
-                        , esize.height / dem_.size.height);
-
-        effectiveGsdArea_ = math::area(px);
-        effectiveGsdAreaComputed_ = true;
-
-        LOG(info1)
-            << id() << ": using computed effective GSD area "
-            << definition_.demDataset << ": "
-            << effectiveGsdArea_ << " m2.";
     }
 
     try {
