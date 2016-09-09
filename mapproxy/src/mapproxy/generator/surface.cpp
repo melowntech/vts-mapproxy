@@ -82,7 +82,7 @@ Generator::Task SurfaceBase
             if (fi.raw) {
                 sink.content(vs::fileIStream
                               (fi.fileType, filePath(vts::File::config))
-                             , Sink::FileInfo::FileClass::data);
+                             , FileClass::data);
             } else {
                 std::ostringstream os;
                 mapConfig(os, ResourceRoot::none);
@@ -94,7 +94,7 @@ Generator::Task SurfaceBase
         case vts::File::tileIndex:
             sink.content(vs::fileIStream
                           (fi.fileType, filePath(vts::File::tileIndex))
-                         , Sink::FileInfo::FileClass::data);
+                         , FileClass::data);
             break;
 
         case vts::File::registry: {
@@ -166,7 +166,7 @@ Generator::Task SurfaceBase
     case SurfaceFileInfo::Type::registry:
         sink.content(vs::fileIStream
                       (fi.registry->contentType, fi.registry->path)
-                     , Sink::FileInfo::FileClass::registry);
+                     , FileClass::registry);
         break;
 
     default:

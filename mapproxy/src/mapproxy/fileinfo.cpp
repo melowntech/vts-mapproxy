@@ -308,27 +308,27 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
     switch (type) {
     case Type::config:
         return Sink::FileInfo(vts::MapConfig::contentType, lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::config);
+            .setFileClass(FileClass::config);
 
     case Type::image:
         return Sink::FileInfo(contentType(format), lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::data);
+            .setFileClass(FileClass::data);
 
     case Type::mask:
         return Sink::FileInfo(contentType(MaskFormat), lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::data);
+            .setFileClass(FileClass::data);
 
     case Type::metatile:
         return Sink::FileInfo(contentType(RasterMetatileFormat), lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::data);
+            .setFileClass(FileClass::data);
 
     case Type::support:
         return Sink::FileInfo(support->contentType, support->lastModified)
-        .setFileClass(Sink::FileInfo::FileClass::support);
+        .setFileClass(FileClass::support);
 
     case Type::definition:
         return Sink::FileInfo("application/json", lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::config);
+            .setFileClass(FileClass::config);
 
     case Type::unknown:
         return {};
@@ -411,23 +411,23 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
     switch (type) {
     case Type::file:
         return Sink::FileInfo(vs::contentType(fileType), lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::config);
+            .setFileClass(FileClass::config);
 
     case Type::tile:
         return Sink::FileInfo(vs::contentType(tileType), lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::data);
+            .setFileClass(FileClass::data);
 
     case Type::support:
         return Sink::FileInfo(support->contentType, support->lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::support);
+            .setFileClass(FileClass::support);
 
     case Type::registry:
         return Sink::FileInfo(registry->contentType, lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::registry);
+            .setFileClass(FileClass::registry);
 
     case Type::definition:
         return Sink::FileInfo("application/json", lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::config);
+            .setFileClass(FileClass::config);
 
     case Type::unknown:
         return {};
@@ -514,28 +514,28 @@ Sink::FileInfo GeodataFileInfo::sinkFileInfo(std::time_t lastModified) const
     switch (type) {
     case Type::geo:
         return Sink::FileInfo(contentType(format), lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::data);
+            .setFileClass(FileClass::data);
 
     case Type::metatile:
         return Sink::FileInfo(vs::contentType(vs::TileFile::meta)
                               , lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::data);
+            .setFileClass(FileClass::data);
 
     case Type::support:
         return Sink::FileInfo(support->contentType, support->lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::support);
+            .setFileClass(FileClass::support);
 
     case Type::registry:
         return Sink::FileInfo(registry->contentType, lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::registry);
+            .setFileClass(FileClass::registry);
 
     case Type::config:
         return Sink::FileInfo(vts::MapConfig::contentType, lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::config);
+            .setFileClass(FileClass::config);
 
     case Type::definition:
         return Sink::FileInfo("application/json; charset=utf-8", lastModified)
-            .setFileClass(Sink::FileInfo::FileClass::config);
+            .setFileClass(FileClass::config);
 
     case Type::unknown:
         return {};

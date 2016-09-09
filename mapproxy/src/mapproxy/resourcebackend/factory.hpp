@@ -5,10 +5,12 @@
 
 struct ResourceBackend::Factory {
     typedef std::shared_ptr<Factory> pointer;
+    typedef ResourceBackend::GenericConfig GenericConfig;
     typedef ResourceBackend::TypedConfig TypedConfig;
 
     virtual ~Factory() {}
-    virtual ResourceBackend::pointer create(const TypedConfig &config) = 0;
+    virtual ResourceBackend::pointer create(const GenericConfig &genericConfig
+                                            , const TypedConfig &config) = 0;
 
     virtual service::UnrecognizedParser::optional
     configure(const std::string &prefix, TypedConfig &config

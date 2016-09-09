@@ -82,13 +82,18 @@ Generator::Generator(const Params &params)
         save(rfile, resource_);
     } else {
         // reopen of existing dataset
-        savedResource_ = loadResource(rfile).front();
+        savedResource_
+            = loadResource(rfile).front();
         if (savedResource_ != resource_) {
+            // different setup, use stored definition
             LOG(warn3)
                 << "Definition of resource <" << resource_.id
                 << "> differs from the one stored in store at "
                 << root() << "; using stored definition.";
             resource_ = savedResource_;
+
+            // force received file class setings
+            resource_.fileClassSettings = params.resource.fileClassSettings;
         } else {
             // something non-destructive can changed -> re-save
             save(rfile, resource_);
@@ -490,10 +495,9 @@ void Generators::Detail::update(const Resource::map &resources)
             throw Aborted{};
         }
         try {
-            Generator::Params params;
+            Generator::Params params(res);
             params.config = config_;
             params.config.root = config_.root;
-            params.resource = res;
             params.generatorFinder = this;
             toAdd.push_back(Generator::create(params));
         } catch (const std::exception &e) {

@@ -13,7 +13,8 @@ public:
         boost::filesystem::path path;
     };
 
-    Conffile(const Config &config);
+    Conffile(const GenericConfig &genericConfig
+             , const Config &config);
 
 private:
     virtual Resource::map load_impl() const;

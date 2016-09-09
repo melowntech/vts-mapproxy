@@ -73,9 +73,28 @@ boost::optional<Resource::Id> parseResourceId(const python::dict &value)
     return boost::none;
 }
 
-Resource::list parseResource(const Resource::Id &id, const python::dict &value)
+FileClassSettings parseFileClassSettings(const python::dict &value
+                                         , const FileClassSettings &defaults)
 {
-    Resource r;
+    FileClassSettings fcs(defaults);
+
+    for (python::stl_input_iterator<python::str> ivalue(value), evalue;
+         ivalue != evalue; ++ivalue)
+    {
+        auto fc(boost::lexical_cast<FileClass>(py2utf8(*ivalue)));
+        auto maxAge(python::extract<int>(value[*ivalue])());
+        fcs.setMaxAge(fc, maxAge);
+    }
+    return fcs;
+}
+
+Resource::list parseResource(const Resource::Id &id, const python::dict &value
+                             , const FileClassSettings &fileClassSettings)
+{
+    Resource r(value.has_key("maxAge")
+               ? parseFileClassSettings(python::dict(value["maxAge"])
+                                        , fileClassSettings)
+               : fileClassSettings);
     r.id = id;
 
     std::string tmp(py2utf8(value["type"]));
@@ -127,7 +146,8 @@ Resource::list parseResource(const Resource::Id &id, const python::dict &value)
 }
 
 void parseResources(Resource::map &resources, const python::list &value
-                    , ResourceLoadErrorCallback error)
+                    , ResourceLoadErrorCallback error
+                    , const FileClassSettings &fileClassSettings)
 {
     // process all definitions
     for (python::stl_input_iterator<python::dict> ivalue(value), evalue;
@@ -138,7 +158,7 @@ void parseResources(Resource::map &resources, const python::list &value
         if (!id) { continue; }
 
         try {
-            auto resList(parseResource(*id, dict));
+            auto resList(parseResource(*id, dict, fileClassSettings));
             for (const auto &res : resList) {
                 if (!resources.insert(Resource::map::value_type(res.id, res))
                     .second)
@@ -160,12 +180,14 @@ void parseResources(Resource::map &resources, const python::list &value
 
 } // namespace detail
 
-Resource::map loadResourcesFromPython(const boost::any &pylist
-                                      , ResourceLoadErrorCallback error)
+Resource::map
+loadResourcesFromPython(const boost::any &pylist
+                        , ResourceLoadErrorCallback error
+                        , const FileClassSettings &fileClassSettings)
 {
     const auto &list(boost::any_cast<const python::list&>(pylist));
 
     Resource::map resources;
-    detail::parseResources(resources, list, error);
+    detail::parseResources(resources, list, error, fileClassSettings);
     return resources;
 }

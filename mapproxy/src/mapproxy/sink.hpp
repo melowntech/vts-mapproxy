@@ -14,6 +14,8 @@
 
 #include "vts-libs/storage/streams.hpp"
 
+#include "./support/fileclass.hpp"
+
 namespace vs = vadstena::storage;
 
 /** Aborter helper.
@@ -37,10 +39,6 @@ public:
     typedef std::vector<ListingItem> Listing;
 
     struct FileInfo : http::SinkBase::FileInfo {
-        enum class FileClass {
-            unknown, config, support, registry, data
-        };
-
         FileInfo(const std::string &contentType = "application/octet-stream"
                  , std::time_t lastModified = -1
                  , std::time_t expires = -1)
@@ -49,10 +47,12 @@ public:
 
         FileInfo& setFileClass(FileClass fc);
 
+        FileClass fileClass;
         http::Header::list headers;
     };
 
-    Sink(const http::ServerSink::pointer &sink) : sink_(sink) {}
+    Sink(const http::ServerSink::pointer &sink)
+        : sink_(sink), fileClassSettings_() {}
 
     /** Sends content to client.
      * \param data data top send
@@ -81,7 +81,7 @@ public:
      * \param file class
      */
     void content(const vs::IStream::pointer &stream
-                 , FileInfo::FileClass fileClass);
+                 , FileClass fileClass);
 
     /** Tell client to look somewhere else.
      */
@@ -116,12 +116,21 @@ public:
         sink_->setAborter(ac);
     }
 
+    /** Assigns file-class-related stuff to be used when sending data to the
+     *  client.
+     */
+    void assignFileClassSettings(const FileClassSettings &fileClasssettings);
+
 private:
     /** Sends given error to the client.
      */
     void error(const std::exception_ptr &exc);
 
+    http::Header::list buildHeaders(const FileInfo &stat) const;
+
     http::ServerSink::pointer sink_;
+
+    const FileClassSettings *fileClassSettings_;
 };
 
 // inlines
@@ -135,27 +144,28 @@ inline void Sink::error(const T &exc)
 inline void Sink::error() { error(std::current_exception()); }
 
 inline void Sink::content(const std::string &data, const FileInfo &stat) {
-    sink_->content(data, stat, &stat.headers);
+    auto headers(buildHeaders(stat));
+    sink_->content(data, stat, &headers);
 }
 
 template <typename T>
 inline void Sink::content(const std::vector<T> &data, const FileInfo &stat) {
-    sink_->content(data, stat, &stat.headers);
+    auto headers(buildHeaders(stat));
+    sink_->content(data, stat, &headers);
 }
 
 inline void Sink::content(const void *data, std::size_t size
                           , const FileInfo &stat, bool needCopy)
 {
-    sink_->content(data, size, stat, needCopy, &stat.headers);
+    auto headers(buildHeaders(stat));
+    sink_->content(data, size, stat, needCopy, &headers);
 }
 
-UTILITY_GENERATE_ENUM_IO(Sink::FileInfo::FileClass,
-    ((unknown))
-    ((config))
-    ((support))
-    ((registry))
-    ((data))
-)
+inline void
+Sink::assignFileClassSettings(const FileClassSettings &fileClassSettings)
+{
+    fileClassSettings_ = &fileClassSettings;
+}
 
 #endif // mapproxy_sink_hpp_included_
 
