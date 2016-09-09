@@ -526,10 +526,11 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &fallbackDs
            , const boost::optional<std::string> &geoidGrid)
 {
-    // NB: geoid is used only for navtile DS generation, not to be passed to
-    // actual heightcoding!
-    return heightcode(mb, openVectorDataset(vectorDs, config)
-                      , fromNavtile(navtile, dataBlock
-                                    , cache(fallbackDs), geoidGrid)
-                      , config);
+    auto vds(openVectorDataset(vectorDs, config));
+    auto rds(fromNavtile(navtile, dataBlock
+                              , cache(fallbackDs), geoidGrid));
+    // switch to dataset SRS (we need to fool the underlying level)
+    config.workingSrs = rds.srs();
+    config.rasterDsSrs = rds.srs();
+    return heightcode(mb, vds, rds, config);
 }
