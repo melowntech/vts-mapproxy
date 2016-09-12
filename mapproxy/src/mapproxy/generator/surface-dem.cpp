@@ -488,7 +488,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
                      , ts.height / (ntd.rows - 1));
     double h;
     for (int j(0); j < ntd.rows; ++j) {
-        auto y(extents.ll(1) + j * npx.height);
+        auto y(extents.ur(1) - j * npx.height);
         for (int i(0); i < ntd.cols; ++i) {
             // mask with node's mask
             if (!coverage.get(i, j)) { continue; }
