@@ -41,8 +41,8 @@ public:
     struct FileInfo : http::SinkBase::FileInfo {
         FileInfo(const std::string &contentType = "application/octet-stream"
                  , std::time_t lastModified = -1
-                 , std::time_t expires = -1)
-            : http::SinkBase::FileInfo(contentType, lastModified, expires)
+                 , const boost::optional<long> maxAge = boost::none)
+            : http::SinkBase::FileInfo(contentType, lastModified, maxAge)
         {}
 
         FileInfo& setFileClass(FileClass fc);
@@ -126,7 +126,7 @@ private:
      */
     void error(const std::exception_ptr &exc);
 
-    http::Header::list buildHeaders(const FileInfo &stat) const;
+    FileInfo update(const FileInfo &stat) const;
 
     http::ServerSink::pointer sink_;
 
@@ -144,21 +144,18 @@ inline void Sink::error(const T &exc)
 inline void Sink::error() { error(std::current_exception()); }
 
 inline void Sink::content(const std::string &data, const FileInfo &stat) {
-    auto headers(buildHeaders(stat));
-    sink_->content(data, stat, &headers);
+    sink_->content(data, update(stat), &stat.headers);
 }
 
 template <typename T>
 inline void Sink::content(const std::vector<T> &data, const FileInfo &stat) {
-    auto headers(buildHeaders(stat));
-    sink_->content(data, stat, &headers);
+    sink_->content(data, update(stat), &stat.headers);
 }
 
 inline void Sink::content(const void *data, std::size_t size
                           , const FileInfo &stat, bool needCopy)
 {
-    auto headers(buildHeaders(stat));
-    sink_->content(data, size, stat, needCopy, &headers);
+    sink_->content(data, size, update(stat), needCopy, &stat.headers);
 }
 
 inline void

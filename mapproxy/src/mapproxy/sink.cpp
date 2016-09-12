@@ -12,32 +12,30 @@
 
 namespace {
 
-http::Header::list buildHeaders(const Sink::FileInfo &stat
-                                , const FileClassSettings *fileClassSettings)
+boost::optional<long> maxAge(FileClass fileClass
+                             , const FileClassSettings *fileClassSettings)
 {
-    auto headers(stat.headers);
+    if (!fileClassSettings) { return boost::none; }
+    return fileClassSettings->getMaxAge(fileClass);
+}
 
-    // TODO: obsolete, remove
-    headers.emplace_back("X-MapProxy-File-Class"
-                         , boost::lexical_cast<std::string>(stat.fileClass));
+Sink::FileInfo update(const Sink::FileInfo &inStat
+                      , const FileClassSettings *fileClassSettings)
+{
+    if (inStat.maxAge) { return inStat; }
+    auto stat(inStat);
 
     if (!fileClassSettings) {
         // no file class attached, no caching
-        headers.emplace_back("Cache-Control", "no-cache");
-        return headers;
+        stat.maxAge = -1;
+        return stat;
     }
 
     // set max age based on fileClass settings
-    auto maxAge(fileClassSettings->getMaxAge(stat.fileClass));
-    if (maxAge < 0) {
-        headers.emplace_back("Cache-Control", "no-cache");
-    } else {
-        headers.emplace_back("Cache-Control"
-                             , str(boost::format("max-age=%s")
-                                   % maxAge));
-    }
+    stat.maxAge = fileClassSettings->getMaxAge(stat.fileClass);
 
-    return headers;
+    // done
+    return stat;
 }
 
 const std::vector<unsigned char> emptyImage([]() -> std::vector<unsigned char>
@@ -55,16 +53,15 @@ public:
                       , FileClass fileClass
                       , const FileClassSettings *fileClassSettings)
         : stream_(stream), stat_(stream->stat())
-        , fs_(Sink::FileInfo(stat_.contentType, stat_.lastModified)
-              .setFileClass(fileClass))
-        , headers_(buildHeaders(fs_, fileClassSettings))
+        , fs_(Sink::FileInfo(stat_.contentType, stat_.lastModified
+                             , maxAge(fileClass, fileClassSettings)))
     {
         // do not fail on eof
         stream->get().exceptions(std::ios::badbit);
     }
 
     virtual http::SinkBase::FileInfo stat() const {
-        return {  };
+        return fs_;
     }
 
     virtual std::size_t read(char *buf, std::size_t size
@@ -117,7 +114,7 @@ Sink::FileInfo& Sink::FileInfo::setFileClass(FileClass fc) {
     return *this;
 }
 
-http::Header::list Sink::buildHeaders(const FileInfo &stat) const
+Sink::FileInfo Sink::update(const FileInfo &stat) const
 {
-    return ::buildHeaders(stat, fileClassSettings_);
+    return ::update(stat, fileClassSettings_);
 }
