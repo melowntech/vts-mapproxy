@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.19) citationtech-wheezy; urgency=low
+
+  * Fixed geodata, added generator revision into tiled geodata URL.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 13 Sep 2016 15:40:52 +0200
+
 ctt-vts-mapproxy (0.18) citationtech-wheezy; urgency=low
 
   * Shared mem leak fix.  
