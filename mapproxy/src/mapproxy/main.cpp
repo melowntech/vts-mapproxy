@@ -58,6 +58,15 @@ public:
 
         variables_["VTS_BUILTIN_BROWSER_URL"]
             = "//cdn.melown.com/libs/melownjs/builtin/stable";
+
+
+        // some file class defaults
+        auto &fcs(resourceBackendGenericConfig_.fileClassSettings);
+        fcs.setMaxAge(FileClass::config, 60);
+        fcs.setMaxAge(FileClass::support, 3600);
+        fcs.setMaxAge(FileClass::registry, 3600);
+        fcs.setMaxAge(FileClass::data, 604800);
+        fcs.setMaxAge(FileClass::unknown, -1);
     }
 
 private:
@@ -99,6 +108,7 @@ private:
     unsigned int httpClientThreadCount_;
     unsigned int coreThreadCount_;
     bool httpEnableBrowser_;
+    ResourceBackend::GenericConfig resourceBackendGenericConfig_;
     ResourceBackend::TypedConfig resourceBackendConfig_;
     vs::SupportFile::Vars variables_;
     Generators::Config generatorsConfig_;
@@ -175,6 +185,9 @@ void Daemon::configuration(po::options_description &cmdline
          , po::value(&variables_["VTS_BUILTIN_BROWSER_URL"])
          , "URL of built in browser.");
         ;
+
+        resourceBackendGenericConfig_.fileClassSettings
+            .configuration(config, "file-class.");
 
     (void) cmdline;
     (void) pd;
@@ -279,7 +292,8 @@ service::Service::Cleanup Daemon::start()
     // warper must be first since it uses processes
     gdalWarper_ = boost::in_place(gdalWarperOptions_, std::ref(*this));
 
-    resourceBackend_ = ResourceBackend::create(resourceBackendConfig_);
+    resourceBackend_ = ResourceBackend::create
+        (resourceBackendGenericConfig_, resourceBackendConfig_);
     generators_ = boost::in_place(generatorsConfig_, resourceBackend_);
 
     http_ = boost::in_place();

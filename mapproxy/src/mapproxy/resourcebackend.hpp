@@ -25,6 +25,10 @@ public:
     void error(const Resource::Id &resourceId, const std::string &message)
         const;
 
+    struct GenericConfig {
+        FileClassSettings fileClassSettings;
+    };
+
     class TypedConfig {
     public:
         /** Resource backend type.
@@ -47,7 +51,8 @@ public:
         boost::any value_;
     };
 
-    static pointer create(const TypedConfig &config);
+    static pointer create(const GenericConfig &genericConfig
+                          , const TypedConfig &config);
 
     /** Processes configuration for resource backend as an unrecognized parser.
      *
@@ -70,11 +75,15 @@ public:
                              , const std::shared_ptr<Factory> &factory);
 
 protected:
-    ResourceBackend() {}
+    ResourceBackend(const GenericConfig &genericConfig)
+        : genericConfig_(genericConfig)
+    {}
 
     virtual Resource::map load_impl() const = 0;
 
     virtual void error_impl(const Resource::Id&, const std::string&) const {}
+
+    GenericConfig genericConfig_;
 };
 
 inline Resource::map ResourceBackend::load() const

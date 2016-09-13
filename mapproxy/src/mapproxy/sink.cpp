@@ -1,4 +1,5 @@
 #include <boost/lexical_cast.hpp>
+#include <boost/format.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -10,6 +11,32 @@
 #include "./error.hpp"
 
 namespace {
+
+boost::optional<long> maxAge(FileClass fileClass
+                             , const FileClassSettings *fileClassSettings)
+{
+    if (!fileClassSettings) { return boost::none; }
+    return fileClassSettings->getMaxAge(fileClass);
+}
+
+Sink::FileInfo update(const Sink::FileInfo &inStat
+                      , const FileClassSettings *fileClassSettings)
+{
+    if (inStat.maxAge) { return inStat; }
+    auto stat(inStat);
+
+    if (!fileClassSettings) {
+        // no file class attached, no caching
+        stat.maxAge = -1;
+        return stat;
+    }
+
+    // set max age based on fileClass settings
+    stat.maxAge = fileClassSettings->getMaxAge(stat.fileClass);
+
+    // done
+    return stat;
+}
 
 const std::vector<unsigned char> emptyImage([]() -> std::vector<unsigned char>
 {
@@ -23,17 +50,18 @@ const std::vector<unsigned char> emptyImage([]() -> std::vector<unsigned char>
 class IStreamDataSource : public http::ServerSink::DataSource {
 public:
     IStreamDataSource(const vs::IStream::pointer &stream
-                      , Sink::FileInfo::FileClass fileClass)
+                      , FileClass fileClass
+                      , const FileClassSettings *fileClassSettings)
         : stream_(stream), stat_(stream->stat())
-        , fs_(Sink::FileInfo(stat_.contentType, stat_.lastModified)
-              .setFileClass(fileClass))
+        , fs_(Sink::FileInfo(stat_.contentType, stat_.lastModified
+                             , maxAge(fileClass, fileClassSettings)))
     {
         // do not fail on eof
         stream->get().exceptions(std::ios::badbit);
     }
 
     virtual http::SinkBase::FileInfo stat() const {
-        return {  };
+        return fs_;
     }
 
     virtual std::size_t read(char *buf, std::size_t size
@@ -48,20 +76,22 @@ public:
 
     virtual long size() const { return stat_.size; }
 
-    virtual const http::Header::list *headers() const { return &fs_.headers; }
+    virtual const http::Header::list *headers() const { return &headers_; }
 
 private:
     vs::IStream::pointer stream_;
     vs::FileStat stat_;
     Sink::FileInfo fs_;
+    http::Header::list headers_;
 };
 
 } //namesapce
 
 void Sink::content(const vs::IStream::pointer &stream
-                   , FileInfo::FileClass fileClass)
+                   , FileClass fileClass)
 {
-    sink_->content(std::make_shared<IStreamDataSource>(stream, fileClass));
+    sink_->content(std::make_shared<IStreamDataSource>
+                   (stream, fileClass, fileClassSettings_));
 }
 
 void Sink::error(const std::exception_ptr &exc)
@@ -70,17 +100,21 @@ void Sink::error(const std::exception_ptr &exc)
         std::rethrow_exception(exc);
     } catch (const EmptyImage &e) {
         // special "error" -> send "empty" image
-        sink_->content(emptyImage.data(), emptyImage.size()
-                       , Sink::FileInfo("image/png")
-                       .setFileClass(Sink::FileInfo::FileClass::data)
-                       , false);
+        content(emptyImage.data(), emptyImage.size()
+                , Sink::FileInfo("image/png")
+                .setFileClass(FileClass::data)
+                , false);
     } catch (...) {
         sink_->error(std::current_exception());
     }
 }
 
 Sink::FileInfo& Sink::FileInfo::setFileClass(FileClass fc) {
-    headers.emplace_back("X-MapProxy-File-Class"
-                         , boost::lexical_cast<std::string>(fc));
+    fileClass = fc;
     return *this;
+}
+
+Sink::FileInfo Sink::update(const FileInfo &stat) const
+{
+    return ::update(stat, fileClassSettings_);
 }

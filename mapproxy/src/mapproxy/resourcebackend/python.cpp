@@ -22,7 +22,8 @@ namespace {
 std::once_flag onceFlag;
 
 struct Factory : ResourceBackend::Factory {
-    virtual ResourceBackend::pointer create(const TypedConfig &config)
+    virtual ResourceBackend::pointer create(const GenericConfig &genericConfig
+                                            , const TypedConfig &config)
     {
         std::call_once(onceFlag, [&]()
         {
@@ -33,7 +34,8 @@ struct Factory : ResourceBackend::Factory {
             dbglog::py::import();
         });
 
-        return std::make_shared<Python>(config.value<Python::Config>());
+        return std::make_shared<Python>
+            (genericConfig, config.value<Python::Config>());
     }
 
     virtual service::UnrecognizedParser::optional
@@ -118,8 +120,8 @@ utility::PreMain Factory::register_([]()
 
 } // namespace
 
-Python::Python(const Config &config)
-    : run_(), error_()
+Python::Python(const GenericConfig &genericConfig, const Config &config)
+    : ResourceBackend(genericConfig), run_(), error_()
 {
     try {
         python::dict options;
@@ -148,7 +150,7 @@ Resource::map Python::load_impl() const
             (python::list(run_())
              , [this](const Resource::Id &id, const std::string &error) {
                 error_impl(id, error);
-            });
+            }, genericConfig_.fileClassSettings);
     } catch (const python::error_already_set&) {
         // TODO: handle exceptions
         LOG(err3) << "Resource backend run failed, py exception follows:";

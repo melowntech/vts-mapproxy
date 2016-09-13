@@ -62,14 +62,30 @@ Json::Value buildDefinition(const Resource &r)
     return boost::any_cast<const Json::Value&>(tmp);
 }
 
-Resource::list parseResource(const Json::Value &value)
+FileClassSettings parseFileClassSettings(const Json::Value &value
+                                         , const FileClassSettings &defaults)
+{
+    if (value.isNull()) { return defaults; }
+
+    FileClassSettings fcs(defaults);
+    for (const auto &name : value.getMemberNames()) {
+        auto fc(boost::lexical_cast<FileClass>(name));
+        long maxAge;
+        Json::get(maxAge, value, name.c_str());
+        fcs.setMaxAge(fc, maxAge);
+    }
+    return fcs;
+}
+
+Resource::list parseResource(const Json::Value &value
+                             , const FileClassSettings &fileClassSettings)
 {
     if (!value.isObject()) {
         LOGTHROW(err1, Json::Error)
             << "Resource definition is not an object.";
     }
 
-    Resource r;
+    Resource r(parseFileClassSettings(value["maxAge"], fileClassSettings));
 
     Json::get(r.id.group, value, "group");
     Json::get(r.id.id, value, "id");
@@ -114,7 +130,8 @@ Resource::list parseResource(const Json::Value &value)
     return out;
 }
 
-void parseResources(Resource::map &resources, const Json::Value &value)
+void parseResources(Resource::map &resources, const Json::Value &value
+                    , const FileClassSettings &fileClassSettings)
 {
     if (!value.isArray()) {
         LOGTHROW(err1, Json::Error)
@@ -124,7 +141,7 @@ void parseResources(Resource::map &resources, const Json::Value &value)
     // process all definitions
     for (const auto &item : value) {
         // parse resource and remember
-        auto resList(parseResource(item));
+        auto resList(parseResource(item, fileClassSettings));
 
         for (const auto &res : resList) {
             if (!resources.insert(Resource::map::value_type(res.id, res))
@@ -137,7 +154,8 @@ void parseResources(Resource::map &resources, const Json::Value &value)
     }
 }
 
-Resource::map loadResources(std::istream &in, const fs::path &path)
+Resource::map loadResources(std::istream &in, const fs::path &path
+                            , const FileClassSettings &fileClassSettings)
 {
     Json::Value config;
     Json::Reader reader;
@@ -150,7 +168,7 @@ Resource::map loadResources(std::istream &in, const fs::path &path)
     Resource::map resources;
 
     try {
-        parseResources(resources, config);
+        parseResources(resources, config, fileClassSettings);
     } catch (const Json::Error &e) {
         LOGTHROW(err1, FormatError)
             << "Invalid resource config file " << path
@@ -164,7 +182,8 @@ Resource::map loadResources(std::istream &in, const fs::path &path)
     return resources;
 }
 
-Resource::list loadResource(std::istream &in, const fs::path &path)
+Resource::list loadResource(std::istream &in, const fs::path &path
+                            , const FileClassSettings &fileClassSettings)
 {
     Json::Value config;
     Json::Reader reader;
@@ -175,7 +194,7 @@ Resource::list loadResource(std::istream &in, const fs::path &path)
     }
 
     try {
-        return parseResource(config);
+        return parseResource(config, fileClassSettings);
     } catch (const Json::Error &e) {
         LOGTHROW(err1, FormatError)
             << "Invalid resource config file " << path
@@ -232,7 +251,8 @@ void saveResource(std::ostream &out, const Resource &resource)
 } // namespace detail
 
 Resource::map loadResources(const boost::filesystem::path &path
-                            , ResourceLoadErrorCallback)
+                            , ResourceLoadErrorCallback
+                            , const FileClassSettings &fileClassSettings)
 {
     std::ifstream f;
     f.exceptions(std::ios::badbit | std::ios::failbit);
@@ -245,10 +265,11 @@ Resource::map loadResources(const boost::filesystem::path &path
             << ": <" << e.what() << ">.";
     }
 
-    return detail::loadResources(f, path);
+    return detail::loadResources(f, path, fileClassSettings);
 }
 
-Resource::list loadResource(const boost::filesystem::path &path)
+Resource::list loadResource(const boost::filesystem::path &path
+                            , const FileClassSettings &fileClassSettings)
 {
     std::ifstream f;
     f.exceptions(std::ios::badbit | std::ios::failbit);
@@ -261,7 +282,7 @@ Resource::list loadResource(const boost::filesystem::path &path)
             << ": <" << e.what() << ">.";
     }
 
-    return detail::loadResource(f, path);
+    return detail::loadResource(f, path, fileClassSettings);
 }
 
 void save(const boost::filesystem::path &path, const Resource &resource)

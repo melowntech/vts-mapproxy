@@ -15,9 +15,11 @@ namespace resource_backend {
 namespace {
 
 struct Factory : ResourceBackend::Factory {
-    virtual ResourceBackend::pointer create(const TypedConfig &config)
+    virtual ResourceBackend::pointer create(const GenericConfig &genericConfig
+                                            , const TypedConfig &config)
     {
-        return std::make_shared<Conffile>(config.value<Conffile::Config>());
+        return std::make_shared<Conffile>
+            (genericConfig, config.value<Conffile::Config>());
     }
 
     virtual service::UnrecognizedParser::optional
@@ -56,8 +58,9 @@ utility::PreMain Factory::register_([]()
 
 } // namespace
 
-Conffile::Conffile(const Config &config)
-    : config_(config)
+Conffile::Conffile(const GenericConfig &genericConfig
+                   , const Config &config)
+    : ResourceBackend(genericConfig), config_(config)
 {
     // try to load config file now
     load_impl();
@@ -65,7 +68,7 @@ Conffile::Conffile(const Config &config)
 
 Resource::map Conffile::load_impl() const
 {
-    return loadResources(config_.path, {});
+    return loadResources(config_.path, {}, genericConfig_.fileClassSettings);
 }
 
 } // namespace resource_backend

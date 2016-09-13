@@ -468,6 +468,9 @@
                 }
             }
         },
+        "maxAge": {
+            "data": 5555
+        },
         "definition": {
             "dataset": "/mnt/media/derivatives/mapproxy/cz",
             "mask": "/mnt/media/derivatives/mask/osm-boundaries/cz/cz.mask",

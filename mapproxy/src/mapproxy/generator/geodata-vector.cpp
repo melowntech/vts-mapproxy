@@ -166,7 +166,7 @@ void GeodataVector::generateGeodata(Sink &sink
 {
     auto sfi(fi.sinkFileInfo());
     sink.content(vs::fileIStream(sfi.contentType.c_str(), dataPath_)
-                 , Sink::FileInfo::FileClass::data);
+                 , FileClass::data);
 }
 
 } // namespace generator

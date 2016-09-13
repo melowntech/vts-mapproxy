@@ -17,6 +17,8 @@
 
 #include "./error.hpp"
 
+#include "./support/fileclass.hpp"
+
 /** Base of all resource definitions.
  */
 class DefinitionBase {
@@ -149,6 +151,8 @@ struct Resource {
 
     vr::RegistryBase registry;
 
+    FileClassSettings fileClassSettings;
+
     DefinitionBase::pointer definition() const {
         return definition_;
     }
@@ -164,7 +168,9 @@ struct Resource {
     typedef std::map<Id, Resource> map;
     typedef std::vector<Resource> list;
 
-    Resource() {}
+    Resource(const FileClassSettings &fileClassSettings)
+        : fileClassSettings(fileClassSettings)
+    {}
 
     bool operator==(const Resource &o) const;
     bool operator!=(const Resource &o) const;
@@ -246,17 +252,24 @@ ResourceLoadErrorCallback;
 /** Load resources from given path.
  */
 Resource::map loadResources(const boost::filesystem::path &path
-                            , ResourceLoadErrorCallback error);
+                            , ResourceLoadErrorCallback error
+                            , const FileClassSettings &fileClassSettings
+                            = FileClassSettings());
 
 /** Load single resource from given path.
  */
-Resource::list loadResource(const boost::filesystem::path &path);
+Resource::list loadResource(const boost::filesystem::path &path
+                            , const FileClassSettings &fileClassSettings
+                            = FileClassSettings());
 
 /** Load resources from Python list (passed as a boost::any to hide
  *  implementation)
  */
 Resource::map loadResourcesFromPython(const boost::any &pylist
-                                      , ResourceLoadErrorCallback error);
+                                      , ResourceLoadErrorCallback error
+                                      , const FileClassSettings
+                                      &fileClassSettings
+                                      = FileClassSettings());
 
 /** Save single resource to given path.
  */

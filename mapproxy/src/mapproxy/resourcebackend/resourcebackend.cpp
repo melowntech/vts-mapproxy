@@ -53,10 +53,11 @@ std::vector<std::string> ResourceBackend::listTypes(const std::string &prefix)
 }
 
 ResourceBackend::pointer
-ResourceBackend::create(const TypedConfig &config)
+ResourceBackend::create(const GenericConfig &genericConfig
+                        , const TypedConfig &config)
 {
     try {
-        return findFactory(config.type)->create(config);
+        return findFactory(config.type)->create(genericConfig, config);
     } catch (const boost::bad_any_cast&) {
         LOGTHROW(err2, InvalidConfiguration)
             << "Passed configuration does not match resource backend <"

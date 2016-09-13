@@ -77,6 +77,8 @@ public:
         Config config;
         Resource resource;
         const GeneratorFinder *generatorFinder;
+
+        Params(const Resource &resource) : resource(resource) {}
     };
 
     static Generator::pointer create(const Params &params);

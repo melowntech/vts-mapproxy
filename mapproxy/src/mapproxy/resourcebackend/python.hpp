@@ -21,7 +21,7 @@ public:
         Options options;
     };
 
-    Python(const Config &config);
+    Python(const GenericConfig &genericConfig, const Config &config);
 
 private:
     virtual Resource::map load_impl() const;
