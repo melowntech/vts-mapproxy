@@ -16,7 +16,12 @@
 #include "geo/vectorformat.hpp"
 #include "geo/heightcoding.hpp"
 
+#include "vts-libs/vts/opencv/navtile.hpp"
+#include "vts-libs/vts/nodeinfo.hpp"
+
 #include "./sink.hpp"
+
+namespace vts = vadstena::vts;
 
 class GdalWarper {
 public:
@@ -130,6 +135,29 @@ public:
     heightcode(const std::string &vectorDs
                , const std::string &rasterDs
                , const geo::heightcoding::Config &config
+               , const boost::optional<std::string> &geoidGrid
+               , Aborter &aborter);
+
+    /** Navigation tile info.
+     */
+    struct Navtile {
+        std::string path;
+        std::string raw;
+        math::Extents2 extents;
+        std::string sdsSrs;
+        std::string navSrs;
+        vts::NavTile::HeightRange heightRange;
+
+        Navtile() {}
+    };
+
+    /** Heightcode vector ds using navtile ds
+     */
+    Heighcoded::pointer
+    heightcode(const std::string &vectorDs
+               , const Navtile &navtile
+               , const geo::heightcoding::Config &config
+               , const std::string &fallbackDs
                , const boost::optional<std::string> &geoidGrid
                , Aborter &aborter);
 

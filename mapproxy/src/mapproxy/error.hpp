@@ -44,5 +44,6 @@ typedef http::NotFound NotFound;
 typedef http::ServiceUnavailable Unavailable;
 typedef http::InternalServerError InternalError;
 typedef http::RequestAborted RequestAborted;
+typedef http::BadRequest BadRequest;
 
 #endif // mapproxy_error_hpp_included_

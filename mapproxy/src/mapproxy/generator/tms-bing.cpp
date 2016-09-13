@@ -134,10 +134,9 @@ void generateTileUrl(Sink sink, Arsenal &arsenal
     typedef utility::ResourceFetcher::Query Query;
     typedef utility::ResourceFetcher::MultiQuery MultiQuery;
 
-    Query q(metadataUrl);
-    q.reuse(false);
-
-    arsenal.fetcher.perform(q, [=](const MultiQuery &query) mutable -> void
+    // fetch JSON; no reuse, reasonable timeout
+    arsenal.fetcher.perform(Query(metadataUrl).reuse(false).timeout(10000)
+                            , [=](const MultiQuery &query) mutable -> void
     {
         try {
             Json::Value reply;

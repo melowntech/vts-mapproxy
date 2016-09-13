@@ -83,7 +83,7 @@ FileInfo::FileInfo(const http::Request &request, int f)
     auto qm(url.find('?'));
     if (qm != std::string::npos) {
         end = url.begin() + qm;
-        query = url.substr(qm);
+        query = url.substr(qm + 1);
     }
 
     std::vector<std::string> components;

@@ -448,16 +448,16 @@
         "driver": "surface-dem",
         "referenceFrames": {
             "webmerc-projected": {
-                "lodRange": [0,20],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [5,20],
+                "tileRange": [[0,0],[31,31]]
             },
             "webmerc-unprojected": {
-                "lodRange": [0,20],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [5,20],
+                "tileRange": [[0,0],[31,31]]
             },
             "melown2015": {
-                "lodRange": [0,21],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [6,21],
+                "tileRange": [[0,0],[31,31]]
             }
         },
         "credits": ["melown"],
@@ -486,6 +486,10 @@
             "melown2015": {
                 "lodRange": [4,21],
                 "tileRange": [[0,0], [15,15]]
+            }
+            , "webmerc-projected": {
+                "lodRange": [3,20],
+                "tileRange": [[0,0], [7,7]]
             }
         },
         "credits": ["jonathan"],
@@ -612,6 +616,10 @@
                 "lodRange": [1, 21],
                 "tileRange": [[0, 0], [0, 0]]
             }
+            , "webmerc-projected": {
+                "lodRange": [3,20],
+                "tileRange": [[0,0], [7,7]]
+            }
         },
         "credits": [],
         "definition": {
@@ -619,13 +627,50 @@
             , "demDataset": "viewfinder"
             , "geoidGrid": "egm96_15.gtx"
             , "format": "geodataJson"
-            , "styleUrl": "http://pomerol.internal:8870/plain/dummy-stylesheet.json"
+            , "styleUrl": "http://cdn.melown.com/mario/store/melown2015/stylesheet/melown/mapzen-stylesheet"
             , "displaySize": 256
+            , "layers": [ "roads" ]
 
             , "introspection": {
                 "surface": { "group": "melown", "id": "viewfinder" }
             }
         }
+    },
+
+    {
+        "comment" : "Mapzen vector tiles (MVT)",
+        "credits" : [ ],
+        "definition" :
+        {
+                "dataset" : "http://vector.mapzen.com/osm/all/{loclod}/{locx}/{locy}.mvt?api_key=vector-tiles-mJRqnWb",
+                "demDataset" : "viewfinder",
+                "displaySize" : 1024,
+                "format" : "geodataJson",
+                "geoidGrid" : "egm96_15.gtx",
+                "styleUrl" : "//cdn.melown.com/mario/store/melown2015/stylesheet/melown/mapzen-stylesheet"
+            , "layers": [ "roads" ]
+        },
+        "driver" : "geodata-vector-tiled",
+        "group" : "melown",
+        "id" : "mapzen-all",
+        "referenceFrames" : 
+        {
+                "melown2015" : 
+                {
+                        "lodRange" : [ 1, 21 ],
+                        "tileRange" : 
+                        [
+                                [ 0, 0 ],
+                                [ 0, 0 ]
+                        ]
+                }
+            , "webmerc-projected": {
+                "lodRange": [3,20],
+                "tileRange": [[0,0], [7,7]]
+            }
+        },
+        "registry" : {},
+        "type" : "geodata"
     }
 
     , {
@@ -654,4 +699,100 @@
             }
         }
     }
+
+    , {
+        "comment": "Legacy Mapzen vector tiles (JSON)",
+        "group": "melown",
+        "id": "legacy-mapzen-all-json",
+        "type": "geodata",
+        "driver": "geodata-vector-tiled",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 21],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+            , "webmerc-projected": {
+                "lodRange": [3,20],
+                "tileRange": [[0,0], [7,7]]
+            }
+        },
+        "credits": ["osm"],
+        "definition": {
+            "dataset": "https://vector.mapzen.com/osm/all/{loclod}/{locx}/{locy}.json?api_key=vector-tiles-mJRqnWb"
+            , "demDataset": "viewfinder"
+            , "geoidGrid": "egm96_15.gtx"
+            , "format": "geodataJson"
+            , "styleUrl": "http://pomerol.internal:8870/plain/dummy-stylesheet.json"
+            , "displaySize": 256
+
+            , "introspection": {
+                "surface": { "group": "melown", "id": "viewfinder" }
+            }
+        }
+    }
+
+    , {
+        "comment": "Mapzen vector tiles",
+        "group": "mapzen",
+        "id": "json",
+        "type": "geodata",
+        "driver": "geodata-vector-tiled",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 21],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+            , "webmerc-projected": {
+                "lodRange": [3,20],
+                "tileRange": [[0,0], [7,7]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "https://vector.mapzen.com/osm/all/{loclod}/{locx}/{locy}.json?api_key=vector-tiles-mJRqnWb"
+            , "demDataset": "viewfinder"
+            , "geoidGrid": "egm96_15.gtx"
+            , "format": "geodataJson"
+            , "styleUrl": "http://cdn.melown.com/mario/store/melown2015/stylesheet/melown/mapzen-stylesheet"
+            , "displaySize": 256
+            , "layers": [ "roads" ]
+
+            , "introspection": {
+                "surface": { "group": "melown", "id": "viewfinder" }
+            }
+        }
+    }
+
+    , {
+        "comment": "Mapzen vector tiles",
+        "group": "mapzen",
+        "id": "mvt",
+        "type": "geodata",
+        "driver": "geodata-vector-tiled",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 21],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+            , "webmerc-projected": {
+                "lodRange": [3,20],
+                "tileRange": [[0,0], [7,7]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "https://vector.mapzen.com/osm/all/{loclod}/{locx}/{locy}.mvt?api_key=vector-tiles-mJRqnWb"
+            , "demDataset": "viewfinder"
+            , "geoidGrid": "egm96_15.gtx"
+            , "format": "geodataJson"
+            , "styleUrl": "http://cdn.melown.com/mario/store/melown2015/stylesheet/melown/mapzen-stylesheet"
+            , "displaySize": 256
+            , "layers": [ "roads" ]
+
+            , "introspection": {
+                "surface": { "group": "melown", "id": "viewfinder" }
+            }
+        }
+    }
+
 ]

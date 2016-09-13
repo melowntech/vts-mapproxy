@@ -40,4 +40,29 @@ typedef bi::vector<String, bi::allocator<String, SegmentManager>> StringVector;
 
 typedef bi::scoped_lock<bi::interprocess_mutex> Lock;
 
+inline std::string asString(const String &str) {
+    return { str.data(), str.size() };
+}
+
+inline boost::optional<std::string> asOptional(const String &str) {
+    if (str.empty()) { return {}; }
+    return std::string(str.data(), str.size());
+}
+
+inline boost::optional<geo::SrsDefinition>
+asOptional(const String &str, geo::SrsDefinition::Type type)
+{
+    if (str.empty()) { return {}; }
+    return geo::SrsDefinition(std::string(str.data(), str.size()), type);
+}
+
+struct ConstBlock {
+    const char *data;
+    std::size_t size;
+
+    ConstBlock(const char *data = nullptr, std::size_t size = 0)
+        : data(data), size(size)
+    {}
+};
+
 #endif // mapproxy_gdalsupport_types_hpp_included_
