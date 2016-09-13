@@ -3,6 +3,7 @@
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/format.hpp"
 
 #include "geo/heightcoding.hpp"
 #include "geo/srsfactors.hpp"
@@ -50,6 +51,10 @@ utility::PreMain Factory::register_([]()
                              , "geodata-vector-tiled")
          , std::make_shared<Factory>());
 });
+
+/** NOTICE: increment each time some data-related bug is fixed.
+ */
+int GeneratorRevision(0);
 
 } // namespace
 
@@ -151,10 +156,11 @@ vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
     fl.type = vr::FreeLayer::Type::geodataTiles;
 
     auto &def(fl.createDefinition<vr::FreeLayer::GeodataTiles>());
-    def.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
-                             , resource(), root);
+    def.metaUrl = prependRoot
+        (utility::format("{lod}-{x}-{y}.meta?gr=%d", GeneratorRevision)
+         , resource(), root);
     def.geodataUrl = prependRoot
-        (std::string("{lod}-{x}-{y}.geo?navtile={geonavtile}")
+        (utility::format("{lod}-{x}-{y}.geo?gr=%d", GeneratorRevision)
          , resource(), root);
     def.style = definition_.styleUrl;
 
