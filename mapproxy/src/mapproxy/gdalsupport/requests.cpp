@@ -165,7 +165,7 @@ ShNavtile::ShNavtile(const GdalWarper::Navtile &navtile, ManagedBuffer &sm)
     , sdsSrs(navtile.sdsSrs.data(), navtile.sdsSrs.size()
              , sm.get_allocator<char>())
     , navSrs(navtile.navSrs.data(), navtile.navSrs.size()
-              , sm.get_allocator<char>())
+             , sm.get_allocator<char>())
     , heightRange(navtile.heightRange)
 {}
 

@@ -453,7 +453,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
                              , demDataset_, definition_.geoidGrid);
                 return;
             }
-            LOG(info1) << "Using DEM because navtile" << ni->tileId
+            LOG(info1) << "Using DEM because navtile " << ni->tileId
                        << " because is worse than DEM at " << tileId << ".";
         }
     }

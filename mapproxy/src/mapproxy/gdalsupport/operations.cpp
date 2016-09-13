@@ -323,7 +323,9 @@ VectorDataset openVectorDataset(const std::string &dataset
     // open vector dataset
     OptionsWrapper openOptions;
     if (config.clipWorkingExtents) {
-        openOptions("@MVT_EXTENTS", *config.clipWorkingExtents);
+        std::ostringstream os;
+        os << std::fixed << *config.clipWorkingExtents;
+        openOptions("@MVT_EXTENTS", os.str());
     }
 
     if (config.workingSrs) {
