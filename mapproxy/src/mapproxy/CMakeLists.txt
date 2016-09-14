@@ -33,6 +33,7 @@ set(mapproxy_SOURCES
   generator/tms-raster.hpp generator/tms-raster.cpp
   generator/tms-raster-remote.hpp generator/tms-raster-remote.cpp
   generator/tms-bing.hpp generator/tms-bing.cpp
+  generator/tms-windyty.hpp generator/tms-windyty.cpp
 
   generator/surface.hpp generator/surface.cpp
   generator/surface-spheroid.hpp generator/surface-spheroid.cpp

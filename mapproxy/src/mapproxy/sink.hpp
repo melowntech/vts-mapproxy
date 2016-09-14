@@ -41,11 +41,13 @@ public:
     struct FileInfo : http::SinkBase::FileInfo {
         FileInfo(const std::string &contentType = "application/octet-stream"
                  , std::time_t lastModified = -1
-                 , const boost::optional<long> maxAge = boost::none)
+                 , const boost::optional<long> &maxAge = boost::none)
             : http::SinkBase::FileInfo(contentType, lastModified, maxAge)
         {}
 
         FileInfo& setFileClass(FileClass fc);
+
+        FileInfo& setMaxAge(const boost::optional<long> &maxAge);
 
         FileClass fileClass;
         http::Header::list headers;

@@ -26,6 +26,27 @@ public:
         virtual bool frozenCredits_impl() const { return false; }
     };
 
+protected:
+    const Definition &definition() const { return definition_; }
+
+    /** Dataset descriptor.
+     */
+    struct DatasetDesc {
+        /** Path to dataset.
+         */
+        std::string path;
+
+        /** Maximum allowed age of this dataset. Should be translated into
+         *  Cache-Control max-age is valid.
+         */
+        boost::optional<long> maxAge;
+
+        DatasetDesc(const std::string &path
+                    , const boost::optional<long> &maxAge = boost::none)
+            : path(path), maxAge(maxAge)
+        {}
+    };
+
 private:
     virtual void prepare_impl(Arsenal &arsenal);
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
@@ -47,10 +68,34 @@ private:
 
     vr::BoundLayer boundLayer(ResourceRoot root) const;
 
+    DatasetDesc dataset() const;
+
+    RasterFormat format() const;
+
+    bool transparent() const;
+
+    // customizable stuff
+
+    /** Path to dataset and its validity. Defaults to path from resource.
+     */
+    virtual DatasetDesc dataset_impl() const;
+
+    /** Reports bound layer as a transparent one. Forces raster format to PNG>
+     */
+    virtual bool transparent_impl() const;
+
     const Definition &definition_;
 
     bool hasMetatiles_;
 };
+
+inline TmsRaster::DatasetDesc TmsRaster::dataset() const {
+    return dataset_impl();
+}
+
+inline bool TmsRaster::transparent() const {
+    return transparent_impl();
+}
 
 } // namespace generator
 

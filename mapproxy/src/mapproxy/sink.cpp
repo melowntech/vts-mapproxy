@@ -109,8 +109,15 @@ void Sink::error(const std::exception_ptr &exc)
     }
 }
 
-Sink::FileInfo& Sink::FileInfo::setFileClass(FileClass fc) {
+Sink::FileInfo& Sink::FileInfo::setFileClass(FileClass fc)
+{
     fileClass = fc;
+    return *this;
+}
+
+Sink::FileInfo& Sink::FileInfo::setMaxAge(const boost::optional<long> &ma)
+{
+    maxAge = ma;
     return *this;
 }
 

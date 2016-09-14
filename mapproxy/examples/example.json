@@ -798,4 +798,30 @@
         }
     }
 
+    , {
+        "comment": "Windyty clouds",
+        "group": "windyty",
+        "id": "clouds",
+        "type": "tms",
+        "driver": "tms-windyty",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1, 5],
+                "tileRange": [[0, 0], [1, 1]]
+            },
+            "webmerc-projected": {
+                "lodRange": [0, 4],
+                "tileRange": [[0, 0], [0, 0]]
+            },
+            "webmerc-unprojected": {
+                "lodRange": [0, 4],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": ["melown"],
+        "definition": {
+           "dataset": "windyty/clouds.conf",
+           "format": "jpg"
+        }
+    }
 ]

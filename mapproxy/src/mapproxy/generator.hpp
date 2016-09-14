@@ -64,6 +64,7 @@ public:
     struct Config {
         boost::filesystem::path root;
         boost::filesystem::path resourceRoot;
+        boost::filesystem::path tmpRoot;
         int fileFlags;
         const vs::SupportFile::Vars *variables;
         const vs::SupportFile::Vars *defaults;

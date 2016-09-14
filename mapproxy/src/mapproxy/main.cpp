@@ -246,6 +246,9 @@ void Daemon::configure(const po::variables_map &vars)
                                              , resourceBackendConfig_);
             })
         ;
+
+    // share same root
+    generatorsConfig_.tmpRoot = gdalWarperOptions_.tmpRoot / "generators";
 }
 
 const std::string RBHelpPrefix(RBPrefix + "-");
