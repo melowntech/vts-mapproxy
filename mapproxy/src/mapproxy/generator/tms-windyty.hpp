@@ -47,6 +47,7 @@ public:
 private:
     virtual DatasetDesc dataset_impl() const;
     virtual bool transparent_impl() const;
+    virtual bool hasMask_impl() const;
 
     struct Dataset {
         std::mutex mutex;

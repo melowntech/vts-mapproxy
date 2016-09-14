@@ -210,6 +210,12 @@ bool TmsWindyty::transparent_impl() const
     return dsConfig_.transparent;
 }
 
+bool TmsWindyty::hasMask_impl() const
+{
+    // we do not want metatiles and mask
+    return false;
+}
+
 TmsRaster::DatasetDesc TmsWindyty::dataset_impl() const
 {
     struct Info {

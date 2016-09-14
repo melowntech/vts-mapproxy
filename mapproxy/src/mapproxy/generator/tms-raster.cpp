@@ -181,6 +181,12 @@ bool TmsRaster::transparent_impl() const
     return false;
 }
 
+bool TmsRaster::hasMask_impl() const
+{
+    // we want mask by default
+    return true;
+}
+
 vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
 {
     const auto &res(resource());
@@ -194,12 +200,13 @@ vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
     bl.url = prependRoot
         (str(boost::format("{lod}-{x}-{y}.%s") % format())
          , resource(), root);
-    bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
-                             , resource(), root);
-
-    if (hasMetatiles_) {
-        bl.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
+    if (hasMask()) {
+        bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
                                  , resource(), root);
+        if (hasMetatiles_) {
+            bl.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
+                                     , resource(), root);
+        }
     }
 
     bl.lodRange = res.lodRange;

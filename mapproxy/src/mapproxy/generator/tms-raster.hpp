@@ -74,6 +74,8 @@ private:
 
     bool transparent() const;
 
+    bool hasMask() const;
+
     // customizable stuff
 
     /** Path to dataset and its validity. Defaults to path from resource.
@@ -83,6 +85,10 @@ private:
     /** Reports bound layer as a transparent one. Forces raster format to PNG>
      */
     virtual bool transparent_impl() const;
+
+    /** Advertise mask definition to the user?
+     */
+    virtual bool hasMask_impl() const;
 
     const Definition &definition_;
 
@@ -95,6 +101,10 @@ inline TmsRaster::DatasetDesc TmsRaster::dataset() const {
 
 inline bool TmsRaster::transparent() const {
     return transparent_impl();
+}
+
+inline bool TmsRaster::hasMask() const {
+    return hasMask_impl();
 }
 
 } // namespace generator
