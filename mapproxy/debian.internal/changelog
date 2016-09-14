@@ -1,3 +1,10 @@
+ctt-vts-mapproxy (0.20) citationtech-wheezy; urgency=low
+
+  * Configurable (per resource) Cache-Control max-age.
+  * Windyty driver.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 14 Sep 2016 16:02:22 +0200
+
 ctt-vts-mapproxy (0.19) citationtech-wheezy; urgency=low
 
   * Fixed geodata, added generator revision into tiled geodata URL.
