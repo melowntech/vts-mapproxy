@@ -187,7 +187,7 @@ void Daemon::configuration(po::options_description &cmdline
         ;
 
         resourceBackendGenericConfig_.fileClassSettings
-            .configuration(config, "file-class.");
+            .configuration(config, "max-age.");
 
     (void) cmdline;
     (void) pd;
