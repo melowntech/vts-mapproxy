@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.22) citationtech-wheezy; urgency=low
+
+  * --file-class.* -> --max-age.*
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 15 Sep 2016 13:44:16 +0200
+
 ctt-vts-mapproxy (0.21) citationtech-wheezy; urgency=low
 
   * Windyty driver tells base raster generator not to generate metatiles and mask.
