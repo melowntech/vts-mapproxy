@@ -1,8 +1,8 @@
-vts/mapproxy
+# vts/mapproxy
 
 ---
 
-generatevrtwo: Generate virtual GDAL dataset with overviews.
+## generatevrtwo: Generate virtual GDAL dataset with overviews.
 
 Dataset format:
 * directory with:
@@ -18,7 +18,7 @@ when moving around filesystems/machines.
 
 ---
 
-Windyty driver
+## Windyty driver
 
 Dataset format:
 
@@ -42,3 +42,31 @@ overviews = 8
 # Transparent images?
 transparent = true
 ```
+
+---
+
+## Per-resource max-age
+
+Full resource max-age definition:
+
+```json
+"maxAge": {
+    "config": 60
+    , "support": 3600
+    , "registry": 3600
+    , "data": 604800
+}
+```
+Each entry specifies `max-age` (in seconds) set into HTTP `Cache-Control` header for given file class.
+File classes without definition in resource use default value from server's configuration. Whole `maxAge`
+section can be ommited.
+
+Server's defaults can be changed by specifying one of `--max-age.XXX` where `XXX` is file class.
+
+Supported file classes are
+ * `config`: configuration files (mapConfig.json, boundlayer.json and freelayer.json so far)
+ * `support`: support files (built-in 3D browser, built-in 2D browser etc.)
+ * `registry`: registry files (e.g. geoid grid files from registry)
+ * `data`: resource's data (metatiles, textures, meshes, masks, raw surface data, ...)
+
+Negative value is translated into `Cache-Control: no-cache`.
