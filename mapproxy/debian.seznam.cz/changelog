@@ -1,3 +1,11 @@
+ctt-vts-seznamcz-mapproxy (0.3) citationtech-wheezy-seznamcz; urgency=low
+
+  * Memory limits.
+  * More drivers.
+  * Fixes. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Tue, 20 Sep 2016 16:36:22 +0200
+
 ctt-vts-seznamcz-mapproxy (0.2) citationtech-wheezy-seznamcz; urgency=low
 
   * Release build 
