@@ -103,19 +103,24 @@ ShHeightCodeConfig::operator geo::heightcoding::Config() const
 }
 
 ShHeightCode::ShHeightCode(const std::string &vectorDs
-                           , const std::string &rasterDs
+                           , const std::vector<std::string> &rasterDs
                            , const geo::heightcoding::Config &config
                            , const boost::optional<std::string> &geoidGrid
                            , ManagedBuffer &sm, ShRequestBase *owner)
     : sm_(sm), owner_(owner)
     , vectorDs_(vectorDs.data(), vectorDs.size()
                 , sm.get_allocator<char>())
-    , rasterDs_(rasterDs.data(), rasterDs.size()
-                , sm.get_allocator<char>())
+    , rasterDs_(sm.get_allocator<String>())
     , config_(config, sm)
     , geoidGrid_(sm.get_allocator<char>())
     , response_()
 {
+    // copy strings to shared memory
+    for (const auto &str : rasterDs) {
+        rasterDs_.push_back(String(str.data(), str.size()
+                                   , sm.get_allocator<char>()));
+    }
+
     if (geoidGrid) {
         geoidGrid_.assign(geoidGrid->data(), geoidGrid->size());
     }
@@ -125,12 +130,18 @@ ShHeightCode::~ShHeightCode() {
     if (response_) { sm_.deallocate(response_); }
 }
 
-std::string ShHeightCode::vectorDs() const {
+std::string ShHeightCode::vectorDs() const
+{
     return asString(vectorDs_);
 }
 
-std::string ShHeightCode::rasterDs() const {
-    return asString(rasterDs_);
+std::vector<std::string> ShHeightCode::rasterDs() const
+{
+    std::vector<std::string> ds;
+    for (const auto &str : rasterDs_) {
+        ds.emplace_back(str.data(), str.size());
+    }
+    return ds;
 }
 
 geo::heightcoding::Config ShHeightCode::config() const {

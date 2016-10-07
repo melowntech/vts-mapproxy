@@ -45,6 +45,8 @@ public:
 
     void generateListing(const FileInfo &fi, Sink &sink);
 
+    void generateReferenceFrameDems(const FileInfo &fi, Sink &sink);
+
     bool assertBrowserEnabled(int flags, Sink &sink) const {
         if (flags & FileFlags::browserEnabled) { return true; }
         sink.error(utility::makeError<NotFound>("Browsing disabled."));
@@ -221,6 +223,10 @@ void Core::Detail::generate(const http::Request &request, Sink sink)
             generateListing(fi, sink);
             return;
 
+        case FileInfo::Type::referenceFrameDems:
+            generateReferenceFrameDems(fi, sink);
+            return;
+
         default: break;
         }
 
@@ -268,6 +274,40 @@ void Core::Detail::generateResourceFile(const FileInfo &fi, Sink &sink)
     post(generator->generateFile(fi, sink), sink);
 }
 
+void Core::Detail::generateReferenceFrameDems(const FileInfo &fi, Sink &sink)
+{
+    if (!assertBrowserEnabled(fi.flags, sink)) { return; }
+
+    const auto &referenceFrame(fi.resourceId.referenceFrame);
+
+    auto records(generators_.demRegistry().records(referenceFrame));
+
+    std::ostringstream os;
+    os << R"RAW(<html>
+<head><title>DEM mapping for )RAW" << referenceFrame
+       << R"RAW(</title></head>
+<body bgcolor="white">
+<h1>DEM mapping for )RAW"
+       << referenceFrame
+       << "\n</h1><hr><pre><a href=\"../\">../</a>\n";
+
+    for (const auto &record : records) {
+        auto link(prependRoot(boost::filesystem::path()
+                              , record.resourceId
+                              , Resource::Generator::Type::surface
+                              , ResourceRoot::Depth::type));
+
+        os << "<a href=\"" << link.string() << "\">"
+                   << record.id.id << "</a>\n";
+    }
+
+    os << R"RAW(</pre><hr></body>
+</html>
+)RAW";
+
+    sink.content(os.str(), { "text/html; charset=utf-8", -1, -1 });
+}
+
 namespace {
 
 Sink::Listing browsableDirectoryContent = {
@@ -277,6 +317,12 @@ Sink::Listing browsableDirectoryContent = {
 
 Sink::Listing otherDirectoryContent = {
     { "index.html" }
+};
+
+Sink::Listing rfDirectoryContent = {
+    { "index.html" }
+    , { "mapConfig.json" }
+    , { "dems.html" }
 };
 
 } // namespace
@@ -294,7 +340,7 @@ void Core::Detail::generateListing(const FileInfo &fi, Sink &sink)
     case FileInfo::Type::typeListing:
         sink.listing
             (buildListing(enumerationValues(Resource::Generator::Type())
-                          , browsableDirectoryContent));
+                          , rfDirectoryContent));
         return;
 
     case FileInfo::Type::groupListing:

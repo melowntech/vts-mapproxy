@@ -232,6 +232,14 @@ struct ResourceRoot {
 
 /** Computes path from this resource to that resource.
  */
+ResourceRoot resolveRoot(const Resource::Id &thisResource
+                         , Resource::Generator::Type thisGeneratorType
+                         , const Resource::Id &thatResource
+                         , Resource::Generator::Type thatGeneratorType
+                         , ResourceRoot::Depth thisDepth = ResourceRoot::none);
+
+/** Computes path from this resource to that resource.
+ */
 ResourceRoot resolveRoot(const Resource &thisResource
                          , const Resource &thatResource
                          , ResourceRoot::Depth thisDepth = ResourceRoot::none);
@@ -280,6 +288,15 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const ResourceRoot &root);
 
 std::string prependRoot(const std::string &path, const Resource &resource
+                        , const ResourceRoot &root);
+
+boost::filesystem::path prependRoot(const boost::filesystem::path &path
+                                    , const Resource::Id &resource
+                                    , Resource::Generator::Type generatorType
+                                    , const ResourceRoot &root);
+
+std::string prependRoot(const std::string &path, const Resource::Id &resource
+                        , Resource::Generator::Type generatorType
                         , const ResourceRoot &root);
 
 std::string contentType(RasterFormat format);
@@ -347,6 +364,29 @@ inline Resource::Id addReferenceFrame(Resource::Id rid
 {
     rid.referenceFrame = std::move(referenceFrame);
     return rid;
+}
+
+inline boost::filesystem::path prependRoot(const boost::filesystem::path &path
+                                           , const Resource &resource
+                                           , const ResourceRoot &root)
+{
+    return prependRoot(path, resource.id, resource.generator.type, root);
+}
+
+inline std::string prependRoot(const std::string &path
+                               , const Resource &resource
+                               , const ResourceRoot &root)
+{
+    return prependRoot(path, resource.id, resource.generator.type, root);
+}
+
+inline ResourceRoot resolveRoot(const Resource &thisResource
+                                , const Resource &thatResource
+                                , ResourceRoot::Depth thisDepth)
+{
+    return resolveRoot(thisResource.id, thisResource.generator.type
+                       , thatResource.id, thatResource.generator.type
+                       , thisDepth);
 }
 
 #endif // mapproxy_resource_hpp_included_

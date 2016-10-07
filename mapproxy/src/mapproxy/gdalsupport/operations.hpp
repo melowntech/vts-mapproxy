@@ -11,7 +11,7 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
 GdalWarper::Heighcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
-           , const std::string &rasterDs
+           , const std::vector<std::string> &rasterDs
            , geo::heightcoding::Config config
            , const boost::optional<std::string> &geoidGrid);
 

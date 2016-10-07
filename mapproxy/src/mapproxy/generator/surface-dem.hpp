@@ -18,11 +18,14 @@ class SurfaceDem : public SurfaceBase {
 public:
     SurfaceDem(const Params &params);
 
+    ~SurfaceDem();
+
     struct Definition : public DefinitionBase {
         std::string dataset;
         boost::optional<boost::filesystem::path> mask;
         unsigned int textureLayerId;
         boost::optional<std::string> geoidGrid;
+        boost::optional<std::string> heightcodingAlias;
 
         Definition() : textureLayerId() {}
         bool operator==(const Definition &o) const;
@@ -58,6 +61,10 @@ private:
     vts::MetaTile generateMetatileImpl(const vts::TileId &tileId
                                        , Sink &sink
                                        , Arsenal &arsenal) const;
+
+    void addToRegistry();
+
+    void removeFromRegistry();
 
     const Definition &definition_;
 

@@ -66,7 +66,8 @@ struct ShHeightCodeConfig {
 
 class ShHeightCode : boost::noncopyable {
 public:
-    ShHeightCode(const std::string &vectorDs, const std::string &rasterDs
+    ShHeightCode(const std::string &vectorDs
+                 , const std::vector<std::string> &rasterDs
                  , const geo::heightcoding::Config &config
                  , const boost::optional<std::string> &geoidGrid
                  , ManagedBuffer &sm, ShRequestBase *owner);
@@ -75,7 +76,7 @@ public:
 
     std::string vectorDs() const;
 
-    std::string rasterDs() const;
+    std::vector<std::string> rasterDs() const;
 
     geo::heightcoding::Config config() const;
 
@@ -92,7 +93,7 @@ private:
     ManagedBuffer &sm_;
     ShRequestBase *owner_;
     String vectorDs_;
-    String rasterDs_;
+    StringVector rasterDs_;
     ShHeightCodeConfig config_;
     String geoidGrid_;
 

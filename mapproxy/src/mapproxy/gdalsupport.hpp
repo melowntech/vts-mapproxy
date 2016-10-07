@@ -133,7 +133,7 @@ public:
      */
     Heighcoded::pointer
     heightcode(const std::string &vectorDs
-               , const std::string &rasterDs
+               , const std::vector<std::string> &rasterDs
                , const geo::heightcoding::Config &config
                , const boost::optional<std::string> &geoidGrid
                , Aborter &aborter);

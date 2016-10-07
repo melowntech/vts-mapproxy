@@ -23,6 +23,7 @@ namespace constants {
     const std::string FreeLayerDefinition("freelayer.json");
     const std::string Self("");
     const std::string Index("index.html");
+    const std::string Dems("dems.html");
     const std::string Geo("geo");
 
     namespace tileset {
@@ -70,7 +71,8 @@ const std::string& checkReferenceFrame(const std::string &referenceFrame)
 } // namespace
 
 FileInfo::FileInfo(const http::Request &request, int f)
-    : url(request.uri), flags(f), type(Type::resourceFile)
+    : url(request.uri), path(request.path), query(request.query)
+    , flags(f), type(Type::resourceFile)
 {
     if (flags & FileFlags::browserEnabled) {
         // browsing enabled, check for disable header
@@ -79,16 +81,11 @@ FileInfo::FileInfo(const http::Request &request, int f)
         }
     }
 
-    auto end(url.end());
-    auto qm(url.find('?'));
-    if (qm != std::string::npos) {
-        end = url.begin() + qm;
-        query = url.substr(qm + 1);
-    }
+    auto end(path.end());
 
     std::vector<std::string> components;
     {
-        auto range(boost::make_iterator_range(url.begin(), end));
+        auto range(boost::make_iterator_range(path.begin(), end));
         ba::split(components, range, ba::is_any_of("/")
                   , ba::token_compress_on);
     }
@@ -119,6 +116,10 @@ FileInfo::FileInfo(const http::Request &request, int f)
         } else if (filename == constants::Index) {
             // /rf/index.html -> browser
             type = Type::referenceFrameBrowser;
+            return;
+        } else if (filename == constants::Dems) {
+            // /rf/dems.html -> dems
+            type = Type::referenceFrameDems;
             return;
         } else if (filename == constants::Self) {
             // /rf/ -> list types

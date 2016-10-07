@@ -2,6 +2,7 @@
 
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
+#include <boost/algorithm/string/split.hpp>
 
 #include "dbglog/dbglog.hpp"
 
@@ -13,6 +14,8 @@
 #include "../support/python.hpp"
 
 #include "./geodatavectorbase.hpp"
+
+namespace ba = boost::algorithm;
 
 namespace generator {
 
@@ -229,6 +232,53 @@ Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
     }
 
     return {};
+}
+
+namespace {
+
+typedef boost::iterator_range<std::string::const_iterator> SubString;
+typedef std::vector<SubString> Args;
+typedef std::pair<SubString, SubString> KeyValue;
+
+KeyValue splitArgument(const SubString &arg)
+{
+    auto b(std::begin(arg));
+    auto e(std::end(arg));
+    for (auto i(b); i != e; ++i) {
+        if (*i == '=') {
+            return KeyValue(SubString(b, i), SubString(std::next(i), e));
+        }
+    }
+    return KeyValue(SubString(b, e), SubString());
+}
+
+} // namespace
+
+DemRegistry::Datasets
+GeodataVectorBase::viewspec2datasets(const std::string &query
+                                     , const std::string &fallback) const
+{
+    if (query.empty()) { return { fallback }; };
+
+    Args args;
+    ba::split(args, query, ba::is_any_of("&"), ba::token_compress_on);
+
+    for (auto iargs(args.begin()), eargs(args.end()); iargs != eargs; ++iargs)
+    {
+        auto kv(splitArgument(*iargs));
+        if (ba::equals(kv.first, "viewspec")) {
+            std::vector<std::string> ids;
+            ba::split(ids, kv.second, ba::is_any_of(",")
+                      , ba::token_compress_on);
+
+            auto result(demRegistry().find(referenceFrameId(), ids));
+            result.push_back(fallback);
+            return result;
+        }
+    }
+
+    // nothing appropriate
+    return { fallback };
 }
 
 } // namespace generator

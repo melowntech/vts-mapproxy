@@ -28,6 +28,7 @@ set(mapproxy_SOURCES
 
   generator.hpp
   generator/metatile.hpp generator/metatile.cpp
+  generator/demregistry.hpp generator/demregistry.cpp
   generator/generator.cpp
   generator/factory.hpp
   generator/tms-raster.hpp generator/tms-raster.cpp

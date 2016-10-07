@@ -322,7 +322,8 @@ bool Resource::operator==(const Resource &o) const
 }
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
-                                    , const Resource &resource
+                                    , const Resource::Id &resource
+                                    , Resource::Generator::Type generatorType
                                     , const ResourceRoot &root)
 {
     boost::filesystem::path out;
@@ -332,19 +333,19 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
 
     switch (root) {
     case ResourceRoot::referenceFrame:
-        out /= resource.id.referenceFrame;
+        out /= resource.referenceFrame;
         // fall through
 
     case ResourceRoot::type:
-        out /= boost::lexical_cast<std::string>(resource.generator.type);
+        out /= boost::lexical_cast<std::string>(generatorType);
         // fall through
 
     case ResourceRoot::group:
-        out /= resource.id.group;
+        out /= resource.group;
         // fall through
 
     case ResourceRoot::id:
-        out /= resource.id.id;
+        out /= resource.id;
         // fall through
 
     case ResourceRoot::none:
@@ -357,33 +358,36 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
 }
 
 std::string prependRoot(const std::string &path
-                        , const Resource &resource
+                        , const Resource::Id &resource
+                        , Resource::Generator::Type generatorType
                         , const ResourceRoot &root)
 {
     fs::path tmp(path);
-    return prependRoot(tmp, resource, root).string();
+    return prependRoot(tmp, resource, generatorType, root).string();
 }
 
-ResourceRoot resolveRoot(const Resource &thisResource
-                         , const Resource &thatResource
+ResourceRoot resolveRoot(const Resource::Id &thisResource
+                         , Resource::Generator::Type thisGeneratorType
+                         , const Resource::Id &thatResource
+                         , Resource::Generator::Type thatGeneratorType
                          , ResourceRoot::Depth thisDepth)
 {
     // compute difference between two resources
     auto difference([&]() -> ResourceRoot
     {
-        if (thisResource.id.referenceFrame != thisResource.id.referenceFrame) {
+        if (thisResource.referenceFrame != thatResource.referenceFrame) {
             return { ResourceRoot::referenceFrame, 4 };
         }
 
-        if (thisResource.generator.type != thatResource.generator.type) {
+        if (thisGeneratorType != thatGeneratorType) {
             return { ResourceRoot::type, 3 };
         }
 
-        if (thisResource.id.group != thisResource.id.group) {
+        if (thisResource.group != thatResource.group) {
             return { ResourceRoot::group, 2 };
         }
 
-        if (thisResource.id.id != thisResource.id.id) {
+        if (thisResource.id != thatResource.id) {
             return { ResourceRoot::id, 1 };
         }
 

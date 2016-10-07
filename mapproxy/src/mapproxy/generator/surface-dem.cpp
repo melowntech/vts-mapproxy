@@ -96,6 +96,11 @@ void parseDefinition(SurfaceDem::Definition &def, const Json::Value &value)
         Json::get(s, value, "geoidGrid");
         def.geoidGrid = s;
     }
+
+    if (value.isMember("heightcodingAlias")) {
+        def.heightcodingAlias = boost::in_place();
+        Json::get(*def.heightcodingAlias, value, "heightcodingAlias");
+    }
 }
 
 void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
@@ -110,6 +115,9 @@ void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
     }
     if (def.geoidGrid) {
         value["geoidGrid"] = *def.geoidGrid;
+    }
+    if (def.heightcodingAlias) {
+        value["heightcodingAlias"] = *def.heightcodingAlias;
     }
 }
 
@@ -130,6 +138,10 @@ void parseDefinition(SurfaceDem::Definition &def
 
     if (value.has_key("geoidGrid")) {
         def.geoidGrid = py2utf8(value["geoidGrid"]);
+    }
+
+    if (value.has_key("heightcodingAlias")) {
+        def.heightcodingAlias = py2utf8(value["heightcodingAlias"]);
     }
 }
 
@@ -185,12 +197,20 @@ SurfaceDem::SurfaceDem(const Params &params)
             vts::tileset::loadTileSetIndex(index_, indexPath);
             properties_ = vts::tileset::loadConfig(propertiesPath);
             makeReady();
+
+            // remember dem
+            addToRegistry();
             return;
         }
     } catch (const std::exception &e) {
         // not ready
     }
     LOG(info1) << "Generator for <" << id() << "> not ready.";
+}
+
+SurfaceDem::~SurfaceDem()
+{
+    removeFromRegistry();
 }
 
 void SurfaceDem::prepare_impl(Arsenal&)
@@ -225,6 +245,31 @@ void SurfaceDem::prepare_impl(Arsenal&)
     // save it all
     vts::tileset::saveConfig(filePath(vts::File::config), properties_);
     vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
+
+    addToRegistry();
+}
+
+void SurfaceDem::addToRegistry()
+{
+    demRegistry().add(DemRegistry::Record
+                      (DemRegistry::Id(referenceFrameId(), id().fullId())
+                       , dataset_, id()));
+    if (definition_.heightcodingAlias) {
+        demRegistry().add(DemRegistry::Record
+                          (DemRegistry::Id(referenceFrameId()
+                                           , *definition_.heightcodingAlias)
+                           , dataset_, id()));
+    }
+}
+
+void SurfaceDem::removeFromRegistry()
+{
+    demRegistry().remove(DemRegistry::Id(referenceFrameId(), id().fullId()));
+    if (definition_.heightcodingAlias) {
+        demRegistry().remove
+            (DemRegistry::Id(referenceFrameId()
+                             , *definition_.heightcodingAlias));
+    }
 }
 
 vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const

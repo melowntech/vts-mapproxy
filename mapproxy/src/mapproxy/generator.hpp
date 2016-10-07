@@ -22,6 +22,8 @@
 #include "./gdalsupport.hpp"
 #include "./sink.hpp"
 
+#include "./generator/demregistry.hpp"
+
 namespace vs = vadstena::storage;
 namespace vts = vadstena::vts;
 
@@ -78,6 +80,7 @@ public:
         Config config;
         Resource resource;
         const GeneratorFinder *generatorFinder;
+        DemRegistry::pointer demRegistry;
 
         Params(const Resource &resource) : resource(resource) {}
     };
@@ -125,6 +128,8 @@ public:
 
     Task generateFile(const FileInfo &fileInfo, Sink sink) const;
 
+    void stat(std::ostream &os) const;
+
 protected:
     Generator(const Params &params);
 
@@ -157,6 +162,9 @@ protected:
     void supportFile(const vs::SupportFile &support, Sink &sink
                      , const Sink::FileInfo &fileInfo) const;
 
+    DemRegistry& demRegistry() { return *demRegistry_; }
+    const DemRegistry& demRegistry() const { return *demRegistry_; }
+
 private:
     virtual void prepare_impl(Arsenal &arsenal) = 0;
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
@@ -170,6 +178,7 @@ private:
     Resource savedResource_;
     bool fresh_;
     std::atomic<bool> ready_;
+    DemRegistry::pointer demRegistry_;
 };
 
 /** Set of dataset generators.
@@ -214,6 +223,14 @@ public:
     std::vector<std::string> listIds(const std::string &referenceFrame
                                      , Resource::Generator::Type type
                                      , const std::string &group) const;
+
+    const DemRegistry& demRegistry() const;
+
+    /** Force resources update.
+     */
+    void update();
+
+    void stat(std::ostream &os) const;
 
     // internals
     struct Detail;

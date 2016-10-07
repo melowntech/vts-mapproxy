@@ -511,11 +511,13 @@ geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
 GdalWarper::Heighcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
-           , const std::string &rasterDs
+           , const std::vector<std::string> &rasterDs
            , geo::heightcoding::Config config
            , const boost::optional<std::string> &geoidGrid)
 {
-    return heightcode(mb, openVectorDataset(vectorDs, config), cache(rasterDs)
+    // TODO: get vector of open datasets
+    return heightcode(mb, openVectorDataset(vectorDs, config)
+                      , cache(rasterDs.back())
                       , config, geoidGrid);
 }
 

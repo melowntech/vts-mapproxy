@@ -87,7 +87,7 @@ void GeodataVector::prepare_impl(Arsenal &arsenal)
     Aborter dummyAborter;
     auto hc(arsenal.warper.heightcode
             (absoluteDataset(definition_.dataset)
-             , absoluteDataset(definition_.demDataset + "/dem")
+             , { absoluteDataset(definition_.demDataset + "/dem") }
              , config, definition_.geoidGrid
              , dummyAborter));
 

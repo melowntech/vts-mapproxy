@@ -90,9 +90,13 @@ private:
 
     int run();
 
-    void stat(std::ostream &os);
-
     void cleanup();
+
+    virtual bool ctrl(const CtrlCommand &cmd, std::ostream &os);
+
+    virtual void stat(std::ostream &os);
+
+    virtual void monitor(std::ostream &os);
 
     struct Stopper {
         Stopper(Daemon &d) : d(d) { }
@@ -300,6 +304,10 @@ service::Service::Cleanup Daemon::start()
     generators_ = boost::in_place(generatorsConfig_, resourceBackend_);
 
     http_ = boost::in_place();
+    http_->serverHeader(utility::format
+                        ("%s/%s", utility::buildsys::TargetName
+                         , utility::buildsys::TargetVersion));
+
     http_->startClient(httpClientThreadCount_);
 
     // starts core + generators
@@ -327,7 +335,22 @@ void Daemon::cleanup()
 
 void Daemon::stat(std::ostream &os)
 {
-    os << "TODO: report stat here";
+    generators_->stat(os);
+}
+
+void Daemon::monitor(std::ostream &os)
+{
+    (void) os;
+}
+
+bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
+{
+    if (cmd.cmd == "update-resources") {
+        generators_->update();
+        os << "resource updater notified\n";
+        return true;
+    }
+    return false;
 }
 
 int Daemon::run()

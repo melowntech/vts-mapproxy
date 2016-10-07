@@ -42,6 +42,11 @@ public:
         }
     };
 
+protected:
+    DemRegistry::Datasets
+    viewspec2datasets(const std::string &query
+                      , const std::string &fallback) const;
+
 private:
     virtual vr::FreeLayer freeLayer_impl(ResourceRoot root) const = 0;
 

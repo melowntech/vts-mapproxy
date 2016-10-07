@@ -68,7 +68,7 @@ public:
     {}
 
     ShRequest(const std::string &vectorDs
-              , const std::string &rasterDs
+              , const std::vector<std::string> &rasterDs
               , const geo::heightcoding::Config &config
               , const boost::optional<std::string> &geoidGrid
               , ManagedBuffer &sm)
@@ -136,7 +136,7 @@ public:
     }
 
     static pointer create(const std::string &vectorDs
-                          , const std::string &rasterDs
+                          , const std::vector<std::string> &rasterDs
                           , const geo::heightcoding::Config &config
                           , const boost::optional<std::string> &geoidGrid
                           , ManagedBuffer &mb)
@@ -422,7 +422,7 @@ public:
 
     Heighcoded::pointer
     heightcode(const std::string &vectorDs
-               , const std::string &rasterDs
+               , const std::vector<std::string> &rasterDs
                , const geo::heightcoding::Config &config
                , const boost::optional<std::string> &geoidGrid
                , Aborter &aborter);
@@ -481,7 +481,7 @@ GdalWarper::Raster GdalWarper::warp(const RasterRequest &req, Aborter &aborter)
 
 GdalWarper::Heighcoded::pointer
 GdalWarper::heightcode(const std::string &vectorDs
-                       , const std::string &rasterDs
+                       , const std::vector<std::string> &rasterDs
                        , const geo::heightcoding::Config &config
                        , const boost::optional<std::string> &geoidGrid
                        , Aborter &aborter)
@@ -849,7 +849,7 @@ GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
 
 GdalWarper::Heighcoded::pointer
 GdalWarper::Detail::heightcode(const std::string &vectorDs
-                               , const std::string &rasterDs
+                               , const std::vector<std::string> &rasterDs
                                , const geo::heightcoding::Config &config
                                , const boost::optional<std::string> &geoidGrid
                                , Aborter &aborter)

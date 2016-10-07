@@ -539,8 +539,8 @@
         "driver": "surface-dem",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [0,8],
-                "tileRange": [[0,0],[0,0]]
+                "lodRange": [2,8],
+                "tileRange": [[0,0],[3,3]]
             }
         },
         "credits": ["melown"],
@@ -548,7 +548,8 @@
             "dataset": "/mnt/media/derivatives/mapproxy/cz",
             "mask": "/mnt/media/derivatives/mask/osm-boundaries/cz/cz.mask",
             "geoidGrid": "egm96_15.gtx",
-            "textureLayerId": 120
+            "textureLayerId": 120,
+            "heightcodingAlias": "this-is-an-alias"
         }
     },
 

@@ -69,6 +69,7 @@ Generator::Generator(const Params &params)
     : generatorFinder_(params.generatorFinder), config_(params.config)
     , resource_(params.resource), savedResource_(params.resource)
     , fresh_(false), ready_(false)
+    , demRegistry_(params.demRegistry)
 {
     config_.root = (config_.root / resource_.id.referenceFrame
                     / resource_.id.group / resource_.id.id);
@@ -233,6 +234,7 @@ public:
            , const ResourceBackend::pointer &resourceBackend)
         : config_(config), resourceBackend_(resourceBackend)
         , arsenal_(), running_(false), ready_(false), work_(ios_)
+        , demRegistry_(std::make_shared<DemRegistry>())
     {}
 
     void checkReady() const;
@@ -255,6 +257,12 @@ public:
 
     inline const Config& config() const { return config_; }
 
+    inline const DemRegistry& demRegistry() const { return *demRegistry_; }
+
+    void update();
+
+    void stat(std::ostream &os) const;
+
 private:
     void update(const Resource::map &resources);
 
@@ -273,6 +281,7 @@ private:
     // resource updater stuff
     std::thread updater_;
     std::atomic<bool> running_;
+    std::atomic<bool> updateRequest_;
     std::mutex updaterLock_;
     std::condition_variable updaterCond_;
 
@@ -325,6 +334,9 @@ private:
     asio::io_service ios_;
     asio::io_service::work work_;
     std::vector<std::thread> workers_;
+
+    // DEM registry
+    DemRegistry::pointer demRegistry_;
 };
 
 void Generators::Detail::checkReady() const
@@ -382,6 +394,7 @@ void Generators::Detail::updater()
 {
     dbglog::thread_id("updater");
 
+    updateRequest_ = false;
 
     while (running_) {
         std::chrono::seconds sleep(config_.resourceUpdatePeriod);
@@ -398,9 +411,11 @@ void Generators::Detail::updater()
         // sleep for 5 minutes
         {
             std::unique_lock<std::mutex> lock(updaterLock_);
-            updaterCond_.wait_for(lock, sleep, [this]()
+            updaterCond_.wait_for(lock, sleep, [this]() -> bool
             {
-                return !running_;
+                auto updateRequest
+                    (std::atomic_exchange(&updateRequest_, false));
+                return !running_ || updateRequest;
             });
         }
     }
@@ -499,6 +514,7 @@ void Generators::Detail::update(const Resource::map &resources)
             params.config = config_;
             params.config.root = config_.root;
             params.generatorFinder = this;
+            params.demRegistry = demRegistry_;
             toAdd.push_back(Generator::create(params));
         } catch (const std::exception &e) {
             LOG(err2) << "Failed to create generator for resource <"
@@ -704,4 +720,49 @@ void Generator::supportFile(const vs::SupportFile &support, Sink &sink
     // expand and send
     sink.content(support.expand(config_.variables, config_.defaults)
                  , fileInfo);
+}
+
+const DemRegistry& Generators::demRegistry() const
+{
+    return detail().demRegistry();
+}
+
+void Generators::Detail::update()
+{
+    updateRequest_ = true;
+    updaterCond_.notify_one();
+}
+
+void Generators::update()
+{
+    detail().update();
+}
+
+void Generator::stat(std::ostream &os) const
+{
+    os << "<" << id()
+       << "> (type <" << resource().generator << ">)"
+       << (ready_ ? "" : " not ready")
+       << "\n";
+}
+
+void Generators::Detail::stat(std::ostream &os) const
+{
+
+    Generator::list generators;
+    {
+        std::unique_lock<std::mutex> lock(lock_);
+        for (const auto &generator : serving_) {
+            generators.push_back(generator);
+        }
+    }
+
+    for (const auto &generator : generators) {
+        generator->stat(os);
+    }
+}
+
+void Generators::stat(std::ostream &os) const
+{
+    detail().stat(os);
 }

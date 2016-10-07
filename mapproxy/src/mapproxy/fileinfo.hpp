@@ -27,6 +27,14 @@ struct FileInfo {
      */
     std::string url;
 
+    /** Path component
+     */
+    std::string path;
+
+    /** Query party of URL (?query)
+     */
+    std::string query;
+
     /** Delivery flags.
      */
     int flags;
@@ -39,6 +47,7 @@ struct FileInfo {
 
         , referenceFrameMapConfig, typeMapConfig, groupMapConfig
         , resourceFile
+        , referenceFrameDems
     };
 
     /** Type of file to generate.
@@ -59,10 +68,6 @@ struct FileInfo {
      *  Valid only if type == Type::resourceFile.
      */
     std::string filename;
-
-    /** Query party of URL (?query)
-     */
-    std::string query;
 };
 
 /** Parsed TMS file information.
