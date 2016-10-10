@@ -816,7 +816,7 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
         if (cache.worn()) { break; }
     }
 
-    LOG(info2) << "GDAL worker id" << id << " finishing.";
+    LOG(info2) << "GDAL worker id:" << id << " finishing.";
 }
 
 GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
