@@ -19,14 +19,11 @@ public:
         boost::optional<std::string> geoidGrid;
 
         Definition() : textureLayerId() {}
-        bool operator==(const Definition &o) const;
 
     private:
         virtual void from_impl(const boost::any &value);
         virtual void to_impl(boost::any &value) const;
-        virtual bool same_impl(const DefinitionBase &other) const {
-            return (*this == other.as<Definition>());
-        }
+        virtual Changed changed_impl(const DefinitionBase &other) const;
     };
 
 private:

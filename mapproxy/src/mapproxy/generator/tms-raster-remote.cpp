@@ -112,12 +112,15 @@ void TmsRasterRemote::Definition::to_impl(boost::any &value) const
     }
 }
 
-bool TmsRasterRemote::Definition::operator==(const Definition &o) const
+Changed TmsRasterRemote::Definition::changed_impl(const DefinitionBase &o)
+    const
 {
-    if (remoteUrl != o.remoteUrl) { return false; }
-    if (mask != o.mask) { return false; }
+    const auto &other(o.as<Definition>());
 
-    return true;
+    if (remoteUrl != other.remoteUrl) { return Changed::yes; }
+    if (mask != other.mask) { return Changed::yes; }
+
+    return Changed::no;
 }
 
 TmsRasterRemote::TmsRasterRemote(const Params &params)

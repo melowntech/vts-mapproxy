@@ -81,6 +81,7 @@ public:
         Resource resource;
         const GeneratorFinder *generatorFinder;
         DemRegistry::pointer demRegistry;
+        Generator::pointer replace;
 
         Params(const Resource &resource) : resource(resource) {}
     };
@@ -122,13 +123,18 @@ public:
         return config_.resourceRoot;
     }
 
-    bool check(const Resource &resource) const;
+    Changed changed(const Resource &resource) const;
 
     vts::MapConfig mapConfig(ResourceRoot root) const;
 
     Task generateFile(const FileInfo &fileInfo, Sink sink) const;
 
     void stat(std::ostream &os) const;
+
+    /** Pointer to original generator this one replaces.
+     *  Used in runtime update.
+     */
+    Generator::pointer replace() const { return replace_; }
 
 protected:
     Generator(const Params &params);
@@ -179,6 +185,7 @@ private:
     bool fresh_;
     std::atomic<bool> ready_;
     DemRegistry::pointer demRegistry_;
+    Generator::pointer replace_;
 };
 
 /** Set of dataset generators.

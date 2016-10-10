@@ -160,17 +160,27 @@ void GeodataVectorBase::Definition::to_impl(boost::any &value) const
     }
 }
 
-bool GeodataVectorBase::Definition::operator==(const Definition &o) const
+Changed
+GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
 {
-    if (dataset != o.dataset) { return false; }
-    if (demDataset != o.demDataset) { return false; }
-    if (geoidGrid != o.geoidGrid) { return false; }
-    if (layers != o.layers) { return false; }
+    const auto &other(o.as<Definition>());
+
+    if (dataset != other.dataset) { return Changed::yes; }
+    if (demDataset != other.demDataset) { return Changed::yes; }
+    if (geoidGrid != other.geoidGrid) { return Changed::yes; }
+    if (layers != other.layers) { return Changed::yes; }
 
     // format can change
+    if (format != other.format) { return Changed::safely; }
     // displaySize can change
+    if (displaySize != other.displaySize) { return Changed::safely; }
+    // styleUrl can change
+    if (styleUrl != other.styleUrl) { return Changed::safely; }
     // introspection can change
-    return true;
+    if (introspectionSurface != other.introspectionSurface) {
+        return Changed::safely;
+    }
+    return Changed::no;
 }
 
 GeodataVectorBase::GeodataVectorBase(const Params &params, bool tiled)

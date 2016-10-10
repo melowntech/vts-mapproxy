@@ -70,6 +70,7 @@ Generator::Generator(const Params &params)
     , resource_(params.resource), savedResource_(params.resource)
     , fresh_(false), ready_(false)
     , demRegistry_(params.demRegistry)
+    , replace_(params.replace)
 {
     config_.root = (config_.root / resource_.id.referenceFrame
                     / resource_.id.group / resource_.id.id);
@@ -85,7 +86,14 @@ Generator::Generator(const Params &params)
         // reopen of existing dataset
         savedResource_
             = loadResource(rfile).front();
-        if (savedResource_ != resource_) {
+        switch (savedResource_.changed(resource_)) {
+        case Changed::no:
+        case Changed::safely:
+            // nothing or something non-destructive changed -> re-save
+            save(rfile, resource_);
+            break;
+
+        case Changed::yes:
             // different setup, use stored definition
             LOG(warn3)
                 << "Definition of resource <" << resource_.id
@@ -93,25 +101,26 @@ Generator::Generator(const Params &params)
                 << root() << "; using stored definition.";
             resource_ = savedResource_;
 
-            // force received file class setings
+            // force received file class setings even for saved resource
             resource_.fileClassSettings = params.resource.fileClassSettings;
-        } else {
-            // something non-destructive can changed -> re-save
-            save(rfile, resource_);
+            break;
         }
     }
 }
 
-bool Generator::check(const Resource &resource) const
+Changed Generator::changed(const Resource &resource) const
 {
-    if (resource_ != resource) {
+    switch (auto changed = resource.changed(resource_)) {
+    case Changed::yes:
         LOG(warn2)
             << "Definition of resource <" << resource.id
             << "> differs from the one stored in store at "
             << root() << "; using stored definition.";
-        return false;
+        return changed;
+
+    default:
+        return changed;
     }
-    return true;
 }
 
 void Generator::makeReady()
@@ -262,6 +271,9 @@ public:
     void update();
 
     void stat(std::ostream &os) const;
+
+    void replace(const Generator::pointer &original
+                 , const Generator::pointer &replacement);
 
 private:
     void update(const Resource::map &resources);
@@ -445,6 +457,9 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
     {
         try {
             generator->prepare(*arsenal_);
+            if (auto original = generator->replace()) {
+                replace(original, generator);
+            }
         } catch (const std::exception &e) {
             LOG(warn2)
                 << "Failed to prepare generator for <"
@@ -493,6 +508,18 @@ Generators::generator(Resource::Generator::Type generatorType
     return detail().generator(generatorType, resourceId);
 }
 
+void Generators::Detail::replace(const Generator::pointer &original
+                                 , const Generator::pointer &replacement)
+{
+    std::unique_lock<std::mutex> lock(lock_);
+    // find original in the serving set
+    auto ioriginal(serving_.find(original));
+    // and replace
+    serving_.replace(ioriginal, replacement);
+    LOG(info3)
+        << "Replaced resource <" << original->id() << "> with new definiton.";
+}
+
 void Generators::Detail::update(const Resource::map &resources)
 {
     LOG(info2) << "Updating resources.";
@@ -503,6 +530,7 @@ void Generators::Detail::update(const Resource::map &resources)
 
     Generator::list toAdd;
     Generator::list toRemove;
+    Generator::list toReplace;
 
     auto add([&](const Resource &res)
     {
@@ -522,11 +550,31 @@ void Generators::Detail::update(const Resource::map &resources)
         }
     });
 
+    auto replace([&](const Resource &res, const Generator::pointer &original)
+    {
+        if (!running_) {
+            throw Aborted{};
+        }
+        try {
+            Generator::Params params(res);
+            params.config = config_;
+            params.config.root = config_.root;
+            params.generatorFinder = this;
+            params.demRegistry = demRegistry_;
+            params.replace = original;
+            toReplace.push_back(Generator::create(params));
+        } catch (const std::exception &e) {
+            LOG(err2) << "Failed to re-create generator for resource <"
+                      << iresources->first << ">: <" << e.what() << ">.";
+        }
+    });
+
     // process common stuff
     while ((iresources != eresources) && (iserving != eserving)) {
+        const auto &resource(iresources->second);
         if (iresources->first < (*iserving)->id()) {
             // new resource
-            add(iresources->second);
+            add(resource);
             ++iresources;
         } else if ((*iserving)->id() < iresources->first) {
             // removed resource
@@ -534,7 +582,18 @@ void Generators::Detail::update(const Resource::map &resources)
             ++iserving;
         } else {
             // existing resource
-            (*iserving)->check(iresources->second);
+            switch ((*iserving)->changed(resource)) {
+            case Changed::no:
+            case Changed::yes:
+                // same or completety different stuff, do nothing
+                break;
+
+            case Changed::safely:
+                // here comes the fun
+                replace(resource, *iserving);
+                break;
+            }
+
             ++iresources;
             ++iserving;
         }
@@ -571,6 +630,15 @@ void Generators::Detail::update(const Resource::map &resources)
         }
 
         // TODO: mark as to be removed for prepare workers
+    }
+
+    // repalce stuff (prepare)
+    for (const auto &generator : toReplace) {
+        if (!generator->ready()) {
+            prepare(generator);
+        } else {
+            this->replace(generator->replace(), generator);
+        }
     }
 
     LOG(info2) << "Resources updated.";

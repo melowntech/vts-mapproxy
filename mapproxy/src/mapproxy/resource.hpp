@@ -19,6 +19,8 @@
 
 #include "./support/fileclass.hpp"
 
+enum class Changed { yes, no, safely };
+
 /** Base of all resource definitions.
  */
 class DefinitionBase {
@@ -28,7 +30,9 @@ public:
 
     void from(const boost::any &value) { from_impl(value); }
     void to(boost::any &value) const { to_impl(value); }
-    bool same(const DefinitionBase &other) const { return same_impl(other); }
+    Changed changed(const DefinitionBase &other) const {
+        return changed_impl(other);
+    }
 
     /** Are credits frozen in the resources's dataset?
      */
@@ -59,7 +63,7 @@ private:
      *  are basically the same. The definitions can differ but the difference
      *  must not affect resource generation.
      */
-    virtual bool same_impl(const DefinitionBase &other) const = 0;
+    virtual Changed changed_impl(const DefinitionBase &other) const = 0;
 
     /** If generated dataset freezes credit info into its published data then
      *  credits cannot be changed.
@@ -172,8 +176,7 @@ struct Resource {
         : fileClassSettings(fileClassSettings)
     {}
 
-    bool operator==(const Resource &o) const;
-    bool operator!=(const Resource &o) const;
+    Changed changed(const Resource &o) const;
 
 private:
     /** Definition: based on type and driver, created by resource
@@ -352,11 +355,6 @@ inline bool Resource::Generator::operator<(const Generator &o) const {
 inline bool Resource::Generator::operator==(const Generator &o) const {
     return ((type == o.type)
             && (driver == o.driver));
-}
-
-inline bool Resource::operator!=(const Resource &o) const
-{
-    return !operator==(o);
 }
 
 inline Resource::Id addReferenceFrame(Resource::Id rid

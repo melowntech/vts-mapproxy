@@ -173,14 +173,16 @@ void SurfaceDem::Definition::to_impl(boost::any &value) const
     }
 }
 
-bool SurfaceDem::Definition::operator==(const Definition &o) const
+Changed SurfaceDem::Definition::changed_impl(const DefinitionBase &o) const
 {
-    if (dataset != o.dataset) { return false; }
-    if (mask != o.mask) { return false; }
-    if (textureLayerId != o.textureLayerId) { return false; }
-    if (geoidGrid != o.geoidGrid) { return false; }
+    const auto &other(o.as<Definition>());
 
-    return true;
+    if (dataset != other.dataset) { return Changed::yes; }
+    if (mask != other.mask) { return Changed::yes; }
+    if (textureLayerId != other.textureLayerId) { return Changed::yes; }
+    if (geoidGrid != other.geoidGrid) { return Changed::yes; }
+
+    return Changed::no;
 }
 
 SurfaceDem::SurfaceDem(const Params &params)

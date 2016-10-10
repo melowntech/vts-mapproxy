@@ -130,13 +130,19 @@ void TmsRaster::Definition::to_impl(boost::any &value) const
     }
 }
 
-bool TmsRaster::Definition::operator==(const Definition &o) const
+Changed TmsRaster::Definition::changed_impl(const DefinitionBase &o) const
 {
-    if (dataset != o.dataset) { return false; }
-    if (mask != o.mask) { return false; }
+    const auto &other(o.as<Definition>());
+
+    // non-safe changes first
+    if (dataset != other.dataset) { return Changed::yes; }
+    if (mask != other.mask) { return Changed::yes; }
 
     // format can change
-    return true;
+    if (format != other.format) { return Changed::safely; }
+
+    // not changed
+    return Changed::no;
 }
 
 TmsRaster::TmsRaster(const Params &params)

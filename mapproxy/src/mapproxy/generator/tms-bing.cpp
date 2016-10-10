@@ -105,10 +105,14 @@ void TmsBing::Definition::to_impl(boost::any &value) const
     }
 }
 
-bool TmsBing::Definition::operator==(const Definition&) const
+Changed TmsBing::Definition::changed_impl(const DefinitionBase &o) const
 {
+    const auto &other(o.as<Definition>());
+
     // ignore metadata URL, we it has no effect on this resource
-    return true;
+    if (metadataUrl != other.metadataUrl) { return Changed::safely; }
+
+    return Changed::no;
 }
 
 TmsBing::TmsBing(const Params &params)

@@ -31,15 +31,12 @@ public:
 
         Definition()
             : format(geo::VectorFormat::geodataJson) , displaySize(256) {}
-        bool operator==(const Definition &o) const;
 
         virtual void from_impl(const boost::any &value);
         virtual void to_impl(boost::any &value) const;
 
     private:
-        virtual bool same_impl(const DefinitionBase &other) const {
-            return (*this == other.as<Definition>());
-        }
+        virtual Changed changed_impl(const DefinitionBase &other) const;
     };
 
 protected:

@@ -301,24 +301,23 @@ void save(const boost::filesystem::path &path, const Resource &resource)
     detail::saveResource(f, resource);
 }
 
-bool Resource::operator==(const Resource &o) const
+Changed Resource::changed(const Resource &o) const
 {
-    if (!(id == o.id)) { return false; }
-    if (!(generator == o.generator)) { return false; }
+    if (!(id == o.id)) { return Changed::no; }
+    if (!(generator == o.generator)) { return Changed::no; }
 
-    if (lodRange != o.lodRange) { return false; }
-    if (tileRange != o.tileRange) { return false; }
+    if (lodRange != o.lodRange) { return Changed::no; }
+    if (tileRange != o.tileRange) { return Changed::no; }
 
     // compare credits only if frozen
     if (definition_->frozenCredits() && (credits != o.credits)) {
-        return false;
+        // TODO: update
+        return Changed::no;
     }
 
-    if (!definition_->same(*o.definition())) { return false; }
+    // TODO: registry
 
-    // registry is not checked
-
-    return true;
+    return definition_->changed(*o.definition());
 }
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path

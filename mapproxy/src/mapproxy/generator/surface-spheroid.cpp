@@ -131,11 +131,15 @@ void SurfaceSpheroid::Definition::to_impl(boost::any &value) const
     }
 }
 
-bool SurfaceSpheroid::Definition::operator==(const Definition &o) const
+Changed SurfaceSpheroid::Definition::changed_impl(const DefinitionBase &o)
+    const
 {
-    if (textureLayerId != o.textureLayerId) { return false; }
-    if (geoidGrid != o.geoidGrid) { return false; }
-    return true;
+    const auto &other(o.as<Definition>());
+
+    if (textureLayerId != other.textureLayerId) { return Changed::yes; }
+    if (geoidGrid != other.geoidGrid) { return Changed::yes; }
+
+    return Changed::no;
 }
 
 SurfaceSpheroid::SurfaceSpheroid(const Params &params)
