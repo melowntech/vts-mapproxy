@@ -52,6 +52,10 @@ utility::PreMain Factory::register_([]()
 GeodataVector::GeodataVector(const Params &params)
     : GeodataVectorBase(params, false)
     , definition_(this->resource().definition<Definition>())
+    , dem_(absoluteDataset(definition_.dem.dataset + "/dem")
+           , definition_.dem.geoidGrid)
+    , physicalSrs_(vr::system.srs(resource()
+                                  .referenceFrame->model.physicalSrs))
     , dataPath_(root() / "geodata")
 {
     try {
@@ -68,28 +72,30 @@ GeodataVector::GeodataVector(const Params &params)
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
-void GeodataVector::prepare_impl(Arsenal &arsenal)
+GdalWarper::Heightcoded::pointer
+GeodataVector::heightcode(const DemDataset::list &datasets
+                          , GdalWarper &warper, Aborter &aborter) const
 {
-    // TODO: heightcode input
-    LOG(info4) << "Preparing data";
-
-    const auto &physicalSrs
-        (vr::system.srs(resource().referenceFrame->model.physicalSrs));
-
     // height code dataset
     geo::heightcoding::Config config;
-    config.outputSrs = physicalSrs.srsDef;
-    config.outputVerticalAdjust = physicalSrs.adjustVertical();
+    config.outputSrs = physicalSrs_.srsDef;
+    config.outputVerticalAdjust = physicalSrs_.adjustVertical();
     config.layers = definition_.layers;
     config.format = definition_.format;
 
     // heightcode data using warper's machinery
-    Aborter dummyAborter;
-    auto hc(arsenal.warper.heightcode
+    auto hc(warper.heightcode
             (absoluteDataset(definition_.dataset)
-             , { absoluteDataset(definition_.demDataset + "/dem") }
-             , config, definition_.geoidGrid
-             , dummyAborter));
+             , datasets, config, aborter));
+    return hc;
+}
+
+void GeodataVector::prepare_impl(Arsenal &arsenal)
+{
+    LOG(info4) << "Preparing data";
+
+    Aborter dummyAborter;
+    auto hc(heightcode({ dem_ }, arsenal.warper, dummyAborter));
 
     // save output to file
     utility::write(dataPath_, hc->data, hc->size);
@@ -162,8 +168,19 @@ void GeodataVector::generateMetatile(Sink &sink, const GeodataFileInfo &
 
 void GeodataVector::generateGeodata(Sink &sink
                                     , const GeodataFileInfo &fi
-                                    , Arsenal&) const
+                                    , Arsenal &arsenal) const
 {
+    const DemDataset::list datasets
+        (viewspec2datasets(fi.fileInfo.query, dem_));
+
+    if (datasets.size() > 1) {
+        // valid viewspec -> use it to heightcode file
+        auto hc(heightcode(datasets, arsenal.warper, sink));
+        sink.content(hc->data, hc->size, fi.sinkFileInfo(), true);
+        return;
+    }
+
+    // no valid viewspec, return original file
     auto sfi(fi.sinkFileInfo());
     sink.content(vs::fileIStream(sfi.contentType.c_str(), dataPath_)
                  , FileClass::data);

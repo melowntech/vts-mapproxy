@@ -4,6 +4,7 @@
 #include "../gdalsupport.hpp"
 #include "./types.hpp"
 
+
 class ShRequestBase {
 public:
     virtual ~ShRequestBase() {}
@@ -64,41 +65,50 @@ struct ShHeightCodeConfig {
     operator geo::heightcoding::Config() const;
 };
 
+struct ShDemDataset {
+    String dataset;
+    String geoidGrid;
+
+    ShDemDataset(const DemDataset &demDataset, ManagedBuffer &sm);
+
+    DemDataset demDataset() const;
+};
+
+typedef bi::vector<ShDemDataset, bi::allocator<ShDemDataset, SegmentManager>>
+    ShDemDatasetList;
+
 class ShHeightCode : boost::noncopyable {
 public:
     ShHeightCode(const std::string &vectorDs
-                 , const std::vector<std::string> &rasterDs
+                 , const DemDataset::list &rasterDs
                  , const geo::heightcoding::Config &config
-                 , const boost::optional<std::string> &geoidGrid
                  , ManagedBuffer &sm, ShRequestBase *owner);
 
     ~ShHeightCode();
 
     std::string vectorDs() const;
 
-    std::vector<std::string> rasterDs() const;
+    DemDataset::list rasterDs() const;
 
     geo::heightcoding::Config config() const;
 
-    boost::optional<std::string> geoidGrid() const;
-
     /** Steals response.
      */
-    GdalWarper::Heighcoded* response();
+    GdalWarper::Heightcoded* response();
 
     void response(bi::interprocess_mutex &mutex
-                  , GdalWarper::Heighcoded *response);
+                  , GdalWarper::Heightcoded *response);
 
 private:
     ManagedBuffer &sm_;
     ShRequestBase *owner_;
     String vectorDs_;
-    StringVector rasterDs_;
+    ShDemDatasetList rasterDs_;
     ShHeightCodeConfig config_;
     String geoidGrid_;
 
     // response memory block
-    GdalWarper::Heighcoded *response_;
+    GdalWarper::Heightcoded *response_;
 };
 
 struct ShNavtile {
@@ -141,10 +151,10 @@ public:
 
     /** Steals response.
      */
-    GdalWarper::Heighcoded* response();
+    GdalWarper::Heightcoded* response();
 
     void response(bi::interprocess_mutex &mutex
-                  , GdalWarper::Heighcoded *response);
+                  , GdalWarper::Heightcoded *response);
 
 private:
     ManagedBuffer &sm_;
@@ -157,7 +167,7 @@ private:
     String geoidGrid_;
 
     // response memory block
-    GdalWarper::Heighcoded *response_;
+    GdalWarper::Heightcoded *response_;
 };
 
 #endif // mapproxy_gdalsupport_requests_hpp_included_

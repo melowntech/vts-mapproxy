@@ -7,12 +7,12 @@ class DemRegistry::Detail {
 public:
     Detail() {}
 
-    Datasets find(const std::string &referenceFrame
-                  , const std::vector<std::string> &ids) const
+    DemDataset::list find(const std::string &referenceFrame
+                          , const std::vector<std::string> &ids) const
     {
         std::unique_lock<std::mutex> lock(mutex_);
 
-        Datasets datasets;
+        DemDataset::list datasets;
         for (const auto &id : ids) {
             auto fmap(map_.find({ referenceFrame, id }));
             if (fmap != map_.end()) {
@@ -57,8 +57,8 @@ DemRegistry::DemRegistry()
 
 DemRegistry::~DemRegistry() {}
 
-DemRegistry::Datasets DemRegistry::find(const std::string &referenceFrame
-                                        , const std::vector<std::string> &ids)
+DemDataset::list DemRegistry::find(const std::string &referenceFrame
+                                   , const std::vector<std::string> &ids)
     const
 {
     return detail().find(referenceFrame, ids);

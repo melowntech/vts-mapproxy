@@ -33,7 +33,15 @@ private:
                                  , const GeodataFileInfo &fileInfo
                                  , Arsenal &arsenal) const;
 
+    GdalWarper::Heightcoded::pointer
+    heightcode(const DemDataset::list &datasets
+               , GdalWarper &warper, Aborter &aborter) const;
+
     Definition definition_;
+
+    const DemDataset dem_;
+
+    const vr::Srs physicalSrs_;
 
     /** Output metadata.
      */

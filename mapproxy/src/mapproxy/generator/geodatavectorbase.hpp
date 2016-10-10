@@ -18,8 +18,7 @@ public:
          *  version.
          */
         std::string dataset;
-        std::string demDataset;
-        boost::optional<std::string> geoidGrid;
+        DemDataset dem;
         boost::optional<std::vector<std::string>> layers;
         geo::VectorFormat format;
         std::string styleUrl;
@@ -40,9 +39,9 @@ public:
     };
 
 protected:
-    DemRegistry::Datasets
-    viewspec2datasets(const std::string &query
-                      , const std::string &fallback) const;
+    DemDataset::list viewspec2datasets(const std::string &query
+                                       , const DemDataset &fallback)
+        const;
 
 private:
     virtual vr::FreeLayer freeLayer_impl(ResourceRoot root) const = 0;

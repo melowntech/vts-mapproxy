@@ -80,7 +80,7 @@ typedef vts::TileIndex::Flag TiFlag;
 
 void parseDefinition(SurfaceDem::Definition &def, const Json::Value &value)
 {
-    Json::get(def.dataset, value, "dataset");
+    Json::get(def.dem.dataset, value, "dataset");
     if (value.isMember("mask")) {
         std::string s;
         Json::get(s, value, "mask");
@@ -94,7 +94,7 @@ void parseDefinition(SurfaceDem::Definition &def, const Json::Value &value)
     if (value.isMember("geoidGrid")) {
         std::string s;
         Json::get(s, value, "geoidGrid");
-        def.geoidGrid = s;
+        def.dem.geoidGrid = s;
     }
 
     if (value.isMember("heightcodingAlias")) {
@@ -105,7 +105,7 @@ void parseDefinition(SurfaceDem::Definition &def, const Json::Value &value)
 
 void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
 {
-    value["dataset"] = def.dataset;
+    value["dataset"] = def.dem.dataset;
     if (def.mask) {
         value["mask"] = def.mask->string();
     }
@@ -113,8 +113,8 @@ void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
     if (def.textureLayerId) {
         value["textureLayerId"] = def.textureLayerId;
     }
-    if (def.geoidGrid) {
-        value["geoidGrid"] = *def.geoidGrid;
+    if (def.dem.geoidGrid) {
+        value["geoidGrid"] = *def.dem.geoidGrid;
     }
     if (def.heightcodingAlias) {
         value["heightcodingAlias"] = *def.heightcodingAlias;
@@ -126,7 +126,7 @@ void parseDefinition(SurfaceDem::Definition &def
 {
     namespace python = boost::python;
 
-    def.dataset = py2utf8(value["dataset"]);
+    def.dem.dataset = py2utf8(value["dataset"]);
 
     if (value.has_key("mask")) {
         def.mask = py2utf8(value["mask"]);
@@ -137,7 +137,7 @@ void parseDefinition(SurfaceDem::Definition &def
     }
 
     if (value.has_key("geoidGrid")) {
-        def.geoidGrid = py2utf8(value["geoidGrid"]);
+        def.dem.geoidGrid = py2utf8(value["geoidGrid"]);
     }
 
     if (value.has_key("heightcodingAlias")) {
@@ -177,10 +177,9 @@ Changed SurfaceDem::Definition::changed_impl(const DefinitionBase &o) const
 {
     const auto &other(o.as<Definition>());
 
-    if (dataset != other.dataset) { return Changed::yes; }
+    if (dem != other.dem) { return Changed::yes; }
     if (mask != other.mask) { return Changed::yes; }
     if (textureLayerId != other.textureLayerId) { return Changed::yes; }
-    if (geoidGrid != other.geoidGrid) { return Changed::yes; }
 
     return Changed::no;
 }
@@ -188,7 +187,8 @@ Changed SurfaceDem::Definition::changed_impl(const DefinitionBase &o) const
 SurfaceDem::SurfaceDem(const Params &params)
     : SurfaceBase(params)
     , definition_(resource().definition<Definition>())
-    , dataset_(absoluteDataset(definition_.dataset + "/dem"))
+    , dem_(absoluteDataset(definition_.dem.dataset + "/dem")
+           , definition_.dem.geoidGrid)
     , maskTree_(absoluteDatasetRf(definition_.mask))
 {
     try {
@@ -222,9 +222,9 @@ void SurfaceDem::prepare_impl(Arsenal&)
     const auto &r(resource());
 
     // try to open datasets
-    auto dataset(geo::GeoDataset::open(dataset_));
-    auto datasetMin(geo::GeoDataset::open(dataset_ + ".min"));
-    auto datasetMax(geo::GeoDataset::open(dataset_ + ".max"));
+    auto dataset(geo::GeoDataset::open(dem_.dataset));
+    auto datasetMin(geo::GeoDataset::open(dem_.dataset + ".min"));
+    auto datasetMax(geo::GeoDataset::open(dem_.dataset + ".max"));
 
     // build properties
     properties_ = {};
@@ -240,7 +240,7 @@ void SurfaceDem::prepare_impl(Arsenal&)
     properties_.tileRange = r.tileRange;
 
     prepareTileIndex(index_
-                     , (absoluteDataset(definition_.dataset)
+                     , (absoluteDataset(definition_.dem.dataset)
                         + "/tiling." + r.id.referenceFrame)
                      , r, true, maskTree_);
 
@@ -255,12 +255,12 @@ void SurfaceDem::addToRegistry()
 {
     demRegistry().add(DemRegistry::Record
                       (DemRegistry::Id(referenceFrameId(), id().fullId())
-                       , dataset_, id()));
+                       , dem_, id()));
     if (definition_.heightcodingAlias) {
         demRegistry().add(DemRegistry::Record
                           (DemRegistry::Id(referenceFrameId()
                                            , *definition_.heightcodingAlias)
-                           , dataset_, id()));
+                           , dem_, id()));
     }
 }
 
@@ -328,7 +328,8 @@ SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
                                  , Arsenal &arsenal) const
 {
     return metatileFromDem(tileId, sink, arsenal, resource()
-                           , index_.tileIndex, dataset_, definition_.geoidGrid
+                           , index_.tileIndex, dem_.dataset
+                           , dem_.geoidGrid
                            , maskTree_);
 }
 
@@ -412,7 +413,7 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
     auto dem(arsenal.warper.warp
              (GdalWarper::RasterRequest
               (GdalWarper::RasterRequest::Operation::demOptimal
-               , dataset_
+               , dem_.dataset
                , nodeInfo.srsDef(), nodeInfo.extents()
                , math::Size2(samplesPerSide, samplesPerSide))
               , sink));
@@ -446,7 +447,7 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
     vts::Mesh mesh(false);
     if (!lm.vertices.empty()) {
         // local mesh is valid -> add as a submesh into output mesh
-        auto &sm(addSubMesh(mesh, lm, nodeInfo, definition_.geoidGrid));
+        auto &sm(addSubMesh(mesh, lm, nodeInfo, dem_.geoidGrid));
         if (definition_.textureLayerId) {
             sm.textureLayer = definition_.textureLayerId;
         }
@@ -495,7 +496,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     const auto ts(math::size(extents));
 
     // sds -> navigation SRS convertor
-    auto navConv(sds2nav(node, definition_.geoidGrid));
+    auto navConv(sds2nav(node, dem_.geoidGrid));
 
     sink.checkAborted();
 
@@ -518,7 +519,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     auto dem(arsenal.warper.warp
              (GdalWarper::RasterRequest
               (GdalWarper::RasterRequest::Operation::dem
-               , dataset_
+               , dem_.dataset
                , node.srsDef(), node.extents()
                , math::Size2(ntd.cols - 1, ntd.rows -1))
               , sink));

@@ -32,9 +32,9 @@ private:
 
     /** Path to /dem dataset
      */
-    const std::string demDataset_;
+    const DemDataset dem_;
 
-    geo::GeoDataset::Descriptor dem_;
+    geo::GeoDataset::Descriptor demDescriptor_;
     double effectiveGsdArea_;
     bool effectiveGsdAreaComputed_;
 

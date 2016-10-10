@@ -27,11 +27,11 @@ void parseDefinition(GeodataVectorBase::Definition &def
     std::string s;
 
     Json::get(def.dataset, value, "dataset");
-    Json::get(def.demDataset, value, "demDataset");
+    Json::get(def.dem.dataset, value, "demDataset");
 
     if (value.isMember("geoidGrid")) {
-        def.geoidGrid = boost::in_place();
-        Json::get(*def.geoidGrid, value, "geoidGrid");
+        def.dem.geoidGrid = boost::in_place();
+        Json::get(*def.dem.geoidGrid, value, "geoidGrid");
     }
 
     if (value.isMember("layers")) {
@@ -79,9 +79,11 @@ void buildDefinition(Json::Value &value
                      , const GeodataVectorBase::Definition &def)
 {
     value["dataset"] = def.dataset;
-    value["demDataset"] = def.demDataset;
+    value["demDataset"] = def.dem.dataset;
 
-    if (def.geoidGrid) { value["geoidGrid"] = *def.geoidGrid;  }
+    if (def.dem.geoidGrid) {
+        value["geoidGrid"] = *def.dem.geoidGrid;
+    }
 
     if (def.layers) {
         auto &layers(value["layers"] = Json::arrayValue);
@@ -99,10 +101,10 @@ void parseDefinition(GeodataVectorBase::Definition &def
                      , const boost::python::dict &value)
 {
     def.dataset = py2utf8(value["dataset"]);
-    def.demDataset = py2utf8(value["demDataset"]);
+    def.dem.dataset = py2utf8(value["demDataset"]);
 
     if (value.has_key("geoidGrid")) {
-        def.geoidGrid = py2utf8(value["geoidGrid"]);
+        def.dem.geoidGrid = py2utf8(value["geoidGrid"]);
     }
 
     if (value.has_key("layers")) {
@@ -166,8 +168,7 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     const auto &other(o.as<Definition>());
 
     if (dataset != other.dataset) { return Changed::yes; }
-    if (demDataset != other.demDataset) { return Changed::yes; }
-    if (geoidGrid != other.geoidGrid) { return Changed::yes; }
+    if (dem != other.dem) { return Changed::yes; }
     if (layers != other.layers) { return Changed::yes; }
 
     // format can change
@@ -264,9 +265,10 @@ KeyValue splitArgument(const SubString &arg)
 
 } // namespace
 
-DemRegistry::Datasets
+DemDataset::list
 GeodataVectorBase::viewspec2datasets(const std::string &query
-                                     , const std::string &fallback) const
+                                     , const DemDataset &fallback)
+    const
 {
     if (query.empty()) { return { fallback }; };
 

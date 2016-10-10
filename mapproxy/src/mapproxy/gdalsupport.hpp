@@ -19,6 +19,7 @@
 #include "vts-libs/vts/opencv/navtile.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 
+#include "./support/geo.hpp"
 #include "./sink.hpp"
 
 namespace vts = vadstena::vts;
@@ -113,15 +114,15 @@ public:
 
     Raster warp(const RasterRequest &request, Aborter &sink);
 
-    struct Heighcoded {
-        typedef std::shared_ptr<Heighcoded> pointer;
+    struct Heightcoded {
+        typedef std::shared_ptr<Heightcoded> pointer;
 
         const char *data;
         std::size_t size;
 
         geo::heightcoding::Metadata metadata;
 
-        Heighcoded(const char *data, std::size_t size
+        Heightcoded(const char *data, std::size_t size
                    , const geo::heightcoding::Metadata &metadata)
             : data(data), size(size), metadata(metadata)
         {}
@@ -131,11 +132,10 @@ public:
 
     /** Heightcode vector ds using raster ds
      */
-    Heighcoded::pointer
+    Heightcoded::pointer
     heightcode(const std::string &vectorDs
-               , const std::vector<std::string> &rasterDs
+               , const DemDataset::list &rasterDs
                , const geo::heightcoding::Config &config
-               , const boost::optional<std::string> &geoidGrid
                , Aborter &aborter);
 
     /** Navigation tile info.
@@ -153,7 +153,7 @@ public:
 
     /** Heightcode vector ds using navtile ds
      */
-    Heighcoded::pointer
+    Heightcoded::pointer
     heightcode(const std::string &vectorDs
                , const Navtile &navtile
                , const geo::heightcoding::Config &config

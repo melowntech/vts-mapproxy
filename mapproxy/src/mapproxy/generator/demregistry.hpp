@@ -5,7 +5,10 @@
 #include <string>
 #include <vector>
 
+#include <boost/optional.hpp>
+
 #include "../resource.hpp"
+#include "../support/geo.hpp"
 
 /** Special class to store links to all available DEMs.
  */
@@ -31,14 +34,12 @@ public:
         typedef std::vector<Id> list;
     };
 
-    typedef std::vector<std::string> Datasets;
-
     struct Record {
         Id id;
-        std::string dataset;
+        DemDataset dataset;
         Resource::Id resourceId;
 
-        Record(const Id &id, const std::string &dataset
+        Record(const Id &id, const DemDataset &dataset
                , const Resource::Id &resourceId)
             : id(id), dataset(dataset), resourceId(resourceId)
         {}
@@ -50,8 +51,8 @@ public:
      *  an empty set.
      *  Datasets have the same order as ids.
      */
-    Datasets find(const std::string &referenceFrame
-                  , const std::vector<std::string> &ids) const;
+    DemDataset::list find(const std::string &referenceFrame
+                          , const std::vector<std::string> &ids) const;
 
     /** Registers DEM under given ID.
      */

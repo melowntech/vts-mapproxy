@@ -68,15 +68,14 @@ public:
     {}
 
     ShRequest(const std::string &vectorDs
-              , const std::vector<std::string> &rasterDs
+              , const DemDataset::list &rasterDs
               , const geo::heightcoding::Config &config
-              , const boost::optional<std::string> &geoidGrid
               , ManagedBuffer &sm)
         : sm_(sm)
         , raster_()
         , heightcode_(sm.construct<ShHeightCode>
                       (bi::anonymous_instance)
-                      (vectorDs, rasterDs, config, geoidGrid, sm, this))
+                      (vectorDs, rasterDs, config, sm, this))
         , navHeightcode_()
         , done_(false)
         , error_(sm.get_allocator<char>())
@@ -120,8 +119,8 @@ public:
     GdalWarper::Raster getRaster(Lock &lock);
     GdalWarper::Raster getRaster(bi::interprocess_mutex &mutex);
 
-    GdalWarper::Heighcoded::pointer getHeighcoded(Lock &lock);
-    GdalWarper::Heighcoded::pointer getHeighcoded(bi::interprocess_mutex &mutex);
+    GdalWarper::Heightcoded::pointer getHeightcoded(Lock &lock);
+    GdalWarper::Heightcoded::pointer getHeightcoded(bi::interprocess_mutex &mutex);
 
     virtual void done_impl();
     void process(bi::interprocess_mutex &mutex, DatasetCache &cache);
@@ -136,14 +135,13 @@ public:
     }
 
     static pointer create(const std::string &vectorDs
-                          , const std::vector<std::string> &rasterDs
+                          , const DemDataset::list &rasterDs
                           , const geo::heightcoding::Config &config
-                          , const boost::optional<std::string> &geoidGrid
                           , ManagedBuffer &mb)
     {
         return pointer(mb.construct<ShRequest>
                        (bi::anonymous_instance)
-                       (vectorDs, rasterDs, config, geoidGrid, mb)
+                       (vectorDs, rasterDs, config, mb)
                        , mb.get_allocator<void>()
                        , mb.get_deleter<ShRequest>());
     }
@@ -194,8 +192,7 @@ void ShRequest::process(bi::interprocess_mutex &mutex
             (mutex, ::heightcode(cache, sm_
                                  , heightcode_->vectorDs()
                                  , heightcode_->rasterDs()
-                                 , heightcode_->config()
-                                 , heightcode_->geoidGrid()));
+                                 , heightcode_->config()));
         return;
     }
 
@@ -299,7 +296,7 @@ GdalWarper::Raster ShRequest::getRaster(bi::interprocess_mutex &mutex)
     return getRaster(lock);
 }
 
-GdalWarper::Heighcoded::pointer ShRequest::getHeighcoded(Lock &lock)
+GdalWarper::Heightcoded::pointer ShRequest::getHeightcoded(Lock &lock)
 {
     cond_.wait(lock, [&]()
     {
@@ -317,8 +314,8 @@ GdalWarper::Heighcoded::pointer ShRequest::getHeighcoded(Lock &lock)
                           ? heightcode_->response()
                           : navHeightcode_->response()))
     {
-        return GdalWarper::Heighcoded::pointer
-            (response, [&sm_](GdalWarper::Heighcoded *block)
+        return GdalWarper::Heightcoded::pointer
+            (response, [&sm_](GdalWarper::Heightcoded *block)
         {
             // deallocate data
             sm_.deallocate(block);
@@ -337,11 +334,11 @@ GdalWarper::Heighcoded::pointer ShRequest::getHeighcoded(Lock &lock)
     throw std::runtime_error("Unknown exception!");
 }
 
-GdalWarper::Heighcoded::pointer
-ShRequest::getHeighcoded(bi::interprocess_mutex &mutex)
+GdalWarper::Heightcoded::pointer
+ShRequest::getHeightcoded(bi::interprocess_mutex &mutex)
 {
     Lock lock(mutex);
-    return getHeighcoded(lock);
+    return getHeightcoded(lock);
 }
 
 struct Worker {
@@ -420,14 +417,13 @@ public:
 
     Raster warp(const RasterRequest &req, Aborter &aborter);
 
-    Heighcoded::pointer
+    Heightcoded::pointer
     heightcode(const std::string &vectorDs
-               , const std::vector<std::string> &rasterDs
+               , const DemDataset::list &rasterDs
                , const geo::heightcoding::Config &config
-               , const boost::optional<std::string> &geoidGrid
                , Aborter &aborter);
 
-    Heighcoded::pointer
+    Heightcoded::pointer
     heightcode(const std::string &vectorDs
                , const Navtile &navtile
                , const geo::heightcoding::Config &config
@@ -479,17 +475,16 @@ GdalWarper::Raster GdalWarper::warp(const RasterRequest &req, Aborter &aborter)
     return detail().warp(req, aborter);
 }
 
-GdalWarper::Heighcoded::pointer
+GdalWarper::Heightcoded::pointer
 GdalWarper::heightcode(const std::string &vectorDs
-                       , const std::vector<std::string> &rasterDs
+                       , const DemDataset::list &rasterDs
                        , const geo::heightcoding::Config &config
-                       , const boost::optional<std::string> &geoidGrid
                        , Aborter &aborter)
 {
-    return detail().heightcode(vectorDs, rasterDs, config, geoidGrid, aborter);
+    return detail().heightcode(vectorDs, rasterDs, config, aborter);
 }
 
-GdalWarper::Heighcoded::pointer
+GdalWarper::Heightcoded::pointer
 GdalWarper::heightcode(const std::string &vectorDs
                        , const Navtile &navtile
                        , const geo::heightcoding::Config &config
@@ -847,16 +842,15 @@ GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
     return shReq->getRaster(lock);
 }
 
-GdalWarper::Heighcoded::pointer
+GdalWarper::Heightcoded::pointer
 GdalWarper::Detail::heightcode(const std::string &vectorDs
-                               , const std::vector<std::string> &rasterDs
+                               , const DemDataset::list &rasterDs
                                , const geo::heightcoding::Config &config
-                               , const boost::optional<std::string> &geoidGrid
                                , Aborter &aborter)
 {
     Lock lock(mutex());
     ShRequest::pointer shReq
-        (ShRequest::create(vectorDs, rasterDs, config, geoidGrid, mb_));
+        (ShRequest::create(vectorDs, rasterDs, config, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 
@@ -872,10 +866,10 @@ GdalWarper::Detail::heightcode(const std::string &vectorDs
         });
     }
 
-    return shReq->getHeighcoded(lock);
+    return shReq->getHeightcoded(lock);
 }
 
-GdalWarper::Heighcoded::pointer
+GdalWarper::Heightcoded::pointer
 GdalWarper::Detail::heightcode(const std::string &vectorDs
                                , const Navtile &navtile
                                , const geo::heightcoding::Config &config
@@ -902,5 +896,5 @@ GdalWarper::Detail::heightcode(const std::string &vectorDs
         });
     }
 
-    return shReq->getHeighcoded(lock);
+    return shReq->getHeightcoded(lock);
 }

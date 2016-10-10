@@ -335,34 +335,35 @@ VectorDataset openVectorDataset(const std::string &dataset
     return openVectorDataset(dataset, openOptions);
 }
 
-GdalWarper::Heighcoded*
+GdalWarper::Heightcoded*
 allocateHc(ManagedBuffer &mb
            , const std::string &data
            , const geo::heightcoding::Metadata &metadata)
 {
     // create raw memory to hold block and data
     char *raw(static_cast<char*>
-              (mb.allocate(sizeof(GdalWarper::Heighcoded) + data.size())));
+              (mb.allocate(sizeof(GdalWarper::Heightcoded) + data.size())));
 
     // poiter to output data
-    auto *dataPtr(raw + sizeof(GdalWarper::Heighcoded));
+    auto *dataPtr(raw + sizeof(GdalWarper::Heightcoded));
 
     // copy data into block
     std::copy(data.begin(), data.end(), dataPtr);
 
     // allocate block in raw data block
-    return new (raw) GdalWarper::Heighcoded
+    return new (raw) GdalWarper::Heightcoded
         (dataPtr, data.size(), metadata);
 }
 
-GdalWarper::Heighcoded*
+GdalWarper::Heightcoded*
 heightcode(ManagedBuffer &mb, const VectorDataset &vds
-           , const geo::GeoDataset &rds, geo::heightcoding::Config config
+           , std::vector<const geo::GeoDataset*> rds
+           , geo::heightcoding::Config config
            , const boost::optional<std::string> &geoidGrid = boost::none)
 {
     if (geoidGrid) {
         // apply geoid grid to SRS of rasterDs and set to rasterDsSrs
-        config.rasterDsSrs = geo::setGeoid(rds.srs(), *geoidGrid);
+        config.rasterDsSrs = geo::setGeoid(rds.back()->srs(), *geoidGrid);
     }
 
     std::ostringstream os;
@@ -370,8 +371,6 @@ heightcode(ManagedBuffer &mb, const VectorDataset &vds
 
     return allocateHc(mb, os.str(), metadata);
 }
-
-
 
 geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
                             , const ConstBlock &dataBlock
@@ -508,20 +507,24 @@ geo::GeoDataset fromNavtile(const GdalWarper::Navtile &ni
 
 } // namespace
 
-GdalWarper::Heighcoded*
+GdalWarper::Heightcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
-           , const std::vector<std::string> &rasterDs
-           , geo::heightcoding::Config config
-           , const boost::optional<std::string> &geoidGrid)
+           , const DemDataset::list &rasterDs
+           , geo::heightcoding::Config config)
 {
-    // TODO: get vector of open datasets
+    std::vector<const geo::GeoDataset*> rasterDsStack;
+    for (const auto &ds : rasterDs) {
+        rasterDsStack.push_back(&cache(ds.dataset));
+    }
+
+    // TODO: propagate geoid grid to heightcoding algo
     return heightcode(mb, openVectorDataset(vectorDs, config)
-                      , cache(rasterDs.back())
-                      , config, geoidGrid);
+                      , rasterDsStack
+                      , config, rasterDs.back().geoidGrid);
 }
 
-GdalWarper::Heighcoded*
+GdalWarper::Heightcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
            , const GdalWarper::Navtile &navtile
@@ -536,5 +539,5 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
     // switch to dataset SRS (we need to fool the underlying level)
     config.workingSrs = rds.srs();
     config.rasterDsSrs = rds.srs();
-    return heightcode(mb, vds, rds, config);
+    return heightcode(mb, vds, { &rds }, config);
 }

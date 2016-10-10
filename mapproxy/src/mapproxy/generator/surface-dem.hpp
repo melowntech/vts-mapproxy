@@ -21,10 +21,9 @@ public:
     ~SurfaceDem();
 
     struct Definition : public DefinitionBase {
-        std::string dataset;
+        DemDataset dem;
         boost::optional<boost::filesystem::path> mask;
         unsigned int textureLayerId;
-        boost::optional<std::string> geoidGrid;
         boost::optional<std::string> heightcodingAlias;
 
         Definition() : textureLayerId() {}
@@ -67,7 +66,7 @@ private:
 
     /** Path to original dataset (must contain overviews)
      */
-    const std::string dataset_;
+    const DemDataset dem_;
 
     // mask tree
     MaskTree maskTree_;

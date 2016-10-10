@@ -102,27 +102,39 @@ ShHeightCodeConfig::operator geo::heightcoding::Config() const
     return config;
 }
 
+
+ShDemDataset::ShDemDataset(const DemDataset &demDataset
+                           , ManagedBuffer &sm)
+    : dataset(demDataset.dataset.data(), demDataset.dataset.size()
+              , sm.get_allocator<char>())
+    , geoidGrid(sm.get_allocator<char>())
+{
+    if (demDataset.geoidGrid) {
+        geoidGrid.assign(demDataset.geoidGrid->data()
+                         , demDataset.geoidGrid->size());
+    }
+}
+
+DemDataset ShDemDataset::demDataset() const
+{
+    return { asString(dataset), asOptional(geoidGrid) };
+}
+
 ShHeightCode::ShHeightCode(const std::string &vectorDs
-                           , const std::vector<std::string> &rasterDs
+                           , const DemDataset::list &rasterDs
                            , const geo::heightcoding::Config &config
-                           , const boost::optional<std::string> &geoidGrid
                            , ManagedBuffer &sm, ShRequestBase *owner)
     : sm_(sm), owner_(owner)
     , vectorDs_(vectorDs.data(), vectorDs.size()
                 , sm.get_allocator<char>())
-    , rasterDs_(sm.get_allocator<String>())
+    , rasterDs_(sm.get_allocator<ShDemDataset>())
     , config_(config, sm)
     , geoidGrid_(sm.get_allocator<char>())
     , response_()
 {
     // copy strings to shared memory
-    for (const auto &str : rasterDs) {
-        rasterDs_.push_back(String(str.data(), str.size()
-                                   , sm.get_allocator<char>()));
-    }
-
-    if (geoidGrid) {
-        geoidGrid_.assign(geoidGrid->data(), geoidGrid->size());
+    for (const auto &dataset : rasterDs) {
+        rasterDs_.push_back(ShDemDataset(dataset, sm));
     }
 }
 
@@ -135,11 +147,11 @@ std::string ShHeightCode::vectorDs() const
     return asString(vectorDs_);
 }
 
-std::vector<std::string> ShHeightCode::rasterDs() const
+DemDataset::list ShHeightCode::rasterDs() const
 {
-    std::vector<std::string> ds;
-    for (const auto &str : rasterDs_) {
-        ds.emplace_back(str.data(), str.size());
+    DemDataset::list ds;
+    for (const auto &dataset : rasterDs_) {
+        ds.push_back(dataset.demDataset());
     }
     return ds;
 }
@@ -148,20 +160,16 @@ geo::heightcoding::Config ShHeightCode::config() const {
     return config_;
 }
 
-boost::optional<std::string> ShHeightCode::geoidGrid() const {
-    return asOptional(geoidGrid_);
-}
-
 /** Steals response.
  */
-GdalWarper::Heighcoded* ShHeightCode::response() {
+GdalWarper::Heightcoded* ShHeightCode::response() {
     auto response(response_);
     response_ = 0;
     return response;
 }
 
 void ShHeightCode::response(bi::interprocess_mutex &mutex
-                            , GdalWarper::Heighcoded *response)
+                            , GdalWarper::Heightcoded *response)
 {
     Lock lock(mutex);
     if (response_) { return; }
@@ -249,14 +257,14 @@ boost::optional<std::string> ShNavHeightCode::geoidGrid() const {
 
 /** Steals response.
  */
-GdalWarper::Heighcoded* ShNavHeightCode::response() {
+GdalWarper::Heightcoded* ShNavHeightCode::response() {
     auto response(response_);
     response_ = 0;
     return response;
 }
 
 void ShNavHeightCode::response(bi::interprocess_mutex &mutex
-                              , GdalWarper::Heighcoded *response)
+                              , GdalWarper::Heightcoded *response)
 {
     Lock lock(mutex);
     if (response_) { return; }

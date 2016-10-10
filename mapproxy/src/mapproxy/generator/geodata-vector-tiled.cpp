@@ -61,7 +61,8 @@ int GeneratorRevision(0);
 GeodataVectorTiled::GeodataVectorTiled(const Params &params)
     : GeodataVectorBase(params, true)
     , definition_(this->resource().definition<Definition>())
-    , demDataset_(absoluteDataset(definition_.demDataset + "/dem"))
+    , dem_(absoluteDataset(definition_.dem.dataset + "/dem")
+           , definition_.dem.geoidGrid)
     , effectiveGsdArea_(), effectiveGsdAreaComputed_(false)
     , tileUrl_(definition_.dataset)
     , physicalSrs_
@@ -70,8 +71,8 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
 {
     {
         // open dataset and get descriptor + metadata
-        auto ds(geo::GeoDataset::open(demDataset_));
-        dem_ = ds.descriptor();
+        auto ds(geo::GeoDataset::open(dem_.dataset));
+        demDescriptor_ = ds.descriptor();
 
         auto md(ds.getMetadata("vts"));
 
@@ -80,11 +81,11 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
 
             LOG(info2)
                 << "<" << id() << ">: using configured effective GSD area of "
-                << definition_.demDataset << ": "
+                << definition_.dem.dataset << ": "
                 << effectiveGsdArea_ << " m2.";
         } else {
-            auto esize(math::size(dem_.extents));
-            auto srs(dem_.srs.reference());
+            auto esize(math::size(demDescriptor_.extents));
+            auto srs(demDescriptor_.srs.reference());
             if (srs.IsGeographic()) {
                 // geographic coordinates system -> convert degrees to meters
                 double a(srs.GetSemiMajor());
@@ -98,15 +99,15 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
                 esize.height *= (a * M_PI / 180.0);
             }
 
-            math::Size2f px(esize.width / dem_.size.width
-                            , esize.height / dem_.size.height);
+            math::Size2f px(esize.width / demDescriptor_.size.width
+                            , esize.height / demDescriptor_.size.height);
 
             effectiveGsdArea_ = math::area(px);
             effectiveGsdAreaComputed_ = true;
 
             LOG(info2)
                 << id() << ": using computed effective GSD area "
-                << definition_.demDataset << ": "
+                << definition_.dem.dataset << ": "
                 << effectiveGsdArea_ << " m2.";
         }
     }
@@ -133,13 +134,13 @@ void GeodataVectorTiled::prepare_impl(Arsenal&)
     const auto &r(resource());
 
     // try to open datasets
-    geo::GeoDataset::open(demDataset_);
-    geo::GeoDataset::open(demDataset_ + ".min");
-    geo::GeoDataset::open(demDataset_ + ".max");
+    geo::GeoDataset::open(dem_.dataset);
+    geo::GeoDataset::open(dem_.dataset + ".min");
+    geo::GeoDataset::open(dem_.dataset + ".max");
 
     // prepare tile index
     prepareTileIndex(index_
-                     , (absoluteDataset(definition_.demDataset)
+                     , (absoluteDataset(definition_.dem.dataset)
                         + "/tiling." + r.id.referenceFrame)
                      , r);
 
@@ -219,7 +220,8 @@ void GeodataVectorTiled::generateMetatile(Sink &sink
 
     auto metatile(metatileFromDem
                   (fi.tileId, sink, arsenal, resource()
-                   , index_.tileIndex, demDataset_, definition_.geoidGrid
+                   , index_.tileIndex, dem_.dataset
+                   , dem_.geoidGrid
                    , MaskTree(), definition_.displaySize));
 
     // write metatile to stream
@@ -252,11 +254,10 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     LOG(debug) << "Using geo file: <" << tileUrl << ">.";
 
     // combine all dem datasets and default/fallback dem dataset
-    const DemRegistry::Datasets datasets
-        (viewspec2datasets(fi.fileInfo.query, demDataset_));
+    auto datasets(viewspec2datasets(fi.fileInfo.query, dem_));
 
     geo::heightcoding::Config config;
-    config.workingSrs = sds(nodeInfo, definition_.geoidGrid);
+    config.workingSrs = sds(nodeInfo, dem_.geoidGrid);
     config.outputSrs = physicalSrs_.srsDef;
     config.outputVerticalAdjust = physicalSrs_.adjustVertical();
     config.layers = definition_.layers;
@@ -264,8 +265,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     config.format = definition_.format;
 
     // heightcode data using warper's machinery
-    auto hc(arsenal.warper.heightcode(tileUrl, datasets, config
-                                      , boost::none, sink));
+    auto hc(arsenal.warper.heightcode(tileUrl, datasets, config, sink));
 
     sink.content(hc->data, hc->size, fi.sinkFileInfo(), true);
 }
