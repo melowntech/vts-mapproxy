@@ -271,10 +271,11 @@ GdalWarper::Raster ShRequest::getRaster(Lock &lock)
     }
 
     if (auto *response = raster_->response()) {
-        return GdalWarper::Raster(response, [&sm_](cv::Mat *mat)
+        auto &sm(sm_);
+        return GdalWarper::Raster(response, [&sm](cv::Mat *mat)
         {
             // deallocate data
-            sm_.deallocate(mat);
+            sm.deallocate(mat);
         });
     }
 
@@ -314,11 +315,12 @@ GdalWarper::Heightcoded::pointer ShRequest::getHeightcoded(Lock &lock)
                           ? heightcode_->response()
                           : navHeightcode_->response()))
     {
+        auto &sm(sm_);
         return GdalWarper::Heightcoded::pointer
-            (response, [&sm_](GdalWarper::Heightcoded *block)
+            (response, [&sm](GdalWarper::Heightcoded *block)
         {
             // deallocate data
-            sm_.deallocate(block);
+            sm.deallocate(block);
         });
     }
 
