@@ -518,7 +518,6 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
         rasterDsStack.push_back(&cache(ds.dataset));
     }
 
-    // TODO: propagate geoid grid to heightcoding algo
     return heightcode(mb, openVectorDataset(vectorDs, config)
                       , rasterDsStack
                       , config, rasterDs.back().geoidGrid);
