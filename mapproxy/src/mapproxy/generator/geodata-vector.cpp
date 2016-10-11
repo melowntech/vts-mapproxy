@@ -119,7 +119,8 @@ vr::FreeLayer GeodataVector::freeLayer_impl(ResourceRoot root) const
     def.extents = metadata_.extents;
     def.displaySize = definition_.displaySize;
     def.label = res.comment;
-    def.geodata = prependRoot(std::string("geo"), res, root);
+    def.geodata = prependRoot(std::string("geo?viewspec={viewspec}")
+                              , res, root);
     def.style = definition_.styleUrl;
 
     // done
