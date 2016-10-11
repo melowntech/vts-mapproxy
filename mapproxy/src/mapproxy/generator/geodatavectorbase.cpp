@@ -6,6 +6,8 @@
 
 #include "dbglog/dbglog.hpp"
 
+#include "utility/uri.hpp"
+
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
@@ -265,12 +267,20 @@ KeyValue splitArgument(const SubString &arg)
 
 } // namespace
 
-DemDataset::list
+std::pair<DemDataset::list, bool>
 GeodataVectorBase::viewspec2datasets(const std::string &query
                                      , const DemDataset &fallback)
     const
 {
-    if (query.empty()) { return { fallback }; };
+    auto empty([&]() -> std::pair<DemDataset::list, bool>
+    {
+        return { DemDataset::list{fallback}, true };
+    });
+
+    if (query.empty()) {
+        LOG(info1) << "No query -. no viewspec.";
+        return empty();
+    };
 
     Args args;
     ba::split(args, query, ba::is_any_of("&"), ba::token_compress_on);
@@ -283,14 +293,24 @@ GeodataVectorBase::viewspec2datasets(const std::string &query
             ba::split(ids, kv.second, ba::is_any_of(",")
                       , ba::token_compress_on);
 
+            // url decode values
+            for (auto &id : ids) { id = utility::urlDecode(id); }
+
+            if ((ids.size() == 1) && (ids.front() == "{viewspec}")) {
+                // viewspec not expanded, treate as empty
+                LOG(info1) << "Viewspec not expanded, ignoring.";
+                return empty();
+            }
+
             auto result(demRegistry().find(referenceFrameId(), ids));
-            result.push_back(fallback);
+            result.first.emplace_back(fallback);
             return result;
         }
     }
 
     // nothing appropriate
-    return { fallback };
+    LOG(info1) << "No query -> no viewspec.";
+    return empty();
 }
 
 } // namespace generator

@@ -170,20 +170,25 @@ void GeodataVector::generateGeodata(Sink &sink
                                     , const GeodataFileInfo &fi
                                     , Arsenal &arsenal) const
 {
-    const DemDataset::list datasets
-        (viewspec2datasets(fi.fileInfo.query, dem_));
+    const auto datasets(viewspec2datasets(fi.fileInfo.query, dem_));
 
-    if (datasets.size() > 1) {
+    // force 1 hour max age if not all views from viewspec have been found
+    boost::optional<long> maxAge;
+    if (!datasets.second) { maxAge = 3600; }
+
+    if (datasets.first.size() > 1) {
         // valid viewspec -> use it to heightcode file
-        auto hc(heightcode(datasets, arsenal.warper, sink));
-        sink.content(hc->data, hc->size, fi.sinkFileInfo(), true);
+        auto hc(heightcode(datasets.first, arsenal.warper, sink));
+
+        sink.content(hc->data, hc->size
+                     , fi.sinkFileInfo().setMaxAge(maxAge), true);
         return;
     }
 
     // no valid viewspec, return original file
-    auto sfi(fi.sinkFileInfo());
-    sink.content(vs::fileIStream(sfi.contentType.c_str(), dataPath_)
-                 , FileClass::data);
+    sink.content(vs::fileIStream(fi.sinkFileInfo().contentType.c_str()
+                                 , dataPath_)
+                 , FileClass::data, maxAge);
 }
 
 } // namespace generator

@@ -48,11 +48,16 @@ public:
     };
 
     /** Tries to find list of datasets. May return less then asked for or even
-     *  an empty set.
-     *  Datasets have the same order as ids.
+     *  an empty set. Result's second value is true only when all arguments have
+     *  been found.
+     *
+     *  Duplicates are automatically removed (first occurence is returned).
+     *
+     * Datasets have the same order as ids.
      */
-    DemDataset::list find(const std::string &referenceFrame
-                          , const std::vector<std::string> &ids) const;
+    std::pair<DemDataset::list, bool>
+    find(const std::string &referenceFrame
+         , const std::vector<std::string> &ids) const;
 
     /** Registers DEM under given ID.
      */

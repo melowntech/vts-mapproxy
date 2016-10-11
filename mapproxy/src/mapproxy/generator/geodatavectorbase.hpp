@@ -39,8 +39,12 @@ public:
     };
 
 protected:
-    DemDataset::list viewspec2datasets(const std::string &query
-                                       , const DemDataset &fallback)
+    /** Parses viewspec from HTTP query. Returns list of found datasets ending
+     *  with fallback dataset. Second returned attribute is information whether
+     *  all viewspec arguments have been found.
+     */
+    std::pair<DemDataset::list, bool>
+    viewspec2datasets(const std::string &query, const DemDataset &fallback)
         const;
 
 private:

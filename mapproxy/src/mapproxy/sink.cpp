@@ -13,8 +13,10 @@
 namespace {
 
 boost::optional<long> maxAge(FileClass fileClass
-                             , const FileClassSettings *fileClassSettings)
+                             , const FileClassSettings *fileClassSettings
+                             , const boost::optional<long> &forcedMaxAge)
 {
+    if (forcedMaxAge) { return forcedMaxAge; }
     if (!fileClassSettings) { return boost::none; }
     return fileClassSettings->getMaxAge(fileClass);
 }
@@ -51,10 +53,13 @@ class IStreamDataSource : public http::ServerSink::DataSource {
 public:
     IStreamDataSource(const vs::IStream::pointer &stream
                       , FileClass fileClass
-                      , const FileClassSettings *fileClassSettings)
+                      , const FileClassSettings *fileClassSettings
+                      , const boost::optional<long> &forcedMaxAge
+                      = boost::none)
         : stream_(stream), stat_(stream->stat())
         , fs_(Sink::FileInfo(stat_.contentType, stat_.lastModified
-                             , maxAge(fileClass, fileClassSettings)))
+                             , maxAge(fileClass, fileClassSettings
+                                      , forcedMaxAge)))
     {
         // do not fail on eof
         stream->get().exceptions(std::ios::badbit);
@@ -87,11 +92,11 @@ private:
 
 } //namesapce
 
-void Sink::content(const vs::IStream::pointer &stream
-                   , FileClass fileClass)
+void Sink::content(const vs::IStream::pointer &stream, FileClass fileClass
+                   , const boost::optional<long> &maxAge)
 {
     sink_->content(std::make_shared<IStreamDataSource>
-                   (stream, fileClass, fileClassSettings_));
+                   (stream, fileClass, fileClassSettings_, maxAge));
 }
 
 void Sink::error(const std::exception_ptr &exc)

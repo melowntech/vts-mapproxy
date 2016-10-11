@@ -7,19 +7,34 @@ class DemRegistry::Detail {
 public:
     Detail() {}
 
-    DemDataset::list find(const std::string &referenceFrame
-                          , const std::vector<std::string> &ids) const
+    std::pair<DemDataset::list, bool>
+    find(const std::string &referenceFrame
+         , const std::vector<std::string> &ids) const
     {
         std::unique_lock<std::mutex> lock(mutex_);
 
-        DemDataset::list datasets;
+        std::pair<DemDataset::list, bool> result;
+        DemDataset::list &datasets(result.first);
+
+        size_t found(0);
+        std::set<std::string> seen;
         for (const auto &id : ids) {
+            if (!seen.insert(id).second) { continue; }
             auto fmap(map_.find({ referenceFrame, id }));
             if (fmap != map_.end()) {
+                ++found;
                 datasets.push_back(fmap->second.dataset);
+                LOG(info1)
+                    << "Viewspec <" << id << "> translated into dem \""
+                    << fmap->second.dataset.dataset << "\".";
+            } else {
+                LOG(info1)
+                    << "Unknown viewspec <" << id << ">.";
             }
         }
-        return datasets;
+        // set all satisfied marker
+        result.second = (seen.size() == found);
+        return result;
     }
 
     void add(const Record &record) {
@@ -57,8 +72,9 @@ DemRegistry::DemRegistry()
 
 DemRegistry::~DemRegistry() {}
 
-DemDataset::list DemRegistry::find(const std::string &referenceFrame
-                                   , const std::vector<std::string> &ids)
+std::pair<DemDataset::list, bool>
+DemRegistry::find(const std::string &referenceFrame
+                  , const std::vector<std::string> &ids)
     const
 {
     return detail().find(referenceFrame, ids);

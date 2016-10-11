@@ -265,9 +265,14 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     config.format = definition_.format;
 
     // heightcode data using warper's machinery
-    auto hc(arsenal.warper.heightcode(tileUrl, datasets, config, sink));
+    auto hc(arsenal.warper.heightcode(tileUrl, datasets.first, config, sink));
 
-    sink.content(hc->data, hc->size, fi.sinkFileInfo(), true);
+    // force 1 hour max age if not all views from viewspec have been found
+    boost::optional<long> maxAge;
+    if (!datasets.second) { maxAge = 3600; }
+
+    sink.content(hc->data, hc->size
+                 , fi.sinkFileInfo().setMaxAge(maxAge), true);
 }
 
 } // namespace generator

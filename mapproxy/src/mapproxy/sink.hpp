@@ -80,10 +80,11 @@ public:
 
     /** Sends content to client.
      * \param stream stream to send
-     * \param file class
+     * \param fileclass file class
+     * \param maxAge explicit max age
      */
-    void content(const vs::IStream::pointer &stream
-                 , FileClass fileClass);
+    void content(const vs::IStream::pointer &stream, FileClass fileClass
+                 , const boost::optional<long> &maxAge = boost::none);
 
     /** Tell client to look somewhere else.
      */
