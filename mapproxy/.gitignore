@@ -1,5 +1,6 @@
 bin
 build
+build.*
 lib
 obj-x86_64-linux-gnu
 core
