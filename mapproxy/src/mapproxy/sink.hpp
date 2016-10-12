@@ -49,6 +49,9 @@ public:
 
         FileInfo& setMaxAge(const boost::optional<long> &maxAge);
 
+        FileInfo& addHeader(const std::string &name
+                            , const std::string &value);
+
         FileClass fileClass;
         http::Header::list headers;
     };
@@ -82,9 +85,11 @@ public:
      * \param stream stream to send
      * \param fileclass file class
      * \param maxAge explicit max age
+     * \param gzipped is content gzipped?
      */
     void content(const vs::IStream::pointer &stream, FileClass fileClass
-                 , const boost::optional<long> &maxAge = boost::none);
+                 , const boost::optional<long> &maxAge = boost::none
+                 , bool gzipped = false);
 
     /** Tell client to look somewhere else.
      */

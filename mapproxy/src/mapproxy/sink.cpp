@@ -55,7 +55,7 @@ public:
                       , FileClass fileClass
                       , const FileClassSettings *fileClassSettings
                       , const boost::optional<long> &forcedMaxAge
-                      = boost::none)
+                      , bool gzipped)
         : stream_(stream), stat_(stream->stat())
         , fs_(Sink::FileInfo(stat_.contentType, stat_.lastModified
                              , maxAge(fileClass, fileClassSettings
@@ -63,6 +63,10 @@ public:
     {
         // do not fail on eof
         stream->get().exceptions(std::ios::badbit);
+
+        if (gzipped) {
+            headers_.emplace_back("Content-Encoding", "gzip");
+        }
     }
 
     virtual http::SinkBase::FileInfo stat() const {
@@ -93,10 +97,10 @@ private:
 } //namesapce
 
 void Sink::content(const vs::IStream::pointer &stream, FileClass fileClass
-                   , const boost::optional<long> &maxAge)
+                   , const boost::optional<long> &maxAge, bool gzipped)
 {
     sink_->content(std::make_shared<IStreamDataSource>
-                   (stream, fileClass, fileClassSettings_, maxAge));
+                   (stream, fileClass, fileClassSettings_, maxAge, gzipped));
 }
 
 void Sink::error(const std::exception_ptr &exc)
@@ -123,6 +127,13 @@ Sink::FileInfo& Sink::FileInfo::setFileClass(FileClass fc)
 Sink::FileInfo& Sink::FileInfo::setMaxAge(const boost::optional<long> &ma)
 {
     maxAge = ma;
+    return *this;
+}
+
+Sink::FileInfo& Sink::FileInfo::addHeader(const std::string &name
+                                          , const std::string &value)
+{
+    headers.emplace_back(name, value);
     return *this;
 }
 

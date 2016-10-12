@@ -181,7 +181,6 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
                                , Sink &sink
                                , const SurfaceFileInfo &fi
                                , Arsenal &arsenal) const
-
 {
     auto flags(index_.tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
@@ -197,22 +196,26 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
     auto mesh(generateMeshImpl
               (nodeInfo, sink, fi, arsenal, fi.raw));
 
-    // write mesh (only mesh!) to stream
-    std::ostringstream os;
+    // write mesh to stream
+    std::stringstream os;
+    auto sfi(fi.sinkFileInfo());
     if (fi.raw) {
         vts::saveMesh(os, mesh);
     } else {
         vts::saveMeshProper(os, mesh);
+        if (vs::gzipped(os)) {
+            // gzip -> mesh
+            sfi.addHeader("Content-Encoding", "gzip");
+        }
     }
 
-    sink.content(os.str(), fi.sinkFileInfo());
+    sink.content(os.str(), sfi);
 }
 
 void SurfaceBase::generate2dMask(const vts::TileId &tileId
                                  , Sink &sink
                                  , const SurfaceFileInfo &fi
                                  , Arsenal &arsenal) const
-
 {
     auto flags(index_.tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
