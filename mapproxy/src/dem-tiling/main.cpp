@@ -163,7 +163,7 @@ public:
                , bool parallel, bool forceWatertight);
 
 private:
-    void process(const vts::NodeInfo &node, bool upscaling = false);
+    void process(const vts::NodeInfo &node, double upscaling = 0.0);
 
     const geo::GeoDataset& dataset() {
         return gds_[omp_get_thread_num()];
@@ -209,7 +209,7 @@ TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
     }
 }
 
-void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
+void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
 {
     struct TIDGuard {
         TIDGuard(const std::string &id)
@@ -263,9 +263,16 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
 
     LOG(info2) << "Processing tile " << tileId << ".";
 
-    int samples(upscaling ? 8 : tileSampling_);
+    int samples(tileSampling_);
+
+    // upscaling, each level decreases size by half
+    // use at least 8 samples
+    if (upscaling >= 1.0) {
+        samples = std::max(int(samples / upscaling), 8);
+    }
 
     math::Size2 size(samples + 1, samples + 1);
+    LOG(info4) << "Size: " << size;
 
     if (tileId.lod >= lodRange_.min) {
         // warp input dataset into tile
@@ -277,21 +284,35 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
                      , GDT_Float32
                      , geo::GeoDataset::NodataValue(-1e6)));
 
+        geo::GeoDataset::WarpOptions wo;
+        if (upscaling >= 1.0) {
+            // last level used original dataset, we have to enforce it now as
+            // well otherwise GeoDataset may choose some overlay automatically
+            // based on smaller size
+            wo.overview = geo::Overview();
+        }
+
         auto wri([&]() -> geo::GeoDataset::WarpResultInfo
         {
+
             try {
                 // try to warp as in mapproxy
                 return ds.warpInto
-                    (tileDs, geo::GeoDataset::Resampling::dem);
+                    (tileDs, geo::GeoDataset::Resampling::dem, wo);
             } catch (const geo::WarpError &e) {
                 // failed -> average could help
                 LOG(info3)
                     << "Warp failed (" << e.what()
                     << "), restarting with simpler kernel.";
                 return ds.warpInto
-                    (tileDs, geo::GeoDataset::Resampling::average);
+                    (tileDs, geo::GeoDataset::Resampling::average, wo);
             }
         }());
+
+        if (!wri.overview) {
+            LOG(info4) << "scale: " << wri.truescale
+                       << ", full: " << (upscaling * wri.truescale);
+        }
 
         TiFlag::value_type baseFlags(TiFlag::mesh);
         if (!upscaling) {
@@ -363,8 +384,14 @@ void TreeWalker::process(const vts::NodeInfo &node, bool upscaling)
         }
         }
 
-        // update upscaling flag
-        upscaling = (upscaling || !wri.overview);
+        // update upscaling level
+        if (!wri.overview) {
+            if (!upscaling) {
+                upscaling = wri.truescale;
+            } else {
+                upscaling *= wri.truescale;
+            }
+        }
     }
 
     if (tileId.lod == lodRange_.max) {

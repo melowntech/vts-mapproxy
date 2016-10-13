@@ -79,14 +79,25 @@ Generator::Task SurfaceBase
     case SurfaceFileInfo::Type::file: {
         switch (fi.fileType) {
         case vts::File::config: {
-            if (fi.raw) {
+            switch (fi.flavor) {
+            case vts::FileFlavor::regular:
+                {
+                    std::ostringstream os;
+                    mapConfig(os, ResourceRoot::none);
+                    sink.content(os.str(), fi.sinkFileInfo());
+                }
+                break;
+
+            case vts::FileFlavor::raw:
                 sink.content(vs::fileIStream
-                              (fi.fileType, filePath(vts::File::config))
+                             (fi.fileType, filePath(vts::File::config))
                              , FileClass::data);
-            } else {
-                std::ostringstream os;
-                mapConfig(os, ResourceRoot::none);
-                sink.content(os.str(), fi.sinkFileInfo());
+                break;
+
+            default:
+                sink.error(utility::makeError<NotFound>
+                           ("Unsupported file flavor."));
+                break;
             }
             break;
         }
@@ -193,13 +204,14 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
             ("TileId outside of valid reference frame tree.");
     }
 
-    auto mesh(generateMeshImpl
-              (nodeInfo, sink, fi, arsenal, fi.raw));
+    const auto raw(fi.flavor == vts::FileFlavor::raw);
+
+    auto mesh(generateMeshImpl(nodeInfo, sink, fi, arsenal, raw));
 
     // write mesh to stream
     std::stringstream os;
     auto sfi(fi.sinkFileInfo());
-    if (fi.raw) {
+    if (raw) {
         vts::saveMesh(os, mesh);
     } else {
         vts::saveMeshProper(os, mesh);
@@ -236,8 +248,15 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
             (nodeInfo, sink, fi, arsenal, true);
     }
 
-    sink.content(imgproc::serialize(vts::mask2d(mesh.coverageMask, { 1 }), 9)
-                  , fi.sinkFileInfo());
+    if (fi.flavor == vts::FileFlavor::debug) {
+        sink.content(imgproc::png::serialize
+                     (vts::debugMask(mesh.coverageMask, { 1 }), 9)
+                     , fi.sinkFileInfo());
+    } else {
+        sink.content(imgproc::png::serialize
+                     (vts::mask2d(mesh.coverageMask, { 1 }), 9)
+                     , fi.sinkFileInfo());
+    }
 }
 
 void SurfaceBase::generate2dMetatile(const vts::TileId &tileId
@@ -246,8 +265,9 @@ void SurfaceBase::generate2dMetatile(const vts::TileId &tileId
                                      , Arsenal&) const
 
 {
-    sink.content(imgproc::serialize(vts::meta2d(index_.tileIndex, tileId), 9)
-                  , fi.sinkFileInfo());
+    sink.content(imgproc::png::serialize
+                 (vts::meta2d(index_.tileIndex, tileId), 9)
+                 , fi.sinkFileInfo());
 }
 
 void SurfaceBase::generateCredits(const vts::TileId&

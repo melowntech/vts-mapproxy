@@ -340,10 +340,11 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
 
 SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), fileType(vs::File::config)
-    , tileType(vts::TileFile::meta), raw(false), support(), registry()
+    , tileType(vts::TileFile::meta), flavor(vts::FileFlavor::regular)
+    , support(), registry()
 {
     if (vts::fromFilename
-        (tileId, tileType, subTileIndex, fi.filename, 0, &raw))
+        (tileId, tileType, subTileIndex, fi.filename, 0, &flavor))
     {
         type = Type::tile;
         return;
@@ -365,7 +366,7 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
         type = Type::file;
         fileType = vs::File::config;
         // this is raw file
-        raw = true;
+        flavor = vts::FileFlavor::raw;
         return;
     }
 

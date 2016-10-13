@@ -557,7 +557,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
 
     // done
     std::ostringstream os;
-    if (fi.raw) {
+    if (fi.flavor == vts::FileFlavor::raw) {
         // raw navtile -> serialize to on-disk format
         nt.serialize(os);
     } else {

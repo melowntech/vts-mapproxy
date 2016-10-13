@@ -134,10 +134,10 @@ struct SurfaceFileInfo {
      */
     unsigned int subTileIndex;
 
-    /** Distinguishes raw file from interpreted (i.e. tileset.conf from
+    /** Distinguishes non-regular file from interpreted (i.e. tileset.conf from
      *  mapConfig.json)
      */
-    bool raw;
+    vts::FileFlavor flavor;
 
     /** Valid only when type == Type::support;
      */
