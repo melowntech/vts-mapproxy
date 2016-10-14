@@ -56,6 +56,11 @@ private:
                                  , const SurfaceFileInfo &fileInfo
                                  , Arsenal &arsenal) const = 0;
 
+    void generateDebugNode(const vts::TileId &tileId
+                           , Sink &sink
+                           , const SurfaceFileInfo &fileInfo
+                           , Arsenal &arsenal) const;
+
     enum MeshRequest { full, mesh, mask };
 
     virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo

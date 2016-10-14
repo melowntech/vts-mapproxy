@@ -5,10 +5,16 @@
 
 #include "dbglog/dbglog.hpp"
 
+#include "imgproc/png.hpp"
+
 #include "http/error.hpp"
+
+#include "vts-libs/vts/2d.hpp"
 
 #include "./sink.hpp"
 #include "./error.hpp"
+
+namespace vts = vadstena::vts;
 
 namespace {
 
@@ -40,13 +46,18 @@ Sink::FileInfo update(const Sink::FileInfo &inStat
     return stat;
 }
 
-const std::vector<unsigned char> emptyImage([]() -> std::vector<unsigned char>
+const auto emptyImage([]() -> std::vector<unsigned char>
 {
     cv::Mat dot(4, 4, CV_8U, cv::Scalar(0));
     std::vector<unsigned char> buf;
     cv::imencode(".png", dot, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
     return buf;
+}());
+
+const auto emptyDebugMask([]() -> std::vector<char>
+{
+    return imgproc::png::serialize(vts::emptyDebugMask(), 9);
 }());
 
 class IStreamDataSource : public http::ServerSink::DataSource {
@@ -110,6 +121,12 @@ void Sink::error(const std::exception_ptr &exc)
     } catch (const EmptyImage &e) {
         // special "error" -> send "empty" image
         content(emptyImage.data(), emptyImage.size()
+                , Sink::FileInfo("image/png")
+                .setFileClass(FileClass::data)
+                , false);
+    } catch (const EmptyDebugMask &e) {
+        // special "error" -> send "empty" image
+        content(emptyDebugMask.data(), emptyDebugMask.size()
                 , Sink::FileInfo("image/png")
                 .setFileClass(FileClass::data)
                 , false);

@@ -20,6 +20,7 @@
 #include "vts-libs/vts/opencv/navtile.hpp"
 #include "vts-libs/vts/types2d.hpp"
 #include "vts-libs/vts/2d.hpp"
+#include "vts-libs/vts/debug.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -125,7 +126,13 @@ Generator::Task SurfaceBase
         switch (fi.tileType) {
         case vts::TileFile::meta:
             return[=](Sink &sink, Arsenal &arsenal) {
-                generateMetatile(fi.tileId, sink, fi, arsenal);
+                if (fi.flavor == vts::FileFlavor::debug) {
+                    // debug metanode
+                    generateDebugNode(fi.tileId, sink, fi, arsenal);
+                } else {
+                    // regular metatile
+                    generateMetatile(fi.tileId, sink, fi, arsenal);
+                }
             };
 
         case vts::TileFile::mesh:
@@ -229,15 +236,26 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
                                  , const SurfaceFileInfo &fi
                                  , Arsenal &arsenal) const
 {
+    const auto debug(fi.flavor == vts::FileFlavor::debug);
+
     auto flags(index_.tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
-        utility::raise<NotFound>("No mesh for this tile.");
+        if (debug) {
+            return sink.error(utility::makeError<EmptyDebugMask>
+                              ("No mesh for this tile."));
+        }
+        return sink.error(utility::makeError<NotFound>
+                          ("No mesh for this tile."));
     }
 
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
     if (!nodeInfo.valid()) {
-        utility::raise<NotFound>
-            ("TileId outside of valid reference frame tree.");
+        if (debug) {
+            return sink.error(utility::makeError<EmptyDebugMask>
+                              ("No mesh for this tile."));
+        }
+        return sink.error(utility::makeError<NotFound>
+                          ("TileId outside of valid reference frame tree."));
     }
 
     // by default full watertight mesh
@@ -248,7 +266,7 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
             (nodeInfo, sink, fi, arsenal, true);
     }
 
-    if (fi.flavor == vts::FileFlavor::debug) {
+    if (debug) {
         sink.content(imgproc::png::serialize
                      (vts::debugMask(mesh.coverageMask, { 1 }), 9)
                      , fi.sinkFileInfo());
@@ -280,6 +298,19 @@ void SurfaceBase::generateCredits(const vts::TileId&
 
     std::ostringstream os;
     saveCreditTile(os, creditTile, true);
+    sink.content(os.str(), fi.sinkFileInfo());
+}
+
+void SurfaceBase::generateDebugNode(const vts::TileId &tileId
+                                    , Sink &sink
+                                    , const SurfaceFileInfo &fi
+                                    , Arsenal &) const
+{
+    // generate debug metanode
+    const auto debugNode(vts::getNodeDebugInfo(index_.tileIndex, tileId));
+
+    std::ostringstream os;
+    vts::saveDebug(os, debugNode);
     sink.content(os.str(), fi.sinkFileInfo());
 }
 

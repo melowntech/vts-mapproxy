@@ -328,7 +328,7 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
         .setFileClass(FileClass::support);
 
     case Type::definition:
-        return Sink::FileInfo("application/json", lastModified)
+        return Sink::FileInfo("application/json; charset=utf-8", lastModified)
             .setFileClass(FileClass::config);
 
     case Type::unknown:
@@ -408,6 +408,21 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
     }
 }
 
+std::string contentType(vts::TileFile tileType, vts::FileFlavor flavor)
+{
+    switch (tileType) {
+    case vts::TileFile::meta:
+        if (flavor == vts::FileFlavor::debug) {
+            // debug node
+            return "application/json; charset=utf-8";
+        }
+        return vs::contentType(tileType);
+
+    default:
+        return vs::contentType(tileType);
+    }
+}
+
 Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
 {
     switch (type) {
@@ -416,7 +431,7 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
             .setFileClass(FileClass::config);
 
     case Type::tile:
-        return Sink::FileInfo(vs::contentType(tileType), lastModified)
+        return Sink::FileInfo(contentType(tileType, flavor), lastModified)
             .setFileClass(FileClass::data);
 
     case Type::support:
