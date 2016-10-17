@@ -1,3 +1,12 @@
+ctt-vts-mapproxy (0.23) citationtech-wheezy; urgency=low
+
+  * Mesh upgrade: gzipped + v.3
+  * Debug support
+  * Resource update fix
+  * Prepared for view-dependent heightcoding
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Mon, 17 Oct 2016 12:51:56 +0200
+
 ctt-vts-mapproxy (0.22) citationtech-wheezy; urgency=low
 
   * --file-class.* -> --max-age.*
