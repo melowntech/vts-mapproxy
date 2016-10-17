@@ -21,6 +21,7 @@ namespace constants {
     const std::string Config("mapConfig.json");
     const std::string BoundLayerDefinition("boundlayer.json");
     const std::string FreeLayerDefinition("freelayer.json");
+    const std::string DebugConfig("debug.json");
     const std::string Self("");
     const std::string Index("index.html");
     const std::string Dems("dems.html");
@@ -404,6 +405,14 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
         (fi.filename, vr::DataFile::Key::filename, std::nothrow);
     if (registry) {
         type = Type::registry;
+        return;
+    }
+
+    if (constants::DebugConfig == fi.filename) {
+        type = Type::file;
+        fileType = vs::File::config;
+        // this is debug file
+        flavor = vts::FileFlavor::debug;
         return;
     }
 }

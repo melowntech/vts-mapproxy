@@ -81,13 +81,12 @@ Generator::Task SurfaceBase
         switch (fi.fileType) {
         case vts::File::config: {
             switch (fi.flavor) {
-            case vts::FileFlavor::regular:
-                {
-                    std::ostringstream os;
-                    mapConfig(os, ResourceRoot::none);
-                    sink.content(os.str(), fi.sinkFileInfo());
-                }
+            case vts::FileFlavor::regular: {
+                std::ostringstream os;
+                mapConfig(os, ResourceRoot::none);
+                sink.content(os.str(), fi.sinkFileInfo());
                 break;
+            }
 
             case vts::FileFlavor::raw:
                 sink.content(vs::fileIStream
@@ -95,9 +94,21 @@ Generator::Task SurfaceBase
                              , FileClass::data);
                 break;
 
+            case vts::FileFlavor::debug: {
+                std::ostringstream os;
+                const auto debug
+                    (debugConfig(vts::meshTilesConfig
+                                 (properties_, vts::ExtraTileSetProperties()
+                                  , prependRoot(fs::path(), resource()
+                                                , ResourceRoot::none))));
+                vts::saveDebug(os, debug);
+                sink.content(os.str(), fi.sinkFileInfo());
+                break;
+            }
+
             default:
                 sink.error(utility::makeError<NotFound>
-                           ("Unsupported file flavor."));
+                           ("Unsupported file flavor %s.", fi.flavor));
                 break;
             }
             break;
