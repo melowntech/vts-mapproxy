@@ -6,6 +6,7 @@
 
 #include "pydbglog/dbglogmodule.hpp"
 #include "pysupport/import.hpp"
+#include "pysupport/formatexception.hpp"
 
 #include "../error.hpp"
 #include "./python.hpp"
@@ -20,6 +21,7 @@ namespace resource_backend {
 namespace {
 
 std::once_flag onceFlag;
+
 
 struct Factory : ResourceBackend::Factory {
     virtual ResourceBackend::pointer create(const GenericConfig &genericConfig
@@ -135,10 +137,9 @@ Python::Python(const GenericConfig &genericConfig, const Config &config)
             error_ = run_.attr("error");
         }
     } catch (const python::error_already_set&) {
-        // TODO: handle exceptions
-        ::PyErr_Print();
         LOGTHROW(err2, Error)
-            << "Run importing python script from " << config.script << ".";
+            << "Run importing python script from " << config.script << ": "
+            << pysupport::formatCurrentException();
     }
 }
 
@@ -146,23 +147,19 @@ Resource::map Python::load_impl() const
 {
     std::unique_lock<std::mutex> lock(mutex_);
     try {
+        LOG(info4) << "Loading resources";
         return loadResourcesFromPython
             (python::list(run_())
              , [this](const Resource::Id &id, const std::string &error) {
                 error_impl(id, error);
             }, genericConfig_.fileClassSettings);
     } catch (const python::error_already_set&) {
-        // TODO: handle exceptions
-        LOG(err3) << "Resource backend run failed, py exception follows:";
-
-        // NB: Do not set system error indicators (sys.last_*) otherwise leak to
-        // next exception exists -> we must call PyErr_PrintEx with false!
-        ::PyErr_PrintEx(false);
-
+        python::handle_exception();
         LOGTHROW(err3, Error)
-            << "Run failed.";
-        throw;
+            << "Resource backend error run failed: "
+            << pysupport::formatCurrentException();
     }
+    throw;
 }
 
 void Python::error_impl(const Resource::Id &resourceId
@@ -180,14 +177,9 @@ void Python::errorRaw(const Resource::Id &resourceId
             error_(resourceId.referenceFrame, resourceId.group
                    , resourceId.id, message);
         } catch (const python::error_already_set&) {
-            // TODO: handle exceptions
-            LOG(err3) << "Resource backend error report failed, "
-                "py exception follows:";
-
-            // NB: Do not set system error indicators (sys.last_*) otherwise
-            // leak to next exception exists -> we must call PyErr_PrintEx with
-            // false!
-            ::PyErr_PrintEx(false);
+        LOGTHROW(err3, Error)
+            << "Resource backend error report failed: "
+            << pysupport::formatCurrentException();
         }
     }
 }
