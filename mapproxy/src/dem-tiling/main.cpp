@@ -272,7 +272,6 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
     }
 
     math::Size2 size(samples + 1, samples + 1);
-    LOG(info4) << "Size: " << size;
 
     if (tileId.lod >= lodRange_.min) {
         // warp input dataset into tile
@@ -308,11 +307,6 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
                     (tileDs, geo::GeoDataset::Resampling::average, wo);
             }
         }());
-
-        if (!wri.overview) {
-            LOG(info4) << "scale: " << wri.truescale
-                       << ", full: " << (upscaling * wri.truescale);
-        }
 
         TiFlag::value_type baseFlags(TiFlag::mesh);
         if (!upscaling) {
