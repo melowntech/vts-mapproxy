@@ -65,6 +65,10 @@ set(mapproxy_BROWSER_SOURCES
 file_to_cpp(mapproxy_BROWSER_SOURCES
   browser2d::index_html
   browser2d/index.html)
+file_to_cpp(mapproxy_BROWSER_SOURCES
+  browser2d::index_js
+  browser2d/index.js)
+
 
 add_executable(mapproxy ${mapproxy_SOURCES} ${mapproxy_BROWSER_SOURCES})
 target_link_libraries(mapproxy ${MODULE_LIBRARIES})

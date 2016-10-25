@@ -8,107 +8,12 @@
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.1/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.0.1/dist/leaflet.js"></script>
+    <script src="index.js"></script>
 </head>
 <body style="width:100%;height:100%">
-    <div id="map" style="width:100%;height:100%;position:absolute;left:0px;top:0px"></div>
-
-    <script>
-      function loadBoundLayer(callback) {
-          var x = new XMLHttpRequest();
-          x.overrideMimeType("application/json");
-          x.open("GET", "boundlayer.json", true);
-          x.onreadystatechange = function () {
-              if ((x.readyState) == 4 && ((x.status == 200) || (x.status == 0)))
-              {
-                  callback(JSON.parse(x.responseText));
-              }
-          };
-          x.send(null);
-      }
-
-      function quadKey(x, y, z) {
-          var quadKey = [];
-          for (i = z - 1; i >= 0; --i) {
-              quadKey.push(((((y >> i) & 1) << 1) + ((x >> i) & 1)));
-          }
-          return quadKey.join('');
-      }
-
-      var BingLayer = L.TileLayer.extend({
-          getTileUrl: function (tilePoint) {
-              this._adjustTilePoint(tilePoint);
-              return L.Util.template(this._url, {
-                  quad: quadKey(tilePoint.x, tilePoint.y, this._getZoomForUrl())
-              });
-          }
-      });
-
-      var map = new L.Map("map");
-
-      loadBoundLayer(function (bl) {
-          var credits = bl["credits"];
-          var copyyear = "&copy; " + new Date().getFullYear() + " ";
-
-          var maxLod = 0;
-
-          var url = bl.url.replace(/{lod}/g, "{z}")
-              .replace(/{loclod}/g, "{z}")
-              .replace(/{locx}/g, "{x}")
-              .replace(/{locy}/g, "{y}")
-              .replace(/{alt\(([^,)]+)[^)]*\)}/g, "$1")
-              .replace(/{quad\([^)]*\)}/g, "{quad}");
-
-          var attribution = "";
-          var prefix = "";
-          for (var creditIndex in credits) {
-              var credit = credits[creditIndex];
-              attribution += prefix;
-              if (credit.copyrighted != false) {
-                  attribution += copyyear;
-              }
-              attribution += credit.notice;
-              prefix = ", ";
-          }
-
-          if (bl.lodRange[1] > maxLod) {
-              maxLod = bl.lodRange[1];
-          }
-
-          var layerGenerator = L.TileLayer;
-          if (url.includes("{quad}")) {
-              layerGenerator = BingLayer;
-          }
-
-          var tl = new layerGenerator(url, {
-              minZoom: bl.lodRange[0]
-              , maxZoom: bl.lodRange[1]
-              , attribution: attribution
-          });
-
-          var layers = {};
-          var overlays = {};
-          layers["map"] = tl;
-
-          if (bl.maskUrl) {
-              var murl = bl.maskUrl.replace(/{lod}/g, "{z}");
-
-              var mtl = new L.TileLayer(murl, {
-                  minZoom: bl.lodRange[0]
-                  , maxZoom: bl.lodRange[1]
-                  , attribution: attribution
-                  , opacity: 0.25
-              });
-
-              overlays["mask"] = mtl;
-          }
-
-          L.control.layers(layers, overlays).addTo(map);
-          map.addLayer(tl);
-
-          // TODO: set from view mapConfig position
-          map.setView(new L.LatLng(50, 15), maxLod);
-      });
-
-    </script>
+  <div id="map" style="width:100%;height:100%;position:absolute;left:0px;top:0px"></div>
+  <script>
+    startBrowser();
+  </script>
 </body>
 </html>

@@ -824,5 +824,28 @@
            "dataset": "windyty/clouds.conf",
            "format": "jpg"
         }
+    },
+
+    {
+        "comment": "Jenstejn 2014 ophoto",
+        "group": "melown",
+        "id": "jenstejn2014",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "ppspace": {
+                "lodRange": [16, 20]
+                , "tileRange": [[32594, 32287], [32596, 32288]]
+            }
+            , "melown2015": {
+                "lodRange": [19, 22]
+                , "tileRange": [[141710, 88729], [141712, 88731]]
+            }
+        },
+        "credits": ["citationtech"],
+        "definition": {
+           "dataset": "jenstejn.ppspace.tif",
+            "format":"jpg"
+        }
     }
 ]
