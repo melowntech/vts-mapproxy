@@ -35,32 +35,43 @@ var prepareTile = function(layer, coords, generator) {
     return generator(tile, size, maxCount);
 }
 
+function drawFrame(ctx, size, bottom, right) {
+    // draw grid
+    ctx.beginPath();
+    if (bottom) {
+        // last tile
+        ctx.moveTo(size.x, size.y);
+        ctx.lineTo(0, size.y);
+    } else {
+        ctx.moveTo(0, size.y);
+    }
+
+    ctx.lineTo(0, 0);
+    ctx.lineTo(size.x, 0);
+
+    if (right) {
+        // last tile
+        ctx.lineTo(size.x, size.y);
+    }
+    ctx.stroke();
+}
+
 var TileGridLayer = L.GridLayer.extend({
     createTile: function(coords) {
         return prepareTile(this, coords, function(tile, size, maxCount) {
             var ctx = tile.getContext('2d');
 
+            var bottom = (maxCount == (coords.y + 1));
+            var right = (maxCount == (coords.x + 1));
             ctx.save();
+            ctx.strokeStyle = "white";
+            drawFrame(ctx, size, bottom, right);
+            ctx.restore();
+
+            ctx.save();
+            ctx.strokeStyle = "black";
             ctx.setLineDash([5, 5]);
-
-            // draw grid
-            ctx.beginPath();
-            if (maxCount == (coords.y + 1)) {
-                // last tile
-                ctx.moveTo(size.x, size.y);
-                ctx.lineTo(0, size.y);
-            } else {
-                ctx.moveTo(0, size.y);
-            }
-
-            ctx.lineTo(0, 0);
-            ctx.lineTo(size.x, 0);
-
-            if (maxCount == (coords.x + 1)) {
-                // last tile
-                ctx.lineTo(size.x, size.y);
-            }
-            ctx.stroke();
+            drawFrame(ctx, size, bottom, right);
             ctx.restore();
 
             var scale = 4.0;
