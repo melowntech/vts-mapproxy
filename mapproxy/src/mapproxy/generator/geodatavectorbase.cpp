@@ -97,6 +97,13 @@ void buildDefinition(Json::Value &value
     value["format"] = boost::lexical_cast<std::string>(def.format);
     value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
+
+    if (def.introspectionSurface) {
+        auto &introspection(value["introspection"] = Json::objectValue);
+        auto &surface(introspection["surface"] = Json::objectValue);
+        surface["group"] = def.introspectionSurface->group;
+        surface["id"] = def.introspectionSurface->id;
+    }
 }
 
 void parseDefinition(GeodataVectorBase::Definition &def
@@ -134,6 +141,17 @@ void parseDefinition(GeodataVectorBase::Definition &def
 
     def.displaySize = boost::python::extract<int>(value["displaySize"]);
     def.styleUrl = py2utf8(value["styleUrl"]);
+
+    if (value.has_key("introspection")) {
+        boost::python::dict introspection(value["introspection"]);
+        if (introspection.has_key("surface")) {
+            boost::python::dict surface(introspection["surface"]);
+            Resource::Id rid;
+            rid.group = py2utf8(surface["group"]);
+            rid.id = py2utf8(surface["id"]);
+            def.introspectionSurface = rid;
+        }
+    }
 }
 
 } // namespace

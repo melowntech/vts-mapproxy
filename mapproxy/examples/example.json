@@ -847,5 +847,34 @@
            "dataset": "jenstejn.ppspace.tif",
             "format":"jpg"
         }
+    },
+
+    {
+        "comment": "Jenstejn 2014 dem",
+        "group": "melown",
+        "id": "jenstejn2014-dem",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "ppspace": {
+                "lodRange": [16, 20]
+                , "tileRange": [[32594, 32287], [32596, 32288]]
+            }
+            , "melown2015": {
+                "lodRange": [19, 22]
+                , "tileRange": [[141710, 88729], [141712, 88731]]
+            }
+        },
+        "credits": ["citationtech"],
+        "definition": {
+            "dataset": "jenstejn"
+            , "introspection": {
+                "tms": { "group": "melown", "id": "jenstejn2014" }
+                , "position" : ["obj", 472217.4412039614, 5555779.958086876
+                                , "float", 0
+                                , 0.0, -90.0, 0.0,
+                                188.2843111138791, 55.0]
+            }
+        }
     }
 ]

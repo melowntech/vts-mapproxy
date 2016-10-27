@@ -20,6 +20,8 @@
 #include "jsoncpp/as.hpp"
 
 #include "vts-libs/storage/fstreams.hpp"
+#include "vts-libs/registry/json.hpp"
+#include "vts-libs/registry/py.hpp"
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/tileset/config.hpp"
@@ -101,6 +103,22 @@ void parseDefinition(SurfaceDem::Definition &def, const Json::Value &value)
         def.heightcodingAlias = boost::in_place();
         Json::get(*def.heightcodingAlias, value, "heightcodingAlias");
     }
+
+    if (value.isMember("introspection")) {
+        const auto &introspection(value["introspection"]);
+        if (introspection.isMember("tms")) {
+            const auto &surface(introspection["tms"]);
+            Resource::Id rid;
+            Json::get(rid.group, surface, "group");
+            Json::get(rid.id, surface, "id");
+            def.introspectionTms = rid;
+        }
+
+        if (introspection.isMember("position")) {
+            def.introspectionPosition
+                = vr::positionFromJson(introspection["position"]);
+        }
+    }
 }
 
 void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
@@ -118,6 +136,18 @@ void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
     }
     if (def.heightcodingAlias) {
         value["heightcodingAlias"] = *def.heightcodingAlias;
+    }
+
+    if (def.introspectionTms || def.introspectionPosition) {
+        auto &introspection(value["introspection"] = Json::objectValue);
+        if (def.introspectionTms) {
+            auto &tms(introspection["tms"] = Json::objectValue);
+            tms["group"] = def.introspectionTms->group;
+            tms["id"] = def.introspectionTms->id;
+        }
+        if (def.introspectionPosition) {
+            introspection["position"] = vr::asJson(*def.introspectionPosition);
+        }
     }
 }
 
@@ -142,6 +172,23 @@ void parseDefinition(SurfaceDem::Definition &def
 
     if (value.has_key("heightcodingAlias")) {
         def.heightcodingAlias = py2utf8(value["heightcodingAlias"]);
+    }
+
+    if (value.has_key("introspection")) {
+        boost::python::dict introspection(value["introspection"]);
+        if (introspection.has_key("tms")) {
+            boost::python::dict tms(introspection["tms"]);
+            Resource::Id rid;
+            rid.group = py2utf8(tms["group"]);
+            rid.id = py2utf8(tms["id"]);
+            def.introspectionTms = rid;
+        }
+
+        if (introspection.has_key("position")) {
+            def.introspectionPosition = boost::in_place();
+            vr::fromPython(*def.introspectionPosition
+                           , introspection["position"]);
+        }
     }
 }
 
@@ -180,6 +227,15 @@ Changed SurfaceDem::Definition::changed_impl(const DefinitionBase &o) const
     if (dem != other.dem) { return Changed::yes; }
     if (mask != other.mask) { return Changed::yes; }
     if (textureLayerId != other.textureLayerId) { return Changed::yes; }
+
+    // introspection can safely change
+    if (introspectionTms != other.introspectionTms) {
+        return Changed::safely;
+    }
+
+    if (introspectionPosition != other.introspectionPosition) {
+        return Changed::safely;
+    }
 
     return Changed::no;
 }
@@ -276,22 +332,53 @@ void SurfaceDem::removeFromRegistry()
 
 vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
 {
+    vts::ExtraTileSetProperties extra;
+    if (definition_.introspectionTms) {
+        if (auto other = otherGenerator
+            (Resource::Generator::Type::tms
+             , addReferenceFrame(*definition_.introspectionTms
+                                 , referenceFrameId())))
+        {
+            // we have found tms resource, use it as a boundlayer
+            const auto otherId(definition_.introspectionTms->fullId());
+            const auto &otherResource(other->resource());
+            const auto resdiff(resolveRoot(resource(), otherResource));
+
+            const fs::path blPath
+                (prependRoot(fs::path(), otherResource, resdiff)
+                 / "boundlayer.json");
+
+            extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
+
+            extra.view.surfaces[id().fullId()]
+                = { vr::View::BoundLayerParams(otherId) };
+        };
+    }
+
+    if (definition_.introspectionPosition) {
+        extra.position = *definition_.introspectionPosition;
+    }
+
     auto mc(vts::mapConfig
-            (properties_, resource().registry, vts::ExtraTileSetProperties()
+            (properties_, resource().registry, extra
              , prependRoot(fs::path(), resource(), root)));
 
     // force 2d interface existence
     mc.surfaces.front().has2dInterface = true;
 
-    // look down
-    mc.position.orientation = { 0.0, -90.0, 0.0 };
+    if (!definition_.introspectionPosition) {
+        // no introspection position, generate some
 
-    // take Y size of reference frame's 3D extents extents
-    mc.position.verticalExtent
-        = math::size(referenceFrame().division.extents).height;
+        // look down
+        mc.position.orientation = { 0.0, -90.0, 0.0 };
 
-    // quite wide angle camera
-    mc.position.verticalFov = 90;
+        // take Y size of reference frame's 3D extents extents
+        mc.position.verticalExtent
+            = math::size(referenceFrame().division.extents).height;
+
+        // quite wide angle camera
+        mc.position.verticalFov = 55;
+    }
 
     return mc;
 }

@@ -11,6 +11,7 @@
 #include "../support/coverage.hpp"
 
 namespace vts = vadstena::vts;
+namespace vr = vadstena::registry;
 
 namespace generator {
 
@@ -25,6 +26,9 @@ public:
         boost::optional<boost::filesystem::path> mask;
         unsigned int textureLayerId;
         boost::optional<std::string> heightcodingAlias;
+
+        boost::optional<Resource::Id> introspectionTms;
+        boost::optional<vr::Position> introspectionPosition;
 
         Definition() : textureLayerId() {}
 
