@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.25) citationtech-wheezy; urgency=low
+
+  * Surface-dem introspection added.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 27 Oct 2016 16:02:53 +0200
+
 ctt-vts-mapproxy (0.24) citationtech-wheezy; urgency=low
 
   * Fixed logging. 
