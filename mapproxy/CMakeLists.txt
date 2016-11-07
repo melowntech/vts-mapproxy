@@ -28,8 +28,14 @@ find_package(CURL REQUIRED)
 find_package(magic REQUIRED)
 find_package(URIPARSER REQUIRED)
 
+# Protobuf: needed by mvt ogr driver
 find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})
+
+# Sqlite3: needed by mvt ogr driver (mbtiles support)
+find_package(Sqlite3 REQUIRED)
+link_directories(${Sqlite3_LIBRARY_DIRS})
+include_directories(${Sqlite3_INCLUDE_DIRS})
 
 find_package(OpenMesh 2.3.1 REQUIRED)
 include_directories(${OPENMESH_INCLUDE_DIR})
