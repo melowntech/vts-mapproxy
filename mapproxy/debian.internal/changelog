@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.29) citationtech-wheezy; urgency=low
+
+  * Fixed resource change check.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Mon, 07 Nov 2016 21:49:45 +0100
+
 ctt-vts-mapproxy (0.28) citationtech-wheezy; urgency=low
 
   * Fixed mvt/mbtiles.
