@@ -64,7 +64,7 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
     , dem_(absoluteDataset(definition_.dem.dataset + "/dem")
            , definition_.dem.geoidGrid)
     , effectiveGsdArea_(), effectiveGsdAreaComputed_(false)
-    , tileUrl_(definition_.dataset)
+    , tileFile_(definition_.dataset)
     , physicalSrs_
       (vr::system.srs(resource().referenceFrame->model.physicalSrs))
     , index_(resource().referenceFrame->metaBinaryOrder)
@@ -247,11 +247,12 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
         return;
     }
 
-    const auto tileUrl
-        (tileUrl_(vts::UrlTemplate::Vars
-                  (tileId, vts::local(nodeInfo.rootLod(), tileId))));
+    const auto tileFile
+        (absoluteDataset
+         (tileFile_(vts::UrlTemplate::Vars
+                    (tileId, vts::local(nodeInfo.rootLod(), tileId)))));
 
-    LOG(debug) << "Using geo file: <" << tileUrl << ">.";
+    LOG(debug) << "Using geo file: <" << tileFile << ">.";
 
     // combine all dem datasets and default/fallback dem dataset
     auto datasets(viewspec2datasets(fi.fileInfo.query, dem_));
@@ -265,7 +266,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     config.format = definition_.format;
 
     // heightcode data using warper's machinery
-    auto hc(arsenal.warper.heightcode(tileUrl, datasets.first, config, sink));
+    auto hc(arsenal.warper.heightcode(tileFile, datasets.first, config, sink));
 
     // force 1 hour max age if not all views from viewspec have been found
     boost::optional<long> maxAge;

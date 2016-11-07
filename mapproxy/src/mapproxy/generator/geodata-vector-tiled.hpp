@@ -38,7 +38,7 @@ private:
     double effectiveGsdArea_;
     bool effectiveGsdAreaComputed_;
 
-    vts::UrlTemplate tileUrl_;
+    vts::UrlTemplate tileFile_;
 
     const vr::Srs &physicalSrs_;
 

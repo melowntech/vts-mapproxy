@@ -877,4 +877,37 @@
             }
         }
     }
+
+    , {
+        "comment": "Policejni lampy",
+        "group": "melown",
+        "id": "lampy",
+        "type": "geodata",
+        "driver": "geodata-vector-tiled",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [11, 15],
+                "tileRange": [[552,677], [553,677]]
+            }
+            , "webmerc-projected": {
+                "lodRange": [10,14],
+                "tileRange": [[552,677], [553,677]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "lampy.mbtiles/{loclod}-{locx}-{locy}"
+            , "demDataset": "viewfinder"
+            , "geoidGrid": "egm96_15.gtx"
+            , "format": "geodataJson"
+            , "styleUrl": "http://cdn.melown.com/mario/store/melown2015/stylesheet/melown/mapzen-stylesheet"
+            , "displaySize": 256
+            , "layers": [ "roads" ]
+
+            , "introspection": {
+                "surface": { "group": "melown", "id": "viewfinder" }
+            }
+        }
+    }
+
 ]

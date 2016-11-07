@@ -11,6 +11,7 @@
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/global_fun.hpp>
 #include <boost/multi_index/mem_fun.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 #include "dbglog/dbglog.hpp"
 #include "utility/path.hpp"
@@ -22,6 +23,7 @@
 namespace fs = boost::filesystem;
 namespace asio = boost::asio;
 namespace bmi = boost::multi_index;
+namespace ba = boost::algorithm;
 
 namespace {
 
@@ -137,10 +139,22 @@ void Generator::mapConfig(std::ostream &os, ResourceRoot root)
     vts::saveMapConfig(mc, os);
 }
 
+namespace {
+
+bool isRemote(const std::string &path)
+{
+    return ((ba::istarts_with(path, "http:")
+             || ba::istarts_with(path, "https:")
+             || ba::istarts_with(path, "ftp:")));
+}
+
+} // namespace
+
 std::string Generator::absoluteDataset(const std::string &path)
     const
 {
-    // TODO: handle non-path resources (i.e. URL's)
+    // handle non-path resources (i.e. URL's)
+    if (isRemote(path)) { return path; }
     return absolute(path, config_.resourceRoot).string();
 }
 
@@ -148,6 +162,8 @@ boost::filesystem::path
 Generator::absoluteDataset(const boost::filesystem::path &path)
     const
 {
+    // handle non-path resources (i.e. URL's)
+    if (isRemote(path.string())) { return path; }
     return absolute(path, config_.resourceRoot);
 }
 
