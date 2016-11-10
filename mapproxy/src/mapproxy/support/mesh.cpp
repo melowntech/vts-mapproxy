@@ -144,7 +144,8 @@ void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
         << mesh.faces.size() << ".";
 
     // simplify with locked inner border
-    {
+
+    if (int(faceCount) < int(mesh.faces.size())) {
         // max edge is radius of tile divided by edges per side computed from
         // faces-per-tile
         double maxEdgeLength
@@ -158,13 +159,15 @@ void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
                           | geometry::SimplifyOption::PREVENTFACEFLIP)
                          .minAspectRatio(5)
                          .maxEdgeLength(maxEdgeLength));
-    }
 
-    LOG(info1)
-        << "Simplified mesh to " << mesh.faces.size()
-        << " faces (should be " << faceCount
-        << ", difference: " << (int(mesh.faces.size()) - int(faceCount))
-        << ").";
+        LOG(info1)
+            << "Simplified mesh to " << mesh.faces.size()
+            << " faces (should be " << faceCount
+            << ", difference: " << (int(mesh.faces.size()) - int(faceCount))
+            << ").";
+    } else {
+        LOG(info1) << "No need to simplify mesh.";
+    }
 }
 
 void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
