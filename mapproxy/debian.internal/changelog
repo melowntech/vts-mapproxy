@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.30) citationtech-wheezy; urgency=low
+
+  * Fixed gzipped meshes.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 15 Nov 2016 10:18:13 +0100
+
 ctt-vts-mapproxy (0.29) citationtech-wheezy; urgency=low
 
   * Fixed resource change check.
