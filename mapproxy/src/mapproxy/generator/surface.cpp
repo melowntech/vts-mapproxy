@@ -21,6 +21,7 @@
 #include "vts-libs/vts/types2d.hpp"
 #include "vts-libs/vts/2d.hpp"
 #include "vts-libs/vts/debug.hpp"
+#include "vts-libs/vts/mapconfig.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -97,10 +98,12 @@ Generator::Task SurfaceBase
             case vts::FileFlavor::debug: {
                 std::ostringstream os;
                 const auto debug
-                    (debugConfig(vts::meshTilesConfig
-                                 (properties_, vts::ExtraTileSetProperties()
-                                  , prependRoot(fs::path(), resource()
-                                                , ResourceRoot::none))));
+                    (vts::debugConfig
+                     (vts::meshTilesConfig
+                      (properties_, vts::ExtraTileSetProperties()
+                       , prependRoot(fs::path(), resource()
+                                     , ResourceRoot::none))
+                      , referenceFrameId()));
                 vts::saveDebug(os, debug);
                 sink.content(os.str(), fi.sinkFileInfo());
                 break;
