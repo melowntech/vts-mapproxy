@@ -44,6 +44,10 @@ struct EmptyDebugMask : Error {
     EmptyDebugMask(const std::string &message) : Error(message) {}
 };
 
+struct EmptyGeoData : Error {
+    EmptyGeoData(const std::string &message) : Error(message) {}
+};
+
 typedef http::NotFound NotFound;
 typedef http::ServiceUnavailable Unavailable;
 typedef http::InternalServerError InternalError;

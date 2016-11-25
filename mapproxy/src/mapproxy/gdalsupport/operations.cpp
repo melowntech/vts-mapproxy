@@ -309,8 +309,15 @@ VectorDataset openVectorDataset(const std::string &dataset
                          , nullptr, openOptions, nullptr));
 
     if (!ds) {
+        const auto code(::CPLGetLastErrorNo());
+        if (code == CPLE_OpenFailed) {
+            LOGTHROW(err2, EmptyGeoData)
+                << "No file found for " << dataset << ".";
+        }
+
         LOGTHROW(err2, std::runtime_error)
-            << "Failed to open dataset " << dataset << ".";
+            << "Failed to open dataset " << dataset << " ("
+            << ::CPLGetLastErrorNo() << ").";
     }
 
     return VectorDataset(static_cast< ::GDALDataset*>(ds)

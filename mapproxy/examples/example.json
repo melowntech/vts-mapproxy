@@ -887,11 +887,11 @@
         "referenceFrames": {
             "melown2015": {
                 "lodRange": [11, 15],
-                "tileRange": [[552,677], [553,677]]
+                "tileRange": [[552,346], [553,346]]
             }
             , "webmerc-projected": {
                 "lodRange": [10,14],
-                "tileRange": [[552,677], [553,677]]
+                "tileRange": [[552,346], [553,346]]
             }
         },
         "credits": [],
@@ -900,7 +900,7 @@
             , "demDataset": "viewfinder"
             , "geoidGrid": "egm96_15.gtx"
             , "format": "geodataJson"
-            , "styleUrl": "http://cdn.melown.com/mario/store/melown2015/stylesheet/melown/mapzen-stylesheet"
+            , "styleUrl": "https://cdn.melown.com/mario/store/melown2015/stylesheet/policie-cr/body-stylesheet?1"
             , "displaySize": 256
             , "layers": [ "roads" ]
 
