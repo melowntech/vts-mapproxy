@@ -314,7 +314,10 @@ GeodataVectorBase::viewspec2datasets(const std::string &query
             // url decode values
             for (auto &id : ids) { id = utility::urlDecode(id); }
 
-            if ((ids.size() == 1) && (ids.front() == "{viewspec}")) {
+            if ((ids.size() == 1)
+                && ((ids.front() == "{viewspec}")
+                    || (ids.front() == "viewspec")))
+            {
                 // viewspec not expanded, treate as empty
                 LOG(info1) << "Viewspec not expanded, ignoring.";
                 return empty();
