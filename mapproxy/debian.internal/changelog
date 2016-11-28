@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.32) citationtech-wheezy; urgency=low
+
+  * both viewspec={viewspec} and viewspec=viewspec both mean no viewspec
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Mon, 28 Nov 2016 12:07:30 +0100
+
 ctt-vts-mapproxy (0.31) citationtech-wheezy; urgency=low
 
   * geodata: no such underlying ogr tile file -> {}
