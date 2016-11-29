@@ -238,6 +238,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     auto flags(index_.tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
         sink.error(utility::makeError<NotFound>("No geodata for this tile."));
+        return;
     }
 
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
