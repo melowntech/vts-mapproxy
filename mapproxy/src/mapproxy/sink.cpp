@@ -131,7 +131,7 @@ void Sink::error(const std::exception_ptr &exc)
                 .setFileClass(FileClass::data)
                 , false);
     } catch (const EmptyGeoData &e) {
-        // special "error" -> send "empty" image
+        // special "error" -> send "empty" geodata
         content("{}", Sink::FileInfo("application/json; charset=utf-8")
                 .setFileClass(FileClass::data));
     } catch (...) {

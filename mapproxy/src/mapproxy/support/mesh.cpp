@@ -7,6 +7,7 @@
 #include "vts-libs/vts/csconvertor.hpp"
 
 #include "./mesh.hpp"
+#include "./srs.hpp"
 
 namespace vr = vadstena::registry;
 
@@ -129,10 +130,42 @@ std::pair<double, double> meshArea(const geometry::Mesh &mesh)
     return res;
 }
 
+double meshArea(const geometry::Mesh &mesh, const math::Points3d &alt)
+{
+    double area(0.0);
+
+    for (const auto &face : mesh.faces) {
+        auto a(alt[face.a]);
+        auto b(alt[face.b]);
+        auto c(alt[face.c]);
+
+        // area in 3D
+        area += vts::triangleArea(a, b, c);
+    }
+
+    return area;
+}
+
+inline math::Matrix4 geo2normalized(const math::Extents3 &extents)
+{
+    const math::Point3 midpoint(math::center(extents));
+
+    math::Matrix4 trafo(boost::numeric::ublas::identity_matrix<double>(4));
+    trafo(0, 0) = (2.0 / (extents.ur[0] - extents.ll[0]));
+    trafo(1, 1) = (2.0 / (extents.ur[1] - extents.ll[1]));
+    trafo(2, 2) = (2.0 / (extents.ur[2] - extents.ll[2]));
+    trafo(0, 3) = -midpoint[0] * trafo(0, 0);
+    trafo(1, 3) = -midpoint[1] * trafo(1, 1);
+    trafo(2, 3) = -midpoint[2] * trafo(2, 2);
+
+    return trafo;
+}
+
 } // namespace
 
 void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
-                  , const TileFacesCalculator &tileFacesCalculator)
+                  , const TileFacesCalculator &tileFacesCalculator
+                  , const boost::optional<std::string> &geoidGrid)
 {
     const auto ts(math::size(nodeInfo.extents()));
 
@@ -146,11 +179,23 @@ void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
     // simplify with locked inner border
 
     if (int(faceCount) < int(mesh.faces.size())) {
+        // convert all vertives to physical space
+        math::Points3d physv;
+        {
+            const auto extents(nodeInfo.extents());
+            const auto l2g(geo::local2geo(extents));
+            const auto conv(sds2phys(nodeInfo, geoidGrid));
+            const auto g2n
+                (geo2normalized(nodeInfo.referenceFrame().division.extents));
+            for (const auto &v : mesh.vertices) {
+                physv.push_back(transform(g2n, conv(transform(l2g, v))));
+            }
+        }
+
         // max edge is radius of tile divided by edges per side computed from
         // faces-per-tile
-        double maxEdgeLength
-            (std::sqrt(math::sqr(ts.width) + math::sqr(ts.height))
-             / std::sqrt(faceCount / 2.0));
+        const auto maxEdgeLength
+            (std::sqrt((2 * area.second) / (faceCount / 2.0)));
 
         mesh = *simplify(mesh, faceCount
                          , geometry::SimplifyOptions
@@ -158,7 +203,9 @@ void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
                           | geometry::SimplifyOption::CORNERS
                           | geometry::SimplifyOption::PREVENTFACEFLIP)
                          .minAspectRatio(5)
-                         .maxEdgeLength(maxEdgeLength));
+                         .maxEdgeLength(maxEdgeLength)
+                         .alternativeVertices(&physv)
+                         );
 
         LOG(info1)
             << "Simplified mesh to " << mesh.faces.size()

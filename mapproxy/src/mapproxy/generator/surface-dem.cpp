@@ -525,7 +525,7 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
     auto &lm(std::get<0>(meshInfo));
 
     // simplify
-    simplifyMesh(lm, nodeInfo, tileFacesCalculator);
+    simplifyMesh(lm, nodeInfo, tileFacesCalculator, dem_.geoidGrid);
 
     // and add skirt
     addSkirt(lm, nodeInfo);

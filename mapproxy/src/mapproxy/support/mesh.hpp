@@ -38,7 +38,8 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
              , const HeightSampler &heights = HeightSampler());
 
 void simplifyMesh(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo
-                  , const TileFacesCalculator &tileFacesCalculator);
+                  , const TileFacesCalculator &tileFacesCalculator
+                  , const boost::optional<std::string> &geoidGrid);
 
 void meshCoverageMask(vts::Mesh::CoverageMask &mask, const geometry::Mesh &mesh
                       , const vts::NodeInfo &nodeInfo, bool fullyCovered);

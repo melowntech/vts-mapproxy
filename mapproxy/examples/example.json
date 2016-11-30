@@ -886,12 +886,12 @@
         "driver": "geodata-vector-tiled",
         "referenceFrames": {
             "melown2015": {
-                "lodRange": [11, 15],
-                "tileRange": [[552,346], [553,346]]
+                "lodRange": [11, 21],
+                "tileRange": [[552,346], [553,347]]
             }
             , "webmerc-projected": {
-                "lodRange": [10,14],
-                "tileRange": [[552,346], [553,346]]
+                "lodRange": [10,20],
+                "tileRange": [[552,346], [553,347]]
             }
         },
         "credits": [],
@@ -910,4 +910,93 @@
         }
     }
 
+    , {
+        "comment": "viewfinder from top level",
+        "group": "melown",
+        "id": "viewfinder1",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1,1],
+                "tileRange": [[0,0], [1,1]]
+            }
+            , "webmerc-projected": {
+                "lodRange": [0,0],
+                "tileRange": [[0,0], [0,0]]
+            }
+        },
+        "credits": ["jonathan"],
+        "definition": {
+            "dataset": "viewfinder",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    }
+
+    , {
+        "comment": "viewfinder from top level",
+        "group": "melown",
+        "id": "viewfinder2",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [1,21],
+                "tileRange": [[0,0], [1,1]]
+            }
+            , "webmerc-projected": {
+                "lodRange": [0,20],
+                "tileRange": [[0,0], [0,0]]
+            }
+        },
+        "credits": ["jonathan"],
+        "definition": {
+            "dataset": "viewfinder",
+            "geoidGrid": "egm96_15.gtx",
+            "textureLayerId": 120
+        }
+    }
+
+    ,{
+        "comment": "Blue Marble NG",
+        "group": "melown",
+        "id": "bmng0",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0, 14],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": ["usgs"],
+        "definition": {
+           "dataset": "melown/bmng",
+           "format":"jpg"
+        }
+    }
+
+    , {
+        "comment": "viewfinder from top level",
+        "group": "melown",
+        "id": "viewfinder3",
+        "type": "surface",
+        "driver": "surface-dem",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0,0],
+                "tileRange": [[0,0], [0,0]]
+            }
+        },
+        "credits": ["jonathan"],
+        "definition": {
+            "dataset": "viewfinder",
+            "geoidGrid": "egm96_15.gtx"
+            , "textureLayerId" : 120
+            , "introspection": {
+                "tms": { "group": "melown", "id": "bmng0" }
+            }
+        }
+    }
 ]
