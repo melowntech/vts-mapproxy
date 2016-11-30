@@ -1,3 +1,10 @@
+ctt-vts-mapproxy (0.33) citationtech-wheezy; urgency=low
+
+  * Mesh simplification computes error in physical space.
+  * Fixed out-of-bounds error handling in vector geodata.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 30 Nov 2016 15:13:29 +0100
+
 ctt-vts-mapproxy (0.32) citationtech-wheezy; urgency=low
 
   * both viewspec={viewspec} and viewspec=viewspec both mean no viewspec
