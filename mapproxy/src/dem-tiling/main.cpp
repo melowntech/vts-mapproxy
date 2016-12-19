@@ -330,8 +330,9 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
         case vts::NodeInfo::CoveredArea::whole: {
             // fully covered by dataset and by reference frame definition
 
-            if (!wri.overview) {
-                // warped using original dataset, no holes -> always without
+            if (!wri.overview && wri.truescale >= 1.0) {
+                // warped using original dataset and no downscaling 
+                // which could possibly fill holes, no holes -> always without
                 // holes -> set whole subtree to watertight mesh
 
                 fullSubtree();
