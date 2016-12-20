@@ -999,4 +999,31 @@
             }
         }
     }
+
+    , {
+        "comment": "Tomášův běh",
+        "group": "tomas.slavkovsky",
+        "id": "baba",
+        "type": "geodata",
+        "driver": "geodata-vector",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0, 0],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": [],
+        "definition": {
+            "dataset": "tomas.slavkovsky/baba.kml"
+            , "demDataset": "viewfinder"
+            , "geoidGrid": "egm96_15.gtx"
+            , "format": "geodataJson"
+            , "styleUrl": "https://cdn.melown.com/mario/store/melown2015/stylesheet/obec-tetin/tetin-voda"
+            , "displaySize": 256
+
+            , "introspection": {
+                "surface": { "group": "melown", "id": "viewfinder" }
+            }
+        }
+    }
 ]

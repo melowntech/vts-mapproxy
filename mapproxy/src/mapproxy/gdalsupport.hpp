@@ -136,6 +136,7 @@ public:
     heightcode(const std::string &vectorDs
                , const DemDataset::list &rasterDs
                , const geo::heightcoding::Config &config
+               , const boost::optional<std::string> &vectorGeoidGrid
                , Aborter &aborter);
 
     /** Navigation tile info.

@@ -6,10 +6,13 @@
 
 #include <opencv2/highgui/highgui.hpp>
 
+#include <ogrsf_frmts.h>
+
 #include "imgproc/rastermask/cvmat.hpp"
 
 #include "geo/verticaladjuster.hpp"
 #include "geo/csconvertor.hpp"
+#include "geo/srs.hpp"
 
 #include "vts-libs/vts/opencv/navtile.hpp"
 
@@ -366,11 +369,20 @@ GdalWarper::Heightcoded*
 heightcode(ManagedBuffer &mb, const VectorDataset &vds
            , std::vector<const geo::GeoDataset*> rds
            , geo::heightcoding::Config config
-           , const boost::optional<std::string> &geoidGrid = boost::none)
+           , const boost::optional<std::string> &geoidGrid = boost::none
+           , const boost::optional<std::string> &vectorGeoidGrid = boost::none)
 {
     if (geoidGrid) {
         // apply geoid grid to SRS of rasterDs and set to rasterDsSrs
         config.rasterDsSrs = geo::setGeoid(rds.back()->srs(), *geoidGrid);
+    }
+
+    if (vectorGeoidGrid && vds->GetLayerCount()) {
+        // set vertical srs
+        config.vectorDsSrs
+            = geo::SrsDefinition::fromReference
+            (geo::setGeoid(*vds->GetLayer(0)->GetSpatialRef()
+                           , *vectorGeoidGrid));
     }
 
     std::ostringstream os;
@@ -518,7 +530,8 @@ GdalWarper::Heightcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
            , const DemDataset::list &rasterDs
-           , geo::heightcoding::Config config)
+           , geo::heightcoding::Config config
+           , const boost::optional<std::string> &vectorGeoidGrid)
 {
     std::vector<const geo::GeoDataset*> rasterDsStack;
     for (const auto &ds : rasterDs) {
@@ -527,7 +540,8 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
 
     return heightcode(mb, openVectorDataset(vectorDs, config)
                       , rasterDsStack
-                      , config, rasterDs.back().geoidGrid);
+                      , config, rasterDs.back().geoidGrid
+                      , vectorGeoidGrid);
 }
 
 GdalWarper::Heightcoded*

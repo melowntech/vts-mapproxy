@@ -12,7 +12,8 @@ GdalWarper::Heightcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const std::string &vectorDs
            , const DemDataset::list &rasterDs
-           , geo::heightcoding::Config config);
+           , geo::heightcoding::Config config
+           , const boost::optional<std::string> &vectorGeoidGrid);
 
 GdalWarper::Heightcoded*
 heightcode(DatasetCache &cache, ManagedBuffer &mb

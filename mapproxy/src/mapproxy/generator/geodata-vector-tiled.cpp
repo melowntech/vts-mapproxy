@@ -267,7 +267,9 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     config.format = definition_.format;
 
     // heightcode data using warper's machinery
-    auto hc(arsenal.warper.heightcode(tileFile, datasets.first, config, sink));
+    auto hc(arsenal.warper.heightcode
+            (tileFile, datasets.first, config, dem_.geoidGrid
+             , sink));
 
     // force 1 hour max age if not all views from viewspec have been found
     boost::optional<long> maxAge;

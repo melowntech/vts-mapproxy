@@ -70,12 +70,13 @@ public:
     ShRequest(const std::string &vectorDs
               , const DemDataset::list &rasterDs
               , const geo::heightcoding::Config &config
+              , const boost::optional<std::string> &vectorGeoidGrid
               , ManagedBuffer &sm)
         : sm_(sm)
         , raster_()
         , heightcode_(sm.construct<ShHeightCode>
                       (bi::anonymous_instance)
-                      (vectorDs, rasterDs, config, sm, this))
+                      (vectorDs, rasterDs, config, vectorGeoidGrid, sm, this))
         , navHeightcode_()
         , done_(false)
         , error_(sm.get_allocator<char>())
@@ -138,11 +139,12 @@ public:
     static pointer create(const std::string &vectorDs
                           , const DemDataset::list &rasterDs
                           , const geo::heightcoding::Config &config
+                          , const boost::optional<std::string> &vectorGeoidGrid
                           , ManagedBuffer &mb)
     {
         return pointer(mb.construct<ShRequest>
                        (bi::anonymous_instance)
-                       (vectorDs, rasterDs, config, mb)
+                       (vectorDs, rasterDs, config, vectorGeoidGrid, mb)
                        , mb.get_allocator<void>()
                        , mb.get_deleter<ShRequest>());
     }
@@ -193,7 +195,8 @@ void ShRequest::process(bi::interprocess_mutex &mutex
             (mutex, ::heightcode(cache, sm_
                                  , heightcode_->vectorDs()
                                  , heightcode_->rasterDs()
-                                 , heightcode_->config()));
+                                 , heightcode_->config()
+                                 , heightcode_->vectorGeoidGrid()));
         return;
     }
 
@@ -437,6 +440,7 @@ public:
     heightcode(const std::string &vectorDs
                , const DemDataset::list &rasterDs
                , const geo::heightcoding::Config &config
+               , const boost::optional<std::string> &vectorGeoidGrid
                , Aborter &aborter);
 
     Heightcoded::pointer
@@ -495,9 +499,11 @@ GdalWarper::Heightcoded::pointer
 GdalWarper::heightcode(const std::string &vectorDs
                        , const DemDataset::list &rasterDs
                        , const geo::heightcoding::Config &config
+                       , const boost::optional<std::string> &vectorGeoidGrid
                        , Aborter &aborter)
 {
-    return detail().heightcode(vectorDs, rasterDs, config, aborter);
+    return detail().heightcode(vectorDs, rasterDs, config, vectorGeoidGrid
+                               , aborter);
 }
 
 GdalWarper::Heightcoded::pointer
@@ -860,15 +866,16 @@ GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
     return shReq->getRaster(lock);
 }
 
-GdalWarper::Heightcoded::pointer
-GdalWarper::Detail::heightcode(const std::string &vectorDs
-                               , const DemDataset::list &rasterDs
-                               , const geo::heightcoding::Config &config
-                               , Aborter &aborter)
+GdalWarper::Heightcoded::pointer GdalWarper::Detail
+::heightcode(const std::string &vectorDs
+             , const DemDataset::list &rasterDs
+             , const geo::heightcoding::Config &config
+             , const boost::optional<std::string> &vectorGeoidGrid
+             , Aborter &aborter)
 {
     Lock lock(mutex());
     ShRequest::pointer shReq
-        (ShRequest::create(vectorDs, rasterDs, config, mb_));
+        (ShRequest::create(vectorDs, rasterDs, config, vectorGeoidGrid, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 

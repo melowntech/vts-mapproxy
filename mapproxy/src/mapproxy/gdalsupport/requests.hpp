@@ -82,6 +82,7 @@ public:
     ShHeightCode(const std::string &vectorDs
                  , const DemDataset::list &rasterDs
                  , const geo::heightcoding::Config &config
+                 , const boost::optional<std::string> &vectorGeoidGrid
                  , ManagedBuffer &sm, ShRequestBase *owner);
 
     ~ShHeightCode();
@@ -91,6 +92,8 @@ public:
     DemDataset::list rasterDs() const;
 
     geo::heightcoding::Config config() const;
+
+    boost::optional<std::string> vectorGeoidGrid() const;
 
     /** Steals response.
      */
@@ -105,7 +108,7 @@ private:
     String vectorDs_;
     ShDemDatasetList rasterDs_;
     ShHeightCodeConfig config_;
-    String geoidGrid_;
+    String vectorGeoidGrid_;
 
     // response memory block
     GdalWarper::Heightcoded *response_;
