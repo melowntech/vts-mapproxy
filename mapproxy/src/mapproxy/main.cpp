@@ -358,7 +358,7 @@ int Daemon::run()
     try {
         while (Service::isRunning()) {
             gdalWarper_->housekeeping();
-            ::usleep(500000);
+            ::usleep(100000);
         }
     } catch (AbandonAll) {
         return EXIT_FAILURE;
