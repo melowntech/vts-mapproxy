@@ -57,6 +57,7 @@ private:
     fs::path output_;
     std::string referenceFrame_;
     vts::LodRange lodRange_;
+    vts::TileRange tileRange_;
     int extentsSampling_;
     int tileSampling_;
 
@@ -81,6 +82,8 @@ void DemTiling::configuration(po::options_description &cmdline
          , "Tiling reference frame.")
         ("lodRange", po::value(&lodRange_)->required()
          , "Lod range where content is generated.")
+        ("tileRange", po::value(&tileRange_)->required()
+         , "Tile range at min lod where content is generated.")
         ("extentsSampling", po::value(&extentsSampling_)
          ->default_value(extentsSampling_)
          , "Nuber of squares to break extents into when converting "
@@ -122,6 +125,7 @@ void DemTiling::configure(const po::variables_map &vars)
         << "\n\toutput = " << output_
         << "\n\treferenceFrame = " << referenceFrame_
         << "\n\tlodRange = " << lodRange_
+        << "\n\ttileRange = " << tileRange_
         << "\n"
         ;
 }
@@ -159,8 +163,8 @@ class TreeWalker {
 public:
     TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                , const vts::NodeInfo &root
-               , vts::LodRange lodRange, int tileSampling
-               , bool parallel, bool forceWatertight);
+               , vts::LodRange lodRange, vts::TileRange tileRange
+               , int tileSampling, bool parallel, bool forceWatertight);
 
 private:
     void process(const vts::NodeInfo &node, double upscaling = 0.0);
@@ -180,6 +184,7 @@ private:
     const fs::path dataset_;
     vts::TileIndex &ti_;
     vts::LodRange lodRange_;
+    std::vector<vts::TileRange> tileRangeAtLod_;
     int tileSampling_;
     geo::SrsDefinition srs_;
 
@@ -191,11 +196,17 @@ private:
 
 TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                        , const vts::NodeInfo &root, vts::LodRange lodRange
+                       , vts::TileRange tileRange
                        , int tileSampling, bool parallel, bool forceWatertight)
     : dataset_(dataset), ti_(ti), lodRange_(lodRange)
+    , tileRangeAtLod_(std::vector<vts::TileRange>(lodRange.max + 1))
     , tileSampling_(tileSampling), srs_(root.srsDef())
     , parallel_(parallel), forceWatertight_(forceWatertight)
 {
+    for (int lod(0); lod <= lodRange.max; ++lod){
+        tileRangeAtLod_[lod] = vts::shiftRange(lodRange.min, tileRange, lod);
+    }
+
     if (parallel_) {
         UTILITY_OMP(parallel)
             UTILITY_OMP(single)
@@ -272,6 +283,13 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
     }
 
     math::Size2 size(samples + 1, samples + 1);
+
+    if (!inside( tileRangeAtLod_[tileId.lod]
+               , vts::TileRange::point_type(tileId.x, tileId.y)))
+    {
+        // outside defined tile range
+        return;
+    }
 
     if (tileId.lod >= lodRange_.min) {
         // warp input dataset into tile
@@ -418,7 +436,7 @@ int DemTiling::run()
 
     vts::TileIndex ti;
 
-    TreeWalker(ti, dataset_, vts::NodeInfo(rf), lodRange_
+    TreeWalker(ti, dataset_, vts::NodeInfo(rf), lodRange_, tileRange_
                , tileSampling_, parallel_, forceWatertight_);
 
     LOG(info3) << "Saving generated tile index into " << output_ << ".";
