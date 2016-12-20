@@ -1,3 +1,10 @@
+ctt-vts-mapproxy (0.34) citationtech-wheezy; urgency=low
+
+  * Using updated lib/service: better ctrl socket configuration
+  * Shorter isRunning polling
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 20 Dec 2016 13:55:01 +0100
+
 ctt-vts-mapproxy (0.33) citationtech-wheezy; urgency=low
 
   * Mesh simplification computes error in physical space.
