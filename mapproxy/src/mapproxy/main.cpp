@@ -349,6 +349,9 @@ bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
         generators_->update();
         os << "resource updater notified\n";
         return true;
+    } else if (cmd.cmd == "help") {
+        os << "update-resources  schedule immediate resource update\n"
+            ;
     }
     return false;
 }
