@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.35) citationtech-wheezy; urgency=low
+
+  * Added required tileRange to mapproxy-dem-tiling. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Tue, 20 Dec 2016 18:32:23 +0100
+
 ctt-vts-mapproxy (0.34) citationtech-wheezy; urgency=low
 
   * Using updated lib/service: better ctrl socket configuration
