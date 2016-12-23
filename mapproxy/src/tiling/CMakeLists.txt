@@ -8,11 +8,11 @@ set(dem-tiling_SOURCES
   main.cpp
   )
 
-add_executable(mapproxy-dem-tiling ${dem-tiling_SOURCES})
-target_link_libraries(mapproxy-dem-tiling ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-dem-tiling ${MODULE_DEFINITIONS})
-buildsys_binary(mapproxy-dem-tiling)
-set_target_version(mapproxy-dem-tiling ${mapproxy_VERSION})
+add_executable(mapproxy-tiling ${dem-tiling_SOURCES})
+target_link_libraries(mapproxy-tiling ${MODULE_LIBRARIES})
+buildsys_target_compile_definitions(mapproxy-tiling ${MODULE_DEFINITIONS})
+buildsys_binary(mapproxy-tiling)
+set_target_version(mapproxy-tiling ${mapproxy_VERSION})
 
 set(sub-tiling_SOURCES
   sub-tiling.cpp
@@ -29,5 +29,5 @@ set_target_version(mapproxy-sub-tiling ${mapproxy_VERSION})
 # ------------------------------------------------------------------------
 
 # binaries
-install(TARGETS mapproxy-dem-tiling RUNTIME DESTINATION bin
+install(TARGETS mapproxy-tiling RUNTIME DESTINATION bin
   COMPONENT main)

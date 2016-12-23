@@ -1025,5 +1025,45 @@
                 "surface": { "group": "melown", "id": "viewfinder" }
             }
         }
+    },
+
+    {
+        "comment" : "",
+        "credits" : [],
+        "definition" : {
+            "dataset" : "carlo/ophoto",
+            "format" : "jpg"
+        },
+        "driver" : "tms-raster",
+        "group" : "melown",
+        "id" : "carlo-tex",
+        "referenceFrames" : {
+            "melown2015" : {
+                "lodRange" : [ 8, 21 ],
+                "tileRange" :[ [ 43, 77 ], [ 43, 77 ] ]
+            }
+        },
+        "registry" : {},
+        "type" : "tms"
+    },
+
+    {
+        "comment" : "",
+        "credits" : [],
+        "definition" : {
+            "dataset" : "carlo",
+            "format" : "jpg"
+        },
+        "driver" : "tms-raster",
+        "group" : "melown",
+        "id" : "carlo.index",
+        "referenceFrames" : {
+            "melown2015" : {
+                "lodRange" : [ 8, 21 ],
+                "tileRange" :[ [ 43, 77 ], [ 43, 77 ] ]
+            }
+        },
+        "registry" : {},
+        "type" : "tms"
     }
 ]
