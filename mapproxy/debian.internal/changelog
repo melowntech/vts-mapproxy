@@ -1,3 +1,11 @@
+ctt-vts-mapproxy (0.37) citationtech-wheezy; urgency=low
+
+  * Added complex raster dataset support.
+  * mapproxy-dem-tiling renamed to mapproxy-tiling
+  * mapproxy-tiling works for dems and ophotos
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Fri, 23 Dec 2016 15:38:02 +0100
+
 ctt-vts-mapproxy (0.36) citationtech-wheezy; urgency=low
 
   * Using updated ctrl support.
