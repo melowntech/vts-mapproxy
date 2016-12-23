@@ -1,6 +1,8 @@
 #ifndef mapproxy_generator_tms_raster_hpp_included_
 #define mapproxy_generator_tms_raster_hpp_included_
 
+#include "vts-libs/vts/tileindex.hpp"
+
 #include "../generator.hpp"
 
 namespace generator {
@@ -90,6 +92,8 @@ private:
     const Definition &definition_;
 
     bool hasMetatiles_;
+
+    boost::optional<vts::TileIndex> index_;
 };
 
 inline TmsRaster::DatasetDesc TmsRaster::dataset() const {

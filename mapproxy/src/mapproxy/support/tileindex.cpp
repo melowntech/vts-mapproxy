@@ -3,7 +3,7 @@
 
 typedef vts::TileIndex::Flag TiFlag;
 
-void prepareTileIndex(vts::tileset::Index &index
+void prepareTileIndex(vts::TileIndex &index
                       , const boost::filesystem::path &tilesPath
                       , const Resource &resource
                       , bool navtiles
@@ -14,7 +14,7 @@ void prepareTileIndex(vts::tileset::Index &index
     datasetTiles.load(tilesPath);
 
     // grab and reset tile index
-    auto &ti(index.tileIndex);
+    auto &ti(index);
 
     // clean tile index
     ti = {};

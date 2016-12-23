@@ -115,9 +115,6 @@ void DemTiling::configure(const po::variables_map &vars)
         dataset_ = input_ / "dem";
     } else if (exists(input_ / "ophoto")) {
         dataset_ = input_ / "ophoto";
-    } else {
-        LOGTHROW(err3, std::runtime_error)
-            << "No dataset (dem, ophoto) found in " << input_ << ".";
     }
 
     if (vars.count("output")) {

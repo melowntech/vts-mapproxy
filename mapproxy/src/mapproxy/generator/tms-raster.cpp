@@ -9,15 +9,18 @@
 #include "geo/geodataset.hpp"
 
 #include "imgproc/rastermask/cvmat.hpp"
+#include "imgproc/png.hpp"
 
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
+#include "vts-libs/vts/qtree-rasterize.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
+#include "../support/tileindex.hpp"
 
 #include "./tms-raster.hpp"
 #include "./factory.hpp"
@@ -25,6 +28,8 @@
 
 #include "browser2d/index.html.hpp"
 
+namespace fs = boost::filesystem;
+namespace bgil = boost::gil;
 namespace vr = vadstena::registry;
 
 namespace generator {
@@ -150,17 +155,57 @@ TmsRaster::TmsRaster(const Params &params)
     , definition_(resource().definition<Definition>())
     , hasMetatiles_(false)
 {
+    const auto indexPath(root() / "tileset.index");
+    if (fs::exists(indexPath)) {
+        index_ = boost::in_place();
+        index_->load(indexPath);
+        hasMetatiles_ = true;
+        makeReady();
+        return;
+    }
+
+    // not seen or index-less
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
 TmsRaster::DatasetDesc TmsRaster::dataset_impl() const
 {
+    if (index_) {
+        return { definition_.dataset + "/ophoto" };
+    }
+
     return { definition_.dataset };
 }
 
 void TmsRaster::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
+
+    if (fs::exists(absoluteDataset(definition_.dataset + "/ophoto"))) {
+        // complex dataset directory
+        // alwas with metatiles
+        hasMetatiles_ = true;
+
+        // try to open
+        geo::GeoDataset::open
+            (absoluteDataset(definition_.dataset + "/ophoto"));
+
+        const auto &r(resource());
+
+        // TODO: use mask if provided; must be in new format
+
+        index_ = boost::in_place();
+        prepareTileIndex(*index_
+                         , (absoluteDataset(definition_.dataset)
+                            + "/tiling." + r.id.referenceFrame)
+                         , r);
+
+        index_->save(root() / "tileset.index");
+
+        // done
+        makeReady();
+        return;
+   }
 
     // try to open datasets
     auto ds(geo::GeoDataset::open(absoluteDataset(dataset().path)));
@@ -338,6 +383,11 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
         return;
     }
 
+    if (index_ && !vts::TileIndex::Flag::isReal(index_->get(tileId))) {
+        sink.error(utility::makeError<EmptyImage>("No valid data."));
+        return;
+    }
+
     auto ds(dataset());
 
     auto tile(arsenal.warper.warp
@@ -384,6 +434,11 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
         return;
     }
 
+    if (index_ && !vts::TileIndex::Flag::isReal(index_->get(tileId))) {
+        sink.error(utility::makeError<EmptyImage>("No valid data."));
+        return;
+    }
+
     // get dataset
     auto ds(dataset());
 
@@ -422,6 +477,42 @@ namespace MetaFlags {
     constexpr std::uint8_t unavailable(0x00);
 }
 
+namespace {
+
+void meta2d(const vts::TileIndex &tileIndex, const vts::TileId &tileId
+            , const TmsFileInfo &fi, Sink &sink)
+{
+    bgil::gray8_image_t out(Constants::RasterMetatileSize.width
+                            , Constants::RasterMetatileSize.height
+                            , bgil::gray8_pixel_t(0x00), 0);
+    auto outView(view(out));
+
+    if (const auto *tree = tileIndex.tree(tileId.lod)) {
+        const auto parentId
+            (vts::parent(tileId, Constants::RasterMetatileBinaryOrder));
+
+        rasterize(*tree, parentId.lod, parentId.x, parentId.y
+                  , outView, [&](vts::QTree::value_type flags) -> std::uint8_t
+        {
+            std::uint8_t out(0);
+
+            if (flags & vts::TileIndex::Flag::mesh) {
+                out |= MetaFlags::available;
+
+                if (flags & vts::TileIndex::Flag::watertight) {
+                    out |= MetaFlags::watertight;
+                }
+            }
+
+            return out;
+        });
+    }
+
+    sink.content(imgproc::png::serialize(out, 9), fi.sinkFileInfo());
+}
+
+} // namespace
+
 void TmsRaster::generateMetatile(const vts::TileId &tileId
                                  , const TmsFileInfo &fi
                                  , Sink &sink
@@ -438,6 +529,13 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
         return;
     }
 
+    if (index_) {
+        // render tileindex
+        meta2d(*index_, tileId, fi, sink);
+        return;
+    }
+
+    // non-tileindex code
     cv::Mat metatile(Constants::RasterMetatileSize.width
                      , Constants::RasterMetatileSize.height
                      , CV_8U, cv::Scalar(0));
