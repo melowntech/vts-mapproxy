@@ -7,6 +7,7 @@
 #include <boost/utility/in_place_factory.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 #include <boost/range/adaptor/reversed.hpp>
@@ -108,6 +109,8 @@ struct Config {
     Color::optional background;
     std::vector<std::string> co;
 
+    geo::OptionalNodataValue nodata;
+
     // derived
     geo::Options createOptions;
 
@@ -168,6 +171,10 @@ void VrtWo::configuration(po::options_description &cmdline
          "all overviews.")
         ("co", po::value(&config_.co)
         , "GTiff extra create option; can be used multiple times.")
+        ("nodata", po::value<std::string>()
+         , "Optional nodata value override. Can be NONE (to disable any "
+         "nodata value) or a (real) number. Input dataset's nodata "
+         "value is used if not used.")
         ;
 
     pd.add("input", 1)
@@ -202,6 +209,24 @@ void VrtWo::configure(const po::variables_map &vars)
         }
     }
 
+    if (vars.count("nodata")) {
+        // get raw value
+        auto raw(vars["nodata"].as<std::string>());
+
+        try {
+            // interpret as a double
+            config_.nodata
+                = geo::NodataValue(boost::lexical_cast<double>(raw));
+        } catch (const boost::bad_lexical_cast&) {
+            // not a double, check special case
+            // convert to lowercase
+            ba::to_lower(raw);
+            if (raw == "none") {
+                config_.nodata = geo::NodataValue();
+            }
+        }
+    }
+
     LOG(info3, log_)
         << "Config:"
         << "\n\tinput = " << config_.input
@@ -216,6 +241,17 @@ void VrtWo::configure(const po::variables_map &vars)
             })
         << "\n\tbackground = " << config_.background
         << "\n\tco = " << utility::join(config_.co, ", ")
+        << utility::LManip([&](std::ostream &os) -> std::ostream& {
+                if (!config_.nodata) { return os; }
+
+                os << "\n\tnodata = ";
+                if (*config_.nodata) {
+                    os << **config_.nodata;
+                } else {
+                    os << "none";
+                }
+                return os;
+            })
         << "\n"
         ;
 }
@@ -561,7 +597,8 @@ Setup buildDatasetBase(const Config &config)
 
     // create virtual output dataset
     VrtDataset out(config.outputDataset, in.srs(), setup.extents
-                   , setup.size, in.getFormat(), in.rawNodataValue());
+                   , setup.size, in.getFormat()
+                   , (config.nodata ? *config.nodata : in.rawNodataValue()));
 
     // add input bands
     auto inSize(in.size());
