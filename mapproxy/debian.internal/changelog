@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.38) citationtech-wheezy; urgency=low
+
+  * Generatevtrwo can force nodata value. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Wed, 11 Jan 2017 16:28:54 +0100
+
 ctt-vts-mapproxy (0.37) citationtech-wheezy; urgency=low
 
   * Added complex raster dataset support.
