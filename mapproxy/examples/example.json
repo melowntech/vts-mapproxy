@@ -1066,4 +1066,32 @@
         "registry" : {},
         "type" : "tms"
     }
+
+    , {
+        "comment" : "",
+        "credits" : [],
+        "definition" : 
+        {
+                "dataset" : "ev2-test",
+                "format" : "jpg"
+        },
+        "driver" : "tms-raster",
+        "group" : "melown",
+        "id" : "ev2-test",
+        "referenceFrames" : 
+        {
+                "melown2015" : 
+                {
+                        "lodRange" : [ 15, 21 ],
+                        "tileRange" : 
+                        [
+                                [ 8992, 5640 ],
+                                [ 8992, 5640 ]
+                        ]
+                }
+        },
+        "registry" : {},
+        "type" : "tms"
+    }
+
 ]

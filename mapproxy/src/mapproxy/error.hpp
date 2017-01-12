@@ -40,6 +40,10 @@ struct EmptyImage : Error {
     EmptyImage(const std::string &message) : Error(message) {}
 };
 
+struct FullImage : Error {
+    FullImage(const std::string &message) : Error(message) {}
+};
+
 struct EmptyDebugMask : Error {
     EmptyDebugMask(const std::string &message) : Error(message) {}
 };
