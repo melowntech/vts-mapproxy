@@ -55,6 +55,15 @@ const auto emptyImage([]() -> std::vector<unsigned char>
     return buf;
 }());
 
+const auto fullImage([]() -> std::vector<unsigned char>
+{
+    cv::Mat dot(8, 8, CV_8U, cv::Scalar(255));
+    std::vector<unsigned char> buf;
+    cv::imencode(".png", dot, buf
+                 , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+    return buf;
+}());
+
 const auto emptyDebugMask([]() -> std::vector<char>
 {
     return imgproc::png::serialize(vts::emptyDebugMask(), 9);
@@ -121,6 +130,12 @@ void Sink::error(const std::exception_ptr &exc)
     } catch (const EmptyImage &e) {
         // special "error" -> send "empty" image
         content(emptyImage.data(), emptyImage.size()
+                , Sink::FileInfo("image/png")
+                .setFileClass(FileClass::data)
+                , false);
+    } catch (const FullImage &e) {
+        // special "error" -> send "full" image
+        content(fullImage.data(), fullImage.size()
                 , Sink::FileInfo("image/png")
                 .setFileClass(FileClass::data)
                 , false);

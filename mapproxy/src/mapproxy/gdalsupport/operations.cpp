@@ -89,13 +89,24 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
     auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
     src.warpInto(dst, resampling);
 
-    if (dst.cmask().empty()) {
-        throw EmptyImage("No valid data.");
+    // fetch mask from dataset (optimized, all valid -> invalid matrix)
+    auto m(dst.fetchMask(true));
+    if (!m.data) {
+        // all pixels valid
+        throw FullImage("All data valid.");
     }
 
-    auto &cmask(dst.cmask());
-    auto *mask(allocateMat(mb, maskMatSize(cmask), maskMatDataType(cmask)));
-    asCvMat(*mask, cmask);
+    auto nonzero(cv::countNonZero(m));
+    if (!nonzero) {
+        // empty mask -> no valid data
+        throw EmptyImage("No valid data.");
+    } else if (nonzero == area(size)) {
+        // all pixels valid
+        throw FullImage("All data valid.");
+    }
+
+    auto *mask(allocateMat(mb, size, m.type()));
+    m.copyTo(*mask);
     return mask;
 }
 

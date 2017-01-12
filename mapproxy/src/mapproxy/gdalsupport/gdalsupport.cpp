@@ -116,6 +116,7 @@ public:
     void setError(Lock&, const std::exception &e);
     void setError(Lock&, const utility::HttpError &exc);
     void setError(Lock&, const EmptyImage &exc);
+    void setError(Lock&, const FullImage &exc);
     void setError(Lock&, const EmptyGeoData &exc);
 
     GdalWarper::Raster getRaster(Lock &lock);
@@ -177,7 +178,10 @@ private:
     // response error
     String error_;
 
-    enum class ErrorType { none, errorCode, emptyImage, emptyGeoData };
+    enum class ErrorType {
+        none, errorCode, emptyImage, fullImage
+        , emptyGeoData
+    };
     ErrorType errorType_;
     std::error_code ec_;
 };
@@ -257,6 +261,15 @@ void ShRequest::setError(Lock&, const EmptyImage &exc)
     cond_.notify_one();
 }
 
+void ShRequest::setError(Lock&, const FullImage &exc)
+{
+    if (!error_.empty()) { return; }
+    error_.assign(exc.what());
+    errorType_ = ErrorType::fullImage;
+    done_ = true;
+    cond_.notify_one();
+}
+
 void ShRequest::setError(Lock&, const EmptyGeoData &exc)
 {
     if (!error_.empty()) { return; }
@@ -296,6 +309,8 @@ GdalWarper::Raster ShRequest::getRaster(Lock &lock)
     case ErrorType::none: break; // handled at the end of function
 
     case ErrorType::emptyImage: throw EmptyImage(asString(error_));
+
+    case ErrorType::fullImage: throw FullImage(asString(error_));
 
     case ErrorType::emptyGeoData: throw EmptyGeoData(asString(error_));
 
@@ -343,6 +358,8 @@ GdalWarper::Heightcoded::pointer ShRequest::getHeightcoded(Lock &lock)
     case ErrorType::none: break; // handled at the end of function
 
     case ErrorType::emptyImage: throw EmptyImage(asString(error_));
+
+    case ErrorType::fullImage: throw FullImage(asString(error_));
 
     case ErrorType::emptyGeoData: throw EmptyGeoData(asString(error_));
 
@@ -817,6 +834,8 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
             } catch (const utility::HttpError &e) {
                 req->setError(mutex(), e);
             } catch (const EmptyImage &e) {
+                req->setError(mutex(), e);
+            } catch (const FullImage &e) {
                 req->setError(mutex(), e);
             } catch (const EmptyGeoData &e) {
                 req->setError(mutex(), e);
