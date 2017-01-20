@@ -164,13 +164,21 @@ DatasetType detectType(const geo::GeoDataset::Descriptor &ds
 }
 
 struct Node {
-    const vts::NodeInfo *node;
+    vts::NodeInfo node;
+    cv::Mat_<char> grid;
     vts::Lod localLod;
     vts::Lod lod;
 
-    Node(const vts::NodeInfo &node, vts::Lod localLod)
-        : node(&node), localLod(localLod), lod(localLod + node.nodeId().lod)
+    Node(const vts::NodeInfo &node, std::size_t steps)
+        : node(node), grid(steps, steps, char(0))
     {}
+
+    void setLod(vts::Lod l) {
+        localLod = l;
+        lod = node.nodeId().lod + l;
+
+        LOG(info4) << "<" << node.srs() << ">: " << lod;
+    }
 
     typedef std::vector<Node> list;
 };
@@ -180,9 +188,6 @@ int Calipers::run()
     const auto ds(geo::GeoDataset::open(dataset_).descriptor());
 
     const auto datasetType(detectType(ds, datasetType_));
-
-    // list of valid nodes
-    Node::list nodes;
 
     // inverse GSD scale
     const double invGsdScale((datasetType == DatasetType::dem)
@@ -204,7 +209,11 @@ int Calipers::run()
     // center of dataset
     const auto dsCenter(math::center(ds.extents));
 
-    for (const auto &node : vts::NodeInfo::nodes(*referenceFrame_)) {
+    const auto nodes(vts::NodeInfo::nodes(*referenceFrame_));
+
+    UTILITY_OMP(parallel for)
+    for (std::size_t nodeIndex = 0; nodeIndex < nodes.size(); ++nodeIndex) {
+        const auto &node(nodes[nodeIndex]);
         const auto &nodeId(node.nodeId());
 
         const auto paneArea(math::area(math::size(node.extents())));
@@ -212,25 +221,28 @@ int Calipers::run()
 
         /** Add projected corner. Returns true on failure.
          */
-        auto add([&](math::Points2d &corners, double x, double y) -> bool
+        auto convert([&](math::Point2 &c, double x, double y) -> bool
         {
             try {
                 // try to convert corner
-                const auto c(conv(math::Point2d(x, y)));
+                c = conv(math::Point2d(x, y));
                 // check if it is inside the node
                 if (!node.inside(c)) { return true; }
-                corners.push_back(c);
             } catch (...) {
                 return true;
             }
             return false;
         });
 
+        Node validNode(node, steps);
+
         // best (local) LOD computed for this node
         // make_optional used to get rid of "maybe uninitialized" GCC warning
         auto bestLod(boost::make_optional<double>(false, 0.0));
 
         double bestDistance(std::numeric_limits<double>::max());
+
+        math::Point2d dummy;
 
         // process whole grid
         double y(ds.extents.ll(1));
@@ -240,23 +252,31 @@ int Calipers::run()
                 // compute distance from center
                 const math::Point2d pxCenter(x + hpx.width, y + hpx.height);
 
-                // calculate distance between pixel center and dataset center
-                const auto distance(ublas::norm_2(pxCenter - dsCenter));
+                // try to convert grid point to node's SRS
+                if (convert(dummy, pxCenter(0), pxCenter(1))) {
+                    continue;
+                }
 
-                // futher than previous best point?
-                if (distance >= bestDistance) { continue; }
+                // valid grid point, mark
+                validNode.grid(j, i) = true;
 
-                // convert pixel to node's SRS
-                math::Points2d corners;
-                if (add(corners, x, y)
-                    || add(corners, x, y + px.height)
-                    || add(corners, x + px.width, y + px.height)
-                    || add(corners, x + px.width, y))
+                // convert pixel aroung grid point to node's SRS
+                std::array<math::Point2d, 4> corners;
+                if (convert(corners[0], x, y)
+                    || convert(corners[1], x, y + px.height)
+                    || convert(corners[2], x + px.width, y + px.height)
+                    || convert(corners[3], x + px.width, y))
                 {
                     continue;
                 }
 
                 // we have valid quadrilateral
+
+                // calculate distance between pixel center and dataset center
+                const auto distance(ublas::norm_2(pxCenter - dsCenter));
+
+                // futher than previous best point?
+                if (distance >= bestDistance) { continue; }
 
                 // calculate (approximate) projected triangle area
                 const auto pxArea
@@ -294,9 +314,7 @@ int Calipers::run()
 
 
         // finally!
-        nodes.emplace_back(node, lod);
-
-        LOG(info4) << "<" << node.srs() << ">: " << nodes.back().lod;
+        validNode.setLod(lod);
     }
 
     return EXIT_SUCCESS;
@@ -307,4 +325,3 @@ int main(int argc, char *argv[])
     gdal_drivers::registerAll();
     return Calipers()(argc, argv);
 }
-
