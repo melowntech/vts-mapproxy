@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.40) citationtech-wheezy; urgency=low
+
+  * Fixed python backend deadlock.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Fri, 20 Jan 2017 15:15:38 +0100
+
 ctt-vts-mapproxy (0.39) citationtech-wheezy; urgency=low
 
   * Fixed mask bleed.
