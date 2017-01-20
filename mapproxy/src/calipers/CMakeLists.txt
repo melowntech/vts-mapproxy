@@ -1,6 +1,6 @@
 # test program
 define_module(BINARY mapproxy-calipers
-  DEPENDS service gdal-drivers geometry geo
+  DEPENDS vts-libs service gdal-drivers geometry geo
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS)
 
