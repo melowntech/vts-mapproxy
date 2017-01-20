@@ -31,10 +31,10 @@ namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 
-class Examiner : public service::Cmdline {
+class Calipers : public service::Cmdline {
 public:
-    Examiner()
-        : service::Cmdline("examiner", BUILD_TARGET_VERSION)
+    Calipers()
+        : service::Cmdline("calipers", BUILD_TARGET_VERSION)
     {
     }
 
@@ -53,7 +53,7 @@ private:
     std::string referenceFrame_;
 };
 
-void Examiner::configuration(po::options_description &cmdline
+void Calipers::configuration(po::options_description &cmdline
                             , po::options_description &config
                             , po::positional_options_description &pd)
 {
@@ -70,7 +70,7 @@ void Examiner::configuration(po::options_description &cmdline
     (void) config;
 }
 
-void Examiner::configure(const po::variables_map &vars)
+void Calipers::configure(const po::variables_map &vars)
 {
     dataset_ = fs::absolute(dataset_);
 
@@ -84,11 +84,11 @@ void Examiner::configure(const po::variables_map &vars)
     (void) vars;
 }
 
-bool Examiner::help(std::ostream &out, const std::string &what) const
+bool Calipers::help(std::ostream &out, const std::string &what) const
 {
     if (what.empty()) {
         // program help
-        out << ("examiner dataset [options]\n"
+        out << ("calipers dataset [options]\n"
                 "    Examines GDAL dataset.\n"
                 "\n"
                 );
@@ -99,7 +99,7 @@ bool Examiner::help(std::ostream &out, const std::string &what) const
     return false;
 }
 
-int Examiner::run()
+int Calipers::run()
 {
     return EXIT_SUCCESS;
 }
@@ -107,5 +107,5 @@ int Examiner::run()
 int main(int argc, char *argv[])
 {
     gdal_drivers::registerAll();
-    return Examiner()(argc, argv);
+    return Calipers()(argc, argv);
 }
