@@ -32,7 +32,7 @@ private:
     void errorRaw(const Resource::Id &resourceId
                   , const std::string &message) const;
 
-    mutable std::mutex mutex_;
+    mutable std::recursive_mutex mutex_;
     python::object run_;
     python::object error_;
 };

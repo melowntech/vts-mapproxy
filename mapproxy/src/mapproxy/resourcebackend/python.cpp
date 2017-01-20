@@ -145,7 +145,7 @@ Python::Python(const GenericConfig &genericConfig, const Config &config)
 
 Resource::map Python::load_impl() const
 {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<decltype(mutex_)> lock(mutex_);
     try {
         LOG(info4) << "Loading resources";
         return loadResourcesFromPython
@@ -165,7 +165,7 @@ Resource::map Python::load_impl() const
 void Python::error_impl(const Resource::Id &resourceId
                         , const std::string &message) const
 {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<decltype(mutex_)> lock(mutex_);
     return errorRaw(resourceId, message);
 }
 
