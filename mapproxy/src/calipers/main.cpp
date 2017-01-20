@@ -163,11 +163,26 @@ DatasetType detectType(const geo::GeoDataset::Descriptor &ds
     return DatasetType::dem;
 }
 
+struct Node {
+    const vts::NodeInfo *node;
+    vts::Lod localLod;
+    vts::Lod lod;
+
+    Node(const vts::NodeInfo &node, vts::Lod localLod)
+        : node(&node), localLod(localLod), lod(localLod + node.nodeId().lod)
+    {}
+
+    typedef std::vector<Node> list;
+};
+
 int Calipers::run()
 {
     const auto ds(geo::GeoDataset::open(dataset_).descriptor());
 
     const auto datasetType(detectType(ds, datasetType_));
+
+    // list of valid nodes
+    Node::list nodes;
 
     // inverse GSD scale
     const double invGsdScale((datasetType == DatasetType::dem)
@@ -272,15 +287,16 @@ int Calipers::run()
 
         // check whether curren subtree root can produce tiles at computed
         // lod
-        if (compatible
+        if (!compatible
             (vts::NodeInfo(node.referenceFrame()
                            , vts::lowestChild(nodeId, lod))
-             , node))
-        {
-            // make LOD global
-            lod += nodeId.lod;
-            LOG(info4) << "<" << node.srs() << ">: " << lod;
-        }
+             , node)) { continue; }
+
+
+        // finally!
+        nodes.emplace_back(node, lod);
+
+        LOG(info4) << "<" << node.srs() << ">: " << nodes.back().lod;
     }
 
     return EXIT_SUCCESS;
@@ -291,3 +307,4 @@ int main(int argc, char *argv[])
     gdal_drivers::registerAll();
     return Calipers()(argc, argv);
 }
+
