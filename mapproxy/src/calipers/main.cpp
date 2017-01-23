@@ -165,12 +165,15 @@ DatasetType detectType(const geo::GeoDataset::Descriptor &ds
 
 struct Node {
     vts::NodeInfo node;
+    math::Extents2 gridExtents;
     cv::Mat_<char> grid;
     vts::Lod localLod;
     vts::Lod lod;
 
-    Node(const vts::NodeInfo &node, std::size_t steps)
-        : node(node), grid(steps, steps, char(0))
+    Node(const vts::NodeInfo &node, std::size_t steps
+         , const math::Extents2 &gridExtents)
+        : node(node), gridExtents(gridExtents)
+        , grid(steps + 1, steps + 1, char(0))
     {}
 
     void setLod(vts::Lod l) {
@@ -197,14 +200,21 @@ int Calipers::run()
     // number of max steps to process
     int steps(100);
 
-    // calculate step size
-    auto es(size(ds.extents));
-    const math::Size2f step((es.width / steps), (es.height / steps));
+    auto extents(ds.extents);
+    auto es(size(extents));
 
     // calculate pixel and halfpixel size
     const math::Size2f px((es.width / ds.size.height)
                           , (es.width / ds.size.height));
     const math::Size2f hpx(px.width / 2.0, px.height / 2.0);
+
+    // shrink extents by half pixel to fix to centers of pixels
+    extents.ll(0) += hpx.width; extents.ll(1) += hpx.height;
+    extents.ur(0) -= hpx.width; extents.ur(1) -= hpx.height;
+
+    // calculate step size
+    es = size(extents);
+    const math::Size2f step((es.width / steps), (es.height / steps));
 
     // center of dataset
     const auto dsCenter(math::center(ds.extents));
@@ -234,7 +244,7 @@ int Calipers::run()
             return false;
         });
 
-        Node validNode(node, steps);
+        Node validNode(node, steps, extents);
 
         // best (local) LOD computed for this node
         // make_optional used to get rid of "maybe uninitialized" GCC warning
@@ -245,10 +255,10 @@ int Calipers::run()
         math::Point2d dummy;
 
         // process whole grid
-        double y(ds.extents.ll(1));
-        for (int j(0); j < steps; ++j, y += step.height) {
-            double x(ds.extents.ll(0));
-            for (int i(0); i < steps; ++i, x += step.width) {
+        double y(extents.ll(1));
+        for (int j(0); j <= steps; ++j, y += step.height) {
+            double x(extents.ll(0));
+            for (int i(0); i <= steps; ++i, x += step.width) {
                 // compute distance from center
                 const math::Point2d pxCenter(x + hpx.width, y + hpx.height);
 
