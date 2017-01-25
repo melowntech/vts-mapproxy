@@ -23,6 +23,8 @@
 #include "utility/time.hpp"
 #include "utility/enum-io.hpp"
 
+#include "math/transform.hpp"
+
 #include "service/cmdline.hpp"
 
 #include "geo/geodataset.hpp"
@@ -33,6 +35,7 @@
 
 #include "vts-libs/registry.hpp"
 #include "vts-libs/registry/po.hpp"
+#include "vts-libs/registry/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/csconvertor.hpp"
 #include "vts-libs/vts/tileop.hpp"
@@ -206,6 +209,9 @@ inline bool valid(const OptCorners &c) {
 
 class Node {
 public:
+    typedef std::shared_ptr<Node> pointer;
+    typedef std::vector<pointer> list;
+
     Node(const geo::GeoDataset::Descriptor &ds
          , const vts::NodeInfo &node, const math::Size2 &steps)
         : ds(ds), node(node), ds2node(ds.srs, node.srs())
@@ -236,6 +242,13 @@ public:
                            , vts::Ranges::FromBottom{});
     }
 
+    /** Extents in navigation SRS.
+     */
+    math::Extents2 navExtents() const;
+
+    void updateCameraExtents(math::Matrix4 &trafo
+                             , math::Extents2 &cameraExtents) const;
+
     const std::string& srs() const { return node.srs(); }
 
 private:
@@ -247,7 +260,7 @@ private:
             if (!node.inside(c)) { return true; }
 
             // update local extents
-            update(localExtents, c);
+            math::update(localExtents, c);
         } catch (...) {
             return true;
         }
@@ -515,10 +528,10 @@ void Node::refine()
     });
 
     // compose tile range from all 4 corners of localExtents
-    update(tileRange_, point2tile(ll(localExtents)));
-    update(tileRange_, point2tile(ul(localExtents)));
-    update(tileRange_, point2tile(ur(localExtents)));
-    update(tileRange_, point2tile(lr(localExtents)));
+    math::update(tileRange_, point2tile(ll(localExtents)));
+    math::update(tileRange_, point2tile(ul(localExtents)));
+    math::update(tileRange_, point2tile(ur(localExtents)));
+    math::update(tileRange_, point2tile(lr(localExtents)));
 }
 
 void Node::minLod()
@@ -543,8 +556,9 @@ void Node::minLod()
     minLod_ = node.nodeId().lod + lod;
 }
 
-double computeGsd(const geo::GeoDataset::Descriptor &ds
-                  , const vr::ReferenceFrame &rf)
+::OGRSpatialReference localTm(const vr::ReferenceFrame &rf
+                              , const geo::SrsDefinition &srsDef
+                              , const math::Point2d point)
 {
     auto navSrs(vr::system.srs(rf.model.navigationSrs).srsDef.reference());
 
@@ -554,9 +568,7 @@ double computeGsd(const geo::GeoDataset::Descriptor &ds
             << "Cannot copy GeoCS from navigation SRS.";
     }
 
-    const auto dsCenter(math::center(ds.extents));
-
-    const auto llCenter(geo::CsConvertor(ds.srs, latlon)(dsCenter));
+    const auto llCenter(geo::CsConvertor(srsDef, latlon)(point));
 
     // construct tmerc
     ::OGRSpatialReference tm;
@@ -569,13 +581,21 @@ double computeGsd(const geo::GeoDataset::Descriptor &ds
             << "Cannot set tmerc.";
     }
 
+    return tm;
+}
+
+double computeGsd(const geo::GeoDataset::Descriptor &ds
+                  , const vr::ReferenceFrame &rf)
+{
+    const auto dsCenter(math::center(ds.extents));
+    const geo::CsConvertor ds2tm(ds.srs, localTm(rf, ds.srs, dsCenter));
+
     // compute dataset's half-pixel size
     auto hpx(math::size(ds.extents));
     hpx.width /= (2.0 * ds.size.width);
     hpx.height /= (2.0 * ds.size.height);
 
     // project pixel from dataset center to tmerc
-    const geo::CsConvertor ds2tm(ds.srs, tm);
     std::array<math::Point2d, 4> corners;
     corners[0] = ds2tm(math::Point2d(dsCenter(0) - hpx.width
                                      , dsCenter(1) - hpx.height));
@@ -595,6 +615,94 @@ double computeGsd(const geo::GeoDataset::Descriptor &ds
     return std::sqrt(pxArea);
 }
 
+math::Extents2 Node::navExtents() const
+{
+    const vts::CsConvertor conv
+        (node.srs(), node.referenceFrame().model.navigationSrs);
+
+    math::Extents2 ne(math::InvalidExtents{});
+    for (const auto &p : math::vertices(localExtents)) {
+        math::update(ne, conv(p));
+    }
+
+    return ne;
+}
+
+void Node::updateCameraExtents(math::Matrix4 &trafo
+                               , math::Extents2 &cameraExtents) const
+{
+    const vts::CsConvertor conv
+        (node.srs(), node.referenceFrame().model.physicalSrs);
+
+    // division of source dataset
+    const math::Size2 steps(255, 255);
+
+    auto step(math::size(localExtents));
+    step.width /= steps.width;
+    step.height /= steps.height;
+
+    math::Points3d pc;
+    double y(localExtents.ll(1));
+    for (int j(0); j <= steps.height; ++j, y += step.height) {
+        math::Point3d p(localExtents.ll(0), y);
+        for (int i(0); i <= steps.width; ++i, p(0) += step.width) {
+            auto projected(math::transform(trafo, conv(p)));
+            math::update
+                (cameraExtents, math::Point2d(projected(0), projected(1)));
+        }
+    }
+}
+
+math::Matrix4 makePlaneTrafo(const vr::ReferenceFrame &rf
+                             , const math::Point2 &navCenter)
+{
+    // construct convertor from local tmerc to physical system
+    const auto navSrs(vr::system.srs(rf.model.navigationSrs).srsDef);
+    const vts::CsConvertor tm2phys(localTm(rf, navSrs, navCenter)
+                                   , rf.model.physicalSrs);
+
+    const auto center(tm2phys(math::Point3d(0, 0, 0)));
+    const auto eye(tm2phys(math::Point3d(0, 0, -1)));
+    const auto upOfCenter(tm2phys(math::Point3d(0, 1, 0)));
+
+    const auto look(math::Point3(eye - center));
+    const auto up(math::Point3(upOfCenter - center));
+
+#if 0
+    LOG(info4) << std::fixed << "center: " << center;
+    LOG(info4) << std::fixed << "eye: " << eye;
+    LOG(info4) << std::fixed << "upOfCenter: " << upOfCenter;
+    LOG(info4) << std::fixed << "look: " << look;
+    LOG(info4) << std::fixed << "up: " << up;
+#endif
+
+    // ec to wc camera
+    math::Matrix4 ec2wc(4, 4);
+
+    // fetch all 4 columns of EC2WC matrix
+    auto e1_(ublas::column(ec2wc, 0));
+    auto e2_(ublas::column(ec2wc, 1));
+    auto e3_(ublas::column(ec2wc, 2));
+    auto e4_(ublas::column(ec2wc, 3));
+
+    // fetch only first 3 elements of each column of EC2WC matrix
+    // (cannot be chained because resulting vector expression is read-only :()
+    auto e1(ublas::subrange(e1_, 0, 3));
+    auto e2(ublas::subrange(e2_, 0, 3));
+    auto e3(ublas::subrange(e3_, 0, 3));
+    auto e4(ublas::subrange(e4_, 0, 3));
+
+    // reset last row to (0, 0, 0, 1)
+    ublas::row(ec2wc, 3) = ublas::unit_vector<double>(4, 3);
+
+    e3 = math::normalize(math::normalize(look));
+    e1 = math::normalize(math::crossProduct(up, e3));
+    e2 = math::crossProduct(e3, e1);
+    e4 = eye;
+
+    return math::matrixInvert(ec2wc);
+}
+
 int Calipers::run()
 {
     const auto ds(geo::GeoDataset::open(dataset_).descriptor());
@@ -602,7 +710,6 @@ int Calipers::run()
     const auto datasetType(detectType(ds, datasetType_));
 
     const auto gsd(computeGsd(ds, *referenceFrame_));
-    std::cout << "gsd: " << gsd << "\n";
 
     // inverse GSD scale
     const double invGsdScale((datasetType == DatasetType::dem)
@@ -612,23 +719,77 @@ int Calipers::run()
     // division of source dataset
     math::Size2 steps(255, 255);
 
-    const auto nodes(vts::NodeInfo::nodes(*referenceFrame_));
+    Node::list nodes;
+
+    const auto rfNodes(vts::NodeInfo::nodes(*referenceFrame_));
 
     UTILITY_OMP(parallel for)
-    for (std::size_t nodeIndex = 0; nodeIndex < nodes.size(); ++nodeIndex) {
-        Node node(ds, nodes[nodeIndex], steps);
+    for (std::size_t nodeIndex = 0; nodeIndex < rfNodes.size(); ++nodeIndex) {
+        auto node(std::make_shared<Node>(ds, rfNodes[nodeIndex], steps));
 
-        if (node.run(invGsdScale, tileFractionLimit_)) {
-            auto r(node.ranges());
-            std::cout << node.srs() << ": " << r.lodRange();
-            char sep('/');
-            for (auto lod : r.lodRange()) {
-                std::cout << sep << r.tileRange(lod);
-                sep = ';';
-            }
-            std::cout << '\n';
+        if (node->run(invGsdScale, tileFractionLimit_)) {
+            UTILITY_OMP(critical(calipers))
+                nodes.push_back(node);
         }
     }
+
+    if (nodes.empty()) {
+        // not feasible
+        return 1;
+    }
+
+    std::cout << "gsd: " << gsd << "\n";
+
+    math::Extents2 navExtents(math::InvalidExtents{});
+    for (const auto &node : nodes) {
+        auto r(node->ranges());
+        auto lr(r.lodRange());
+        std::cout << "range<" << node->srs() << ">: " << lr << " "
+                      << lr.max << "/" << r.tileRange(lr.max) << '\n';
+
+        auto tmp(node->navExtents());
+        math::update(navExtents, tmp.ll);
+        math::update(navExtents, tmp.ur);
+    }
+
+    // center of navigation extents
+    const auto navCenter(math::center(navExtents));
+
+    // trafo for converting physical points to plane tangent to surface at nav
+    // center
+    auto trafo(makePlaneTrafo(*referenceFrame_, navCenter));
+
+    // compute camera extents by sampling local extents and projecting samples
+    // into points in tangent plane
+    math::Extents2 cameraExtents(math::InvalidExtents{});
+    for (const auto &node : nodes) {
+        node->updateCameraExtents(trafo, cameraExtents);
+    }
+    // compute size of such extents
+    const auto cameraExtentsSize(math::size(cameraExtents));
+
+    vr::Position position;
+    position.type = vr::Position::Type::objective;
+
+    // position
+    position.position(0) = navCenter(0);
+    position.position(1) = navCenter(1);
+    position.heightMode = vr::Position::HeightMode::floating;
+    position.position(2) = 0.0;
+
+    // orienation
+    position.lookDown();
+
+    // camera
+    position.verticalFov = vr::Position::naturalFov();
+
+    // use maximum from camera extents size
+    position.verticalExtent
+        = std::max(cameraExtentsSize.width, cameraExtentsSize.height);
+
+    std::cout << std::fixed << "position: " << position << '\n';
+
+    std::cout << std::flush;
 
     return EXIT_SUCCESS;
 }
