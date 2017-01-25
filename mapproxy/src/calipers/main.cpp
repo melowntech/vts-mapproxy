@@ -786,6 +786,10 @@ int Calipers::run()
     // use maximum from camera extents size
     position.verticalExtent
         = std::max(cameraExtentsSize.width, cameraExtentsSize.height);
+    if (datasetType == DatasetType::dem) {
+        // compensate for height in dem
+        position.verticalExtent *= 1.3;
+    }
 
     std::cout << std::fixed << "position: " << position << '\n';
 
