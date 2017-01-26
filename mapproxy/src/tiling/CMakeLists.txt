@@ -30,4 +30,4 @@ set_target_version(mapproxy-sub-tiling ${mapproxy_VERSION})
 
 # binaries
 install(TARGETS mapproxy-tiling RUNTIME DESTINATION bin
-  COMPONENT main)
+  COMPONENT tools)

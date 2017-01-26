@@ -18,9 +18,20 @@ Homepage: https://www.melown.com/maps
 Package: ctt-vts-mapproxy
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, ctt-vts-registry (>= 1.0)
+         , ctt-vts-mapproxy-tools (= ${binary:Version})
 Description: VTS MapProxy backend server
+ Backend HTTP daemon.
+
+Package: ctt-vts-mapproxy-tools
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ctt-vts-registry (>= 1.0)
+Breaks: ctt-vts-mapproxy (<< 0.42)
+Replaces: ctt-vts-mapproxy (<< 0.42)
+Description: VTS MapProxy backend server tools
+ Contain colection of tools for mapproxy dataset preparation.
 
 Package: ctt-vts-mapproxy-dbg
 Architecture: any
 Depends: ${misc:Depends}, ctt-vts-mapproxy (= ${binary:Version})
-Description: Debug Symbols for ctt-vts-mapproxy
+         , ctt-vts-mapproxy--tools (= ${binary:Version})
+Description: Debug Symbols for ctt-vts-mapproxy*

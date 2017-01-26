@@ -1,3 +1,11 @@
+ctt-vts-mapproxy (0.42) citationtech-wheezy; urgency=low
+
+  * Added mapproxy-calipers
+  * mapproxy-tiling benefits from data obtained from mapproxy-calipers
+  * Split package into two: mapproxy and mapproxy-tools
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 26 Jan 2017 10:53:02 +0100
+
 ctt-vts-mapproxy (0.41) citationtech-wheezy; urgency=low
 
   * Fixed bad exception type.

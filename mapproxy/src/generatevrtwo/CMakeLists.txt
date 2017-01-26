@@ -20,4 +20,4 @@ set_target_version(generatevrtwo ${mapproxy_VERSION})
 
 # binaries
 install(TARGETS generatevrtwo RUNTIME DESTINATION bin
-  COMPONENT main)
+  COMPONENT tools)

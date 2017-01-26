@@ -20,4 +20,4 @@ set_target_version(mapproxy-calipers ${mapproxy_VERSION})
 
 # binaries
 install(TARGETS mapproxy-calipers RUNTIME DESTINATION bin
-  COMPONENT main)
+  COMPONENT tools)

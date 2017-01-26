@@ -1,6 +1,7 @@
 *debhelper*
 *.substvars
 ctt-vts-mapproxy
+ctt-vts-mapproxy-tools
 ctt-vts-mapproxy-dbg
 *.debhelper
 files

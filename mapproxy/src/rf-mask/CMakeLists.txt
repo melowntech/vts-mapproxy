@@ -21,4 +21,4 @@ set_target_version(mapproxy-rf-mask ${mapproxy_VERSION})
 
 # binaries
 install(TARGETS mapproxy-rf-mask RUNTIME DESTINATION bin
-  COMPONENT main)
+  COMPONENT tools)

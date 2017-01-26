@@ -4,10 +4,11 @@
 PACKAGE_VERSION=$(shell dpkg-parsechangelog | grep ^Version: | cut -d' ' -f2)
 
 # list of packages to build
-PACKAGES=MAPPROXY
+PACKAGES=MAPPROXY MAPPROXY_TOOLS
 
 # package names
 DEB_PACKAGE_MAPPROXY=ctt-vts-mapproxy
+DEB_PACKAGE_MAPPROXY_TOOLS=ctt-vts-mapproxy-tools
 DEB_PACKAGE_DEBUG=ctt-vts-mapproxy-dbg
 
 PREFIX=/opt/vts
@@ -16,6 +17,7 @@ PREFIX=/opt/vts
 DEB_BUILDDIR=obj-$(DEB_BUILD_GNU_TYPE)
 # install components
 INSTALL_COMPONENTS_MAPPROXY=main
+INSTALL_COMPONENTS_MAPPROXY_TOOLS=tools
 
 # add settings here
 CMAKE_FLAGS =  \
