@@ -18,6 +18,7 @@ Homepage: https://www.melown.com/maps
 Package: ctt-vts-seznamcz-mapproxy
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, ctt-vts-seznamcz-registry (>= 1.0)
+         , ctt-vts-seznamcz-mapproxy-tools (= ${binary:Version})
 Description: VTS MapProxy backend server
  Backend HTTP daemon.
 
