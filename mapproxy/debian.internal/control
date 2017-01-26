@@ -33,5 +33,5 @@ Description: VTS MapProxy backend server tools
 Package: ctt-vts-mapproxy-dbg
 Architecture: any
 Depends: ${misc:Depends}, ctt-vts-mapproxy (= ${binary:Version})
-         , ctt-vts-mapproxy--tools (= ${binary:Version})
+         , ctt-vts-mapproxy-tools (= ${binary:Version})
 Description: Debug Symbols for ctt-vts-mapproxy*
