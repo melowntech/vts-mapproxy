@@ -9,6 +9,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
+#include <boost/variant.hpp>
 
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
@@ -33,14 +34,106 @@ namespace vts = vadstena::vts;
 
 namespace vr = vadstena::registry;
 
+struct UnifiedTileRange {
+    boost::variant<vts::TileRange, vts::LodTileRange> range;
+
+    UnifiedTileRange(vts::TileRange &&tr)
+        : range(std::move(tr))
+    {}
+
+    UnifiedTileRange(vts::LodTileRange &&tr)
+        : range(std::move(tr))
+    {}
+
+    typedef std::vector<UnifiedTileRange> list;
+};
+
+class PrintUnifiedTileRange : public boost::static_visitor<>
+{
+public:
+    PrintUnifiedTileRange(std::ostream &os) : os_(&os) {}
+
+    void operator()(const vts::TileRange &tr) const {
+        *os_ << tr;
+    }
+
+    void operator()(const vts::LodTileRange &tr) const {
+        *os_ << tr;
+    }
+
+private:
+    std::ostream *os_;
+};
+
+
+template<typename CharT, typename Traits>
+inline std::basic_ostream<CharT, Traits>&
+operator<<(std::basic_ostream<CharT, Traits> &os, const UnifiedTileRange &tr)
+{
+    boost::apply_visitor(PrintUnifiedTileRange(os), tr.range);
+    return os;
+}
+
+class AsLodTileRange : public boost::static_visitor<vts::LodTileRange>
+{
+public:
+    AsLodTileRange(vts::Lod minLod) : minLod_(minLod) {}
+
+    vts::LodTileRange operator()(const vts::TileRange &tr) const {
+        return vts::LodTileRange(minLod_, tr);
+    }
+
+    vts::LodTileRange operator()(const vts::LodTileRange &tr) const {
+        return tr;
+    }
+
+private:
+    vts::Lod minLod_;
+};
+
+vts::LodTileRange::list
+asLodTileRangeList(vts::Lod minLod, const UnifiedTileRange::list &utr)
+{
+    vts::LodTileRange::list ranges;
+    AsLodTileRange visitor(minLod);
+    for (const auto &tr : utr) {
+        ranges.push_back(boost::apply_visitor(visitor, tr.range));
+    }
+    return ranges;
+}
+
+void validate(boost::any &v, const std::vector<std::string> &values
+              , UnifiedTileRange*, int)
+{
+    po::validators::check_first_occurrence(v);
+    const auto &s(po::validators::get_single_string(values));
+
+    try {
+        v = UnifiedTileRange(boost::lexical_cast<vts::TileRange>(s));
+    } catch (const boost::bad_lexical_cast&) {
+        try {
+            v = UnifiedTileRange(boost::lexical_cast<vts::LodTileRange>(s));
+        } catch (const boost::bad_lexical_cast&) {
+            throw po::validation_error
+                (po::validation_error::invalid_option_value);
+        }
+    }
+}
+
+struct Flag {
+    typedef vts::TileIndex::Flag::value_type value_type;
+    enum : value_type {
+        descend = 0x1
+        , analyze = 0x2
+    };
+};
+
 class DemTiling : public service::Cmdline {
 public:
     DemTiling()
         : service::Cmdline("dem-tiling", BUILD_TARGET_VERSION)
-        , extentsSampling_(20), tileSampling_(128), parallel_(true)
-        , forceWatertight_(false)
-    {
-    }
+        , tileSampling_(128), parallel_(true), forceWatertight_(false)
+    {}
 
 private:
     void configuration(po::options_description &cmdline
@@ -58,8 +151,9 @@ private:
     std::string referenceFrame_;
     vts::LodRange lodRange_;
     vts::TileRange tileRange_;
-    int extentsSampling_;
     int tileSampling_;
+
+    UnifiedTileRange::list tileRanges_;
 
     fs::path dataset_;
     bool parallel_;
@@ -82,12 +176,10 @@ void DemTiling::configuration(po::options_description &cmdline
          , "Tiling reference frame.")
         ("lodRange", po::value(&lodRange_)->required()
          , "Lod range where content is generated.")
-        ("tileRange", po::value(&tileRange_)->required()
+        // ("tileRange", po::value(&tileRange_)->required()
+        //  , "Tile range at min lod where content is generated.")
+        ("tileRange", po::value(&tileRanges_)->required()
          , "Tile range at min lod where content is generated.")
-        ("extentsSampling", po::value(&extentsSampling_)
-         ->default_value(extentsSampling_)
-         , "Nuber of squares to break extents into when converting "
-         "to another SRS.")
         ("tileSampling", po::value(&tileSampling_)
          ->default_value(tileSampling_)
          , "Nuber of pixels to break tile into when analyzing its coverage.")
@@ -130,7 +222,7 @@ void DemTiling::configure(const po::variables_map &vars)
         << "\n\toutput = " << output_
         << "\n\treferenceFrame = " << referenceFrame_
         << "\n\tlodRange = " << lodRange_
-        << "\n\ttileRange = " << tileRange_
+        << "\n\ttileRange = " << utility::join(tileRanges_, " ")
         << "\n"
         ;
 }
@@ -168,7 +260,8 @@ class TreeWalker {
 public:
     TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                , const vts::NodeInfo &root
-               , vts::LodRange lodRange, vts::TileRange tileRange
+               , const vts::LodRange &lodRange
+               , const vts::LodTileRange::list &tileRanges
                , int tileSampling, bool parallel, bool forceWatertight);
 
 private:
@@ -186,31 +279,33 @@ private:
         }
     }
 
+    void buildWorld(const vts::LodRange &lodRange
+                    , const vts::LodTileRange::list &tileRanges);
+
     const fs::path dataset_;
     vts::TileIndex &ti_;
     vts::LodRange lodRange_;
-    std::vector<vts::TileRange> tileRangeAtLod_;
     int tileSampling_;
     geo::SrsDefinition srs_;
 
     std::vector<geo::GeoDataset> gds_;
     bool parallel_;
     bool forceWatertight_;
+
+    vts::TileIndex world_;
 };
 
 
 TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
-                       , const vts::NodeInfo &root, vts::LodRange lodRange
-                       , vts::TileRange tileRange
+                       , const vts::NodeInfo &root
+                       , const vts::LodRange &lodRange
+                       , const vts::LodTileRange::list &tileRanges
                        , int tileSampling, bool parallel, bool forceWatertight)
     : dataset_(dataset), ti_(ti), lodRange_(lodRange)
-    , tileRangeAtLod_(std::vector<vts::TileRange>(lodRange.max + 1))
     , tileSampling_(tileSampling), srs_(root.srsDef())
     , parallel_(parallel), forceWatertight_(forceWatertight)
 {
-    for (int lod(0); lod <= lodRange.max; ++lod){
-        tileRangeAtLod_[lod] = vts::shiftRange(lodRange.min, tileRange, lod);
-    }
+    buildWorld(lodRange, tileRanges);
 
     if (parallel_) {
         UTILITY_OMP(parallel)
@@ -222,6 +317,25 @@ TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
     } else {
         prepareDataset();
         process(root);
+    }
+}
+
+void TreeWalker::buildWorld(const vts::LodRange &lodRange
+                            , const vts::LodTileRange::list &tileRanges)
+{
+    // process whole LOD range from root
+    for (auto lod : vts::LodRange(0, lodRange.max)) {
+        // set mesh flag everywhere we have to step in
+        // set to watertight mesh everywhere we should analyze data
+        Flag::value_type flags(Flag::descend);
+        if (lod >= lodRange.min) {
+            flags |= Flag::analyze;
+        }
+
+        for (const auto &tr : tileRanges) {
+            auto localRange(vts::shiftRange(tr, lod));
+            world_.set(lod, localRange, flags);
+        }
     }
 }
 
@@ -289,14 +403,14 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
 
     math::Size2 size(samples + 1, samples + 1);
 
-    if (!inside( tileRangeAtLod_[tileId.lod]
-               , vts::TileRange::point_type(tileId.x, tileId.y)))
-    {
-        // outside defined tile range
+    // consult flags
+    const auto flags(world_.get(tileId));
+    if (!flags) {
+        // outside defined roid
         return;
     }
 
-    if (tileId.lod >= lodRange_.min) {
+    if (flags & Flag::analyze) {
         // warp input dataset into tile
         const auto &ds(dataset());
         // set some output nodata value to force mask generation
@@ -441,7 +555,8 @@ int DemTiling::run()
 
     vts::TileIndex ti;
 
-    TreeWalker(ti, dataset_, vts::NodeInfo(rf), lodRange_, tileRange_
+    TreeWalker(ti, dataset_, vts::NodeInfo(rf), lodRange_
+               , asLodTileRangeList(lodRange_.min, tileRanges_)
                , tileSampling_, parallel_, forceWatertight_);
 
     LOG(info3) << "Saving generated tile index into " << output_ << ".";

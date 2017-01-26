@@ -1094,4 +1094,31 @@
         "type" : "tms"
     }
 
+    , {
+        "comment" : "",
+        "credits" : [],
+        "definition" :
+        {
+                "dataset" : "lada-bug",
+                "geoidGrid" : "egm96_15.gtx"
+        },
+        "driver" : "surface-dem",
+        "group" : "melown",
+        "id" : "lada-bug",
+        "referenceFrames" :
+        {
+                "melown2015" :
+                {
+                        "lodRange" : [ 15, 21 ],
+                        "tileRange" :
+                        [
+                                [ 8992, 5640 ],
+                                [ 8992, 5640 ]
+                        ]
+                }
+        },
+        "registry" : {},
+        "type" : "surface"
+    }
+
 ]
