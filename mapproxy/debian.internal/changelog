@@ -1,3 +1,10 @@
+ctt-vts-mapproxy (0.41) citationtech-wheezy; urgency=low
+
+  * Fixed bad exception type.
+  * Added mapproxy-calipers.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Wed, 25 Jan 2017 17:25:10 +0100
+
 ctt-vts-mapproxy (0.40) citationtech-wheezy; urgency=low
 
   * Fixed python backend deadlock.
