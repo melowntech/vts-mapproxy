@@ -19,8 +19,18 @@ Package: ctt-vts-seznamcz-mapproxy
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, ctt-vts-seznamcz-registry (>= 1.0)
 Description: VTS MapProxy backend server
+ Backend HTTP daemon.
+
+Package: ctt-vts-seznamcz-mapproxy-tools
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ctt-vts-registry (>= 1.0)
+Breaks: ctt-vts-seznamcz-mapproxy (<< 0.4)
+Replaces: ctt-vts-seznamcz-mapproxy (<< 0.4)
+Description: VTS MapProxy backend server tools
+ Contain colection of tools for mapproxy dataset preparation.
 
 Package: ctt-vts-seznamcz-mapproxy-dbg
 Architecture: any
 Depends: ${misc:Depends}, ctt-vts-seznamcz-mapproxy (= ${binary:Version})
+         , ctt-vts-seznamcz-mapproxy-tools (= ${binary:Version})
 Description: Debug Symbols for ctt-vts-seznamcz-mapproxy

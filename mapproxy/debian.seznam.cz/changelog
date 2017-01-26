@@ -1,3 +1,27 @@
+ctt-vts-seznamcz-mapproxy (0.4) citationtech-wheezy-seznamcz; urgency=low
+
+  * Split package into two: mapproxy and mapproxy-tools
+  * Added mapproxy-calipers
+  * mapproxy-tiling benefits from data obtained from mapproxy-calipers
+  * Fixed mask bleed.
+  * Generatevtrwo can force nodata value.
+  * Added complex raster dataset support.
+  * mapproxy-dem-tiling renamed to mapproxy-tiling
+  * mapproxy-tiling works for dems and ophotos
+  * Mesh simplification computes error in physical space.
+  * Fixed out-of-bounds error handling in vector geodata.
+  * geodata: no such underlying ogr tile file -> {}
+  * Better logging in mvt/mbtiles driver.
+  * absoluteDataset igores http:/https:/ftp: uris
+  * using absoluteDataset in geodata-vector-tiled
+  * mbtiles support
+  * Surface-dem introspection added.
+  * Mesh upgrade: gzipped + v.3
+  * Debug support
+  * Prepared for view-dependent heightcoding
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 26 Jan 2017 11:33:14 +0100
+
 ctt-vts-seznamcz-mapproxy (0.3) citationtech-wheezy-seznamcz; urgency=low
 
   * Memory limits.

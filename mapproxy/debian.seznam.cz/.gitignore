@@ -1,6 +1,7 @@
 *debhelper*
 *.substvars
 ctt-vts-seznamcz-mapproxy
+ctt-vts-seznamcz-mapproxy-tools
 ctt-vts-seznamcz-mapproxy-dbg
 *.debhelper
 files
