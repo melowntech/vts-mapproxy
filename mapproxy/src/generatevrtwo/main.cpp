@@ -12,6 +12,8 @@
 #include <boost/format.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 
+#include <gdal/vrtdataset.h>
+
 #include "cpl_minixml.h"
 
 #include "utility/streams.hpp"
@@ -21,6 +23,7 @@
 #include "utility/duration.hpp"
 #include "utility/time.hpp"
 #include "service/cmdline.hpp"
+#include "utility/enum-io.hpp"
 
 #include "geo/geodataset.hpp"
 #include "geo/gdal.hpp"
@@ -31,6 +34,63 @@
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
+
+class NodeIterator {
+public:
+    NodeIterator(::CPLXMLNode *node, const char *name = nullptr)
+        : node_(node->psChild), name_(name)
+    {
+        // go till node with given name is hit
+        while (node_ && !matches()) {
+            node_ = node_->psNext;
+        }
+    }
+
+    operator bool() const { return node_; }
+    ::CPLXMLNode* operator*() { return node_; }
+    ::CPLXMLNode* operator->() { return node_; }
+
+    NodeIterator& operator++() {
+        if (!node_) { return *this; }
+        // skip current node and find new with the same name
+        do {
+            node_ = node_->psNext;
+        } while (node_ && !matches());
+        return *this;
+    }
+
+private:
+    bool matches() const {
+        return !name_ || !std::strcmp(name_, node_->pszValue);
+    }
+
+    ::CPLXMLNode *node_;
+    const char *name_;
+};
+
+typedef std::shared_ptr< ::CPLXMLNode> XmlNode;
+XmlNode xmlNode(const fs::path &path)
+{
+    auto n(::CPLParseXMLFile(path.c_str()));
+    if (!n) {
+        LOGTHROW(err1, std::runtime_error)
+            << "Cannot parse XML from " << path
+            << ": <" << ::CPLGetLastErrorMsg() << ">.";
+    }
+    return XmlNode(n, [](::CPLXMLNode *n) { ::CPLDestroyXMLNode(n); });
+}
+
+typedef std::shared_ptr< ::CPLXMLNode> XmlNode;
+XmlNode xmlNodeFromString(const std::string &data)
+{
+    auto n(::CPLParseXMLString(data.c_str()));
+    if (!n) {
+        LOGTHROW(err1, std::runtime_error)
+            << "Cannot parse XML from a string \"" << data
+            << "\": <" << ::CPLGetLastErrorMsg() << ">.";
+    }
+    return XmlNode(n, [](::CPLXMLNode *n) { ::CPLDestroyXMLNode(n); });
+}
 
 struct Color {
     std::vector<double> value;
@@ -273,19 +333,30 @@ bool VrtWo::help(std::ostream &out, const std::string &what) const
 
 typedef std::vector<math::Size2> Sizes;
 
+// dataset mask type
+UTILITY_GENERATE_ENUM(MaskType,
+    ((none))
+    ((nodata))
+    ((band))
+)
+
 struct Setup {
     math::Size2 size;
     math::Extents2 extents;
     Sizes ovrSizes;
     Sizes ovrTiled;
     int xPlus;
+    MaskType maskType;
 
-    Setup() : xPlus() {}
+    Setup() : xPlus(), maskType() {}
 };
 
-Setup makeSetup(math::Size2 size, math::Extents2 extents
+Setup makeSetup(const geo::GeoDataset::Descriptor &ds
                 , const Config &config)
 {
+    auto size(ds.size);
+    auto extents(ds.extents);
+
     auto halve([&]()
     {
         size.width = int(std::round(size.width / 2.0));
@@ -295,6 +366,15 @@ Setup makeSetup(math::Size2 size, math::Extents2 extents
     Setup setup;
     setup.extents = extents;
     setup.size = size;
+
+    // determine mask type
+    if (ds.maskType & GMF_ALL_VALID) {
+        setup.maskType = MaskType::none;
+    } else if (ds.maskType & GMF_NODATA) {
+        setup.maskType = MaskType::nodata;
+    } else {
+        setup.maskType = MaskType::band;
+    }
 
     halve();
     while ((size.width >= config.minOvrSize.width)
@@ -368,18 +448,50 @@ struct Rect {
 
 typedef boost::optional<Rect> OptionalRect;
 
-class VrtDataset {
-public:
-    VrtDataset(const fs::path &path, const geo::SrsDefinition &srs
-               , const math::Extents2 &extents, const math::Size2 &size
-               , geo::GeoDataset::Format format
-               , const geo::GeoDataset::NodataValue &nodata)
-        : ds_(geo::GeoDataset::create
-              (path, srs, extents, size, asVrt(format), nodata))
-        , bandCount_(format.channels.size())
+struct BandDescriptor {
+    fs::path filename;
+    int srcBand;
+    Rect src;
+    Rect dst;
+    geo::GeoDataset::BandProperties bp;
+
+    BandDescriptor(const fs::path &filename
+                   , const geo::GeoDataset &ds, int srcBand
+                   , const OptionalRect &srcRect
+                   , const OptionalRect &dstRect)
+        : filename(filename), srcBand(srcBand)
+        , src(srcRect ? *srcRect : Rect(ds.size()))
+        , dst(dstRect ? *dstRect : src)
+        , bp(ds.bandProperties(srcBand))
     {}
 
-    void flush() { ds_.flush(); }
+    void serialize(std::ostream &os, bool mask = false) const;
+
+    typedef std::vector<BandDescriptor> list;
+};
+
+class VrtDs {
+public:
+    VrtDs(const fs::path &path, const geo::SrsDefinition &srs
+          , const math::Extents2 &extents, const math::Size2 &size
+          , geo::GeoDataset::Format format
+          , const geo::GeoDataset::NodataValue &nodata
+          , MaskType maskType)
+        : path_(path.string())
+        , ds_(geo::GeoDataset::create
+              (path, srs, extents, size, asVrt(format), nodata))
+        , bandCount_(format.channels.size())
+        , maskType_(maskType), maskBand_()
+    {
+        if (maskType == MaskType::band) {
+            maskBand_ = ds_.createPerDatasetMask<VRTSourcedRasterBand>();
+        }
+    }
+
+    void flush() {
+        // destroy dataset
+        ds_ = geo::GeoDataset::placeholder();
+    }
 
     /** NB: band and srcBand are zero-based!
      */
@@ -388,6 +500,7 @@ public:
                          , int srcBand
                          , const OptionalRect &srcRect = boost::none
                          , const OptionalRect &dstRect = boost::none);
+
 
     void addBackground(const fs::path &path, const Color::optional &color
                        , const boost::optional<fs::path> &localTo
@@ -398,8 +511,12 @@ public:
     std::size_t bandCount() const { return bandCount_; };
 
 private:
+    // need to use std::string becase fs::path is non-moveable
+    std::string path_;
     geo::GeoDataset ds_;
     std::size_t bandCount_;
+    MaskType maskType_;
+    VRTSourcedRasterBand *maskBand_;
 };
 
 void writeSourceFilename(std::ostream &os, const fs::path &filename
@@ -412,9 +529,11 @@ void writeSourceFilename(std::ostream &os, const fs::path &filename
         ;
 }
 
-void writeSourceBand(std::ostream &os, int srcBand)
+void writeSourceBand(std::ostream &os, int srcBand, bool mask)
 {
-    os << "<SourceBand>" << (srcBand + 1) << "</SourceBand>\n";
+    os << "<SourceBand>";
+    if (mask) { os << "mask,"; }
+    os << (srcBand + 1) << "</SourceBand>\n";
 }
 
 void writeRect(std::ostream &os, const char *name, const Rect &r)
@@ -425,26 +544,15 @@ void writeRect(std::ostream &os, const char *name, const Rect &r)
        << "\" ySize=\"" << r.size.height << "\" />";
 }
 
-void VrtDataset::addSimpleSource(int band, const fs::path &filename
-                                 , const geo::GeoDataset &ds
-                                 , int srcBand
-                                 , const OptionalRect &srcRect
-                                 , const OptionalRect &dstRect)
+void BandDescriptor::serialize(std::ostream &os, bool mask) const
 {
-    Rect src(srcRect ? *srcRect : Rect(ds.size()));
-    Rect dst(dstRect ? *dstRect : src);
-
-    std::ostringstream os;
-
     os << "<SimpleSource>\n";
 
     writeSourceFilename(os, filename, true);
-    writeSourceBand(os, srcBand);
+    writeSourceBand(os, srcBand, mask);
 
     writeRect(os, "SrcRect", src);
     writeRect(os, "DstRect", dst);
-
-    const auto bp(ds.bandProperties(srcBand));
 
     os << "<SourceProperties RasterXSize=\""<< bp.size.width
        << "\" RasterYSize=\"" << bp.size.height
@@ -456,14 +564,48 @@ void VrtDataset::addSimpleSource(int band, const fs::path &filename
 
     os << "</SimpleSource>\n"
         ;
-
-    ds_.setMetadata(band + 1, geo::GeoDataset::Metadata("source", os.str())
-                    , "new_vrt_sources");
 }
 
-void VrtDataset::addBackground(const fs::path &path
-                               , const Color::optional &color
-                               , const boost::optional<fs::path> &localTo)
+void VrtDs::addSimpleSource(int band, const fs::path &filename
+                            , const geo::GeoDataset &ds
+                            , int srcBand
+                            , const OptionalRect &srcRect
+                            , const OptionalRect &dstRect)
+{
+    BandDescriptor bd(filename, ds, srcBand, srcRect, dstRect);
+
+    // set source
+    {
+        std::ostringstream os;
+        bd.serialize(os);
+        ds_.setMetadata(band + 1, geo::GeoDataset::Metadata("source", os.str())
+                        , "new_vrt_sources");
+    }
+
+    // only if mask is being used
+    if (band || !maskBand_) { return; }
+
+    // add mask simple source
+    // serialize as a XML
+    std::ostringstream os;
+    bd.serialize(os, true);
+
+    // try to create simple source from parsed string
+    std::unique_ptr< ::VRTSimpleSource> src(new ::VRTSimpleSource());
+    if (src->XMLInit(xmlNodeFromString(os.str()).get(), nullptr) != CE_None) {
+        LOGTHROW(err2, std::runtime_error)
+            << "Cannot parse VRT source from XML: <"
+            << ::CPLGetLastErrorNo() << ", "
+            << ::CPLGetLastErrorMsg() << ">.";
+    }
+
+    // add source to mask band
+    maskBand_->AddSource(src.release());
+}
+
+void VrtDs::addBackground(const fs::path &path
+                          , const Color::optional &color
+                          , const boost::optional<fs::path> &localTo)
 {
     if (!color) { return; }
 
@@ -499,50 +641,6 @@ void VrtDataset::addBackground(const fs::path &path
 
 void addOverview(const fs::path &vrtPath, const fs::path &ovrPath)
 {
-    typedef std::shared_ptr< ::CPLXMLNode> XmlNode;
-    auto xmlNode([](const fs::path &path) -> XmlNode
-    {
-        auto n(::CPLParseXMLFile(path.c_str()));
-        if (!n) {
-            LOGTHROW(err1, std::runtime_error)
-                << "Cannot parse XML from " << path
-                << ": <" << ::CPLGetLastErrorMsg() << ">.";
-        }
-        return XmlNode(n, [](::CPLXMLNode *n) { ::CPLDestroyXMLNode(n); });
-    });
-
-    class NodeIterator {
-    public:
-        NodeIterator(::CPLXMLNode *node, const char *name = nullptr)
-            : node_(node->psChild), name_(name)
-        {
-            // go till node with given name is hit
-            while (node_ && !matches()) {
-                node_ = node_->psNext;
-            }
-        }
-
-        operator bool() const { return node_; }
-        ::CPLXMLNode* operator*() { return node_; }
-        ::CPLXMLNode* operator->() { return node_; }
-
-        NodeIterator& operator++() {
-            if (!node_) { return *this; }
-            // skip current node and find new with the same name
-            do {
-                node_ = node_->psNext;
-            } while (node_ && !matches());
-            return *this;
-        }
-
-    private:
-        bool matches() const {
-            return !name_ || !std::strcmp(name_, node_->pszValue);
-        }
-
-        ::CPLXMLNode *node_;
-        const char *name_;
-    };
 
     auto root(xmlNode(vrtPath));
 
@@ -580,25 +678,29 @@ Setup buildDatasetBase(const Config &config)
 {
     LOG(info3) << "Creating dataset base in " << config.outputDataset
                << " from " << config.input << ".";
-    auto in(geo::GeoDataset::open(config.input));
-    auto setup(makeSetup(in.size(), in.extents(), config));
 
-    // make symlink to input dataset
     fs::path inputDataset("./original");
-    {
-        fs::path symlink(config.output / inputDataset);
-        fs::remove(symlink);
-        fs::create_symlink(config.input, symlink);
-    }
+    fs::path inputDatasetSymlink(config.output / inputDataset);
+    // make symlink to input dataset
+
+    fs::remove(inputDatasetSymlink);
+    fs::create_symlink(config.input, inputDatasetSymlink);
+
+    auto in(geo::GeoDataset::open(inputDatasetSymlink));
+
+    const auto ds(in.descriptor());
+    auto setup(makeSetup(ds, config));
 
     // remove anything lying in the way of the dataset
     boost::system::error_code ec;
     fs::remove(config.outputDataset, ec);
 
     // create virtual output dataset
-    VrtDataset out(config.outputDataset, in.srs(), setup.extents
-                   , setup.size, in.getFormat()
-                   , (config.nodata ? *config.nodata : in.rawNodataValue()));
+    VrtDs out(config.outputDataset, in.srs(), setup.extents
+              , setup.size, in.getFormat()
+              , (config.nodata ? *config.nodata
+                 : in.rawNodataValue())
+              , setup.maskType);
 
     // add input bands
     auto inSize(in.size());
@@ -611,25 +713,27 @@ Setup buildDatasetBase(const Config &config)
 
             // add center section
             Rect centerDst(math::Point2i(setup.xPlus, 0), inSize);
-            out.addSimpleSource(i, inputDataset, in, i, boost::none
-                                , centerDst);
+            out.addSimpleSource(i, inputDataset, in, i
+                                , boost::none, centerDst);
             math::Size2 strip(math::Size2(setup.xPlus, inSize.height));
 
-            Rect rightSrc(math::Point2i(inSize.width - setup.xPlus - shift, 0)
-                          , strip);
+            Rect rightSrc
+                (math::Point2i(inSize.width - setup.xPlus - shift, 0)
+                 , strip);
             Rect leftDst(math::Size2(setup.xPlus, inSize.height));
             out.addSimpleSource(i, inputDataset, in, i, rightSrc, leftDst);
 
             Rect leftSrc(math::Point2i(shift, 0)
                          , math::Size2(setup.xPlus, inSize.height));
             Rect rightDst(math::Point2i(inSize.width + setup.xPlus, 0)
-                          , strip);
+                              , strip);
             out.addSimpleSource(i, inputDataset, in, i, leftSrc, rightDst);
         } else {
             out.addSimpleSource(i, inputDataset, in, i);
         }
     }
 
+    // done
     out.flush();
 
     return setup;
@@ -749,12 +853,106 @@ bool emptyTile(const Config &config, const geo::GeoDataset &ds)
     return !cv::countNonZero(mask);
 }
 
+geo::GeoDataset createTmpDataset(const geo::GeoDataset &src
+                                 , const math::Extents2 &extents
+                                 , const math::Size2 &size
+                                 , MaskType maskType)
+{
+    // data format
+    auto format(src.getFormat());
+    format.storageType = geo::GeoDataset::Format::Storage::memory;
+
+    auto nodata(src.rawNodataValue());
+
+    if (maskType == MaskType::band) {
+        // internal mask type, derive bigger data type and nodata value
+        const auto ds(src.descriptor());
+
+        switch (ds.dataType) {
+        // 8 bit -> 16 bits
+        case ::GDT_Byte:
+            format.channelType = ::GDT_Int16;
+            nodata = std::numeric_limits<std::int16_t>::lowest();
+            break;
+
+        // 16 bits -> 32 bits
+        case ::GDT_UInt16:
+        case ::GDT_Int16:
+            format.channelType = ::GDT_Int32;
+            nodata = std::numeric_limits<std::int32_t>::lowest();
+            break;
+
+        // 32 bits -> 64 bits
+        case ::GDT_UInt32:
+        case ::GDT_Int32:
+        case ::GDT_Float32:
+            format.channelType = ::GDT_Float64;
+            nodata = std::numeric_limits<double>::lowest();
+            break;
+
+         // 64 bits -> well, 64 bits + nodata value
+        case ::GDT_Float64:
+            nodata = std::numeric_limits<double>::lowest();
+            break;
+
+        default:
+            utility::raise<std::runtime_error>
+                ("Unsupported data type <%s>.", ds.dataType);
+        }
+    }
+
+    // create in-memory temporary dataset dataset
+    return geo::GeoDataset::create
+        ("MEM", src.srs(), extents, size, format, nodata);
+}
+
+void copyWithMask(const geo::GeoDataset &src, geo::GeoDataset &dst)
+{
+    for (const auto &bi : src.getBlocking()) {
+        // copy all data bands
+        dst.writeBlock(bi.offset, src.readBlock(bi.offset, true).data);
+        // copy mask band
+        dst.writeMaskBlock(bi.offset, src.readBlock(bi.offset, -1, true).data);
+    }
+}
+
+void createOutputDataset(const geo::GeoDataset &original
+                         , const geo::GeoDataset &src
+                         , const fs::path &path
+                         , const geo::Options &createOptions
+                         , MaskType maskType)
+{
+    if (maskType != MaskType::band) {
+        // we can copy as is
+        UTILITY_OMP(critical(createOutputDataset))
+            src.copy(path, "GTiff", createOptions);
+        return;
+    }
+
+    // we need to create output dataset manually
+    auto format(original.getFormat());
+    // use custom format to prevent .tfw and .prj creation...
+    format.storageType = geo::GeoDataset::Format::Storage::custom;
+    format.driver = "GTiff";
+
+    auto dst(geo::GeoDataset::placeholder());
+
+    UTILITY_OMP(critical(createOutputDataset))
+        dst = geo::GeoDataset::create(path, src.srs(), src.extents()
+                                      , src.size(), format, boost::none
+                                      , createOptions);
+
+    copyWithMask(src, dst);
+    dst.flush();
+}
+
 fs::path createOverview(const Config &config, int ovrIndex
                         , const fs::path &srcPath
                         , const fs::path &dir
                         , const math::Size2 &size
                         , const math::Size2 &tiled
-                        , std::atomic<int> &progress, int total)
+                        , std::atomic<int> &progress, int total
+                        , MaskType maskType)
 {
     auto ovrName(dir / "ovr.vrt");
     auto ovrPath(config.output / ovrName);
@@ -765,12 +963,15 @@ fs::path createOverview(const Config &config, int ovrIndex
         << " of " << math::area(tiled) << " tiles in "
         << ovrPath << " from " << srcPath << ".";
 
-    VrtDataset ovr([&]() -> VrtDataset
+    VrtDs ovr([&]() -> VrtDs
     {
         auto src(geo::GeoDataset::open(srcPath));
-        return VrtDataset(ovrPath, src.srs(), src.extents()
-                          , size, src.getFormat(), src.rawNodataValue());
+        return VrtDs(ovrPath, src.srs(), src.extents()
+                     , size, src.getFormat(), src.rawNodataValue()
+                     , maskType);
     }());
+
+    (void) maskType;
 
     auto extents(ovr.dataset().extents());
     ovr.addBackground(config.output / dir, config.background, fs::path());
@@ -837,14 +1038,7 @@ fs::path createOverview(const Config &config, int ovrIndex
                                   % tile(0) % tile(1)));
             fs::path tilePath(config.output / dir / tileName);
 
-            // data format
-            auto format(src.getFormat());
-            format.storageType = geo::GeoDataset::Format::Storage::memory;
-
-            // create in-memory temporary dataset dataset
-            auto tmp(geo::GeoDataset::create
-                     ("MEM", src.srs(), te, pxSize, format
-                      , src.rawNodataValue()));
+            auto tmp(createTmpDataset(src, te, pxSize, maskType));
 
             src.warpInto(tmp, config.resampling, warpOptions);
 
@@ -862,18 +1056,18 @@ fs::path createOverview(const Config &config, int ovrIndex
                 continue;
             }
 
-            // copy data into real gtiff
-            UTILITY_OMP(critical)
-            {
-                fs::remove(tilePath);
-                tmp.copy(tilePath, "GTiff", config.createOptions);
-            }
+            // make room for output file
+            fs::remove(tilePath);
+
+            createOutputDataset(src, tmp, tilePath
+                                , config.createOptions
+                                , maskType);
 
             // store result
             Rect drect(math::Point2i(tile(0) * ts.width, tile(1) * ts.height)
                        , pxSize);
 
-            UTILITY_OMP(critical)
+            UTILITY_OMP(critical(createOverwiew_addSimpleSource))
                 for (std::size_t b(0), eb(ovr.bandCount()); b != eb; ++b) {
                     ovr.addSimpleSource(b, tileName, tmp, b
                                         , boost::none, drect);
@@ -924,7 +1118,8 @@ int VrtWo::run()
 
         auto path(createOverview
                   (config_, i, inputPath, dir, setup.ovrSizes[i]
-                   , setup.ovrTiled[i], progress, total));
+                   , setup.ovrTiled[i], progress, total
+                   , setup.maskType));
 
         // add overview (manually by manipulating the XML)
         addOverview(config_.outputDataset, path);
@@ -943,5 +1138,6 @@ int main(int argc, char *argv[])
     gdal_drivers::registerAll();
     // force VRT not to share undelying datasets
     geo::Gdal::setOption("VRT_SHARED_SOURCE", 0);
+    geo::Gdal::setOption("GDAL_TIFF_INTERNAL_MASK", "YES");
     return VrtWo()(argc, argv);
 }
