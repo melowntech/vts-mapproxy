@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.44) citationtech-wheezy; urgency=low
+
+  * Support for internal/external mask in datasets.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Fri, 27 Jan 2017 12:20:06 +0100
+
 ctt-vts-mapproxy (0.43) citationtech-wheezy; urgency=low
 
   * Fixed mapproxy-dbg dependencies
