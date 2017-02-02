@@ -24,7 +24,7 @@ Description: VTS MapProxy backend server
 
 Package: ctt-vts-seznamcz-mapproxy-tools
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ctt-vts-registry (>= 1.0)
+Depends: ${shlibs:Depends}, ${misc:Depends}, ctt-vts-seznamcz-registry (>= 1.0)
 Breaks: ctt-vts-seznamcz-mapproxy (<< 0.4)
 Replaces: ctt-vts-seznamcz-mapproxy (<< 0.4)
 Description: VTS MapProxy backend server tools
