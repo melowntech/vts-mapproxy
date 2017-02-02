@@ -1,3 +1,9 @@
+ctt-vts-seznamcz-mapproxy (0.5) citationtech-wheezy-seznamcz; urgency=low
+
+  * Fixed dependencies.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Mon, 30 Jan 2017 12:20:22 +0100
+
 ctt-vts-seznamcz-mapproxy (0.4) citationtech-wheezy-seznamcz; urgency=low
 
   * Split package into two: mapproxy and mapproxy-tools
