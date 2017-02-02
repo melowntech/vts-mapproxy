@@ -14,7 +14,7 @@ class SurfaceSpheroid : public SurfaceBase {
 public:
     SurfaceSpheroid(const Params &params);
 
-    struct Definition : public DefinitionBase {
+    struct Definition : public SurfaceBase::SurfaceDefinition {
         unsigned int textureLayerId;
         boost::optional<std::string> geoidGrid;
 

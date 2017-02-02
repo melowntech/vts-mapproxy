@@ -1099,8 +1099,11 @@
         "credits" : [],
         "definition" :
         {
-                "dataset" : "lada-bug",
-                "geoidGrid" : "egm96_15.gtx"
+            "dataset" : "lada-bug"
+            , "geoidGrid" : "egm96_15.gtx"
+
+            , "nominalTexelSize": 1
+            , "mergeBottomLod": 100
         },
         "driver" : "surface-dem",
         "group" : "melown",
@@ -1119,6 +1122,46 @@
         },
         "registry" : {},
         "type" : "surface"
+    }
+
+    , {
+        "comment": "Some art with alpha",
+        "group": "melown",
+        "id": "art",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0, 20],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": ["citationtech"],
+        "definition": {
+            "dataset": "art.tif"
+            , "format": "jpg"
+            , "transparent": true
+        }
+    }
+
+    , {
+        "comment": "Some art with alpha",
+        "group": "melown",
+        "id": "art2",
+        "type": "tms",
+        "driver": "tms-raster",
+        "referenceFrames": {
+            "melown2015": {
+                "lodRange": [0, 20],
+                "tileRange": [[0, 0], [0, 0]]
+            }
+        },
+        "credits": ["citationtech"],
+        "definition": {
+            "dataset": "art2.tif"
+            , "format": "jpg"
+            , "transparent": true
+        }
     }
 
 ]

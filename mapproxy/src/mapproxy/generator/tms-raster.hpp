@@ -15,6 +15,7 @@ public:
         std::string dataset;
         boost::optional<std::string> mask;
         RasterFormat format;
+        bool transparent;
 
         Definition(): format(RasterFormat::jpg) {}
 

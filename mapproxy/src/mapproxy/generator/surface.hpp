@@ -9,14 +9,34 @@
 
 namespace vts = vadstena::vts;
 
+namespace json { class Value; }
+namespace boost { namespace python { class dict; } }
+
 namespace generator {
 
 class SurfaceBase : public Generator {
 public:
     SurfaceBase(const Params &params);
 
+    struct SurfaceDefinition : public DefinitionBase {
+        boost::optional<double> nominalTexelSize;
+        boost::optional<vts::Lod> mergeBottomLod;
+
+        boost::optional<Resource::Id> introspectionTms;
+        boost::optional<vr::Position> introspectionPosition;
+
+        void parse(const Json::Value &value);
+        void build(Json::Value &value) const;
+        void parse(const boost::python::dict &value);
+
+    protected:
+        virtual Changed changed_impl(const DefinitionBase &other) const;
+    };
+
 protected:
     boost::filesystem::path filePath(vts::File fileType) const;
+    bool updateProperties(const SurfaceDefinition &def);
+    bool loadFiles(const SurfaceDefinition &definition);
 
 protected:
     vts::tileset::Index index_;

@@ -21,14 +21,11 @@ public:
 
     ~SurfaceDem();
 
-    struct Definition : public DefinitionBase {
+    struct Definition : public SurfaceBase::SurfaceDefinition {
         DemDataset dem;
         boost::optional<boost::filesystem::path> mask;
         unsigned int textureLayerId;
         boost::optional<std::string> heightcodingAlias;
-
-        boost::optional<Resource::Id> introspectionTms;
-        boost::optional<vr::Position> introspectionPosition;
 
         Definition() : textureLayerId() {}
 

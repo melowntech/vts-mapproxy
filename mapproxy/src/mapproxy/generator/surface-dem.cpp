@@ -104,21 +104,7 @@ void parseDefinition(SurfaceDem::Definition &def, const Json::Value &value)
         Json::get(*def.heightcodingAlias, value, "heightcodingAlias");
     }
 
-    if (value.isMember("introspection")) {
-        const auto &introspection(value["introspection"]);
-        if (introspection.isMember("tms")) {
-            const auto &surface(introspection["tms"]);
-            Resource::Id rid;
-            Json::get(rid.group, surface, "group");
-            Json::get(rid.id, surface, "id");
-            def.introspectionTms = rid;
-        }
-
-        if (introspection.isMember("position")) {
-            def.introspectionPosition
-                = vr::positionFromJson(introspection["position"]);
-        }
-    }
+    def.parse(value);
 }
 
 void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
@@ -138,17 +124,7 @@ void buildDefinition(Json::Value &value, const SurfaceDem::Definition &def)
         value["heightcodingAlias"] = *def.heightcodingAlias;
     }
 
-    if (def.introspectionTms || def.introspectionPosition) {
-        auto &introspection(value["introspection"] = Json::objectValue);
-        if (def.introspectionTms) {
-            auto &tms(introspection["tms"] = Json::objectValue);
-            tms["group"] = def.introspectionTms->group;
-            tms["id"] = def.introspectionTms->id;
-        }
-        if (def.introspectionPosition) {
-            introspection["position"] = vr::asJson(*def.introspectionPosition);
-        }
-    }
+    def.build(value);
 }
 
 void parseDefinition(SurfaceDem::Definition &def
@@ -174,22 +150,7 @@ void parseDefinition(SurfaceDem::Definition &def
         def.heightcodingAlias = py2utf8(value["heightcodingAlias"]);
     }
 
-    if (value.has_key("introspection")) {
-        boost::python::dict introspection(value["introspection"]);
-        if (introspection.has_key("tms")) {
-            boost::python::dict tms(introspection["tms"]);
-            Resource::Id rid;
-            rid.group = py2utf8(tms["group"]);
-            rid.id = py2utf8(tms["id"]);
-            def.introspectionTms = rid;
-        }
-
-        if (introspection.has_key("position")) {
-            def.introspectionPosition = boost::in_place();
-            vr::fromPython(*def.introspectionPosition
-                           , introspection["position"]);
-        }
-    }
+    def.parse(value);
 }
 
 } // namespace
@@ -228,16 +189,7 @@ Changed SurfaceDem::Definition::changed_impl(const DefinitionBase &o) const
     if (mask != other.mask) { return Changed::yes; }
     if (textureLayerId != other.textureLayerId) { return Changed::yes; }
 
-    // introspection can safely change
-    if (introspectionTms != other.introspectionTms) {
-        return Changed::safely;
-    }
-
-    if (introspectionPosition != other.introspectionPosition) {
-        return Changed::safely;
-    }
-
-    return Changed::no;
+    return SurfaceBase::SurfaceDefinition::changed_impl(o);
 }
 
 SurfaceDem::SurfaceDem(const Params &params)
@@ -247,23 +199,10 @@ SurfaceDem::SurfaceDem(const Params &params)
            , definition_.dem.geoidGrid)
     , maskTree_(absoluteDatasetRf(definition_.mask))
 {
-    try {
-        auto indexPath(filePath(vts::File::tileIndex));
-        auto propertiesPath(filePath(vts::File::config));
-        if (fs::exists(indexPath) && fs::exists(propertiesPath)) {
-            // both paths exist -> ok
-            vts::tileset::loadTileSetIndex(index_, indexPath);
-            properties_ = vts::tileset::loadConfig(propertiesPath);
-            makeReady();
-
-            // remember dem
-            addToRegistry();
-            return;
-        }
-    } catch (const std::exception &e) {
-        // not ready
+    if (loadFiles(definition_)) {
+        // remember dem in registry
+        addToRegistry();
     }
-    LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
 SurfaceDem::~SurfaceDem()
@@ -294,6 +233,12 @@ void SurfaceDem::prepare_impl(Arsenal&)
     // keep driverOptions empty -> no driver
     properties_.lodRange = r.lodRange;
     properties_.tileRange = r.tileRange;
+
+    // optional tuning properties
+    properties_.nominalTexelSize = definition_.nominalTexelSize;
+    if (definition_.mergeBottomLod) {
+        properties_.mergeBottomLod = *definition_.mergeBottomLod;
+    }
 
     prepareTileIndex(index_
                      , (absoluteDataset(definition_.dem.dataset)

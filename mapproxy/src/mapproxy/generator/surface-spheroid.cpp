@@ -77,6 +77,8 @@ void parseDefinition(SurfaceSpheroid::Definition &def
         Json::get(s, value, "geoidGrid");
         def.geoidGrid = s;
     }
+
+    def.parse(value);
 }
 
 void buildDefinition(Json::Value &value
@@ -88,6 +90,8 @@ void buildDefinition(Json::Value &value
     if (def.geoidGrid) {
         value["geoidGrid"] = *def.geoidGrid;
     }
+
+    def.build(value);
 }
 
 void parseDefinition(SurfaceSpheroid::Definition &def
@@ -101,6 +105,8 @@ void parseDefinition(SurfaceSpheroid::Definition &def
     if (value.has_key("geoidGrid")) {
         def.geoidGrid = py2utf8(value["geoidGrid"]);
     }
+
+    def.parse(value);
 }
 
 } // namespace
@@ -139,27 +145,14 @@ Changed SurfaceSpheroid::Definition::changed_impl(const DefinitionBase &o)
     if (textureLayerId != other.textureLayerId) { return Changed::yes; }
     if (geoidGrid != other.geoidGrid) { return Changed::yes; }
 
-    return Changed::no;
+    return SurfaceBase::SurfaceDefinition::changed_impl(o);
 }
 
 SurfaceSpheroid::SurfaceSpheroid(const Params &params)
     : SurfaceBase(params)
     , definition_(resource().definition<Definition>())
 {
-    try {
-        auto indexPath(filePath(vts::File::tileIndex));
-        auto propertiesPath(filePath(vts::File::config));
-        if (fs::exists(indexPath) && fs::exists(propertiesPath)) {
-            // both paths exist -> ok
-            vts::tileset::loadTileSetIndex(index_, indexPath);
-            properties_ = vts::tileset::loadConfig(propertiesPath);
-            makeReady();
-            return;
-        }
-    } catch (const std::exception &e) {
-        // not ready
-    }
-    LOG(info1) << "Generator for <" << id() << "> not ready.";
+    loadFiles(definition_);
 }
 
 void SurfaceSpheroid::prepare_impl(Arsenal&)
@@ -240,8 +233,37 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
 vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
     const
 {
+    vts::ExtraTileSetProperties extra;
+
+    if (definition_.introspectionTms) {
+        if (auto other = otherGenerator
+            (Resource::Generator::Type::tms
+             , addReferenceFrame(*definition_.introspectionTms
+                                 , referenceFrameId())))
+        {
+            // we have found tms resource, use it as a boundlayer
+            const auto otherId(definition_.introspectionTms->fullId());
+            const auto &otherResource(other->resource());
+            const auto resdiff(resolveRoot(resource(), otherResource));
+
+            const fs::path blPath
+                (prependRoot(fs::path(), otherResource, resdiff)
+                 / "boundlayer.json");
+
+            extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
+
+            extra.view.surfaces[id().fullId()]
+                = { vr::View::BoundLayerParams(otherId) };
+        };
+    }
+
+
+    if (definition_.introspectionPosition) {
+        extra.position = *definition_.introspectionPosition;
+    }
+
     auto mc(vts::mapConfig
-            (properties_, resource().registry, vts::ExtraTileSetProperties()
+            (properties_, resource().registry, extra
              , prependRoot(fs::path(), resource(), root)));
 
     return mc;

@@ -76,6 +76,10 @@ void parseDefinition(TmsRaster::Definition &def, const Json::Value &value)
                 ("Value stored in format is not RasterFormat value");
         }
     }
+
+    if (value.isMember("transparent")) {
+        Json::get(def.transparent, value, "transparent");
+    }
 }
 
 void buildDefinition(Json::Value &value, const TmsRaster::Definition &def)
@@ -85,6 +89,8 @@ void buildDefinition(Json::Value &value, const TmsRaster::Definition &def)
         value["mask"] = *def.mask;
     }
     value["format"] = boost::lexical_cast<std::string>(def.format);
+
+    value["transparent"] = def.transparent;
 }
 
 void parseDefinition(TmsRaster::Definition &def
@@ -104,6 +110,11 @@ void parseDefinition(TmsRaster::Definition &def
             utility::raise<Error>
                 ("Value stored in format is not RasterFormat value");
         }
+    }
+
+    if (value.has_key("transparent")) {
+        def.transparent = boost::python::extract<bool>
+            (value["transparent"]);
     }
 }
 
@@ -142,6 +153,9 @@ Changed TmsRaster::Definition::changed_impl(const DefinitionBase &o) const
     // non-safe changes first
     if (dataset != other.dataset) { return Changed::yes; }
     if (mask != other.mask) { return Changed::yes; }
+
+    // transparent can change
+    if (transparent != other.transparent) { return Changed::safely; }
 
     // format can change
     if (format != other.format) { return Changed::safely; }
@@ -229,7 +243,7 @@ RasterFormat TmsRaster::format() const
 
 bool TmsRaster::transparent_impl() const
 {
-    return false;
+    return definition_.transparent;
 }
 
 bool TmsRaster::hasMask_impl() const
