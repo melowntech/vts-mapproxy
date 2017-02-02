@@ -24,6 +24,7 @@
 #include "utility/time.hpp"
 #include "service/cmdline.hpp"
 #include "utility/enum-io.hpp"
+#include "utility/path.hpp"
 
 #include "geo/geodataset.hpp"
 #include "geo/gdal.hpp"
@@ -681,10 +682,35 @@ Setup buildDatasetBase(const Config &config)
 
     fs::path inputDataset("./original");
     fs::path inputDatasetSymlink(config.output / inputDataset);
-    // make symlink to input dataset
 
-    fs::remove(inputDatasetSymlink);
-    fs::create_symlink(config.input, inputDatasetSymlink);
+    // make a symlink, remove newpath beforehand
+    auto symlink([](const fs::path &oldpath, const fs::path &newpath)
+    {
+        fs::remove(newpath);
+        fs::create_symlink(oldpath, newpath);
+    });
+
+    // make symlink to input dataset
+    symlink(config.input, inputDatasetSymlink);
+
+    // make symlinks to "sidecar" files
+    {
+        const auto dir(config.input.parent_path());
+        const auto basename(config.input.filename().string());
+        const auto prefix(basename + ".");
+
+        // temporarily open dataset and grab list of datasets files
+        const auto in(geo::GeoDataset::open(config.input));
+        for (const auto &file : in.files()) {
+            // get file name
+            const auto name(file.filename().string());
+            if (ba::starts_with(name, prefix)) {
+                const auto ext(name.substr(basename.size()));
+                symlink(dir / name, utility::addExtension
+                        (inputDatasetSymlink, ext));
+            }
+        }
+    }
 
     auto in(geo::GeoDataset::open(inputDatasetSymlink));
 
