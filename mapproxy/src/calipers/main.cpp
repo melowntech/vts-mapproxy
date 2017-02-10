@@ -310,8 +310,8 @@ bool Node::sample(double invGsdScale, double tileFractionLimit)
     const auto dsCenter(math::center(extents));
 
     // calculate pixel and halfpixel size
-    const math::Size2f px((es.width / ds.size.height)
-                          , (es.width / ds.size.height));
+    const math::Size2f px((es.width / ds.size.width)
+                        , (es.height / ds.size.height));
     const math::Size2f hpx(px.width / 2.0, px.height / 2.0);
 
     // best (local) LOD computed for this node
@@ -342,16 +342,16 @@ bool Node::sample(double invGsdScale, double tileFractionLimit)
             else if (j == grid.rows) { p(1) -= hpx.height; }
 
 
-            // convert pixel aroung grid point to node's SRS
+            // convert pixel around grid point to node's SRS
             std::array<math::Point2d, 4> corners;
             if (convert(corners[0], p(0) - hpx.width
-                             , p(1) - hpx.height)
+                                  , p(1) - hpx.height)
                 || convert(corners[1], p(0) - hpx.width
-                                , p(1) + hpx.height)
+                                     , p(1) + hpx.height)
                 || convert(corners[2], p(0) + hpx.width
-                                , p(1) + hpx.height)
+                                     , p(1) + hpx.height)
                 || convert(corners[3], p(0) + hpx.width
-                                , p(1) - hpx.height))
+                                     , p(1) - hpx.height))
             {
                 continue;
             }
