@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.46) citationtech-wheezy; urgency=low
+
+  * Fixed calipers lod range determination. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Wed, 15 Feb 2017 13:53:34 +0100
+
 ctt-vts-mapproxy (0.45) citationtech-wheezy; urgency=low
 
   * Fixed generatevrtwo auxiliary files handling.
