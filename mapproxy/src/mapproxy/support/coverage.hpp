@@ -5,7 +5,7 @@
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "imgproc/rastermask/mappedqtree.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 typedef imgproc::mappedqtree::RasterMask MaskTree;
 

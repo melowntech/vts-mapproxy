@@ -47,8 +47,8 @@ namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 namespace ublas = boost::numeric::ublas;
-namespace vr = vadstena::registry;
-namespace vts = vadstena::vts;
+namespace vr = vtslibs::registry;
+namespace vts = vtslibs::vts;
 
 UTILITY_GENERATE_ENUM(DatasetType,
     ((dem))

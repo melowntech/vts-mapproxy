@@ -15,7 +15,7 @@
 #include "./browser2d.hpp"
 
 namespace ba = boost::algorithm;
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 
 namespace constants {
     const std::string Config("mapConfig.json");

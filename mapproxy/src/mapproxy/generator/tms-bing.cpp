@@ -30,7 +30,7 @@
 
 namespace ba = boost::algorithm;
 
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 
 namespace generator {
 

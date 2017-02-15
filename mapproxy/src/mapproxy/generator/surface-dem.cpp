@@ -46,9 +46,9 @@
 #include "./metatile.hpp"
 
 namespace fs = boost::filesystem;
-namespace vr = vadstena::registry;
-namespace vs = vadstena::storage;
-namespace vts = vadstena::vts;
+namespace vr = vtslibs::registry;
+namespace vs = vtslibs::storage;
+namespace vts = vtslibs::vts;
 
 namespace generator {
 

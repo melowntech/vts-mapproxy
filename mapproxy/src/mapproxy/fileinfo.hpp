@@ -10,8 +10,8 @@
 #include "./resource.hpp"
 #include "./sink.hpp"
 
-namespace vs = vadstena::storage;
-namespace vts = vadstena::vts;
+namespace vs = vtslibs::storage;
+namespace vts = vtslibs::vts;
 
 namespace FileFlags { enum {
     none = 0x00

@@ -71,8 +71,8 @@ private:
     virtual bool frozenCredits_impl() const { return true; }
 };
 
-namespace vr = vadstena::registry;
-namespace vts = vadstena::vts;
+namespace vr = vtslibs::registry;
+namespace vts = vtslibs::vts;
 
 struct DualId {
     std::string id;

@@ -10,8 +10,8 @@
 
 #include "../support/coverage.hpp"
 
-namespace vts = vadstena::vts;
-namespace vr = vadstena::registry;
+namespace vts = vtslibs::vts;
+namespace vr = vtslibs::registry;
 
 namespace generator {
 

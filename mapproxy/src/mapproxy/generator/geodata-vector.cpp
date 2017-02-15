@@ -18,7 +18,7 @@
 #include "./geodata-vector.hpp"
 #include "./factory.hpp"
 
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 namespace fs = boost::filesystem;
 
 namespace generator {

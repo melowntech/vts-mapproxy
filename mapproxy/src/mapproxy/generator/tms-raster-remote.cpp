@@ -25,7 +25,7 @@
 
 #include "browser2d/index.html.hpp"
 
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 
 namespace generator {
 

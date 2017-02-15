@@ -5,7 +5,7 @@
 
 #include "vts-libs/vts/nodeinfo.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 struct DemDataset {
     std::string dataset;

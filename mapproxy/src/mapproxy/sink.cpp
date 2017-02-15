@@ -14,7 +14,7 @@
 #include "./sink.hpp"
 #include "./error.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 namespace {
 

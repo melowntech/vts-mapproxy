@@ -6,7 +6,7 @@
 
 #include "./surface.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 namespace generator {
 

@@ -9,8 +9,8 @@
 
 #include "./coverage.hpp"
 
-namespace vts = vadstena::vts;
-namespace vr = vadstena::registry;
+namespace vts = vtslibs::vts;
+namespace vr = vtslibs::registry;
 
 /** Metatile block (part of metatile sharing same spatial division)
  */

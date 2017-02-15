@@ -16,8 +16,8 @@
 #include "./sink.hpp"
 
 namespace asio = boost::asio;
-namespace vts = vadstena::vts;
-namespace vr = vadstena::registry;
+namespace vts = vtslibs::vts;
+namespace vr = vtslibs::registry;
 
 class Core::Detail : boost::noncopyable {
 public:

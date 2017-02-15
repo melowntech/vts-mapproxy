@@ -18,8 +18,8 @@
 namespace fs = boost::filesystem;
 namespace python = boost::python;
 
-namespace vr = vadstena::registry;
-namespace vs = vadstena::storage;
+namespace vr = vtslibs::registry;
+namespace vs = vtslibs::storage;
 
 namespace detail {
 

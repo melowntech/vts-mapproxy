@@ -30,9 +30,9 @@
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 
 struct UnifiedTileRange {
     boost::variant<vts::TileRange, vts::LodTileRange> range;

@@ -5,7 +5,7 @@
 
 namespace browser2d {
 
-const vadstena::storage::SupportFile::Files supportFiles =
+const vtslibs::storage::SupportFile::Files supportFiles =
 {
     { "index.html"
       , {

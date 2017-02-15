@@ -6,7 +6,7 @@
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/csconvertor.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 vts::CsConvertor sds2phys(const vts::NodeInfo &nodeInfo
                           , const boost::optional<std::string> &geoidGrid);

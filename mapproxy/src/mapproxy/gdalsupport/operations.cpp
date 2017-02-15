@@ -21,7 +21,7 @@
 #include "./operations.hpp"
 
 namespace bio = boost::iostreams;
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 
 namespace {
 

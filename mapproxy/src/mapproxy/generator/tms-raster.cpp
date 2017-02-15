@@ -30,7 +30,7 @@
 
 namespace fs = boost::filesystem;
 namespace bgil = boost::gil;
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 
 namespace generator {
 

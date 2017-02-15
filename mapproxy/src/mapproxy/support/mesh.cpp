@@ -9,7 +9,7 @@
 #include "./mesh.hpp"
 #include "./srs.hpp"
 
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 
 std::tuple<geometry::Mesh, bool>
 meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges

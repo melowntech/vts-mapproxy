@@ -30,7 +30,7 @@ namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 
-namespace vr = vadstena::registry;
+namespace vr = vtslibs::registry;
 
 class Daemon : public service::Service {
 public:

@@ -24,8 +24,8 @@
 
 #include "./generator/demregistry.hpp"
 
-namespace vs = vadstena::storage;
-namespace vts = vadstena::vts;
+namespace vs = vtslibs::storage;
+namespace vts = vtslibs::vts;
 
 struct Arsenal {
     GdalWarper &warper;

@@ -5,7 +5,7 @@
 
 namespace browser2d {
 
-extern const vadstena::storage::SupportFile::Files supportFiles;
+extern const vtslibs::storage::SupportFile::Files supportFiles;
 
 } // namespace browser2d
 

@@ -7,7 +7,7 @@
 
 #include "../generator.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 namespace json { class Value; }
 namespace boost { namespace python { class dict; } }

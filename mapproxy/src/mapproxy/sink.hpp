@@ -16,7 +16,7 @@
 
 #include "./support/fileclass.hpp"
 
-namespace vs = vadstena::storage;
+namespace vs = vtslibs::storage;
 
 /** Aborter helper.
  */

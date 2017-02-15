@@ -10,7 +10,7 @@
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/mesh.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 /** Calculates number of faces to simplify mesh to based on ideal flat tile and
  *  tile's roughness.

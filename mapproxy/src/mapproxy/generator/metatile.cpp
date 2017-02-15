@@ -30,13 +30,24 @@ struct Sample {
     math::Point3 min;
     math::Point3 max;
     HeightRange heightRange;
+    vts::GeomExtents ge;
 
     Sample() : valid(false), heightRange(HeightRange::emptyRange()) {}
-    Sample(const math::Point3 &value, const math::Point3 &min
-           , const math::Point3 &max, const HeightRange &heightRange)
-        : valid(true), value(value), min(min), max(max)
-        , heightRange(heightRange)
-    {}
+
+    Sample(double x, double y, const cv::Vec3d &value
+           , const vts::CsConvertor &conv
+           , const vts::CsConvertor &navConv)
+        : valid(true)
+        , value(conv(math::Point3(x, y, value[0])))
+        , min(conv(math::Point3(x, y, value[1])))
+        , max(conv(math::Point3(x, y, value[2])))
+        , heightRange(navConv(math::Point3(x, y, value[1]))(2)
+                      , navConv(math::Point3(x, y, value[2]))(2))
+    {
+        vts::update(ge, value[0]);
+        vts::update(ge, value[1]);
+        vts::update(ge, value[2]);
+    }
 };
 
 const Sample* getSample(const Sample &sample)
@@ -211,15 +222,7 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
 
                 // compute all 3 world points (value, min, max) and height range
                 // in navigation space
-                grid(i, j) = {
-                    conv(math::Point3(x, y, (*value)[0]))
-                    , conv(math::Point3(x, y, (*value)[1]))
-                    , conv(math::Point3(x, y, (*value)[2]))
-                    // use only z-component from converted points
-                    , HeightRange
-                    (navConv(math::Point3(x, y, (*value)[1]))(2)
-                     , navConv(math::Point3(x, y, (*value)[2]))(2))
-                };
+                grid(i, j) = { x, y, *value, conv, navConv };
             }
         }
 
@@ -258,6 +261,7 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                             // update by both minimum and maximum
                             math::update(te, p->min);
                             math::update(te, p->max);
+                            vts::update(node.geomExtents, p->ge);
                         }
 
                         if (geometry && ii && jj) {

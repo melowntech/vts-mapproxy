@@ -7,7 +7,7 @@
 #include "../resource.hpp"
 #include "./coverage.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 void prepareTileIndex(vts::TileIndex &index
                       , const boost::filesystem::path &tilesPath

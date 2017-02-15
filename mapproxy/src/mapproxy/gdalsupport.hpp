@@ -22,7 +22,7 @@
 #include "./support/geo.hpp"
 #include "./sink.hpp"
 
-namespace vts = vadstena::vts;
+namespace vts = vtslibs::vts;
 
 class GdalWarper {
 public:
