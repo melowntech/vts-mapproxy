@@ -320,6 +320,13 @@ geo::SrsDefinition sds(const vts::NodeInfo &nodeInfo
     return geo::setGeoid(nodeInfo.srsDef(), *geoidGrid);
 }
 
+vts::CsConvertor sdsg2sdsr(const vts::NodeInfo &nodeInfo
+                           , const boost::optional<std::string> &geoidGrid)
+{
+    if (!geoidGrid) { return {}; }
+    return vts::CsConvertor(sds(nodeInfo, geoidGrid), nodeInfo.srs());
+}
+
 namespace {
 
 class TextureNormalizer {

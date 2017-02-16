@@ -36,18 +36,18 @@ struct Sample {
 
     Sample(double x, double y, const cv::Vec3d &value
            , const vts::CsConvertor &conv
-           , const vts::CsConvertor &navConv)
+           , const vts::CsConvertor &navConv
+           , const vts::CsConvertor &geConv)
         : valid(true)
         , value(conv(math::Point3(x, y, value[0])))
         , min(conv(math::Point3(x, y, value[1])))
         , max(conv(math::Point3(x, y, value[2])))
         , heightRange(navConv(math::Point3(x, y, value[1]))(2)
                       , navConv(math::Point3(x, y, value[2]))(2))
-    {
-        vts::update(ge, value[0]);
-        vts::update(ge, value[1]);
-        vts::update(ge, value[2]);
-    }
+        , ge(geConv(math::Point3(x, y, value[1]))(2)
+             , geConv(math::Point3(x, y, value[2]))(2)
+             , geConv(math::Point3(x, y, value[0]))(2))
+    {}
 };
 
 const Sample* getSample(const Sample &sample)
@@ -201,6 +201,7 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
 
         auto conv(sds2phys(block.commonAncestor, geoidGrid));
         auto navConv(sds2nav(block.commonAncestor, geoidGrid));
+        auto geConv(sdsg2sdsr(block.commonAncestor, geoidGrid));
 
         // grid mask
         const ShiftMask rfmask(block, metatileSamplesPerTile, maskTree);
@@ -222,7 +223,7 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
 
                 // compute all 3 world points (value, min, max) and height range
                 // in navigation space
-                grid(i, j) = { x, y, *value, conv, navConv };
+                grid(i, j) = { x, y, *value, conv, navConv, geConv };
             }
         }
 
@@ -245,8 +246,10 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 // compute tile extents and height range
                 auto heightRange(HeightRange::emptyRange());
                 math::Extents3 te(math::InvalidExtents{});
-                double area(0);
+                double area(0.0);
                 int triangleCount(0);
+                double avgHeightSum(0.f);
+                int avgHeightCount(0);
 
                 // process all node's vertices in grid
                 for (int jj(0); jj <= metatileSamplesPerTile; ++jj) {
@@ -262,6 +265,8 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                             math::update(te, p->min);
                             math::update(te, p->max);
                             vts::update(node.geomExtents, p->ge);
+                            avgHeightSum += p->ge.surrogate;
+                            ++avgHeightCount;
                         }
 
                         if (geometry && ii && jj) {
@@ -311,10 +316,13 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                     // reset content flags
                     node.geometry(geometry = false);
                     node.navtile(navtile = false);
+                    // reset height range
                     heightRange = heightRange.emptyRange();
+                    // reset geom extents
+                    node.geomExtents = {};
                 }
 
-                // calculate texel size
+                // calculate texel size and surrogate
                 if (geometry) {
                     // set credits
                     node.updateCredits(resource.credits);
@@ -343,6 +351,12 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
 
                         // calculate texel size
                         node.texelSize = std::sqrt(area / textureArea);
+                    }
+
+                    // surrogate
+                    if (avgHeightCount) {
+                        node.geomExtents.surrogate
+                            = (avgHeightSum / avgHeightCount);
                     }
                 }
 

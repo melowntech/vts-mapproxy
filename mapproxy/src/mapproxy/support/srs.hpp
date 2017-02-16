@@ -17,4 +17,10 @@ vts::CsConvertor sds2nav(const vts::NodeInfo &nodeInfo
 geo::SrsDefinition sds(const vts::NodeInfo &nodeInfo
                        , const boost::optional<std::string> &geoidGrid);
 
+/** Convertor between geoid-shifted SDS to raw SDS
+ *  Returns dummy convertor if no grid applies.
+ */
+vts::CsConvertor sdsg2sdsr(const vts::NodeInfo &nodeInfo
+                           , const boost::optional<std::string> &geoidGrid);
+
 #endif // mapproxy_support_srs_hpp_included_
