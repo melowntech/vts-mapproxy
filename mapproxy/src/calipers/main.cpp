@@ -238,7 +238,7 @@ public:
     }
 
     vts::Ranges ranges() const {
-        return vts::Ranges(vts::LodRange(minLod_, lod), tileRange_
+        return vts::Ranges(vts::LodRange(minLod_, lod), globalRange()
                            , vts::Ranges::FromBottom{});
     }
 
@@ -281,6 +281,8 @@ private:
                            , const math::Extents2 &extents
                            , const OptCorners &corners);
 
+    vts::TileRange globalRange() const;
+
     geo::GeoDataset::Descriptor ds;
     vts::NodeInfo node;
     vts::CsConvertor ds2node;
@@ -298,6 +300,13 @@ private:
     vts::Lod minLod_;
     vts::TileRange tileRange_;
 };
+
+vts::TileRange Node::globalRange() const
+{
+    auto lch(vts::lowestChild(node.nodeId(), localLod));
+    return vts::TileRange( tileRange_.ll(0) + lch.x, tileRange_.ll(1) + lch.y
+                         , tileRange_.ur(0) + lch.x, tileRange_.ur(1) + lch.y);
+}
 
 bool Node::sample(double invGsdScale, double tileFractionLimit)
 {
