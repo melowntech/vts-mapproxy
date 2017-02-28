@@ -352,6 +352,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
         auto conv(sds2phys(block.commonAncestor, definition_.geoidGrid));
         auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
+        auto geConv(sdsg2sdsr(block.commonAncestor, definition_.geoidGrid));
 
         // fill in matrix
         for (int j(0), je(gridSize.height); j < je; ++j) {
@@ -384,6 +385,8 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                 math::Extents3 te(math::InvalidExtents{});
                 double area(0);
                 int triangleCount(0);
+                double avgHeightSum(0.f);
+                int avgHeightCount(0);
 
                 // process all node's vertices in grid
                 for (int jj(0); jj <= metatileSamplesPerTile; ++jj) {
@@ -393,7 +396,17 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                         const auto *p(grid(mask, xx, yy));
 
                         // update tile extents (if point valid)
-                        if (p) { math::update(te, *p); }
+                        if (p) {
+                            math::update(te, *p);
+                            // convert point to proper SDS
+                            const auto sdsHeight(geConv(*p)[2]);
+                            // update geom extents
+                            vts::update(node.geomExtents, sdsHeight);
+
+                            // accumulate average height (surrogate) calculator
+                            avgHeightSum += sdsHeight;
+                            ++avgHeightCount;
+                        }
 
                         if (geometry && ii && jj) {
                             // compute area of the quad composed of 1 or 2
@@ -469,6 +482,12 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
                     // calculate texel size
                     node.texelSize = std::sqrt(area / textureArea);
+
+                    // surrogate
+                    if (avgHeightCount) {
+                        node.geomExtents.surrogate
+                            = (avgHeightSum / avgHeightCount);
+                    }
                 }
 
                 // store metata node
