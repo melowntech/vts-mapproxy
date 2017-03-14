@@ -128,11 +128,13 @@ struct Flag {
     };
 };
 
-class DemTiling : public service::Cmdline {
+class Tiling : public service::Cmdline {
 public:
-    DemTiling()
-        : service::Cmdline("dem-tiling", BUILD_TARGET_VERSION)
+    Tiling()
+        : service::Cmdline("mapproxy-tiling", BUILD_TARGET_VERSION
+                           , (service::DISABLE_EXCESSIVE_LOGGING))
         , tileSampling_(128), parallel_(true), forceWatertight_(false)
+        , noexcept_(false)
     {}
 
 private:
@@ -146,6 +148,8 @@ private:
 
     int run();
 
+    int runImpl();
+
     fs::path input_;
     fs::path output_;
     std::string referenceFrame_;
@@ -158,9 +162,11 @@ private:
     fs::path dataset_;
     bool parallel_;
     bool forceWatertight_;
+
+    bool noexcept_;
 };
 
-void DemTiling::configuration(po::options_description &cmdline
+void Tiling::configuration(po::options_description &cmdline
                             , po::options_description &config
                             , po::positional_options_description &pd)
 {
@@ -190,6 +196,8 @@ void DemTiling::configuration(po::options_description &cmdline
          ->default_value(forceWatertight_)->implicit_value(true)
          , "Treats all partial tiles as watertight. Will lie about the holes "
            "in the dataset.")
+
+        ("noexcept", "Do not catch exceptions, let the program crash.")
         ;
 
     pd.add("input", 1)
@@ -199,7 +207,7 @@ void DemTiling::configuration(po::options_description &cmdline
     (void) config;
 }
 
-void DemTiling::configure(const po::variables_map &vars)
+void Tiling::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
 
@@ -215,6 +223,8 @@ void DemTiling::configure(const po::variables_map &vars)
         output_ = input_ / ("tiling." + referenceFrame_);
     }
 
+    noexcept_ = vars.count("noexcept");
+
     LOG(info3, log_)
         << "Config:"
         << "\n\tinput = " << input_
@@ -227,15 +237,15 @@ void DemTiling::configure(const po::variables_map &vars)
         ;
 }
 
-bool DemTiling::help(std::ostream &out, const std::string &what) const
+bool Tiling::help(std::ostream &out, const std::string &what) const
 {
     if (what.empty()) {
         // program help
-        out << ("mapproxy-dem-tiling tool\n"
+        out << ("mapproxy-tiling tool\n"
                 "    Analyzes input dataset and generates tiling "
                 "information.\n"
                 "usage:\n"
-                "    mapproxy-dem-tiling input referenceFrame [ options ]\n"
+                "    mapproxy-tiling input referenceFrame [ options ]\n"
                 "\n"
                 );
 
@@ -286,7 +296,6 @@ private:
     vts::TileIndex &ti_;
     vts::LodRange lodRange_;
     int tileSampling_;
-    geo::SrsDefinition srs_;
 
     std::vector<geo::GeoDataset> gds_;
     bool parallel_;
@@ -302,7 +311,7 @@ TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
                        , const vts::LodTileRange::list &tileRanges
                        , int tileSampling, bool parallel, bool forceWatertight)
     : dataset_(dataset), ti_(ti), lodRange_(lodRange)
-    , tileSampling_(tileSampling), srs_(root.srsDef())
+    , tileSampling_(tileSampling)
     , parallel_(parallel), forceWatertight_(forceWatertight)
 {
     buildWorld(lodRange, tileRanges);
@@ -388,6 +397,35 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
                 << ", srs: " << node.srs()
                 << ") [fake watertight subtree in invalid part of a tree].";
         }
+        return;
+    }
+
+    auto descend([&]() -> void
+    {
+
+        if (tileId.lod == lodRange_.max) {
+            // no children down there
+            return;
+        }
+
+        // we can proces children -> go down
+        for (auto child : vts::children(tileId)) {
+            // compute child node
+            auto childNode(node.child(child));
+
+            if (parallel_) {
+                UTILITY_OMP(task)
+                    process(childNode, upscaling);
+            } else {
+                process(childNode, upscaling);
+            }
+        }
+    });
+
+
+    if (!node.productive()) {
+        // unproductive node, immediate descend
+        descend();
         return;
     }
 
@@ -526,28 +564,12 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
         }
     }
 
-    if (tileId.lod == lodRange_.max) {
-        // no children down there
-        return;
-    }
-
-    // we can proces children -> go down
-    for (auto child : vts::children(tileId)) {
-        // compute child node
-        auto childNode(node.child(child));
-
-        if (parallel_) {
-            UTILITY_OMP(task)
-                process(childNode, upscaling);
-        } else {
-            process(childNode, upscaling);
-        }
-    }
-
+    // descend to children
+    descend();
     // done
 }
 
-int DemTiling::run()
+int Tiling::runImpl()
 {
     auto rf(vr::system.referenceFrames(referenceFrame_));
 
@@ -566,10 +588,24 @@ int DemTiling::run()
     return EXIT_SUCCESS;
 }
 
+int Tiling::run()
+{
+    if (noexcept_) {
+        return runImpl();
+    }
+
+    try {
+        return runImpl();
+    } catch (const std::exception &e) {
+        std::cerr << "maproxy-tiling: " << e.what() << '\n';
+        return EXIT_FAILURE;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     gdal_drivers::registerAll();
     // force VRT not to share undelying datasets
     geo::Gdal::setOption("VRT_SHARED_SOURCE", 0);
-    return DemTiling()(argc, argv);
+    return Tiling()(argc, argv);
 }
