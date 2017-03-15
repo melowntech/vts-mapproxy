@@ -275,7 +275,8 @@ public:
                , int tileSampling, bool parallel, bool forceWatertight);
 
 private:
-    void process(const vts::NodeInfo &node, double upscaling = 0.0);
+    void process(bool parentProductive
+                 , const vts::NodeInfo &node, double upscaling = 0.0);
     void descend(const vts::NodeInfo &node, const vts::TileId &tileId
                  , double upscaling);
 
@@ -323,11 +324,11 @@ TreeWalker::TreeWalker(vts::TileIndex &ti, const fs::path &dataset
             UTILITY_OMP(single)
             {
                 prepareDataset();
-                process(root);
+                process(false, root);
             }
     } else {
         prepareDataset();
-        process(root);
+        process(false, root);
     }
 }
 
@@ -350,13 +351,16 @@ void TreeWalker::buildWorld(const vts::LodRange &lodRange
     }
 }
 
-void TreeWalker::descend(const vts::NodeInfo &node, const vts::TileId &tileId
-                         , double upscaling)
+void TreeWalker::descend(const vts::NodeInfo &node
+                         , const vts::TileId &tileId, double upscaling)
 {
     if (tileId.lod == lodRange_.max) {
         // no children down there
         return;
     }
+
+    // do not use const otherwise OpenMP makes it shared
+    bool parentProductive(node.productive());
 
     // we can proces children -> go down
     for (auto child : vts::children(tileId)) {
@@ -364,15 +368,16 @@ void TreeWalker::descend(const vts::NodeInfo &node, const vts::TileId &tileId
         auto childNode(node.child(child));
 
         if (parallel_) {
-            UTILITY_OMP(task firstprivate(childNode, upscaling))
-                process(childNode, upscaling);
+            UTILITY_OMP(task)
+                process(parentProductive, childNode, upscaling);
         } else {
-            process(childNode, upscaling);
+            process(parentProductive, childNode, upscaling);
         }
     }
 }
 
-void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
+void TreeWalker::process(bool parentProductive
+                         , const vts::NodeInfo &node, double upscaling)
 {
     struct TIDGuard {
         TIDGuard(const std::string &id)
@@ -412,7 +417,8 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
         // It is a lie but it will not hurt anyone.
 
         // set full subtree
-        if (tileId.lod >= lodRange_.min) {
+        if ((tileId.lod >= lodRange_.min) && parentProductive) {
+            (void) parentProductive;
             fullSubtree();
             // stop descent here
             LOG(info3)
