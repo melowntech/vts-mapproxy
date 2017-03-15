@@ -276,6 +276,8 @@ public:
 
 private:
     void process(const vts::NodeInfo &node, double upscaling = 0.0);
+    void descend(const vts::NodeInfo &node, const vts::TileId &tileId
+                 , double upscaling);
 
     const geo::GeoDataset& dataset() {
         return gds_[omp_get_thread_num()];
@@ -348,6 +350,28 @@ void TreeWalker::buildWorld(const vts::LodRange &lodRange
     }
 }
 
+void TreeWalker::descend(const vts::NodeInfo &node, const vts::TileId &tileId
+                         , double upscaling)
+{
+    if (tileId.lod == lodRange_.max) {
+        // no children down there
+        return;
+    }
+
+    // we can proces children -> go down
+    for (auto child : vts::children(tileId)) {
+        // compute child node
+        auto childNode(node.child(child));
+
+        if (parallel_) {
+            UTILITY_OMP(task firstprivate(childNode, upscaling))
+                process(childNode, upscaling);
+        } else {
+            process(childNode, upscaling);
+        }
+    }
+}
+
 void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
 {
     struct TIDGuard {
@@ -369,7 +393,7 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
 
     auto fullSubtree([&]()
     {
-        UTILITY_OMP(critical)
+        UTILITY_OMP(critical(tileIndex))
         {
             ti_.set(vts::LodRange(tileId.lod, lodRange_.max)
                     , vts::tileRange(tileId)
@@ -400,32 +424,9 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
         return;
     }
 
-    auto descend([&]() -> void
-    {
-
-        if (tileId.lod == lodRange_.max) {
-            // no children down there
-            return;
-        }
-
-        // we can proces children -> go down
-        for (auto child : vts::children(tileId)) {
-            // compute child node
-            auto childNode(node.child(child));
-
-            if (parallel_) {
-                UTILITY_OMP(task)
-                    process(childNode, upscaling);
-            } else {
-                process(childNode, upscaling);
-            }
-        }
-    });
-
-
     if (!node.productive()) {
         // unproductive node, immediate descend
-        descend();
+        descend(node, tileId, upscaling);
         return;
     }
 
@@ -444,7 +445,8 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
     // consult flags
     const auto flags(world_.get(tileId));
     if (!flags) {
-        // outside defined roid
+        // outside of defined world
+        LOG(info1) << "outside of defined world";
         return;
     }
 
@@ -506,7 +508,7 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
             // fully covered by dataset and by reference frame definition
 
             if (!wri.overview && wri.truescale >= 1.0) {
-                // warped using original dataset and no downscaling 
+                // warped using original dataset and no downscaling
                 // which could possibly fill holes, no holes -> always without
                 // holes -> set whole subtree to watertight mesh
 
@@ -521,7 +523,7 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
                 return;
             }
 
-            UTILITY_OMP(critical)
+            UTILITY_OMP(critical(tileIndex))
                 ti_.set(tileId, (baseFlags | TiFlag::watertight));
             LOG(info3)
                 << "Processed tile " << tileId
@@ -533,7 +535,7 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
 
         case vts::NodeInfo::CoveredArea::some: {
             // partially covered
-            UTILITY_OMP(critical)
+            UTILITY_OMP(critical(tileIndex))
                 ti_.set(tileId, baseFlags);
             LOG(info3)
                 << "Processed tile " << tileId
@@ -565,7 +567,7 @@ void TreeWalker::process(const vts::NodeInfo &node, double upscaling)
     }
 
     // descend to children
-    descend();
+    descend(node, tileId, upscaling);
     // done
 }
 
