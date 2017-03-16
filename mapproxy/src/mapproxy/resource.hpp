@@ -143,10 +143,6 @@ struct Resource {
     Generator generator;
     std::string comment;
 
-    /** Data root from configuration.
-     */
-    boost::filesystem::path root;
-
     DualId::set credits;
 
     const vr::ReferenceFrame *referenceFrame;

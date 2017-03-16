@@ -230,33 +230,38 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
     vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
 }
 
-vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
-    const
+vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root) const
 {
     vts::ExtraTileSetProperties extra;
 
+    Resource::Id introspectionTms;
     if (definition_.introspectionTms) {
-        if (auto other = otherGenerator
-            (Resource::Generator::Type::tms
-             , addReferenceFrame(*definition_.introspectionTms
-                                 , referenceFrameId())))
-        {
-            // we have found tms resource, use it as a boundlayer
-            const auto otherId(definition_.introspectionTms->fullId());
-            const auto &otherResource(other->resource());
-            const auto resdiff(resolveRoot(resource(), otherResource));
-
-            const fs::path blPath
-                (prependRoot(fs::path(), otherResource, resdiff)
-                 / "boundlayer.json");
-
-            extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
-
-            extra.view.surfaces[id().fullId()]
-                = { vr::View::BoundLayerParams(otherId) };
-        };
+        introspectionTms = *definition_.introspectionTms;
+    } else {
+        // defaults to patchwork
+        introspectionTms.referenceFrame = referenceFrameId();
+        introspectionTms.group = systemGroup();
+        introspectionTms.id = "tms-raster-patchwork";
     }
 
+    if (auto other = otherGenerator
+        (Resource::Generator::Type::tms
+         , addReferenceFrame(introspectionTms, referenceFrameId())))
+    {
+        // we have found tms resource, use it as a boundlayer
+        const auto otherId(introspectionTms.fullId());
+        const auto &otherResource(other->resource());
+        const auto resdiff(resolveRoot(resource(), otherResource));
+
+        const fs::path blPath
+            (prependRoot(fs::path(), otherResource, resdiff)
+             / "boundlayer.json");
+
+        extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
+
+        extra.view.surfaces[id().fullId()]
+            = { vr::View::BoundLayerParams(otherId) };
+    };
 
     if (definition_.introspectionPosition) {
         extra.position = *definition_.introspectionPosition;

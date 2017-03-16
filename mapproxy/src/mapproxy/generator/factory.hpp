@@ -5,6 +5,8 @@
 
 #include "../generator.hpp"
 
+namespace vr = vtslibs::registry;
+
 struct Generator::Factory {
     typedef std::shared_ptr<Factory> pointer;
     virtual ~Factory() {}
@@ -14,6 +16,11 @@ struct Generator::Factory {
      *  Throws in case of error.
      */
     virtual DefinitionBase::pointer definition() = 0;
+
+    /** If true is returned a default system resource is generated for each
+     *  reference frame.
+     */
+    virtual bool systemInstance() const { return false; }
 };
 
 #endif // mapproxy_generator_factory_hpp_included_

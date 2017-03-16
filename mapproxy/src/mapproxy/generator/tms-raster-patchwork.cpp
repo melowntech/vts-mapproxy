@@ -47,6 +47,8 @@ struct Factory : Generator::Factory {
         return std::make_shared<TmsRasterPatchwork::Definition>();
     }
 
+    virtual bool systemInstance() const { return true; }
+
 private:
     static utility::PreMain register_;
 };
@@ -326,8 +328,17 @@ void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
     colorIndex = 1 + (colorIndex % 254);
 
     cv::Mat_<cv::Vec3b> tile(vr::BoundLayer::tileHeight
-                             , vr::BoundLayer::tileWidth
-                             , vts::opencv::palette256vec[colorIndex]);
+                             , vr::BoundLayer::tileWidth);
+
+    const cv::Vec3b color(vts::opencv::palette256vec[colorIndex]);
+    const cv::Vec3b darkColor(color[0] * 0.8, color[1] * 0.8, color[2] * 0.8);
+    cv::Vec3b colors[2] = { color, darkColor };
+
+    for (int j(0); j < vr::BoundLayer::tileHeight; ++j) {
+        for (int i(0); i < vr::BoundLayer::tileWidth; ++i) {
+            tile(j, i) = colors[((j >> 3) + (i >> 3)) & 1];
+        }
+    }
 
     // serialize
     std::vector<unsigned char> buf;

@@ -51,6 +51,8 @@ public:
         boost::any value_;
     };
 
+    const GenericConfig& genericConfig() const { return genericConfig_; }
+
     static pointer create(const GenericConfig &genericConfig
                           , const TypedConfig &config);
 

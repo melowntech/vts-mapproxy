@@ -82,8 +82,10 @@ public:
         const GeneratorFinder *generatorFinder;
         DemRegistry::pointer demRegistry;
         Generator::pointer replace;
+        bool system;
 
-        Params(const Resource &resource) : resource(resource) {}
+        Params(const Resource &resource)
+            : resource(resource), system(false) {}
     };
 
     static Generator::pointer create(const Params &params);
@@ -101,6 +103,8 @@ public:
     /** Throws Unavailable if generator is not ready yet.
      */
     void checkReady() const;
+
+    bool system() const { return system_; }
 
     /** Prepares generator for serving.
      */
@@ -135,6 +139,8 @@ public:
      *  Used in runtime update.
      */
     Generator::pointer replace() const { return replace_; }
+
+    static std::string systemGroup() { return ".system"; }
 
 protected:
     Generator(const Params &params);
@@ -183,6 +189,7 @@ private:
     Resource resource_;
     Resource savedResource_;
     bool fresh_;
+    bool system_;
     std::atomic<bool> ready_;
     DemRegistry::pointer demRegistry_;
     Generator::pointer replace_;
