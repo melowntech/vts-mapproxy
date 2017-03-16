@@ -242,7 +242,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     }
 
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
-    if (!nodeInfo.valid()) {
+    if (!nodeInfo.productive()) {
         sink.error(utility::makeError<NotFound>
                    ("TileId outside of valid reference frame tree."));
         return;

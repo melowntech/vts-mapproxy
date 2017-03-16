@@ -54,6 +54,8 @@ struct Factory : Generator::Factory {
         return std::make_shared<SurfaceSpheroid::Definition>();
     }
 
+    virtual bool systemInstance() const { return true; }
+
 private:
     static utility::PreMain register_;
 };
@@ -76,6 +78,8 @@ void parseDefinition(SurfaceSpheroid::Definition &def
         std::string s;
         Json::get(s, value, "geoidGrid");
         def.geoidGrid = s;
+    } else {
+        def.geoidGrid = boost::none;
     }
 
     def.parse(value);
@@ -104,6 +108,8 @@ void parseDefinition(SurfaceSpheroid::Definition &def
 
     if (value.has_key("geoidGrid")) {
         def.geoidGrid = py2utf8(value["geoidGrid"]);
+    } else {
+        def.geoidGrid = boost::none;
     }
 
     def.parse(value);
@@ -183,9 +189,7 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
     properties_.position.verticalExtent
         = math::size(referenceFrame().division.extents).height;
     // quite wide angle camera
-    properties_.position.verticalFov = 90;
-
-    // TODO: spatialDivisionExtents
+    properties_.position.verticalFov = 55;
 
     // grab and reset tile index
     auto &ti(index_.tileIndex);
@@ -204,7 +208,7 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
                        << block.commonAncestor.nodeId()
                        << "block: " << block.view << ".";
 
-            if (block.valid() && in(lod, r.lodRange)) {
+            if (block.commonAncestor.productive() && in(lod, r.lodRange)) {
                 // mesh and navtile in valid area (If there are non-existent
                 // tiles we'll get empty meshes and navtiles with empty masks.
                 // This is lesser evil than to construct gargantuan tileindex
@@ -349,7 +353,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
                 // build metanode
                 vts::MetaNode node;
-                node.flags(ti2metaFlags(index_.tileIndex.get(nodeId)));
+                node.flags(MetaFlag::allChildren);
                 setChildren(block, nodeId, node);
                 metatile.set(nodeId, node);
             }

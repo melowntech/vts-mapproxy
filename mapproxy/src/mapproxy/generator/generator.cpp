@@ -80,8 +80,8 @@ Generator::Generator(const Params &params)
     // TODO: handle failed creation
     auto rfile(root() / ResourceFile);
 
-    if (create_directories(root())) {
-        // new resource
+    if (create_directories(root()) || system_) {
+        // new or system resource
         fresh_ = true;
         save(rfile, resource_);
     } else {

@@ -517,7 +517,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     }
 
     vts::NodeInfo node(rf, tileId);
-    if (!node.valid()) {
+    if (!node.productive()) {
         sink.error(utility::makeError<NotFound>
                     ("TileId outside of valid reference frame tree."));
         return;
