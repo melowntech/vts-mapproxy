@@ -322,7 +322,8 @@ void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
     unsigned long long int colorIndex(tileId.y);
     colorIndex <<= tileId.lod;
     colorIndex += tileId.x;
-    colorIndex = colorIndex & 0xff;
+    // skip black
+    colorIndex = 1 + (colorIndex % 254);
 
     cv::Mat_<cv::Vec3b> tile(vr::BoundLayer::tileHeight
                              , vr::BoundLayer::tileWidth
