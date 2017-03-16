@@ -320,11 +320,48 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
     vts::MetaTile metatile(tileId, rf.metaBinaryOrder);
 
+    auto setChildren([&](const MetatileBlock &block, const vts::TileId &nodeId
+                         , vts::MetaNode &node) -> void
+    {
+        if (block.commonAncestor.partial() || special(rf, nodeId)) {
+            // partial node, update children flags
+            for (const auto &child : vts::children(nodeId)) {
+                node.setChildFromId
+                    (child, vts::NodeInfo(rf, child).valid());
+            }
+        }
+    });
+
+    auto generateUnproductiveNodes([&](const MetatileBlock &block
+                                       , const math::Size2 &bSize) -> void
+    {
+        const auto &view(block.view);
+        for (int j(0), je(bSize.height); j < je; ++j) {
+            for (int i(0), ie(bSize.width); i < ie; ++i) {
+                // ID of current tile
+                const vts::TileId nodeId
+                    (tileId.lod, view.ll(0) + i, view.ll(1) + j);
+
+                // build metanode
+                vts::MetaNode node;
+                node.flags(ti2metaFlags(index_.tileIndex.get(nodeId)));
+                setChildren(block, nodeId, node);
+                metatile.set(nodeId, node);
+            }
+        }
+    });
+
     for (const auto &block : blocks) {
         const auto &view(block.view);
         const auto &extents(block.extents);
         const auto es(math::size(extents));
         const math::Size2 bSize(vts::tileRangesSize(view));
+
+        if (!block.commonAncestor.productive()) {
+            // unproductive node
+            generateUnproductiveNodes(block, bSize);
+            continue;
+        }
 
         const math::Size2 gridSize
             (bSize.width * metatileSamplesPerTile + 1
@@ -352,7 +389,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
         auto conv(sds2phys(block.commonAncestor, definition_.geoidGrid));
         auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
-        auto geConv(sdsg2sdsr(block.commonAncestor, definition_.geoidGrid));
+        auto geConv(phys2sds(block.commonAncestor));
 
         // fill in matrix
         for (int j(0), je(gridSize.height); j < je; ++j) {
@@ -430,13 +467,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                     }
                 }
 
-                if (block.commonAncestor.partial() || special(rf, nodeId)) {
-                    // partial node, update children flags
-                    for (const auto &child : vts::children(nodeId)) {
-                        node.setChildFromId
-                            (child, vts::NodeInfo(rf, child).valid());
-                    }
-                }
+                setChildren(block, nodeId, node);
 
                 if (geometry && !area) {
                     // well, empty tile, no children

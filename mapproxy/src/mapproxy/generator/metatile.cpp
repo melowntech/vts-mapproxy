@@ -157,11 +157,57 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
 
     vts::MetaTile metatile(tileId, rf.metaBinaryOrder);
 
+    auto setChildren([&](const vts::TileId &nodeId, vts::MetaNode &node)
+                     -> void
+    {
+        // build children from tile index
+        //
+        // TODO: let tileindex generate validity flag for all children
+        // in this block
+        for (const auto &child : vts::children(nodeId)) {
+            /** some subtrees may have false positives
+             * (i.e. melown2015 polar caps)
+             *
+             * Combine tile index with node validity.
+             *
+             * TODO: optimize
+             */
+            bool valid(tileIndex.validSubtree(child));
+            valid = valid && vts::NodeInfo(rf, child).valid();
+            node.setChildFromId(child, valid);
+        }
+    });
+
+    auto generateUnproductiveNodes([&](const MetatileBlock &block
+                                       , const math::Size2 &bSize) -> void
+    {
+        const auto &view(block.view);
+        for (int j(0), je(bSize.height); j < je; ++j) {
+            for (int i(0), ie(bSize.width); i < ie; ++i) {
+                // ID of current tile
+                const vts::TileId nodeId
+                    (tileId.lod, view.ll(0) + i, view.ll(1) + j);
+
+                // build metanode
+                vts::MetaNode node;
+                node.flags(ti2metaFlags(tileIndex.get(nodeId)));
+                setChildren(nodeId, node);
+                metatile.set(nodeId, node);
+            }
+        }
+    });
+
     for (const auto &block : blocks) {
         const auto &view(block.view);
         auto extents = block.extents;
         const auto es(math::size(extents));
         const math::Size2 bSize(vts::tileRangesSize(view));
+
+        if (!block.commonAncestor.productive()) {
+            // unproductive node
+            generateUnproductiveNodes(block, bSize);
+            continue;
+        }
 
         const math::Size2 gridSize
             (bSize.width * metatileSamplesPerTile + 1
@@ -289,21 +335,7 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 }
 
                 // build children from tile index
-                //
-                // TODO: let tileindex generate validity flag for all children
-                // in this block
-                for (const auto &child : vts::children(nodeId)) {
-                    /** some subtrees may have false positives
-                     * (i.e. melown2015 polar caps)
-                     *
-                     * Combine tile index with node validity.
-                     *
-                     * TODO: optimize
-                     */
-                    bool valid(tileIndex.validSubtree(child));
-                    valid = valid && vts::NodeInfo(rf, child).valid();
-                    node.setChildFromId(child, valid);
-                }
+                setChildren(nodeId, node);
 
                 // set extents
                 node.extents = vr::normalizedExtents(rf, te);

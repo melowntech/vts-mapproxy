@@ -339,6 +339,8 @@ void TmsRasterRemote::generateMetatile(const vts::TileId &tileId
          );
 
     for (const auto &block : blocks) {
+        if (!block.commonAncestor.productive()) { continue; }
+
         const auto &view(block.view);
         math::Size2 bSize(vts::tileRangesSize(view));
 

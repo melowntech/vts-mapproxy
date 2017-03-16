@@ -17,12 +17,13 @@
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/qtree-rasterize.hpp"
+#include "vts-libs/vts/opencv/colors.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
 #include "../support/tileindex.hpp"
 
-#include "./tms-raster.hpp"
+#include "./tms-raster-patchwork.hpp"
 #include "./factory.hpp"
 #include "../support/python.hpp"
 
@@ -39,11 +40,11 @@ namespace {
 struct Factory : Generator::Factory {
     virtual Generator::pointer create(const Generator::Params &params)
     {
-        return std::make_shared<TmsRaster>(params);
+        return std::make_shared<TmsRasterPatchwork>(params);
     }
 
     virtual DefinitionBase::pointer definition() {
-        return std::make_shared<TmsRaster::Definition>();
+        return std::make_shared<TmsRasterPatchwork::Definition>();
     }
 
 private:
@@ -53,15 +54,15 @@ private:
 utility::PreMain Factory::register_([]()
 {
     Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::tms, "tms-raster")
+        (Resource::Generator(Resource::Generator::Type::tms
+                             , "tms-raster-patchwork")
          , std::make_shared<Factory>());
 });
 
-void parseDefinition(TmsRaster::Definition &def, const Json::Value &value)
+void parseDefinition(TmsRasterPatchwork::Definition &def, const Json::Value &value)
 {
     std::string s;
 
-    Json::get(def.dataset, value, "dataset");
     if (value.isMember("mask")) {
         def.mask = boost::in_place();
         Json::get(*def.mask, value, "mask");
@@ -76,28 +77,19 @@ void parseDefinition(TmsRaster::Definition &def, const Json::Value &value)
                 ("Value stored in format is not RasterFormat value");
         }
     }
-
-    if (value.isMember("transparent")) {
-        Json::get(def.transparent, value, "transparent");
-    }
 }
 
-void buildDefinition(Json::Value &value, const TmsRaster::Definition &def)
+void buildDefinition(Json::Value &value, const TmsRasterPatchwork::Definition &def)
 {
-    value["dataset"] = def.dataset;
     if (def.mask) {
         value["mask"] = *def.mask;
     }
     value["format"] = boost::lexical_cast<std::string>(def.format);
-
-    value["transparent"] = def.transparent;
 }
 
-void parseDefinition(TmsRaster::Definition &def
+void parseDefinition(TmsRasterPatchwork::Definition &def
                      , const boost::python::dict &value)
 {
-    def.dataset = py2utf8(value["dataset"]);
-
     if (value.has_key("mask")) {
         def.mask = py2utf8(value["mask"]);
     }
@@ -111,16 +103,11 @@ void parseDefinition(TmsRaster::Definition &def
                 ("Value stored in format is not RasterFormat value");
         }
     }
-
-    if (value.has_key("transparent")) {
-        def.transparent = boost::python::extract<bool>
-            (value["transparent"]);
-    }
 }
 
 } // namespace
 
-void TmsRaster::Definition::from_impl(const boost::any &value)
+void TmsRasterPatchwork::Definition::from_impl(const boost::any &value)
 {
     if (const auto *json = boost::any_cast<Json::Value>(&value)) {
         parseDefinition(*this, *json);
@@ -130,32 +117,28 @@ void TmsRaster::Definition::from_impl(const boost::any &value)
         parseDefinition(*this, *py);
     } else {
         LOGTHROW(err1, Error)
-            << "TmsRaster: Unsupported configuration from: <"
+            << "TmsRasterPatchwork: Unsupported configuration from: <"
             << value.type().name() << ">.";
     }
 }
 
-void TmsRaster::Definition::to_impl(boost::any &value) const
+void TmsRasterPatchwork::Definition::to_impl(boost::any &value) const
 {
     if (auto *json = boost::any_cast<Json::Value>(&value)) {
         buildDefinition(*json, *this);
     } else {
         LOGTHROW(err1, Error)
-            << "TmsRaster:: Unsupported serialization into: <"
+            << "TmsRasterPatchwork:: Unsupported serialization into: <"
             << value.type().name() << ">.";
     }
 }
 
-Changed TmsRaster::Definition::changed_impl(const DefinitionBase &o) const
+Changed TmsRasterPatchwork::Definition::changed_impl(const DefinitionBase &o) const
 {
     const auto &other(o.as<Definition>());
 
     // non-safe changes first
-    if (dataset != other.dataset) { return Changed::yes; }
     if (mask != other.mask) { return Changed::yes; }
-
-    // transparent can change
-    if (transparent != other.transparent) { return Changed::safely; }
 
     // format can change
     if (format != other.format) { return Changed::safely; }
@@ -164,95 +147,30 @@ Changed TmsRaster::Definition::changed_impl(const DefinitionBase &o) const
     return Changed::no;
 }
 
-TmsRaster::TmsRaster(const Params &params)
+TmsRasterPatchwork::TmsRasterPatchwork(const Params &params)
     : Generator(params)
     , definition_(resource().definition<Definition>())
     , hasMetatiles_(false)
 {
-    const auto indexPath(root() / "tileset.index");
-    if (fs::exists(indexPath)) {
-        index_ = boost::in_place();
-        index_->load(indexPath);
-        hasMetatiles_ = true;
-        makeReady();
-        return;
-    }
-
     // not seen or index-less
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
-TmsRaster::DatasetDesc TmsRaster::dataset_impl() const
-{
-    if (index_) {
-        return { definition_.dataset + "/ophoto" };
-    }
-
-    return { definition_.dataset };
-}
-
-void TmsRaster::prepare_impl(Arsenal&)
+void TmsRasterPatchwork::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
 
-    if (fs::exists(absoluteDataset(definition_.dataset + "/ophoto"))) {
-        // complex dataset directory
-        // alwas with metatiles
-        hasMetatiles_ = true;
-
-        // try to open
-        geo::GeoDataset::open
-            (absoluteDataset(definition_.dataset + "/ophoto"));
-
-        const auto &r(resource());
-
-        // TODO: use mask if provided; must be in new format
-
-        index_ = boost::in_place();
-        prepareTileIndex(*index_
-                         , (absoluteDataset(definition_.dataset)
-                            + "/tiling." + r.id.referenceFrame)
-                         , r);
-
-        index_->save(root() / "tileset.index");
-
-        // done
-        makeReady();
-        return;
-   }
-
     // try to open datasets
-    auto ds(geo::GeoDataset::open(absoluteDataset(dataset().path)));
     if (definition_.mask) {
         geo::GeoDataset::open(absoluteDataset(*definition_.mask));
         // we have mask dataset -> metatiles exist
         hasMetatiles_ = true;
-    } else {
-        // no external mask available -> metatiles exist only when dataset has
-        // some invalid pixels
-        hasMetatiles_ = !ds.allValid();
     }
 
     makeReady();
 }
 
-RasterFormat TmsRaster::format() const
-{
-    return transparent() ? RasterFormat::png : definition_.format;
-}
-
-bool TmsRaster::transparent_impl() const
-{
-    return definition_.transparent;
-}
-
-bool TmsRaster::hasMask_impl() const
-{
-    // we want mask by default
-    return true;
-}
-
-vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
+vr::BoundLayer TmsRasterPatchwork::boundLayer(ResourceRoot root) const
 {
     const auto &res(resource());
 
@@ -263,9 +181,9 @@ vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
 
     // build url
     bl.url = prependRoot
-        (str(boost::format("{lod}-{x}-{y}.%s") % format())
+        (str(boost::format("{lod}-{x}-{y}.%s") % definition_.format)
          , resource(), root);
-    if (hasMask()) {
+    if (definition_.mask) {
         bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
                                  , resource(), root);
         if (hasMetatiles_) {
@@ -277,13 +195,12 @@ vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
     bl.lodRange = res.lodRange;
     bl.tileRange = res.tileRange;
     bl.credits = asInlineCredits(res);
-    bl.isTransparent = transparent();
 
     // done
     return bl;
 }
 
-vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
+vts::MapConfig TmsRasterPatchwork::mapConfig_impl(ResourceRoot root)
     const
 {
     const auto &res(resource());
@@ -300,8 +217,8 @@ vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
     return mapConfig;
 }
 
-Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
-                                             , Sink &sink) const
+Generator::Task TmsRasterPatchwork::generateFile_impl(const FileInfo &fileInfo
+                                                      , Sink &sink) const
 {
     TmsFileInfo fi(fileInfo);
 
@@ -357,10 +274,10 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
         break;
 
     case TmsFileInfo::Type::image: {
-        if (fi.format != format()) {
+        if (fi.format != definition_.format) {
             sink.error(utility::makeError<NotFound>
                         ("Format <%s> is not supported by this resource (%s)."
-                         , fi.format, format()));
+                         , fi.format, definition_.format));
             return {};
         }
 
@@ -383,10 +300,10 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
     return {};
 }
 
-void TmsRaster::generateTileImage(const vts::TileId &tileId
-                                  , const TmsFileInfo &fi
-                                  , Sink &sink
-                                  , Arsenal &arsenal) const
+void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
+                                           , const TmsFileInfo &fi
+                                           , Sink &sink
+                                           , Arsenal&) const
 {
     sink.checkAborted();
 
@@ -397,46 +314,39 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
         return;
     }
 
-    if (!nodeInfo.productive()
-        || (index_ && !vts::TileIndex::Flag::isReal(index_->get(tileId))))
-    {
+    if (!nodeInfo.productive()) {
         sink.error(utility::makeError<EmptyImage>("No valid data."));
         return;
     }
 
-    auto ds(dataset());
+    unsigned long long int colorIndex(tileId.y);
+    colorIndex <<= tileId.lod;
+    colorIndex += tileId.x;
+    colorIndex = colorIndex & 0xff;
 
-    auto tile(arsenal.warper.warp
-              (GdalWarper::RasterRequest
-               (GdalWarper::RasterRequest::Operation::image
-                , absoluteDataset(ds.path)
-                , nodeInfo.srsDef()
-                , nodeInfo.extents()
-                , math::Size2(256, 256)
-                           , geo::GeoDataset::Resampling::cubic
-                , absoluteDataset(definition_.mask))
-               , sink));
-    sink.checkAborted();
+    cv::Mat_<cv::Vec3b> tile(vr::BoundLayer::tileHeight
+                             , vr::BoundLayer::tileWidth
+                             , vts::opencv::palette256vec[colorIndex]);
 
     // serialize
     std::vector<unsigned char> buf;
     switch (fi.format) {
     case RasterFormat::jpg:
         // TODO: configurable quality
-        cv::imencode(".jpg", *tile, buf
+        cv::imencode(".jpg", tile, buf
                      , { cv::IMWRITE_JPEG_QUALITY, 75 });
         break;
 
     case RasterFormat::png:
-        cv::imencode(".png", *tile, buf
+        cv::imencode(".png", tile, buf
                      , { cv::IMWRITE_PNG_COMPRESSION, 9 });
         break;
     }
 
-    sink.content(buf, fi.sinkFileInfo().setMaxAge(ds.maxAge));
+    sink.content(buf, fi.sinkFileInfo());
 }
 
-void TmsRaster::generateTileMask(const vts::TileId &tileId
+void TmsRasterPatchwork::generateTileMask(const vts::TileId &tileId
                                  , const TmsFileInfo &fi
                                  , Sink &sink
                                  , Arsenal &arsenal) const
@@ -450,20 +360,30 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
         return;
     }
 
-    if (!nodeInfo.productive()
-        || (index_ && !vts::TileIndex::Flag::isReal(index_->get(tileId))))
-    {
+    if (!nodeInfo.productive()) {
         sink.error(utility::makeError<EmptyImage>("No valid data."));
         return;
     }
 
-    // get dataset
-    auto ds(dataset());
+    if (!definition_.mask) {
+        cv::Mat_<std::uint8_t> mask(vr::BoundLayer::tileHeight
+                                    , vr::BoundLayer::tileWidth, 255);
+
+        // serialize
+        std::vector<unsigned char> buf;
+        // write as png file
+        cv::imencode(".png", mask, buf
+                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+
+        // reset max age received from dataset if mask is uded
+        sink.content(buf, fi.sinkFileInfo());
+        return;
+    }
 
     auto mask(arsenal.warper.warp
               (GdalWarper::RasterRequest
                (GdalWarper::RasterRequest::Operation::mask
-                , absoluteDataset(ds.path, definition_.mask)
+                , absoluteDataset(*definition_.mask)
                 , nodeInfo.srsDef()
                 , nodeInfo.extents()
                 , math::Size2(256, 256)
@@ -479,8 +399,7 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
     // reset max age received from dataset if mask is uded
-    if (definition_.mask) { ds.maxAge = boost::none; }
-    sink.content(buf, fi.sinkFileInfo().setMaxAge(ds.maxAge));
+    sink.content(buf, fi.sinkFileInfo());
 }
 
 namespace Constants {
@@ -531,7 +450,7 @@ void meta2d(const vts::TileIndex &tileIndex, const vts::TileId &tileId
 
 } // namespace
 
-void TmsRaster::generateMetatile(const vts::TileId &tileId
+void TmsRasterPatchwork::generateMetatile(const vts::TileId &tileId
                                  , const TmsFileInfo &fi
                                  , Sink &sink
                                  , Arsenal &arsenal) const
@@ -547,12 +466,6 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
         return;
     }
 
-    if (index_) {
-        // render tileindex
-        meta2d(*index_, tileId, fi, sink);
-        return;
-    }
-
     // non-tileindex code
     cv::Mat metatile(Constants::RasterMetatileSize.width
                      , Constants::RasterMetatileSize.height
@@ -565,8 +478,6 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
          : MetaFlags::available // no mask -> watertight supported
          );
 
-    auto ds(dataset());
-
     for (const auto &block : blocks) {
         if (!block.commonAncestor.productive()) { continue; }
 
@@ -574,26 +485,14 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
         math::Size2 bSize(vts::tileRangesSize(view));
 
         GdalWarper::Raster src;
-        if (definition_.mask) {
-            // warp detailed mask
-            src = arsenal.warper.warp
-                (GdalWarper::RasterRequest
-                 (GdalWarper::RasterRequest::Operation::detailMask
-                  , absoluteDataset(*definition_.mask)
-                  , vr::system.srs(block.srs).srsDef
-                  , block.extents, bSize)
-                 , sink);
-        } else {
-            // warp dataset as mask
-            src = arsenal.warper.warp
-                (GdalWarper::RasterRequest
-                 (GdalWarper::RasterRequest::Operation::mask
-                  , absoluteDataset(ds.path)
-                  , vr::system.srs(block.srs).srsDef
-                  , block.extents, bSize
-                  , geo::GeoDataset::Resampling::cubic)
-                 , sink);
-        }
+        // warp detailed mask
+        src = arsenal.warper.warp
+            (GdalWarper::RasterRequest
+             (GdalWarper::RasterRequest::Operation::detailMask
+              , absoluteDataset(*definition_.mask)
+              , vr::system.srs(block.srs).srsDef
+              , block.extents, bSize)
+             , sink);
         sink.checkAborted();
 
         // generate metatile content for current block
@@ -625,8 +524,7 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
     // reset max age received from dataset if mask is uded
-    if (definition_.mask) { ds.maxAge = boost::none; }
-    sink.content(buf, fi.sinkFileInfo().setMaxAge(ds.maxAge));
+    sink.content(buf, fi.sinkFileInfo());
 }
 
 } // namespace generator
