@@ -352,7 +352,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
         auto conv(sds2phys(block.commonAncestor, definition_.geoidGrid));
         auto navConv(sds2nav(block.commonAncestor, definition_.geoidGrid));
-        auto geConv(sdsg2sdsr(block.commonAncestor, definition_.geoidGrid));
+        auto geConv(phys2sds(block.commonAncestor));
 
         // fill in matrix
         for (int j(0), je(gridSize.height); j < je; ++j) {

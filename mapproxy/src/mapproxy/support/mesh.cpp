@@ -327,6 +327,12 @@ vts::CsConvertor sdsg2sdsr(const vts::NodeInfo &nodeInfo
     return vts::CsConvertor(sds(nodeInfo, geoidGrid), nodeInfo.srs());
 }
 
+vts::CsConvertor phys2sds(const vts::NodeInfo &nodeInfo)
+{
+    return vts::CsConvertor(nodeInfo.referenceFrame().model.physicalSrs
+                            , nodeInfo.srs());
+}
+
 namespace {
 
 class TextureNormalizer {
