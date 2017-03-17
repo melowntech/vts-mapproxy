@@ -158,7 +158,8 @@ vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
 
     auto &def(fl.createDefinition<vr::FreeLayer::GeodataTiles>());
     def.metaUrl = prependRoot
-        (utility::format("{lod}-{x}-{y}.meta?gr=%d", GeneratorRevision)
+        (utility::format("{lod}-{x}-{y}.meta?gr=%d-%d", GeneratorRevision
+                         , vts::MetaTile::currentVersion())
          , resource(), root);
     def.geodataUrl = prependRoot
         (utility::format("{lod}-{x}-{y}.geo?gr=%d&viewspec={viewspec}"
