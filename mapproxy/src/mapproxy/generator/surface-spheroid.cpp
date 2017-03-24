@@ -54,6 +54,8 @@ struct Factory : Generator::Factory {
         return std::make_shared<SurfaceSpheroid::Definition>();
     }
 
+    virtual bool systemInstance() const { return true; }
+
 private:
     static utility::PreMain register_;
 };
@@ -76,6 +78,8 @@ void parseDefinition(SurfaceSpheroid::Definition &def
         std::string s;
         Json::get(s, value, "geoidGrid");
         def.geoidGrid = s;
+    } else {
+        def.geoidGrid = boost::none;
     }
 
     def.parse(value);
@@ -104,6 +108,8 @@ void parseDefinition(SurfaceSpheroid::Definition &def
 
     if (value.has_key("geoidGrid")) {
         def.geoidGrid = py2utf8(value["geoidGrid"]);
+    } else {
+        def.geoidGrid = boost::none;
     }
 
     def.parse(value);
@@ -183,9 +189,7 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
     properties_.position.verticalExtent
         = math::size(referenceFrame().division.extents).height;
     // quite wide angle camera
-    properties_.position.verticalFov = 90;
-
-    // TODO: spatialDivisionExtents
+    properties_.position.verticalFov = 55;
 
     // grab and reset tile index
     auto &ti(index_.tileIndex);
@@ -204,7 +208,7 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
                        << block.commonAncestor.nodeId()
                        << "block: " << block.view << ".";
 
-            if (block.valid() && in(lod, r.lodRange)) {
+            if (block.commonAncestor.productive() && in(lod, r.lodRange)) {
                 // mesh and navtile in valid area (If there are non-existent
                 // tiles we'll get empty meshes and navtiles with empty masks.
                 // This is lesser evil than to construct gargantuan tileindex
@@ -230,33 +234,38 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
     vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
 }
 
-vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root)
-    const
+vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root) const
 {
     vts::ExtraTileSetProperties extra;
 
+    Resource::Id introspectionTms;
     if (definition_.introspectionTms) {
-        if (auto other = otherGenerator
-            (Resource::Generator::Type::tms
-             , addReferenceFrame(*definition_.introspectionTms
-                                 , referenceFrameId())))
-        {
-            // we have found tms resource, use it as a boundlayer
-            const auto otherId(definition_.introspectionTms->fullId());
-            const auto &otherResource(other->resource());
-            const auto resdiff(resolveRoot(resource(), otherResource));
-
-            const fs::path blPath
-                (prependRoot(fs::path(), otherResource, resdiff)
-                 / "boundlayer.json");
-
-            extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
-
-            extra.view.surfaces[id().fullId()]
-                = { vr::View::BoundLayerParams(otherId) };
-        };
+        introspectionTms = *definition_.introspectionTms;
+    } else {
+        // defaults to patchwork
+        introspectionTms.referenceFrame = referenceFrameId();
+        introspectionTms.group = systemGroup();
+        introspectionTms.id = "tms-raster-patchwork";
     }
 
+    if (auto other = otherGenerator
+        (Resource::Generator::Type::tms
+         , addReferenceFrame(introspectionTms, referenceFrameId())))
+    {
+        // we have found tms resource, use it as a boundlayer
+        const auto otherId(introspectionTms.fullId());
+        const auto &otherResource(other->resource());
+        const auto resdiff(resolveRoot(resource(), otherResource));
+
+        const fs::path blPath
+            (prependRoot(fs::path(), otherResource, resdiff)
+             / "boundlayer.json");
+
+        extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
+
+        extra.view.surfaces[id().fullId()]
+            = { vr::View::BoundLayerParams(otherId) };
+    };
 
     if (definition_.introspectionPosition) {
         extra.position = *definition_.introspectionPosition;
@@ -320,11 +329,48 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
     vts::MetaTile metatile(tileId, rf.metaBinaryOrder);
 
+    auto setChildren([&](const MetatileBlock &block, const vts::TileId &nodeId
+                         , vts::MetaNode &node) -> void
+    {
+        if (block.commonAncestor.partial() || special(rf, nodeId)) {
+            // partial node, update children flags
+            for (const auto &child : vts::children(nodeId)) {
+                node.setChildFromId
+                    (child, vts::NodeInfo(rf, child).valid());
+            }
+        }
+    });
+
+    auto generateUnproductiveNodes([&](const MetatileBlock &block
+                                       , const math::Size2 &bSize) -> void
+    {
+        const auto &view(block.view);
+        for (int j(0), je(bSize.height); j < je; ++j) {
+            for (int i(0), ie(bSize.width); i < ie; ++i) {
+                // ID of current tile
+                const vts::TileId nodeId
+                    (tileId.lod, view.ll(0) + i, view.ll(1) + j);
+
+                // build metanode
+                vts::MetaNode node;
+                node.flags(MetaFlag::allChildren);
+                setChildren(block, nodeId, node);
+                metatile.set(nodeId, node);
+            }
+        }
+    });
+
     for (const auto &block : blocks) {
         const auto &view(block.view);
         const auto &extents(block.extents);
         const auto es(math::size(extents));
         const math::Size2 bSize(vts::tileRangesSize(view));
+
+        if (!block.commonAncestor.productive()) {
+            // unproductive node
+            generateUnproductiveNodes(block, bSize);
+            continue;
+        }
 
         const math::Size2 gridSize
             (bSize.width * metatileSamplesPerTile + 1
@@ -430,13 +476,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                     }
                 }
 
-                if (block.commonAncestor.partial() || special(rf, nodeId)) {
-                    // partial node, update children flags
-                    for (const auto &child : vts::children(nodeId)) {
-                        node.setChildFromId
-                            (child, vts::NodeInfo(rf, child).valid());
-                    }
-                }
+                setChildren(block, nodeId, node);
 
                 if (geometry && !area) {
                     // well, empty tile, no children

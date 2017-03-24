@@ -379,7 +379,7 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
     }
 
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
-    if (!nodeInfo.valid()) {
+    if (!nodeInfo.productive()) {
         utility::raise<NotFound>
             ("TileId outside of valid reference frame tree.");
     }
@@ -422,7 +422,7 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
     }
 
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
-    if (!nodeInfo.valid()) {
+    if (!nodeInfo.productive()) {
         if (debug) {
             return sink.error(utility::makeError<EmptyDebugMask>
                               ("No mesh for this tile."));

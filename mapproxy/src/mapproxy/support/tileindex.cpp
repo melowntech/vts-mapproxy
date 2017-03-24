@@ -31,7 +31,9 @@ void prepareTileIndex(vts::TileIndex &index
                        << block.commonAncestor.nodeId()
                        << ", block: " << block.view << ".";
 
-            if (block.valid() && in(lod, resource.lodRange)) {
+            if (block.commonAncestor.productive()
+                && in(lod, resource.lodRange))
+            {
                 TiFlag::value_type flags(TiFlag::mesh);
 
                 if (navtiles && (lod == resource.lodRange.min)) {

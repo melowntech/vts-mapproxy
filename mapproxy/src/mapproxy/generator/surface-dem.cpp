@@ -278,26 +278,34 @@ void SurfaceDem::removeFromRegistry()
 vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
 {
     vts::ExtraTileSetProperties extra;
+
+    Resource::Id introspectionTms;
     if (definition_.introspectionTms) {
-        if (auto other = otherGenerator
-            (Resource::Generator::Type::tms
-             , addReferenceFrame(*definition_.introspectionTms
-                                 , referenceFrameId())))
-        {
-            // we have found tms resource, use it as a boundlayer
-            const auto otherId(definition_.introspectionTms->fullId());
-            const auto &otherResource(other->resource());
-            const auto resdiff(resolveRoot(resource(), otherResource));
+        introspectionTms = *definition_.introspectionTms;
+    } else {
+        // defaults to patchwork
+        introspectionTms.referenceFrame = referenceFrameId();
+        introspectionTms.group = systemGroup();
+        introspectionTms.id = "tms-raster-patchwork";
+    }
 
-            const fs::path blPath
-                (prependRoot(fs::path(), otherResource, resdiff)
-                 / "boundlayer.json");
+    if (auto other = otherGenerator
+        (Resource::Generator::Type::tms
+         , addReferenceFrame(introspectionTms, referenceFrameId())))
+    {
+        // we have found tms resource, use it as a boundlayer
+        const auto otherId(introspectionTms.fullId());
+        const auto &otherResource(other->resource());
+        const auto resdiff(resolveRoot(resource(), otherResource));
 
-            extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
+        const fs::path blPath
+            (prependRoot(fs::path(), otherResource, resdiff)
+             / "boundlayer.json");
 
-            extra.view.surfaces[id().fullId()]
+        extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
+
+        extra.view.surfaces[id().fullId()]
                 = { vr::View::BoundLayerParams(otherId) };
-        };
     }
 
     if (definition_.introspectionPosition) {
@@ -509,7 +517,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     }
 
     vts::NodeInfo node(rf, tileId);
-    if (!node.valid()) {
+    if (!node.productive()) {
         sink.error(utility::makeError<NotFound>
                     ("TileId outside of valid reference frame tree."));
         return;

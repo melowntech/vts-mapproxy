@@ -70,7 +70,7 @@ Generator::pointer Generator::create(const Params &params)
 Generator::Generator(const Params &params)
     : generatorFinder_(params.generatorFinder), config_(params.config)
     , resource_(params.resource), savedResource_(params.resource)
-    , fresh_(false), ready_(false)
+    , fresh_(false), system_(params.system), ready_(false)
     , demRegistry_(params.demRegistry)
     , replace_(params.replace)
 {
@@ -80,8 +80,8 @@ Generator::Generator(const Params &params)
     // TODO: handle failed creation
     auto rfile(root() / ResourceFile);
 
-    if (create_directories(root())) {
-        // new resource
+    if (create_directories(root()) || system_) {
+        // new or system resource
         fresh_ = true;
         save(rfile, resource_);
     } else {
@@ -260,7 +260,9 @@ public:
         : config_(config), resourceBackend_(resourceBackend)
         , arsenal_(), running_(false), ready_(false), work_(ios_)
         , demRegistry_(std::make_shared<DemRegistry>())
-    {}
+    {
+        registerSystemGenerators();
+    }
 
     void checkReady() const;
 
@@ -292,6 +294,8 @@ public:
                  , const Generator::pointer &replacement);
 
 private:
+    void registerSystemGenerators();
+
     void update(const Resource::map &resources);
 
     void updater();
@@ -491,6 +495,55 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
     });
 }
 
+void Generators::Detail::registerSystemGenerators()
+{
+    for (const auto &ritem : registry) {
+        const auto &resourceGenerator(ritem.first);
+        const auto &factory(ritem.second);
+
+        if (!factory->systemInstance()) { continue; }
+
+        for (const auto &rfitem : vr::system.referenceFrames) {
+            const auto &rfId(rfitem.first);
+            const auto &rf(rfitem.second);
+            LOG(info4) << "About to register " << resourceGenerator
+                       << " generator for"
+                       << " reference frame " << rfitem.first << ".";
+
+            // create resource
+            Resource resource
+                (resourceBackend_->genericConfig().fileClassSettings);
+            resource.id = Resource::Id
+                (rfId, Generator::systemGroup(), resourceGenerator.driver);
+            resource.generator = resourceGenerator;
+            resource.comment = "autoregistered resource";
+            resource.referenceFrame = &rf;
+            resource.lodRange = vts::LodRange(0, 22);
+            resource.tileRange = vts::TileRange(0, 0, 0, 0);
+            resource.definition(factory->definition());
+
+            // create generator params
+            Generator::Params params(resource);
+            params.config = config_;
+            params.config.root = config_.root;
+            params.generatorFinder = this;
+            params.demRegistry = demRegistry_;
+            params.system = true;
+
+            // create generator
+            auto g(factory->create(params));
+
+            // register
+            serving_.insert(g);
+
+            // and prepare if not ready
+            if (!g->ready()) {
+                prepare(g);
+            }
+        }
+    }
+}
+
 Generators::Generators(const Config &config
                        , const ResourceBackend::pointer &resourceBackend)
     : detail_(std::make_shared<Detail>(config, resourceBackend))
@@ -594,7 +647,9 @@ void Generators::Detail::update(const Resource::map &resources)
             ++iresources;
         } else if ((*iserving)->id() < iresources->first) {
             // removed resource
-            toRemove.push_back(*iserving);
+            if (!(*iserving)->system()) {
+                toRemove.push_back(*iserving);
+            }
             ++iserving;
         } else {
             // existing resource

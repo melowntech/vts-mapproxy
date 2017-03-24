@@ -54,6 +54,7 @@ inline bool special(const vr::ReferenceFrame &referenceFrame
     {
         switch (node->partitioning.mode) {
         case vr::PartitioningMode::manual:
+        case vr::PartitioningMode::barren:
             return true;
         default:
             return false;

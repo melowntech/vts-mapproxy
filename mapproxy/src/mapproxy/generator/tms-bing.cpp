@@ -288,12 +288,12 @@ Generator::Task TmsBing::generateFile_impl(const FileInfo &fileInfo
 
     case TmsFileInfo::Type::mask:
         sink.error(utility::makeError<NotFound>
-                    ("Bing tms driver is unable to generate any metatile."));
+                    ("Bing tms driver is unable to generate any mask."));
         return {};
 
     case TmsFileInfo::Type::metatile:
         sink.error(utility::makeError<NotFound>
-                    ("Bing tms driver is unable to generate any mask."));
+                    ("Bing tms driver is unable to generate any metatile."));
         return {};
     }
 
