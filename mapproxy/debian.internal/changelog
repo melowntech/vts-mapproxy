@@ -1,3 +1,15 @@
+ctt-vts-mapproxy (0.50) citationtech-wheezy; urgency=low
+
+  * V4 metatiles for geodata II.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Mon, 03 Apr 2017 19:46:52 +0200
+
+ctt-vts-mapproxy (0.49) citationtech-wheezy; urgency=low
+
+  * V4 metatiles for geodata. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Mon, 03 Apr 2017 18:14:44 +0200
+
 ctt-vts-mapproxy (0.48) citationtech-wheezy; urgency=low
 
   * V4 metatile support
