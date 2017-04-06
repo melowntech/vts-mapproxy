@@ -21,7 +21,7 @@
 	url = ../../lib/imgproc.git
 [submodule "externals/jsoncpp"]
 	path = externals/jsoncpp
-	url = ../../3rdparty/jsoncpp.git
+	url = ../../lib/jsoncpp.git
 [submodule "externals/math"]
 	path = externals/math
 	url = ../../lib/math.git

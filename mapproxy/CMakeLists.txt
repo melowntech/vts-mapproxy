@@ -26,7 +26,8 @@ find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(magic REQUIRED)
-find_package(URIPARSER REQUIRED)
+find_package(JsonCPP REQUIRED)
+include_directories(${JSONCPP_INCLUDE_DIRS})
 
 # Protobuf: needed by mvt ogr driver
 find_package(Protobuf REQUIRED)
