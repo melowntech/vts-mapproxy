@@ -51,8 +51,10 @@ public:
          *        warps image from dataset, uses optional mask
          *        returns N channel 8bit image
          *  * mask:
+         *  * maskNoOpt:
          *        warps dataset and return its mask
          *        returns single channel 8bit mask
+         *        mask: throws FullImage exception when all pixels are valid
          *
          *  * detailMask:
          *        warps dataset with agerage filter and no nodata values
@@ -86,7 +88,7 @@ public:
          *       value and maximum value in each pixel
          */
         enum class Operation {
-            image, mask, detailMask, dem, demOptimal, valueMinMax
+            image, mask, maskNoOpt, detailMask, dem, demOptimal, valueMinMax
         };
 
         Operation operation;

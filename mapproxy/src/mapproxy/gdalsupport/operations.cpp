@@ -83,14 +83,15 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
                   , const geo::SrsDefinition &srs
                   , const math::Extents2 &extents
                   , const math::Size2 &size
-                  , geo::GeoDataset::Resampling resampling)
+                  , geo::GeoDataset::Resampling resampling
+                  , bool optimize)
 {
     auto &src(cache(dataset));
     auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
     src.warpInto(dst, resampling);
 
     // fetch mask from dataset (optimized, all valid -> invalid matrix)
-    auto m(dst.fetchMask(true));
+    auto m(dst.fetchMask(optimize));
     if (!m.data) {
         // all pixels valid
         throw FullImage("All data valid.");
@@ -100,7 +101,7 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
     if (!nonzero) {
         // empty mask -> no valid data
         throw EmptyImage("No valid data.");
-    } else if (nonzero == area(size)) {
+    } else if (optimize && (nonzero == area(size))) {
         // all pixels valid
         throw FullImage("All data valid.");
     }
@@ -263,9 +264,10 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
              , req.resampling, req.mask);
 
     case Operation::mask:
+    case Operation::maskNoOpt:
         return warpMask
             (cache, mb, req.dataset, req.srs, req.extents, req.size
-             , req.resampling);
+             , req.resampling, (req.operation == Operation::mask));
 
     case Operation::detailMask:
         return warpDetailMask

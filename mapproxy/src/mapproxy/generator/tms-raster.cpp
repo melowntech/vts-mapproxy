@@ -587,7 +587,7 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
             // warp dataset as mask
             src = arsenal.warper.warp
                 (GdalWarper::RasterRequest
-                 (GdalWarper::RasterRequest::Operation::mask
+                 (GdalWarper::RasterRequest::Operation::maskNoOpt
                   , absoluteDataset(ds.path)
                   , vr::system.srs(block.srs).srsDef
                   , block.extents, bSize
