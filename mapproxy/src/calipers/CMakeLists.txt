@@ -12,7 +12,7 @@ add_executable(mapproxy-calipers ${mapproxy-calipers_SOURCES})
 target_link_libraries(mapproxy-calipers ${MODULE_LIBRARIES})
 buildsys_target_compile_definitions(mapproxy-calipers ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-calipers)
-set_target_version(mapproxy-calipers ${mapproxy_VERSION})
+set_target_version(mapproxy-calipers ${vts-mapproxy_VERSION})
 
 # ------------------------------------------------------------------------
 # --- installation

@@ -75,7 +75,7 @@ add_executable(mapproxy ${mapproxy_SOURCES} ${mapproxy_BROWSER_SOURCES})
 target_link_libraries(mapproxy ${MODULE_LIBRARIES})
 buildsys_target_compile_definitions(mapproxy ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy)
-set_target_version(mapproxy ${mapproxy_VERSION})
+set_target_version(mapproxy ${vts-mapproxy_VERSION})
 
 # ------------------------------------------------------------------------
 # --- installation
