@@ -1,49 +1,15 @@
-[submodule "externals/dbglog"]
-	path = externals/dbglog
-	url = ../../lib/dbglog
 [submodule "externals/buildsys/common"]
 	path = externals/buildsys/common
-	url = ../../buildsys/common.git
+	url = https://github.com/Melown/buildsys-common.git
 [submodule "externals/buildsys/cmake"]
 	path = externals/buildsys/cmake
-	url = ../../buildsys/cmake.git
-[submodule "externals/geo"]
-	path = externals/geo
-	url = ../../lib/geo.git
-[submodule "externals/geometry"]
-	path = externals/geometry
-	url = ../../lib/geometry.git
+	url = https://github.com/Melown/buildsys-cmake.git
 [submodule "externals/half"]
 	path = externals/half
-	url = ../../3rdparty/half.git
-[submodule "externals/imgproc"]
-	path = externals/imgproc
-	url = ../../lib/imgproc.git
-[submodule "externals/jsoncpp"]
-	path = externals/jsoncpp
-	url = ../../lib/jsoncpp.git
-[submodule "externals/math"]
-	path = externals/math
-	url = ../../lib/math.git
-[submodule "externals/service"]
-	path = externals/service
-	url = ../../lib/service.git
-[submodule "externals/utility"]
-	path = externals/utility
-	url = ../../lib/utility.git
+	url = https://github.com/Melown/half.git
 [submodule "externals/vts-libs"]
 	path = externals/vts-libs
-	url = ../../vts/vts-libs.git
+	url = https://github.com/Melown/vts-libs.git
 [submodule "externals/gdal-drivers"]
 	path = externals/gdal-drivers
-	url = ../../lib/gdal-drivers.git
-[submodule "externals/http"]
-        path = externals/http
-        url = ../../lib/http.git
-[submodule "externals/pysupport"]
-	path = externals/pysupport
-	url = ../../lib/pysupport
-[submodule "externals/pydbglog"]
-        path = externals/pydbglog
-        url = ../../lib/pydbglog
-
+	url = https://github.com/Melown/libgdal-drivers.git
