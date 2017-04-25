@@ -224,7 +224,7 @@ private:
 typedef std::array<boost::optional<math::Point2d>, 4> OptCorners;
 
 inline bool partial(const OptCorners &c) {
-    auto b([&](int i) -> bool { return c[i]; });
+    auto b([&](int i) -> bool { return bool(c[i]); });
     auto sum(b(0) + b(1) + b(2) + b(3));
     return (sum > 0) && (sum < 4);
 }

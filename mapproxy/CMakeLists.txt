@@ -16,7 +16,7 @@ include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 find_package(OpenCV 2.4 REQUIRED)
 
 find_package(GDAL REQUIRED)
-include_directories(${GDAL_INCLUDE_DIR})
+include_directories(SYSTEM ${GDAL_INCLUDE_DIR})
 find_package(Proj REQUIRED)
 include_directories(${PROJ_INCLUDE_DIR})
 find_package(GeographicLib REQUIRED)
