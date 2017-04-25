@@ -1,0 +1,5 @@
+vts-mapproxy (1.0) melown-xenial; urgency=low
+
+  * Initial build for Ubuntu/Xenial.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 25 Apr 2017 16:12:07 +0200
