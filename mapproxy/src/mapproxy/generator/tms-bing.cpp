@@ -171,7 +171,7 @@ void generateTileUrl(Sink sink, Arsenal &arsenal
     {
         try {
             std::istringstream in(query.front().get().data);
-            auto reply(Json::read<FormatError>
+            auto reply(Json::read<InternalError>
                        (in, metadataUrl, "Bing metadata"));
 
             const auto &resource
