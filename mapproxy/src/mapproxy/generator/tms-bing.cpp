@@ -41,6 +41,7 @@
 
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
+#include "jsoncpp/io.hpp"
 
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
@@ -169,13 +170,10 @@ void generateTileUrl(Sink sink, Arsenal &arsenal
                             , [=](const MultiQuery &query) mutable -> void
     {
         try {
-            Json::Value reply;
-            Json::Reader reader;
             std::istringstream in(query.front().get().data);
-            if (!reader.parse(in, reply)) {
-                LOGTHROW(err1, InternalError)
-                    << "Unable to parse metadata received from Bing service.";
-            }
+            auto reply(Json::read<FormatError>
+                       (in, metadataUrl, "Bing metadata"));
+
             const auto &resource
                 (reply["resourceSets"][0]["resources"][0]);
 

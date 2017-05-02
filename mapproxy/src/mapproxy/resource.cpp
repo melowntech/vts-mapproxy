@@ -30,6 +30,7 @@
 
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
+#include "jsoncpp/io.hpp"
 
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/vts/tileop.hpp"
@@ -183,13 +184,7 @@ void parseResources(Resource::map &resources, const Json::Value &value
 Resource::map loadResources(std::istream &in, const fs::path &path
                             , const FileClassSettings &fileClassSettings)
 {
-    Json::Value config;
-    Json::Reader reader;
-    if (!reader.parse(in, config)) {
-        LOGTHROW(err2, FormatError)
-            << "Unable to parse resource file " << path << ": <"
-            << reader.getFormattedErrorMessages() << ">.";
-    }
+    auto config(Json::read<FormatError>(in, path, "resources"));
 
     Resource::map resources;
 
@@ -211,13 +206,7 @@ Resource::map loadResources(std::istream &in, const fs::path &path
 Resource::list loadResource(std::istream &in, const fs::path &path
                             , const FileClassSettings &fileClassSettings)
 {
-    Json::Value config;
-    Json::Reader reader;
-    if (!reader.parse(in, config)) {
-        LOGTHROW(err2, FormatError)
-            << "Unable to parse resource file " << path << ": <"
-            << reader.getFormattedErrorMessages() << ">.";
-    }
+    auto config(Json::read<FormatError>(in, path, "resource"));
 
     try {
         return parseResource(config, fileClassSettings);
@@ -271,7 +260,7 @@ void saveResource(std::ostream &out, const Resource &resource)
     buildResource(value, resource);
 
     out.precision(15);
-    Json::StyledStreamWriter().write(out, value);
+    Json::write(out, value);
 }
 
 } // namespace detail

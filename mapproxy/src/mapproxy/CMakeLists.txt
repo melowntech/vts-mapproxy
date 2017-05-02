@@ -2,7 +2,8 @@
 define_module(BINARY mapproxy
   DEPENDS
   pysupport pydbglog
-  vts-libs>=2.0 http>=1.0 service>=1.6 gdal-drivers>=1.13 geometry>=1.7
+  vts-libs>=2.4 http>=1.0 service>=1.6 gdal-drivers>=1.13 geometry>=1.7
+  jsoncpp>=2.1
 
   Boost_SERIALIZATION
   Boost_FILESYSTEM
