@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.52) citationtech-wheezy; urgency=low
+
+  * Using new JsonCPP I/O interface.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 03 May 2017 10:48:37 +0200
+
 ctt-vts-mapproxy (0.51) citationtech-wheezy; urgency=low
 
   * Fixed boundlayer metatile generation from original dataset.
