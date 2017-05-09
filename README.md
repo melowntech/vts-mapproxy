@@ -1,4 +1,35 @@
-# vts/mapproxy
+# VTS-Mapproxy
+
+[VTS-Mapproxy](https://github.com/melown/vts-mapproxy) is a HTTP server that
+converts non-VTS resources (raster or vector) to VTS resources (surface,
+boundlayer, freelayer) on the fly.
+
+## User documentation
+
+VTS-Mapproxy user documentation is available at
+https://melown.readthedocs.io/
+
+## Install
+
+For installation instructions, see the
+[buildsys-common](https://github.com/melown/buildsys-common) project on GitHub.
+
+## Run VTS-Mapproxy server
+
+First you need to create `mapproxy.conf` configuration file. You then can run
+
+```
+mapproxy --config mapproxy.conf
+```
+
+Description of the configuration file can be found in our [user documentation](http://melown.readthedocs.io/en/latest/server/mapproxy.html).
+
+The server is not intended to be exposed to the Internet as it is, instead it's
+advised to hide it behind e.g. [NGINX](https://www.nginx.com/) server.
+
+## How to contribute
+
+Check the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ---
 
