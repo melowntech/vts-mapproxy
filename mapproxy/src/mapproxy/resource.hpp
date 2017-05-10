@@ -151,6 +151,8 @@ struct Resource {
             : referenceFrame(referenceFrame), group(group), id(id) {}
         bool operator<(const Id &o) const;
         bool operator==(const Id &o) const;
+
+        typedef std::vector<Id> list;
     };
 
     struct Generator {

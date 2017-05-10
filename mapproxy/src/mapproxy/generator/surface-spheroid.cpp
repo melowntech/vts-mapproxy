@@ -262,43 +262,9 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
 
 vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root) const
 {
-    vts::ExtraTileSetProperties extra;
-
-    Resource::Id introspectionTms;
-    if (definition_.introspectionTms) {
-        introspectionTms = *definition_.introspectionTms;
-    } else {
-        // defaults to patchwork
-        introspectionTms.referenceFrame = referenceFrameId();
-        introspectionTms.group = systemGroup();
-        introspectionTms.id = "tms-raster-patchwork";
-    }
-
-    if (auto other = otherGenerator
-        (Resource::Generator::Type::tms
-         , addReferenceFrame(introspectionTms, referenceFrameId())))
-    {
-        // we have found tms resource, use it as a boundlayer
-        const auto otherId(introspectionTms.fullId());
-        const auto &otherResource(other->resource());
-        const auto resdiff(resolveRoot(resource(), otherResource));
-
-        const fs::path blPath
-            (prependRoot(fs::path(), otherResource, resdiff)
-             / "boundlayer.json");
-
-        extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
-
-        extra.view.surfaces[id().fullId()]
-            = { vr::View::BoundLayerParams(otherId) };
-    };
-
-    if (definition_.introspectionPosition) {
-        extra.position = *definition_.introspectionPosition;
-    }
-
     auto mc(vts::mapConfig
-            (properties_, resource().registry, extra
+            (properties_, resource().registry
+             , extraProperties(definition_)
              , prependRoot(fs::path(), resource(), root)));
 
     return mc;

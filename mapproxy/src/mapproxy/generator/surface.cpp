@@ -85,11 +85,22 @@ void SurfaceBase::SurfaceDefinition::parse(const Json::Value &value)
     if (value.isMember("introspection")) {
         const auto &introspection(value["introspection"]);
         if (introspection.isMember("tms")) {
-            const auto &surface(introspection["tms"]);
-            Resource::Id rid;
-            Json::get(rid.group, surface, "group");
-            Json::get(rid.id, surface, "id");
-            introspectionTms = rid;
+            const auto &boundLayers(introspection["tms"]);
+            auto getTms([](const Json::Value &bl) -> Resource::Id
+            {
+                Resource::Id rid;
+                Json::get(rid.group, bl, "group");
+                Json::get(rid.id, bl, "id");
+                return rid;
+            });
+
+            if (boundLayers.isArray()) {
+                for (const auto &bl : boundLayers) {
+                    introspectionTms.push_back(getTms(bl));
+                }
+            } else {
+                introspectionTms.push_back(getTms(boundLayers));
+            }
         }
 
         if (introspection.isMember("position")) {
@@ -108,12 +119,15 @@ void SurfaceBase::SurfaceDefinition::build(Json::Value &value) const
         value["mergeBottomLod"] = *mergeBottomLod;
     }
 
-    if (introspectionTms || introspectionPosition) {
+    if (!introspectionTms.empty() || introspectionPosition) {
         auto &introspection(value["introspection"] = Json::objectValue);
-        if (introspectionTms) {
-            auto &tms(introspection["tms"] = Json::objectValue);
-            tms["group"] = introspectionTms->group;
-            tms["id"] = introspectionTms->id;
+        if (!introspectionTms.empty()) {
+            auto &tmsList(introspection["tms"] = Json::arrayValue);
+            for (const auto &bl : introspectionTms) {
+                auto &tms(tmsList.append(Json::objectValue));
+                tms["group"] = bl.group;
+                tms["id"] = bl.id;
+            }
         }
         if (introspectionPosition) {
             introspection["position"] = vr::asJson(*introspectionPosition);
@@ -136,11 +150,17 @@ void SurfaceBase::SurfaceDefinition::parse(const boost::python::dict &value)
     if (value.has_key("introspection")) {
         boost::python::dict introspection(value["introspection"]);
         if (introspection.has_key("tms")) {
+            auto getTms([](const boost::python::dict &bl) -> Resource::Id
+            {
+                Resource::Id rid;
+                rid.group = py2utf8(bl["group"]);
+                rid.id = py2utf8(bl["id"]);
+                return rid;
+            });
+
+            // TODO: support list
             boost::python::dict tms(introspection["tms"]);
-            Resource::Id rid;
-            rid.group = py2utf8(tms["group"]);
-            rid.id = py2utf8(tms["id"]);
-            introspectionTms = rid;
+            introspectionTms.push_back(getTms(tms));
         }
 
         if (introspection.has_key("position")) {
@@ -511,6 +531,47 @@ void SurfaceBase::generateDebugNode(const vts::TileId &tileId
     std::ostringstream os;
     vts::saveDebug(os, debugNode);
     sink.content(os.str(), fi.sinkFileInfo());
+}
+
+vts::ExtraTileSetProperties
+SurfaceBase::extraProperties(const SurfaceDefinition &def) const
+{
+    vts::ExtraTileSetProperties extra;
+
+    Resource::Id::list introspectionTmsList(def.introspectionTms);
+    if (introspectionTmsList.empty()) {
+        // defaults to patchwork
+        introspectionTmsList.emplace_back(referenceFrameId()
+                                          , systemGroup()
+                                          , "tms-raster-patchwork");
+    }
+
+    for (const auto &introspectionTms : introspectionTmsList) {
+        if (auto other = otherGenerator
+            (Resource::Generator::Type::tms
+             , addReferenceFrame(introspectionTms, referenceFrameId())))
+        {
+            // we have found tms resource, use it as a boundlayer
+            const auto otherId(introspectionTms.fullId());
+            const auto &otherResource(other->resource());
+            const auto resdiff(resolveRoot(resource(), otherResource));
+
+            const fs::path blPath
+                (prependRoot(fs::path(), otherResource, resdiff)
+                 / "boundlayer.json");
+
+            extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
+
+            extra.view.surfaces[id().fullId()]
+                .push_back(vr::View::BoundLayerParams(otherId));
+        };
+    }
+
+    if (def.introspectionPosition) {
+        extra.position = *def.introspectionPosition;
+    }
+
+    return extra;
 }
 
 } // namespace generator

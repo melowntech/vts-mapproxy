@@ -532,7 +532,7 @@ void Generators::Detail::registerSystemGenerators()
         for (const auto &rfitem : vr::system.referenceFrames) {
             const auto &rfId(rfitem.first);
             const auto &rf(rfitem.second);
-            LOG(info4) << "About to register " << resourceGenerator
+            LOG(info2) << "About to register " << resourceGenerator
                        << " generator for"
                        << " reference frame " << rfitem.first << ".";
 
@@ -703,9 +703,10 @@ void Generators::Detail::update(const Resource::map &resources)
 
     // process tail: removed resources
     for (; iserving != eserving; ++iserving) {
-        toRemove.push_back(*iserving);
+        if (!(*iserving)->system()) {
+            toRemove.push_back(*iserving);
+        }
     }
-
 
     // add stuff
     for (const auto &generator : toAdd) {
@@ -729,7 +730,7 @@ void Generators::Detail::update(const Resource::map &resources)
         // TODO: mark as to be removed for prepare workers
     }
 
-    // repalce stuff (prepare)
+    // replace stuff (prepare)
     for (const auto &generator : toReplace) {
         if (!generator->ready()) {
             prepare(generator);

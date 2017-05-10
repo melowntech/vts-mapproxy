@@ -48,7 +48,7 @@ public:
         boost::optional<double> nominalTexelSize;
         boost::optional<vts::Lod> mergeBottomLod;
 
-        boost::optional<Resource::Id> introspectionTms;
+        Resource::Id::list introspectionTms;
         boost::optional<vr::Position> introspectionPosition;
 
         void parse(const Json::Value &value);
@@ -63,6 +63,9 @@ protected:
     boost::filesystem::path filePath(vts::File fileType) const;
     bool updateProperties(const SurfaceDefinition &def);
     bool loadFiles(const SurfaceDefinition &definition);
+
+    vts::ExtraTileSetProperties extraProperties(const SurfaceDefinition &def)
+        const;
 
 protected:
     vts::tileset::Index index_;
