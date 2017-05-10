@@ -84,7 +84,7 @@ UTILITY_GENERATE_ENUM(DatasetType,
 class Calipers : public service::Cmdline {
 public:
     Calipers()
-        : service::Cmdline("calipers", BUILD_TARGET_VERSION)
+        : service::Cmdline("mapproxy-calipers", BUILD_TARGET_VERSION)
         , demToOphotoScale_(3.0), tileFractionLimit_(32.0)
     {}
 
@@ -169,8 +169,33 @@ bool Calipers::help(std::ostream &out, const std::string &what) const
 {
     if (what.empty()) {
         // program help
-        out << ("calipers dataset referenceFrame [options]\n"
+        out << ("mapproxy-calipers dataset referenceFrame [options]\n"
                 "    Measures GDAL dataset in given reference frame.\n"
+                "\n"
+                "    Output format (stdout, machine readable):\n"
+                "\n"
+                "        gsd: GSD\n"
+                "        range<SRS1>: lodRange lod/tileRange\n"
+                "        range<SRS2>: lodRange lod/tileRange\n"
+                "        ...\n"
+                "        range<SRSN>: lodRange lod/tileRange\n"
+                "        range:       lodRange tileRange\n"
+                "        position: VTS-position\n"
+                "\n"
+                "    Where\n"
+                "        GSD       is computed ground sample distance\n"
+                "                  (resolution in meters per pixel)\n"
+                "        SRS1-N    SRS in spatial division node 1-N\n"
+                "        lodRange  estimated LOD range\n"
+                "        lod/tileRange measured range at given LOD\n"
+                "        tileRange measured tile range at minimal LOD\n"
+                "        position  best estimated position\n"
+                "\n"
+                "    NB:\n"
+                "        * values from range<SRS*> lines are to be fed to\n"
+                "          mapproxy-tiling tool\n"
+                "        * values from range line are be put in mapproxy\n"
+                "          resource configuration\n"
                 "\n"
                 );
 
@@ -775,6 +800,20 @@ int Calipers::run()
 
     std::cout << "gsd: " << gsd << "\n";
 
+    // compute overall lod range
+    auto lodRange([&]() -> vts::LodRange
+    {
+        auto lr(vts::LodRange::emptyRange());
+        for (const auto &node : nodes) {
+            lr = unite(lr, node->ranges().lodRange());
+        }
+        return lr;
+    }());
+
+    // overall tile range
+    vts::TileRange tileRange(math::InvalidExtents{});
+
+    // overall navigatione extents
     math::Extents2 navExtents(math::InvalidExtents{});
     for (const auto &node : nodes) {
         auto r(node->ranges());
@@ -785,7 +824,12 @@ int Calipers::run()
         auto tmp(node->navExtents());
         math::update(navExtents, tmp.ll);
         math::update(navExtents, tmp.ur);
+
+        // update overall tile range
+        tileRange = math::unite(tileRange, r.tileRange(lodRange.min));
     }
+
+    std::cout << "range: " << lodRange << " " << tileRange << '\n';
 
     // center of navigation extents
     const auto navCenter(math::center(navExtents));

@@ -208,10 +208,9 @@ void Tiling::configuration(po::options_description &cmdline
          , "Tiling reference frame.")
         ("lodRange", po::value(&lodRange_)->required()
          , "Lod range where content is generated.")
-        // ("tileRange", po::value(&tileRange_)->required()
-        //  , "Tile range at min lod where content is generated.")
         ("tileRange", po::value(&tileRanges_)->required()
-         , "Tile range at min lod where content is generated.")
+         , "Either single tile range at lodRange.min or one or more "
+         "lod/tileRange entries (obtained from mapproxy-calipers).")
         ("tileSampling", po::value(&tileSampling_)
          ->default_value(tileSampling_)
          , "Nuber of pixels to break tile into when analyzing its coverage.")
@@ -272,6 +271,29 @@ bool Tiling::help(std::ostream &out, const std::string &what) const
                 "information.\n"
                 "usage:\n"
                 "    mapproxy-tiling input referenceFrame [ options ]\n"
+                "\n"
+                "    LOD and tile ranges:\n"
+                "        Tile tree descent must be limited by user.\n"
+                "        LOD range (--lodRange) is a range of levels of\n"
+                "        detail where tiling tree is analyzed in the\n"
+                "        \"min,max\" format; both numbers are inclusive.\n"
+                "        Tile range (--tileRange) is a range of tiles at\n"
+                "        certain LOD in the \"xmin,ymin:xmax,ymax\" format;\n"
+                "        all four numbers are inclusive.\n"
+                "        Simple tile range describes tile range at minimum\n"
+                "        LOD range (i.e. first number in LOD range).\n"
+                "        Complex tile range is specified in LOD/tileRange\n"
+                "        format which describes tile range at given LOD \n"
+                "        (which can even be outside of lodRange).\n"
+                "\n"
+                "        It is recommended to use LOD range and complex tile\n"
+                "        ranges from the \"mapproxy-calipers\" tool output\n"
+                "        instead of guessing values or processing whole tile \n"
+                "        world.\n"
+                "\n"
+                "        NB: For unlimited tile tree descent (i.e. whole world)\n"
+                "        one must explicitely use lodRange starting from zero \n"
+                "        and use --tileRange=0,0:0,0.\n"
                 "\n"
                 );
 
