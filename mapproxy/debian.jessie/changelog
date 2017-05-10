@@ -1,0 +1,5 @@
+vts-mapproxy (1.0) melown-jessie; urgency=low
+
+  * Initial build for Debian Jessie.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Tue, 9 Apr 2017 15:55:07 +0200

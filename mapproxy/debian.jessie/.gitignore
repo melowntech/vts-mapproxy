@@ -1,0 +1,7 @@
+vts-mapproxy
+vts-mapproxy-tools
+vts-mapproxy-dbg
+debhelper-build-stamp
+files
+*debhelper*
+*.substvars
