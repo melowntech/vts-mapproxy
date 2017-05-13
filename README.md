@@ -12,10 +12,9 @@ https://melown.readthedocs.io/
 
 ## Download, build and install
 
-**NOTE:** VTS-Mapproxy is tested (among other distros) on Ubuntu 16.04 - 
-Xenial Xerus (LTS). For support of newer versions of Ubuntu, please referer to
-[related issue](https://github.com/Melown/vts-mapproxy/issues/2).
-
+You basically need just 2 steps to get VTS-Mapproxy installed: `git clone` the
+source code from the repository and `make` it. But there are some tricky parts
+of the process, so read carefully following compilation howto.
 
 ### Dependencies
 
@@ -33,7 +32,9 @@ sudo apt-get install cmake g++
 
 Before you can run [VTS-Mapproxy](https://github.com/melown/vts-mapproxy), you
 need at least [VTS-Registry](https://github.com/melown/vts-registry) downloaded
-and installed in your system. Please referer to related [README.md](https://github.com/Melown/vts-registry/blob/master/README.md) file, about how to install and compile VTS-Registry.
+and installed in your system. Please refer to related
+[README.md](https://github.com/Melown/vts-registry/blob/master/README.md) file,
+about how to install and compile VTS-Registry.
 
 #### Unpackaged deps
 
@@ -84,7 +85,7 @@ sudo apt-get install \
 
 ### Clone and Download
 
-The source code can be donwloaded from
+The source code can be downloaded from
 [GitHub repository](https://github.com/melown/vts-mapproxy), but since there are
 external dependences, you have to use `--recursive` switch while cloning the
 repo.
@@ -115,7 +116,8 @@ The binaries are then stored in `bin` directory.
 
 ## Install from Melown repository
 
-Yes, we are working on it...
+Yes, we [are working on it](https://github.com/Melown/vts-mapproxy/issues/3) ...
+but till we do, you have to compile VTS-Mapproxy manually. 
 
 ## Run VTS-Mapproxy server
 
