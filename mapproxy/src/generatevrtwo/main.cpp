@@ -28,6 +28,7 @@
 #include <utility>
 #include <functional>
 #include <map>
+#include <numeric>
 
 #include <boost/optional.hpp>
 #include <boost/utility/in_place_factory.hpp>

@@ -24,6 +24,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <boost/utility/in_place_factory.hpp>
+
 #include "./requests.hpp"
 
 ShRaster::ShRaster(const GdalWarper::RasterRequest &other
