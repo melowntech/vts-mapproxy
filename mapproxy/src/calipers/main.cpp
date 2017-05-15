@@ -826,7 +826,12 @@ int Calipers::run()
         math::update(navExtents, tmp.ur);
 
         // update overall tile range
-        tileRange = math::unite(tileRange, r.tileRange(lodRange.min));
+
+        // get tilerange at its minimum lod
+        auto tr(r.tileRange(lr.min));
+        // and adjust to minimum common lod
+        tileRange = math::unite
+            (tileRange, vts::parentRange(tr, lr.min - lodRange.min));
     }
 
     std::cout << "range: " << lodRange << " " << tileRange << '\n';
