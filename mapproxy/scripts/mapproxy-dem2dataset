@@ -133,12 +133,16 @@ def get_ranges(dirname, input_file, reference_frame, verbose=False):
     if verbose:
         stdout = stderr = None
 
+    stderr_output = None
+
     print("Calculating lodRange and tileRange for {}".format(input_file))
     with subprocess.Popen([
         "mapproxy-calipers",
         os.path.join(target_file, "dataset"),
         reference_frame],
             stdout=subprocess.PIPE, stderr=stderr) as caliper:
+        
+        stderr_output = caliper.stderr.read()
 
         for line in caliper.stdout.readlines():
             line = line.decode("utf-8")
@@ -151,9 +155,14 @@ def get_ranges(dirname, input_file, reference_frame, verbose=False):
                 (ref, lod, tile) = (line.split())
                 srange = (lod, tile)
 
+    if caliper.returncode == 1:
+        if caliper.stderr:
+            raise Exception(stderr_output)
+        else:
+            sys.exit(1)
     #
     print("Tiling {} using --lodRange {} and --tileRanges {}".format(
-        input_file, srange[0], " - ".join(map(lambda r: r[2], tileranges))))
+        input_file, srange[0], " - ".join([r[2] for r in tileranges])))
     args = ["mapproxy-tiling", dirname, reference_frame, "--lodRange", lod]
     for tilerange in tileranges:
         args.append("--tileRange")
@@ -206,19 +215,19 @@ def _parse_args():
     parser.add_argument(
         "--input", type=argparse.FileType('r'),
         help="Input file name (e.g. dem.tif)",
-        nargs="+"
+        required=True
     )
     parser.add_argument(
         "--output", metavar="DIR",
         help="Name of output dataset. New directory will be created",
-        nargs="+"
+        required=True
     )
     parser.add_argument(
         "--size", type=int, help="Matrix size", default=1024
     )
     parser.add_argument(
         "--refframe", metavar="REFERENCE_FRAME", help="Reference frame name",
-        nargs="+"
+        required=True
     )
     grp = parser.add_argument_group("Resource")
     grp.add_argument(
@@ -242,10 +251,10 @@ def _parse_args():
     )
     args = parser.parse_args()
 
-    if os.path.isdir(args.output[0]):
+    if os.path.isdir(args.output):
         if args.o:
-            print("Removing existing output dir [{}]".format(args.output[0]))
-            shutil.rmtree(args.output[0])
+            print("Removing existing output dir [{}]".format(args.output))
+            shutil.rmtree(args.output)
         elif args.u:
             print("Updating tiling for new reference frame")
         else:
@@ -259,10 +268,9 @@ if __name__ == "__main__":
     if not _check_scripts():
         sys.exit(1)
     if not my_args.u:
-        make_vrt(my_args.output[0], my_args.input[
-                 0].name, my_args.size, my_args.v)
-    (srange, tileranges) = get_ranges(my_args.output[0], my_args.input[0].name,
-                                      my_args.refframe[0], my_args.v)
-    print_confjson(my_args.id, my_args.output[0], my_args.comment,
+        make_vrt(my_args.output, my_args.input.name, my_args.size, my_args.v)
+    (srange, tileranges) = get_ranges(my_args.output, my_args.input.name,
+                                      my_args.refframe, my_args.v)
+    print_confjson(my_args.id, my_args.output, my_args.comment,
                    my_args.group, srange, tileranges)
-    print("Result saved in [{}]".format(my_args.output[0]))
+    print("Result saved in [{}]".format(my_args.output))
