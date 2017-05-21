@@ -172,7 +172,7 @@ def get_ranges(dirname, input_file, reference_frame, verbose=False):
     return (srange, tileranges)
 
 
-def print_confjson(rid, dirname, comment, group, srange, tileranges):
+def print_confjson(rid, dirname, comment, group, srange, tileranges, refframe):
     """Construct and print configuration for given resource
 
     :param rid: new dataset id
@@ -193,10 +193,12 @@ def print_confjson(rid, dirname, comment, group, srange, tileranges):
     result["definition"] = {
         "dataset": dirname
     }
-    result["referenceFrames"] = {
-        "lodRange": srange[0],
-        "tileRange": [r.split(",") for r in srange[1].split(":")]
-    }
+    result["referenceFrames"] = [{
+        refframe: {
+            "lodRange": [int(x) for x in srange[0].split(","),
+            "tileRange": [ [int(x) for x in r.split(",")] for r in srange[1].split(":")]
+        }
+    }]
 
     print("Configuration snippet:\n")
     print(json.dumps(result, indent=4))
@@ -272,5 +274,5 @@ if __name__ == "__main__":
     (srange, tileranges) = get_ranges(my_args.output, my_args.input.name,
                                       my_args.refframe, my_args.v)
     print_confjson(my_args.id, my_args.output, my_args.comment,
-                   my_args.group, srange, tileranges)
+                   my_args.group, srange, tileranges, my_args.refframe)
     print("Result saved in [{}]".format(my_args.output))
