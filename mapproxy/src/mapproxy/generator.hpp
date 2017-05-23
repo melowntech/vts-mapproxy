@@ -194,6 +194,12 @@ protected:
     absoluteDatasetRf(const boost::optional<boost::filesystem::path> &path)
         const;
 
+    /** Returns valid path if given path is valid and reference file exists.
+     */
+    boost::optional<boost::filesystem::path>
+    ignoreNonexistent(const boost::optional<boost::filesystem::path> &path)
+        const;
+
     Generator::pointer otherGenerator(Resource::Generator::Type generatorType
                                       , const Resource::Id &resourceId) const;
 

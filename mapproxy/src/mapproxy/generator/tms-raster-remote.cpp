@@ -86,8 +86,9 @@ void parseDefinition(TmsRasterRemote::Definition &def
 
     Json::get(def.remoteUrl, value, "remoteUrl");
     if (value.isMember("mask")) {
-        def.mask = boost::in_place();
-        Json::get(*def.mask, value, "mask");
+        std::string s;
+        Json::get(s, value, "mask");
+        def.mask = s;;
     }
 }
 
@@ -96,7 +97,7 @@ void buildDefinition(Json::Value &value
 {
     value["remoteUrl"] = def.remoteUrl;
     if (def.mask) {
-        value["mask"] = *def.mask;
+        value["mask"] = def.mask->string();
     }
 }
 
@@ -153,6 +154,7 @@ TmsRasterRemote::TmsRasterRemote(const Params &params)
     : Generator(params)
     , definition_(resource().definition<Definition>())
     , hasMetatiles_(false)
+    , maskTree_(ignoreNonexistent(absoluteDatasetRf(definition_.mask)))
 {
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
@@ -160,9 +162,12 @@ TmsRasterRemote::TmsRasterRemote(const Params &params)
 void TmsRasterRemote::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
-
-    if (definition_.mask) {
-        geo::GeoDataset::open(absoluteDataset(*definition_.mask));
+    if (maskTree_) {
+        // we have mask tree -> metatiles exist
+        hasMetatiles_ = true;
+    } else if (definition_.mask) {
+        maskDataset_ = definition_.mask->string();
+        geo::GeoDataset::open(absoluteDataset(*maskDataset_));
         // we have mask dataset -> metatiles exist
         hasMetatiles_ = true;
     }
@@ -222,11 +227,22 @@ Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
     // check for valid tileId
     switch (fi.type) {
     case TmsFileInfo::Type::image:
+        if (!checkRanges(resource(), fi.tileId)) {
+            sink.error(utility::makeError<NotFound>
+                        ("TileId outside of configured range."));
+            return {};
+        }
+        break;
+
     case TmsFileInfo::Type::mask:
         if (!checkRanges(resource(), fi.tileId)) {
             sink.error(utility::makeError<NotFound>
                         ("TileId outside of configured range."));
             return {};
+        }
+        if (!maskDataset_ && !maskTree_) {
+            sink.error(utility::makeError<FullImage>
+                        ("No mask defined, every pixel valid."));
         }
         break;
 
@@ -277,9 +293,15 @@ Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
     }
 
     case TmsFileInfo::Type::mask:
-        return [=](Sink &sink, Arsenal &arsenal) {
-            generateTileMask(fi.tileId, fi, sink, arsenal);
-        };
+        if (maskTree_) {
+            return [=](Sink &sink, Arsenal &arsenal) {
+                generateTileMaskFromTree(fi.tileId, fi, sink, arsenal);
+            };
+        } else {
+            return [=](Sink &sink, Arsenal &arsenal) {
+                generateTileMask(fi.tileId, fi, sink, arsenal);
+            };
+        }
 
     case TmsFileInfo::Type::metatile:
         return [=](Sink &sink, Arsenal &arsenal) {
@@ -307,7 +329,7 @@ void TmsRasterRemote::generateTileMask(const vts::TileId &tileId
     auto mask(arsenal.warper.warp
               (GdalWarper::RasterRequest
                (GdalWarper::RasterRequest::Operation::mask
-                , *absoluteDataset(definition_.mask)
+                , *absoluteDataset(maskDataset_)
                 , nodeInfo.srsDef()
                 , nodeInfo.extents()
                 , math::Size2(256, 256)
@@ -320,6 +342,31 @@ void TmsRasterRemote::generateTileMask(const vts::TileId &tileId
     std::vector<unsigned char> buf;
     // write as png file
     cv::imencode(".png", *mask, buf
+                 , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+
+    sink.content(buf, fi.sinkFileInfo());
+}
+
+void TmsRasterRemote::generateTileMaskFromTree(const vts::TileId &tileId
+                                               , const TmsFileInfo &fi
+                                               , Sink &sink
+                                               , Arsenal&) const
+{
+    sink.checkAborted();
+
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.valid()) {
+        sink.error(utility::makeError<NotFound>
+                    ("TileId outside of valid reference frame tree."));
+        return;
+    }
+
+    auto mask(boundlayerMask(tileId, maskTree_));
+
+    // serialize
+    std::vector<unsigned char> buf;
+    // write as png file
+    cv::imencode(".png", mask, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
     sink.content(buf, fi.sinkFileInfo());
@@ -359,7 +406,7 @@ void TmsRasterRemote::generateMetatile(const vts::TileId &tileId
 
     // bits to set for watertight tile
     const auto watertightBits
-        (definition_.mask
+        (maskDataset_
          ? MetaFlags::watertight // detailed mask -> watertight supported
          : MetaFlags::available // no mask -> watertight supported
          );
@@ -375,7 +422,7 @@ void TmsRasterRemote::generateMetatile(const vts::TileId &tileId
         src = arsenal.warper.warp
             (GdalWarper::RasterRequest
              (GdalWarper::RasterRequest::Operation::detailMask
-              , absoluteDataset(*definition_.mask)
+              , absoluteDataset(*maskDataset_)
               , vr::system.srs(block.srs).srsDef
               , block.extents, bSize)
              , sink);

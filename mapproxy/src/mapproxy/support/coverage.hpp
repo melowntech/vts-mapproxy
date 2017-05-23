@@ -35,10 +35,17 @@ namespace vts = vtslibs::vts;
 
 typedef imgproc::mappedqtree::RasterMask MaskTree;
 
+/** Complex converage, used for surface mask.
+ */
 vts::NodeInfo::CoverageMask
 generateCoverage(const int size, const vts::NodeInfo &nodeInfo
                  , const imgproc::mappedqtree::RasterMask &maskTree
                  , vts::NodeInfo::CoverageType type
                  = vts::NodeInfo::CoverageType::pixel);
+
+/** Boundlayer mask, used for TMS mask.
+ */
+cv::Mat boundlayerMask(const vts::TileId &tileId
+                       , const imgproc::mappedqtree::RasterMask &maskTree);
 
 #endif // mapproxy_support_coverage_hpp_included_

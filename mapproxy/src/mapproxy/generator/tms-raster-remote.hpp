@@ -27,6 +27,7 @@
 #ifndef mapproxy_generator_tms_raster_remote_hpp_included_
 #define mapproxy_generator_tms_raster_remote_hpp_included_
 
+#include "../support/coverage.hpp"
 #include "../generator.hpp"
 
 namespace generator {
@@ -37,7 +38,7 @@ public:
 
     struct Definition : public DefinitionBase {
         std::string remoteUrl;
-        boost::optional<std::string> mask;
+        boost::optional<boost::filesystem::path> mask;
 
         Definition() {}
 
@@ -60,6 +61,11 @@ private:
                           , Sink &sink
                           , Arsenal &arsenal) const;
 
+    void generateTileMaskFromTree(const vts::TileId &tileId
+                                  , const TmsFileInfo &fi
+                                  , Sink &sink
+                                  , Arsenal &arsenal) const;
+
     void generateMetatile(const vts::TileId &tileId
                           , const TmsFileInfo &fi
                           , Sink &sink
@@ -70,6 +76,13 @@ private:
     const Definition &definition_;
 
     bool hasMetatiles_;
+
+    // mask tree
+    MaskTree maskTree_;
+
+    /** Mask dataset path. Only when defined and not a RF tree.
+     */
+    boost::optional<std::string> maskDataset_;
 };
 
 } // namespace generator
