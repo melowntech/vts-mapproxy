@@ -184,12 +184,23 @@ MetatileBlock::list metatileBlocks(const Resource &resource
 }
 
 cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
-                                       , const MaskTree &maskTree)
+                                       , const MaskTree &maskTree
+                                       , const MetatileBlock::list &blocks)
 {
     typedef vr::BoundLayer BL;
 
     cv::Mat metatile(BL::rasterMetatileHeight, BL::rasterMetatileWidth
                      , CV_8U, cv::Scalar(0));
+
+    std::vector<cv::Rect> boundsList;
+    for (const auto &block : blocks) {
+        if (!block.valid()) { continue; }
+        const auto &v(block.view);
+        boundsList.emplace_back(v.ll(0) - tileId.x, v.ll(1) - tileId.y
+                                , 1 + v.ur(0) - v.ll(0)
+                                , 1 + v.ur(1) - v.ll(1));
+    }
+    if (boundsList.empty()) { return metatile; }
 
     // clip sampling depth
     int depth(std::min(int(tileId.lod), int(maskTree.depth())));
@@ -207,7 +218,6 @@ cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
     const cv::Scalar available(BL::MetaFlags::available);
     const cv::Scalar watertight(BL::MetaFlags::available
                                 | BL::MetaFlags::watertight);
-    const cv::Rect tileBounds(0, 0, metatile.cols, metatile.rows);
 
     auto draw([&](MaskTree::Node node, boost::tribool value)
     {
@@ -220,12 +230,16 @@ cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
         node.x -= tileId.x;
         node.y -= tileId.y;
 
-        // construct rectangle and intersect it with bounds
+        // construct rectangle and intersect it with all bounds
         cv::Rect r(node.x, node.y, node.size, node.size);
-        auto rr(r & tileBounds);
+        for (const auto &bounds : boundsList) {
+            r = r & bounds;
+            if (!r.width || !r.height) { return; }
+        }
+
         // draw rectangle, true -> watertight tile, indeterminate ->
         // non-watertight
-        cv::rectangle(metatile, rr, (value ? watertight : available)
+        cv::rectangle(metatile, r, (value ? watertight : available)
                       , CV_FILLED, 4);
     });
 

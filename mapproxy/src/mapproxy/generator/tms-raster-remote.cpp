@@ -489,9 +489,8 @@ void TmsRasterRemote::generateMetatileFromTree(const vts::TileId &tileId
         return;
     }
 
-    // TODO: generate tiles only in blocks
-
-    auto metatile(boundlayerMetatileFromMaskTree(tileId, maskTree_));
+    auto metatile(boundlayerMetatileFromMaskTree(tileId, maskTree_
+                                                 , blocks));
 
     // serialize metatile
     std::vector<unsigned char> buf;
