@@ -332,6 +332,11 @@ void TmsRasterRemote::generateTileMask(const vts::TileId &tileId
         return;
     }
 
+    if (!nodeInfo.productive()) {
+        sink.error(utility::makeError<EmptyImage>("No valid data."));
+        return;
+    }
+
     auto mask(arsenal.warper.warp
               (GdalWarper::RasterRequest
                (GdalWarper::RasterRequest::Operation::mask
@@ -364,6 +369,11 @@ void TmsRasterRemote::generateTileMaskFromTree(const vts::TileId &tileId
     if (!nodeInfo.valid()) {
         sink.error(utility::makeError<NotFound>
                     ("TileId outside of valid reference frame tree."));
+        return;
+    }
+
+    if (!nodeInfo.productive()) {
+        sink.error(utility::makeError<EmptyImage>("No valid data."));
         return;
     }
 

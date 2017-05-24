@@ -30,51 +30,60 @@
 typedef vts::TileIndex::Flag TiFlag;
 
 void prepareTileIndex(vts::TileIndex &index
-                      , const boost::filesystem::path &tilesPath
+                      , const boost::filesystem::path *tilesPath
                       , const Resource &resource
                       , bool navtiles
                       , const MaskTree &maskTree)
 {
-    // load definition
-    vts::TileIndex datasetTiles;
-    datasetTiles.load(tilesPath);
-
     // grab and reset tile index
     auto &ti(index);
 
     // clean tile index
     ti = {};
 
-    // generate tile index from lod/tile ranges
-    for (auto lod : resource.lodRange) {
-        // treat whole lod as a huge metatile and process each block
-        // independently
-        for (const auto &block
-                 : metatileBlocks(resource, vts::TileId(lod), lod, true))
-        {
-            LOG(info1) << "Generating tile index LOD <" << lod
-                       << ">: ancestor: "
-                       << block.commonAncestor.nodeId()
-                       << ", block: " << block.view << ".";
+    // generate tile index bootstrap from lod/tile ranges
+    {
+        // build default flags
+        TiFlag::value_type defaultFlags(TiFlag::mesh);
+        if (!tilesPath) {
+            // no external tile index, everything is watertight by default
+            defaultFlags |= TiFlag::watertight;
+        }
 
-            if (block.commonAncestor.productive()
-                && in(lod, resource.lodRange))
+        for (auto lod : resource.lodRange) {
+            // treat whole lod as a huge metatile and process each block
+            // independently
+            for (const auto &block
+                     : metatileBlocks(resource, vts::TileId(lod), lod, true))
             {
-                TiFlag::value_type flags(TiFlag::mesh);
+                LOG(info1) << "Generating tile index LOD <" << lod
+                           << ">: ancestor: "
+                       << block.commonAncestor.nodeId()
+                           << ", block: " << block.view << ".";
 
-                if (navtiles && (lod == resource.lodRange.min)) {
-                    // force navtile in topmost lod
-                    flags |= TiFlag::navtile;
+                if (block.commonAncestor.productive()
+                    && in(lod, resource.lodRange))
+                {
+                    TiFlag::value_type flags(defaultFlags);
+
+                    if (navtiles && (lod == resource.lodRange.min)) {
+                        // force navtile in topmost lod
+                        flags |= TiFlag::navtile;
+                    }
+
+                    // set current block to computed value
+                    ti.set(lod, block.view, flags);
                 }
-
-                // set current block to computed value
-                ti.set(lod, block.view, flags);
             }
         }
     }
 
     // and clip with dataset tiles
-    {
+    if (tilesPath) {
+        // load definition
+        vts::TileIndex datasetTiles;
+        datasetTiles.load(*tilesPath);
+
         // TODO: unset navtile info if navtiles is true
         auto combiner([&](TiFlag::value_type o, TiFlag::value_type n)
                       -> TiFlag::value_type

@@ -36,7 +36,18 @@
 namespace vts = vtslibs::vts;
 
 void prepareTileIndex(vts::TileIndex &index
+                      , const boost::filesystem::path *tilesPath
+                      , const Resource &resource
+                      , bool navtiles = false
+                      , const MaskTree &maskTree = MaskTree());
+
+void prepareTileIndex(vts::TileIndex &index
                       , const boost::filesystem::path &tilesPath
+                      , const Resource &resource
+                      , bool navtiles = false
+                      , const MaskTree &maskTree = MaskTree());
+
+void prepareTileIndex(vts::TileIndex &index
                       , const Resource &resource
                       , bool navtiles = false
                       , const MaskTree &maskTree = MaskTree());
@@ -56,6 +67,23 @@ inline void prepareTileIndex(vts::tileset::Index &index
                              , const MaskTree &maskTree)
 {
     prepareTileIndex(index.tileIndex, tilesPath, resource, navtiles, maskTree);
+}
+
+inline void prepareTileIndex(vts::TileIndex &index
+                             , const boost::filesystem::path &tilesPath
+                             , const Resource &resource
+                             , bool navtiles
+                             , const MaskTree &maskTree)
+{
+    return prepareTileIndex(index, &tilesPath, resource, navtiles, maskTree);
+}
+
+inline void prepareTileIndex(vts::TileIndex &index
+                             , const Resource &resource
+                             , bool navtiles
+                             , const MaskTree &maskTree)
+{
+    return prepareTileIndex(index, nullptr, resource, navtiles, maskTree);
 }
 
 #endif // mapproxy_support_tileindex_hpp_included_

@@ -190,16 +190,31 @@ Changed TmsRaster::Definition::changed_impl(const DefinitionBase &o) const
     return Changed::no;
 }
 
+namespace {
+
+inline boost::optional<fs::path>
+asPath(const boost::optional<std::string> &path)
+{
+    if (!path) { return boost::none; }
+    return fs::path(*path);
+}
+
+} // namespace
+
 TmsRaster::TmsRaster(const Params &params)
     : Generator(params)
     , definition_(resource().definition<Definition>())
     , hasMetatiles_(false)
+    , complexDataset_(false)
+    , maskTree_(ignoreNonexistent(absoluteDatasetRf(asPath(definition_.mask))))
 {
     const auto indexPath(root() / "tileset.index");
     if (fs::exists(indexPath)) {
         index_ = boost::in_place();
         index_->load(indexPath);
         hasMetatiles_ = true;
+        complexDataset_
+            = fs::exists(absoluteDataset(definition_.dataset + "/ophoto"));
         makeReady();
         return;
     }
@@ -210,7 +225,7 @@ TmsRaster::TmsRaster(const Params &params)
 
 TmsRaster::DatasetDesc TmsRaster::dataset_impl() const
 {
-    if (index_) {
+    if (complexDataset_) {
         return { definition_.dataset + "/ophoto" };
     }
 
@@ -225,6 +240,7 @@ void TmsRaster::prepare_impl(Arsenal&)
         // complex dataset directory
         // alwas with metatiles
         hasMetatiles_ = true;
+        complexDataset_ = true;
 
         // try to open
         geo::GeoDataset::open
@@ -232,25 +248,33 @@ void TmsRaster::prepare_impl(Arsenal&)
 
         const auto &r(resource());
 
-        // TODO: use mask if provided; must be in new format
-
         index_ = boost::in_place();
         prepareTileIndex(*index_
                          , (absoluteDataset(definition_.dataset)
                             + "/tiling." + r.id.referenceFrame)
-                         , r);
+                         , r, false, maskTree_);
 
         index_->save(root() / "tileset.index");
 
         // done
         makeReady();
         return;
-   }
+    }
 
     // try to open datasets
     auto ds(geo::GeoDataset::open(absoluteDataset(dataset().path)));
-    if (definition_.mask) {
-        geo::GeoDataset::open(absoluteDataset(*definition_.mask));
+    if (maskTree_) {
+        // we have mask tree -> metatiles exist
+        hasMetatiles_ = true;
+
+        // build tileindex
+        index_ = boost::in_place();
+        prepareTileIndex(*index_, resource(), false, maskTree_);
+
+        index_->save(root() / "tileset.index");
+    } else if (definition_.mask) {
+        maskDataset_ = definition_.mask;
+        geo::GeoDataset::open(absoluteDataset(*maskDataset_));
         // we have mask dataset -> metatiles exist
         hasMetatiles_ = true;
     } else {
@@ -396,9 +420,15 @@ Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
     }
 
     case TmsFileInfo::Type::mask:
-        return [=](Sink &sink, Arsenal &arsenal)  {
-            generateTileMask(fi.tileId, fi, sink, arsenal);
-        };
+        if (maskTree_) {
+            return [=](Sink &sink, Arsenal &arsenal)  {
+                generateTileMaskFromTree(fi.tileId, fi, sink, arsenal);
+            };
+        } else {
+            return [=](Sink &sink, Arsenal &arsenal)  {
+                generateTileMask(fi.tileId, fi, sink, arsenal);
+            };
+        }
 
     case TmsFileInfo::Type::metatile:
         return [=](Sink &sink, Arsenal &arsenal) {
@@ -440,7 +470,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
                 , nodeInfo.extents()
                 , math::Size2(256, 256)
                            , geo::GeoDataset::Resampling::cubic
-                , absoluteDataset(definition_.mask))
+                , absoluteDataset(maskDataset_))
                , sink));
     sink.checkAborted();
 
@@ -489,7 +519,7 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
     auto mask(arsenal.warper.warp
               (GdalWarper::RasterRequest
                (GdalWarper::RasterRequest::Operation::mask
-                , absoluteDataset(ds.path, definition_.mask)
+                , absoluteDataset(ds.path, maskDataset_)
                 , nodeInfo.srsDef()
                 , nodeInfo.extents()
                 , math::Size2(256, 256)
@@ -504,9 +534,50 @@ void TmsRaster::generateTileMask(const vts::TileId &tileId
     cv::imencode(".png", *mask, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
-    // reset max age received from dataset if mask is uded
-    if (definition_.mask) { ds.maxAge = boost::none; }
+    // reset max age received from dataset if mask is used
+    if (maskDataset_) { ds.maxAge = boost::none; }
     sink.content(buf, fi.sinkFileInfo().setMaxAge(ds.maxAge));
+}
+
+void TmsRaster::generateTileMaskFromTree(const vts::TileId &tileId
+                                         , const TmsFileInfo &fi
+                                         , Sink &sink
+                                         , Arsenal&) const
+{
+    sink.checkAborted();
+
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.valid()) {
+        sink.error(utility::makeError<NotFound>
+                    ("TileId outside of valid reference frame tree."));
+        return;
+    }
+
+    if (!nodeInfo.productive()
+        || (index_ && !vts::TileIndex::Flag::isReal(index_->get(tileId))))
+    {
+        sink.error(utility::makeError<EmptyImage>("No valid data."));
+        return;
+    }
+
+    auto mask(boundlayerMask(tileId, maskTree_));
+
+    const auto nz(countNonZero(mask));
+    if (!nz) {
+        sink.error(utility::makeError<EmptyImage>
+                   ("No pixels, optimize."));
+    } else if (nz == vr::BoundLayer::basicTileArea) {
+        sink.error(utility::makeError<FullImage>
+                   ("All pixels valid, optimize."));
+    }
+
+    // serialize
+    std::vector<unsigned char> buf;
+    // write as png file
+    cv::imencode(".png", mask, buf
+                 , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+
+    sink.content(buf, fi.sinkFileInfo());
 }
 
 namespace Constants {
@@ -600,12 +671,12 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
         math::Size2 bSize(vts::tileRangesSize(view));
 
         GdalWarper::Raster src;
-        if (definition_.mask) {
+        if (maskDataset_) {
             // warp detailed mask
             src = arsenal.warper.warp
                 (GdalWarper::RasterRequest
                  (GdalWarper::RasterRequest::Operation::detailMask
-                  , absoluteDataset(*definition_.mask)
+                  , absoluteDataset(*maskDataset_)
                   , vr::system.srs(block.srs).srsDef
                   , block.extents, bSize)
                  , sink);
@@ -650,8 +721,8 @@ void TmsRaster::generateMetatile(const vts::TileId &tileId
     cv::imencode(".png", metatile, buf
                  , { cv::IMWRITE_PNG_COMPRESSION, 9 });
 
-    // reset max age received from dataset if mask is uded
-    if (definition_.mask) { ds.maxAge = boost::none; }
+    // reset max age received from dataset if mask is used
+    if (maskDataset_) { ds.maxAge = boost::none; }
     sink.content(buf, fi.sinkFileInfo().setMaxAge(ds.maxAge));
 }
 
