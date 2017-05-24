@@ -26,6 +26,8 @@
 
 #include <deque>
 
+#include <opencv2/highgui/highgui.hpp>
+
 #include "utility/raise.hpp"
 
 #include "vts-libs/vts/io.hpp"
@@ -179,4 +181,55 @@ MetatileBlock::list metatileBlocks(const Resource &resource
         (*resource.referenceFrame, tileId, metaBinaryOrder, includeInvalid
          , vts::shiftRange
          (resource.lodRange.min, resource.tileRange, tileId.lod));
+}
+
+cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
+                                       , const MaskTree &maskTree)
+{
+    typedef vr::BoundLayer BL;
+
+    cv::Mat metatile(BL::rasterMetatileHeight, BL::rasterMetatileWidth
+                     , CV_8U, cv::Scalar(0));
+
+    // clip sampling depth
+    int depth(std::min(int(tileId.lod), int(maskTree.depth())));
+
+    // bit shift
+    int shift(maskTree.depth() - depth);
+
+    // setup constraints
+    MaskTree::Constraints con(depth);
+    con.extents.ll(0) = applyShift(tileId.x, shift);
+    con.extents.ll(1) = applyShift(tileId.y, shift);
+    con.extents.ur(0) = applyShift((tileId.x + metatile.cols), shift);
+    con.extents.ur(1) = applyShift((tileId.y + metatile.rows), shift);
+
+    const cv::Scalar available(BL::MetaFlags::available);
+    const cv::Scalar watertight(BL::MetaFlags::available
+                                | BL::MetaFlags::watertight);
+    const cv::Rect tileBounds(0, 0, metatile.cols, metatile.rows);
+
+    auto draw([&](MaskTree::Node node, boost::tribool value)
+    {
+        // black -> nothing
+        if (!value) { return; }
+
+        // update to match level grid
+        node.shift(shift);
+
+        node.x -= tileId.x;
+        node.y -= tileId.y;
+
+        // construct rectangle and intersect it with bounds
+        cv::Rect r(node.x, node.y, node.size, node.size);
+        auto rr(r & tileBounds);
+        // draw rectangle, true -> watertight tile, indeterminate ->
+        // non-watertight
+        cv::rectangle(metatile, rr, (value ? watertight : available)
+                      , CV_FILLED, 4);
+    });
+
+    maskTree.forEachQuad(draw, con);
+
+    return metatile;
 }

@@ -45,7 +45,17 @@ generateCoverage(const int size, const vts::NodeInfo &nodeInfo
 
 /** Boundlayer mask, used for TMS mask.
  */
-cv::Mat boundlayerMask(const vts::TileId &tileId
-                       , const imgproc::mappedqtree::RasterMask &maskTree);
+cv::Mat boundlayerMask(const vts::TileId &tileId, const MaskTree &maskTree);
+
+/** Helper for positive/negative bit shift
+ */
+template <typename T>
+T applyShift(T value, int shift)
+{
+    if (shift >= 0) {
+        return value << shift;
+    }
+    return value >> -shift;
+}
 
 #endif // mapproxy_support_coverage_hpp_included_

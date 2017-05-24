@@ -32,19 +32,6 @@
 
 namespace vr = vtslibs::registry;
 
-namespace {
-
-template <typename T>
-T applyShift(T value, int shift)
-{
-    if (shift >= 0) {
-        return value << shift;
-    }
-    return value >> -shift;
-}
-
-} // namespace
-
 vts::NodeInfo::CoverageMask
 generateCoverage(const int size, const vts::NodeInfo &nodeInfo
                  , const MaskTree &maskTree

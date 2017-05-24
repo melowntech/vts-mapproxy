@@ -304,9 +304,15 @@ Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
         }
 
     case TmsFileInfo::Type::metatile:
-        return [=](Sink &sink, Arsenal &arsenal) {
-            generateMetatile(fi.tileId, fi, sink, arsenal);
-        };
+        if (maskTree_) {
+            return [=](Sink &sink, Arsenal &arsenal) {
+                generateMetatileFromTree(fi.tileId, fi, sink, arsenal);
+            };
+        } else {
+            return [=](Sink &sink, Arsenal &arsenal) {
+                generateMetatile(fi.tileId, fi, sink, arsenal);
+            };
+        }
     }
 
     return {};
@@ -363,6 +369,15 @@ void TmsRasterRemote::generateTileMaskFromTree(const vts::TileId &tileId
 
     auto mask(boundlayerMask(tileId, maskTree_));
 
+    const auto nz(countNonZero(mask));
+    if (!nz) {
+        sink.error(utility::makeError<EmptyImage>
+                   ("No pixels, optimize."));
+    } else if (nz == vr::BoundLayer::basicTileArea) {
+        sink.error(utility::makeError<FullImage>
+                   ("All pixels valid, optimize."));
+    }
+
     // serialize
     std::vector<unsigned char> buf;
     // write as png file
@@ -400,8 +415,8 @@ void TmsRasterRemote::generateMetatile(const vts::TileId &tileId
         return;
     }
 
-    cv::Mat metatile(Constants::RasterMetatileSize.width
-                     , Constants::RasterMetatileSize.height
+    cv::Mat metatile(Constants::RasterMetatileSize.height
+                     , Constants::RasterMetatileSize.width
                      , CV_8U, cv::Scalar(0));
 
     // bits to set for watertight tile
@@ -449,6 +464,34 @@ void TmsRasterRemote::generateMetatile(const vts::TileId &tileId
             }
         }
     }
+
+    // serialize metatile
+    std::vector<unsigned char> buf;
+    // write as png file
+    cv::imencode(".png", metatile, buf
+                 , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+    sink.content(buf, fi.sinkFileInfo());
+}
+
+void TmsRasterRemote::generateMetatileFromTree(const vts::TileId &tileId
+                                               , const TmsFileInfo &fi
+                                               , Sink &sink
+                                               , Arsenal&) const
+{
+    sink.checkAborted();
+
+    auto blocks(metatileBlocks
+                (resource(), tileId, Constants::RasterMetatileBinaryOrder));
+
+    if (blocks.empty()) {
+        sink.error(utility::makeError<NotFound>
+                    ("Metatile completely outside of configured range."));
+        return;
+    }
+
+    // TODO: generate tiles only in blocks
+
+    auto metatile(boundlayerMetatileFromMaskTree(tileId, maskTree_));
 
     // serialize metatile
     std::vector<unsigned char> buf;

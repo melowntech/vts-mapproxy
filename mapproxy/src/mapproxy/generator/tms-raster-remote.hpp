@@ -71,6 +71,11 @@ private:
                           , Sink &sink
                           , Arsenal &arsenal) const;
 
+    void generateMetatileFromTree(const vts::TileId &tileId
+                                  , const TmsFileInfo &fi
+                                  , Sink &sink
+                                  , Arsenal &arsenal) const;
+
     vr::BoundLayer boundLayer(ResourceRoot root) const;
 
     const Definition &definition_;
