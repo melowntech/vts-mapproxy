@@ -24,6 +24,7 @@ a JSON file on disk (for JSON resource backend) or a python data tree.
 
 Basic resource layout:
 
+```javascript
 resource = {
     String comment      // any comment, ignored
     String group        // group this resource belongs to
@@ -40,6 +41,7 @@ resource = {
     }
     Object definition = {...} // driver-dependent definition, see below
 }
+```
 
 ## TMS drivers
 
