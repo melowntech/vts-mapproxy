@@ -243,6 +243,7 @@ Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
         if (!maskDataset_ && !maskTree_) {
             sink.error(utility::makeError<FullImage>
                         ("No mask defined, every pixel valid."));
+            return {};
         }
         break;
 
@@ -381,11 +382,11 @@ void TmsRasterRemote::generateTileMaskFromTree(const vts::TileId &tileId
 
     const auto nz(countNonZero(mask));
     if (!nz) {
-        sink.error(utility::makeError<EmptyImage>
-                   ("No pixels, optimize."));
+        return sink.error(utility::makeError<EmptyImage>
+                          ("No pixels, optimize."));
     } else if (nz == vr::BoundLayer::basicTileArea) {
-        sink.error(utility::makeError<FullImage>
-                   ("All pixels valid, optimize."));
+        return sink.error(utility::makeError<FullImage>
+                          ("All pixels valid, optimize."));
     }
 
     // serialize
