@@ -51,9 +51,58 @@ Raster-based bound layer generator. Uses any raster GDAL dataset as its data sou
 
 ```javascript
 definition = {
-    String dataset         // path to GDAL dataset
-    Optional String mask   // path to RF mask or masking GDAL dataset
-    Optional String format // output image format, "jpg" or "png" (defaults to "jpg")
+    String dataset               // path to GDAL dataset
+    Optional String mask         // path to RF mask or masking GDAL dataset
+    Optional String format       // output image format, "jpg" or "png" (defaults to "jpg")
     Optional Boolean transparent // Boundlayer is transparent, forces format to "png"
 }
 ```
+
+### tms-raster-remote
+
+Raster bound layer generator. Imagery is pointer to external resource via `remoteUrl` (a URL template). Supports optional data masking.
+
+```javascript
+definition = {
+    String remoteUrl             // Imagery URL template.
+    Optional String mask         // path to RF mask or masking GDAL dataset
+}
+```
+
+
+### tms-patchwork
+
+Simple raster bound layer generator. Generates color checkered tiles. Supports optional data masking.
+
+```javascript
+definition = {
+    Optional String mask         // path to RF mask or masking GDAL dataset
+    Optional String format       // output image format, "jpg" or "png" (defaults to "jpg")
+}
+```
+
+### tms-bing
+
+Bound layer generator for remote Bing data. Valid session is generated via metatada URL.
+
+```javascript
+definition = {
+    String metadataUrl           // Bing API metadata URL. See Bing API documentation for more info.
+}
+```
+
+## Surface drivers
+
+### surface-spheroid
+
+This driver generates meshed surface for reference frame's spheroid. If geoid grid is provided the resulting body
+is in fact a geoid.
+
+```javascript
+definition = {
+    Optional String geoidGrid    // Name of Proj.4's geoid grid file (e.g. `egm96_15.gtx`).
+    Optional Int textureLayerId  // Numeric bound layer ID. If present this ID is written into generated meshes
+                                 // as a default bound layer to use if nothing else is mapped on the surface.
+}
+```
+
