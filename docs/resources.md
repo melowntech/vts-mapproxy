@@ -161,7 +161,7 @@ If a `textureLayerId` entry is present this ID is written into generated meshes 
 if nothing else is mapped on the surface. Otherwise surface is completely texture less.
 
 All `surface-dem` input datasets are registered in internal map od available DEM's under its `group-id` identifier
-and can be referenced from various `geodata`resources for 2D features heightcofing. See meore in `geodata` resources
+and can be referenced from various `geodata`resources for 2D features heightcofing. See more in `geodata` resources
 documentation. Optionially, input dataset can be registered in this map under an alias.
 
 ```javascript
