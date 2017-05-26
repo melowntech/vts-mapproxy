@@ -1,3 +1,7 @@
+# Preamble
+
+This file is the authoritative mapproxy resource documentation. Please, keep it in sync with the actual implemtation.
+
 # Supported resource types/drivers
 
 Mapproxy supports following resource types:
