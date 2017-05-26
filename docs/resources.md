@@ -1,6 +1,6 @@
 # Preamble
 
-This file is the authoritative mapproxy resource documentation. Please, keep it in sync with the actual implemtation.
+This file is the authoritative mapproxy resource documentation. Please, keep it in sync with the actual implementation.
 
 # Supported resource types/drivers
 
