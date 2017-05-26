@@ -9,6 +9,8 @@ boundlayer, freelayer) on the fly.
 VTS-Mapproxy user documentation is available at
 https://melown.readthedocs.io/
 
+Authoritative resource documentation is available in separated [document](docs/resources.md)
+that should be kept in sync with actual implementation.
 
 ## Download, build and install
 
