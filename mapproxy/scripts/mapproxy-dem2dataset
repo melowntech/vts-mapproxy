@@ -195,7 +195,7 @@ def print_confjson(rid, dirname, comment, group, srange, tileranges, refframe):
     }
     result["referenceFrames"] = [{
         refframe: {
-            "lodRange": [int(x) for x in srange[0].split(","),
+            "lodRange": [int(x) for x in srange[0].split(",")],
             "tileRange": [ [int(x) for x in r.split(",")] for r in srange[1].split(":")]
         }
     }]
