@@ -310,7 +310,7 @@ vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
     // force 2d interface existence
     mc.surfaces.front().has2dInterface = true;
 
-    if (!definition_.introspectionPosition) {
+    if (!definition_.introspection.position) {
         // no introspection position, generate some
 
         // look down

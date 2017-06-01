@@ -208,6 +208,7 @@ vts::MapConfig GeodataVectorTiled::mapConfig_impl(ResourceRoot root)
 
     vts::MapConfig mapConfig;
     mapConfig.referenceFrame = *res.referenceFrame;
+    mapConfig.srs = vr::listSrs(*res.referenceFrame);
 
     // add free layer into list of free layers
     mapConfig.freeLayers.add
@@ -218,11 +219,11 @@ vts::MapConfig GeodataVectorTiled::mapConfig_impl(ResourceRoot root)
     // add free layer into view
     mapConfig.view.freeLayers[res.id.fullId()];
 
-    if (definition_.introspectionSurface) {
+    if (definition_.introspection.surface) {
         LOG(info1) << "trying to find surface";
         if (auto other = otherGenerator
             (Resource::Generator::Type::surface
-             , addReferenceFrame(*definition_.introspectionSurface
+             , addReferenceFrame(*definition_.introspection.surface
                                  , referenceFrameId())))
         {
             mapConfig.merge(other->mapConfig

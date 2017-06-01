@@ -20,6 +20,7 @@ set(mapproxy_SOURCES
   support/coverage.hpp support/coverage.cpp
   support/tileindex.hpp support/tileindex.cpp
   support/fileclass.hpp support/fileclass.cpp
+  support/serialization.hpp support/serialization.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp

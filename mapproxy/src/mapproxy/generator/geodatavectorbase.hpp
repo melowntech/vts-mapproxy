@@ -39,6 +39,13 @@ class GeodataVectorBase : public Generator {
 public:
     GeodataVectorBase(const Params &params, bool tiled);
 
+    struct Introspection {
+        boost::optional<Resource::Id> surface;
+
+        bool empty() const;
+        bool operator!=(const Introspection &other) const;
+    };
+
     struct Definition : public DefinitionBase {
         /** Input dataset (can be remote url, interpreted as a template by tiled
          *  version.
@@ -50,9 +57,7 @@ public:
         std::string styleUrl;
         int displaySize;
 
-        /** Introspection surface.
-         */
-        boost::optional<Resource::Id> introspectionSurface;
+        Introspection introspection;
 
         Definition()
             : format(geo::VectorFormat::geodataJson) , displaySize(256) {}

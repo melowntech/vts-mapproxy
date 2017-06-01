@@ -40,6 +40,7 @@
 #include "vts-libs/storage/fstreams.hpp"
 
 #include "../support/python.hpp"
+#include "../support/serialization.hpp"
 
 #include "./geodatavectorbase.hpp"
 
@@ -92,14 +93,10 @@ void parseDefinition(GeodataVectorBase::Definition &def
     Json::get(def.displaySize, value, "displaySize");
 
     if (value.isMember("introspection")) {
-        const auto &introspection(value["introspection"]);
-        if (introspection.isMember("surface")) {
-            const auto &surface(introspection["surface"]);
-            Resource::Id rid;
-            Json::get(rid.group, surface, "group");
-            Json::get(rid.id, surface, "id");
-            def.introspectionSurface = rid;
-        }
+        const auto &jintrospection(value["introspection"]);
+
+        def.introspection.surface
+            = introspectionIdFrom(jintrospection, "surface");
     }
 }
 
@@ -124,11 +121,10 @@ void buildDefinition(Json::Value &value
     value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
 
-    if (def.introspectionSurface) {
-        auto &introspection(value["introspection"] = Json::objectValue);
-        auto &surface(introspection["surface"] = Json::objectValue);
-        surface["group"] = def.introspectionSurface->group;
-        surface["id"] = def.introspectionSurface->id;
+    if (!def.introspection.empty()) {
+        auto &jintrospection(value["introspection"] = Json::objectValue);
+        introspectionIdTo(jintrospection, "surface"
+                          , def.introspection.surface);
     }
 }
 
@@ -169,18 +165,27 @@ void parseDefinition(GeodataVectorBase::Definition &def
     def.styleUrl = py2utf8(value["styleUrl"]);
 
     if (value.has_key("introspection")) {
-        boost::python::dict introspection(value["introspection"]);
-        if (introspection.has_key("surface")) {
-            boost::python::dict surface(introspection["surface"]);
-            Resource::Id rid;
-            rid.group = py2utf8(surface["group"]);
-            rid.id = py2utf8(surface["id"]);
-            def.introspectionSurface = rid;
-        }
+        boost::python::dict pintrospection(value["introspection"]);
+        def.introspection.surface
+            = introspectionIdFrom(pintrospection, "surface");
     }
 }
 
 } // namespace
+
+bool GeodataVectorBase::Introspection::empty() const
+{
+    return (!surface);
+}
+
+bool GeodataVectorBase::Introspection::operator!=(const Introspection &other)
+    const
+{
+    // introspection can safely change
+    if (surface != other.surface) { return true; }
+
+    return false;
+}
 
 void GeodataVectorBase::Definition::from_impl(const boost::any &value)
 {
@@ -224,7 +229,7 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     // styleUrl can change
     if (styleUrl != other.styleUrl) { return Changed::safely; }
     // introspection can change
-    if (introspectionSurface != other.introspectionSurface) {
+    if (introspection != other.introspection) {
         return Changed::safely;
     }
     return Changed::no;

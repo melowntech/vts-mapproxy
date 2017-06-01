@@ -44,12 +44,19 @@ class SurfaceBase : public Generator {
 public:
     SurfaceBase(const Params &params);
 
+    struct Introspection {
+        Resource::Id::list tms;
+        Resource::Id::list geodata;
+        boost::optional<vr::Position> position;
+
+        bool empty() const;
+        bool operator!=(const Introspection &other) const;
+    };
+
     struct SurfaceDefinition : public DefinitionBase {
         boost::optional<double> nominalTexelSize;
         boost::optional<vts::Lod> mergeBottomLod;
-
-        Resource::Id::list introspectionTms;
-        boost::optional<vr::Position> introspectionPosition;
+        Introspection introspection;
 
         void parse(const Json::Value &value);
         void build(Json::Value &value) const;
