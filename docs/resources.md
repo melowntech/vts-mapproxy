@@ -25,6 +25,15 @@ a JSON file on disk (for JSON resource backend) or a python data tree.
  * `Array<type>`: array of given type(s)
  * `Optional` given entry is optional
  * `?` no fixed name
+ 
+Complex datatypes:
+
+```javascript
+ResourceId`: {
+    String group        // group this resource belongs to
+    String id           // resource identifier (withing group)
+}
+```
 
 Basic resource layout:
 
@@ -142,27 +151,15 @@ All surface drivers support these (optional) options:
                                         // by mapproxy. See below.
 ```
 
-Introspection is extending configuration for mapproxy served `mapConfig.json` (only when browsing is enabled).
+Introspection is extended configuration for mapproxy served `mapConfig.json` (only when browsing is enabled).
 
 ```javascript
 introspection = {
-    Optional Array position;   // VTS position in JSON/python format
-    Optional Object/Array tms  // bound layer(s) mapped on the surface, see below 
+    Optional Array position;                       // VTS position in JSON/python format
+    Optional ResourceId/Array<ResourceId> tms      // bound layer(s) mapped on the surface, see below 
+    Optional ResourceId/Array<ResourceId> geodata  // free layer(s) (geodata) mapped on the surface, see below 
 }
 ```
-
-TMS in the above introspection is one or more TMS resource identifiers:
-```javascript
-tms = [
-    {
-        String group           // group part of TMS resource identifier
-        Strting id             // ID part of TMS resource identifier
-    }
-    ...
-]
-```
-
-If there is just one TMS resource used in the introspection then the enclosing array is optional.
 
 ### surface-spheroid
 
@@ -243,10 +240,7 @@ introspection configuration.
 ```javascript
 
 introspection = {
-    Optional Object surface = { // optional surface mapping
-        String group            // group part of surface resource identifier
-        Strting id              // ID part of surface resource identifier
-    }
+    Optional ResourceId surface // optional surface mapping
 }
 ```
 
