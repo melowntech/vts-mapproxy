@@ -228,11 +228,16 @@ definition = {
     Optional String geoidGrid      // name of Proj.4's geoid grid file (e.g. `egm96_15.gtx`)
     Optional Array<String> layers  // list of layers names
     Optional String format         // output file format, so far only "geodataJson" is supported (default)
-    String styleUrl                // URL to default geodata style
+    Optional String styleUrl       // URL to default geodata style
     Int displaySize                // Nominal size of tile in pixels.
     Optional Object introspection  // Extended configuration for mapConfig.json served by mapproxy
 }
 ```
+
+`styleUrl` handling is as follows:
+ * if there is no `styleUrl` element present mapproxy serves its built-in default style via `style.json` file under resources URL;
+ * or if `styleUrl` element is present and starts with `file:` prefix then contents of this file (either absolute or relative to dataset directory) are server via the same `style.json` file (NB: this is not a file URI);
+ * otherwise, the URL from `styleUrl` element is reported in the `freelayer.json` as is
 
 Introspection can be used to serve mapConfig where geodata are show with some surface which in turn can have its own
 introspection configuration.
