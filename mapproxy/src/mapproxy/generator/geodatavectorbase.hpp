@@ -78,6 +78,8 @@ protected:
     viewspec2datasets(const std::string &query, const DemDataset &fallback)
         const;
 
+    const std::string& styleUrl() const { return styleUrl_; }
+
 private:
     virtual vr::FreeLayer freeLayer_impl(ResourceRoot root) const = 0;
 
@@ -95,6 +97,14 @@ private:
 private:
     const Definition &definition_;
     bool tiled_;
+
+    /** URL to style.
+     */
+    std::string styleUrl_;
+
+    /** Path to style file if definition.styleUrl starts with `file:`.
+     */
+    boost::filesystem::path stylePath_;
 };
 
 } // namespace generator

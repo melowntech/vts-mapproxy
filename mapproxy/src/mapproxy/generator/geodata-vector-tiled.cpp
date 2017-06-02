@@ -191,7 +191,7 @@ vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
         (utility::format("{lod}-{x}-{y}.geo?gr=%d&viewspec={viewspec}"
                          , GeneratorRevision)
          , resource(), root);
-    def.style = definition_.styleUrl;
+    def.style = styleUrl();
 
     def.lodRange = res.lodRange;
     def.tileRange = res.tileRange;

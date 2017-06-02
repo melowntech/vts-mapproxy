@@ -52,6 +52,7 @@ namespace constants {
     const std::string Index("index.html");
     const std::string Dems("dems.html");
     const std::string Geo("geo");
+    const std::string Style("style.json");
 
     namespace tileset {
         const std::string Config("tileset.conf");
@@ -535,6 +536,11 @@ GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled
         return;
     }
 
+    if (constants::Style == fi.filename) {
+        type = Type::style;
+        return;
+    }
+
     if (fi.flags & FileFlags::browserEnabled) {
         LOG(debug) << "Browser enabled, checking browser files.";
 
@@ -586,6 +592,10 @@ Sink::FileInfo GeodataFileInfo::sinkFileInfo(std::time_t lastModified) const
             .setFileClass(FileClass::config);
 
     case Type::definition:
+        return Sink::FileInfo("application/json; charset=utf-8", lastModified)
+            .setFileClass(FileClass::config);
+
+    case Type::style:
         return Sink::FileInfo("application/json; charset=utf-8", lastModified)
             .setFileClass(FileClass::config);
 

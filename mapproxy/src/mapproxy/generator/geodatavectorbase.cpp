@@ -29,6 +29,7 @@
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 #include "dbglog/dbglog.hpp"
 
@@ -43,6 +44,7 @@
 #include "../support/serialization.hpp"
 
 #include "./geodatavectorbase.hpp"
+#include "./files.hpp"
 
 namespace ba = boost::algorithm;
 
@@ -89,7 +91,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
         }
     }
 
-    Json::get(def.styleUrl, value, "styleUrl");
+    Json::getOpt(def.styleUrl, value, "styleUrl");
     Json::get(def.displaySize, value, "displaySize");
 
     if (value.isMember("introspection")) {
@@ -239,7 +241,16 @@ GeodataVectorBase::GeodataVectorBase(const Params &params, bool tiled)
     : Generator(params)
     , definition_(this->resource().definition<Definition>())
     , tiled_(tiled)
-{}
+    , styleUrl_(definition_.styleUrl)
+{
+    if (styleUrl_.empty()) {
+        styleUrl_ = "style.json";
+    } else if (ba::istarts_with(styleUrl_, "file:")) {
+        // pseudo file URL
+        stylePath_ = absoluteDataset(styleUrl_.substr(5));
+        styleUrl_ = "style.json";
+    }
+}
 
 Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
                                                      , Sink &sink) const
@@ -286,6 +297,18 @@ Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
         sink.content(vs::fileIStream
                       (fi.registry->contentType, fi.registry->path)
                      , FileClass::registry);
+        break;
+
+    case GeodataFileInfo::Type::style:
+        if (stylePath_.empty()) {
+            // return internal file
+            supportFile(files::defaultStyle, sink, fi.sinkFileInfo());
+        } else {
+            // return external file
+            sink.content(vs::fileIStream
+                         (files::defaultStyle.contentType, stylePath_)
+                         , FileClass::config);
+        }
         break;
 
     default:

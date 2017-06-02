@@ -186,7 +186,7 @@ struct GeodataFileInfo {
     FileInfo fileInfo;
 
     enum class Type {
-        unknown, config, definition, geo, metatile, support, registry
+        unknown, config, definition, geo, metatile, support, registry, style
     };
 
     /** File type.
