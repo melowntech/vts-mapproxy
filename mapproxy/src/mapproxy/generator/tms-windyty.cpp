@@ -39,6 +39,7 @@
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/path.hpp"
 
 #include "imgproc/rastermask/cvmat.hpp"
 
@@ -185,49 +186,44 @@ void writeWms(std::ostream &os, const TmsWindyty::DatasetConfig &config
 
 TmsWindyty::File writeWms(const fs::path &root
                           , const TmsWindyty::DatasetConfig &config
+                          , const Resource &resource
                           , std::time_t time)
 {
-    auto path(root / "windyty" / "XXXXXX");
+    auto path(root / "windyty" / resource.id.referenceFrame
+              / resource.id.group / (resource.id.id + ".xml"));
     fs::create_directories(path.parent_path());
-    auto buf([&]() -> std::vector<char>
+
+    // temporary file
+    auto tmpPath(utility::addExtension(path, ".tmp"));
+    TmsWindyty::File tmpFile(time, tmpPath.string());
+
+    // write content to file
     {
-        auto tmp(path.string());
-        return std::vector<char>(tmp.c_str(), tmp.c_str() + tmp.size() + 1);
-    }());
-
-    utility::Filedes fd(::mkstemp(buf.data()));
-    if (!fd) {
-        std::system_error e(errno, std::system_category());
-        LOG(err3) << "Failed to create temporary file at " << path << ": <"
-                  << e.code() << ", " << e.what() << ">.";
-        throw e;
-    }
-
-    fs::path tmpPath(buf.data());
-    fs::remove(tmpPath);
-
-    // write data into temporary file
-    {
-        bio::stream_buffer<bio::file_descriptor_sink>
-            buffer(fd.get(), bio::file_descriptor_flags::never_close_handle);
-        std::ostream os(&buffer);
+        std::ofstream os(tmpPath.string()
+                         , std::fstream::out | std::fstream::trunc);
         os.exceptions(std::ios::badbit | std::ios::failbit);
-
         writeWms(os, config, time);
         os.flush();
     }
 
-    // return file information
-    return TmsWindyty::File(time, ::getpid(), std::move(fd));
+    // move tmp file to proper path, release tmpFile erasure and go on
+    fs::rename(tmpFile.path, path);
+    tmpFile.path.clear();
+    return TmsWindyty::File(time, path.string());
 }
 
 } // namespace
+
+void TmsWindyty::File::remove()
+{
+    if (!path.empty()) { fs::remove(path); }
+}
 
 TmsWindyty::TmsWindyty(const Params &params)
     : TmsRaster(params)
     , dsConfig_(loadConfig(absoluteDataset(definition().dataset)))
 {
-    ds_.current = writeWms(config().tmpRoot, dsConfig_
+    ds_.current = writeWms(config().tmpRoot, dsConfig_, resource()
                            , normalizedTime(std::time(nullptr), dsConfig_));
 }
 
@@ -257,7 +253,7 @@ TmsRaster::DatasetDesc TmsWindyty::dataset_impl() const
 
         if (now > ds_.current.timestamp) {
             // generate new (in use previous dataset as a place holder)
-            ds_.prev = writeWms(config().tmpRoot, dsConfig_
+            ds_.prev = writeWms(config().tmpRoot, dsConfig_, resource()
                                 , normalizedTime(now, dsConfig_));
 
             // everything is fine, swap them
