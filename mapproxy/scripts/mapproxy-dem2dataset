@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+
+# Copyright 2017 Melown Technologies SE
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# Purpose:
+#   This shell script generates Virtual Datasets from input digital elevation
+#   models (http://www.gdal.org/gdal_vrttut.html). The datasets do contain
+#   overviews for input data file, as well as minimum and maximum values. It's
+#   basically just wrapper around `generatevrtwo` program.
+#
+# Author:
+#   jachym
+
+"""
+Generate virtual dataset overviews and pregenerated tiles for given reference
+frame from input DEM (e.g. GeoTIFF) files
+
+The program takes input DEM file and applies 3 VTS command line tools to it:
+
+    generatevrtwo - generates virtual datasets
+    mapproxy-calipers - calculates LOD and Tile ranges for input data and
+                        reference frame
+    mapproxy-tiling - creates tile cache for given reference frame in
+                      tile range
+
+User should make sure, that those programs are available in $PATH. Reference
+frames definition are expected to be stored in /usr/local/etc/registry/
+directory. You can change this by $VTS_LIBS_REGISTRY_PATH (possibly to
+/opt/vts/etc/).
+"""
+
+import argparse
+import subprocess
+import os
+import sys
+import shutil
+import re
+import json
+from collections import OrderedDict
+
+
+def _get_filenames(input_file, target_dir):
+    """Return adjusted file and directory names"""
+
+    file_name = os.path.basename(input_file)
+    file_without_suffix = os.path.splitext(file_name)[0]
+    return (
+        file_name,
+        file_without_suffix,
+        os.path.join(target_dir, file_without_suffix)
+    )
+
+
+def _check_scripts():
+    """Check all needed command line programms"""
+
+    ok = True
+    for name in ("generatevrtwo", "mapproxy-tiling", "mapproxy-calipers"):
+        try:
+            res = subprocess.run([name, "--help"], stdout=subprocess.PIPE)
+        except FileNotFoundError as notfound:
+            ok = False
+            sys.stderr.write("ERROR: VTS program [{}] could not be found."
+                             "Make sure, it's located in your $PATH env. "
+                             "variable.\n".format(name))
+    return ok
+
+
+def make_vrt(target_dir, input_file, tile_size, verbose=False):
+    """Create virtual overview dataset
+
+    :param target_dir: name of the virtual dataset (directory)
+    :param input_file: input DEM file name
+    :param tile_size: matrix size
+    :param verbose: verbosity indicator
+    """
+
+    os.mkdir(target_dir)
+    (file_name, file_without_suffix,
+     target_file) = _get_filenames(input_file, target_dir)
+
+    file_name = os.path.basename(input_file)
+    file_without_suffix = os.path.splitext(file_name)[0]
+    target_file = os.path.join(target_dir, file_without_suffix)
+
+    stdout = stderr = subprocess.PIPE
+    if verbose:
+        stdout = stderr = None
+
+    for i in (("", "dem"), (".min", "min"), (".max", "max")):
+        target_file_name = "{}{}".format(target_file, i[0])
+
+        print("Generating virtual dataset for [{}] {}".format(file_name, i[1]))
+        subprocess.run([
+            "generatevrtwo", "--input", input_file, "--output",
+            target_file_name,
+            "--resampling", i[1], "--tileSize",
+            "{size}x{size}".format(size=tile_size)],
+            stdout=stdout, stderr=stderr)
+
+        os.symlink(
+            os.path.join("{}{}".format(file_without_suffix, i[0]), "dataset"),
+            os.path.join(target_dir, "dem{}".format(i[0])))
+
+
+def get_ranges(dirname, input_file, reference_frame, verbose=False):
+    """Eastimate tile ranges for specific reference frame
+
+    :param dirname: name of new target directory
+    :param input_file: input file name
+    :param reference_frame: reference frame name
+        (should be availble in registry)
+    :param verbose: verbosity indicator
+    """
+
+    (file_name, file_without_suffix, target_file) = _get_filenames(input_file,
+                                                                   dirname)
+
+    tileranges = []
+    srange = []
+
+    stdout = stderr = subprocess.PIPE
+    if verbose:
+        stdout = stderr = None
+
+    stderr_output = None
+
+    print("Calculating lodRange and tileRange for {}".format(input_file))
+    with subprocess.Popen([
+        "mapproxy-calipers",
+        os.path.join(target_file, "dataset"),
+        reference_frame],
+            stdout=subprocess.PIPE, stderr=stderr) as caliper:
+        
+        stderr_output = caliper.stderr.read()
+
+        for line in caliper.stdout.readlines():
+            line = line.decode("utf-8")
+
+            if re.match(r'range<\w+>: .*', line):
+                (ref, lod, tile) = (line.split())
+                tileranges.append((ref, lod, tile))
+
+            if re.match(r'range: .*', line):
+                (ref, lod, tile) = (line.split())
+                srange = (lod, tile)
+
+    if caliper.returncode == 1:
+        if caliper.stderr:
+            raise Exception(stderr_output)
+        else:
+            sys.exit(1)
+    #
+    print("Tiling {} using --lodRange {} and --tileRanges {}".format(
+        input_file, srange[0], " - ".join([r[2] for r in tileranges])))
+    args = ["mapproxy-tiling", dirname, reference_frame, "--lodRange", lod]
+    for tilerange in tileranges:
+        args.append("--tileRange")
+        args.append(tilerange[2])
+
+    subprocess.run(args, stdout=stdout, stderr=stderr)
+    return (srange, tileranges)
+
+
+def print_confjson(rid, dirname, comment, group, srange, tileranges, refframe):
+    """Construct and print configuration for given resource
+
+    :param rid: new dataset id
+    :param dirname: name of target dataset directory
+    :param comment: dataset comment
+    :param group: dataset group name
+    :param srange: lod range
+    :param tileranges: list of tile ranges for mapprojections
+    """
+
+    result = OrderedDict()
+    result["comment"] = comment
+    result["group"] = group
+    result["id"] = rid
+    result["type"] = "surface"
+    result["driver"] = "surface-dem"
+    result["credits"] = []
+    result["definition"] = {
+        "dataset": dirname
+    }
+    result["referenceFrames"] = [{
+        refframe: {
+            "lodRange": [int(x) for x in srange[0].split(",")],
+            "tileRange": [ [int(x) for x in r.split(",")] for r in srange[1].split(":")]
+        }
+    }]
+
+    print("Configuration snippet:\n")
+    print(json.dumps(result, indent=4))
+    print("")
+
+
+def _parse_args():
+    """Parse command line arguments"""
+
+    parser = argparse.ArgumentParser(
+        description="Generate virtual dataset overviews and pregenerated "
+                    "tiles for given reference frame from input DEM "
+                    "(e.g. GeoTIFF) files",
+        epilog="Documentation: https://melown.readthedocs.io"
+    )
+    parser.add_argument(
+        "--input", type=argparse.FileType('r'),
+        help="Input file name (e.g. dem.tif)",
+        required=True
+    )
+    parser.add_argument(
+        "--output", metavar="DIR",
+        help="Name of output dataset. New directory will be created",
+        required=True
+    )
+    parser.add_argument(
+        "--size", type=int, help="Matrix size", default=1024
+    )
+    parser.add_argument(
+        "--refframe", metavar="REFERENCE_FRAME", help="Reference frame name",
+        required=True
+    )
+    grp = parser.add_argument_group("Resource")
+    grp.add_argument(
+        "--comment", help="Comment", default="Data source"
+    )
+    grp.add_argument(
+        "--group", help="Group", default="mygroup"
+    )
+    grp.add_argument(
+        "--id", help="ID", default="source-id"
+    )
+    parser.add_argument(
+        "-o", help="Overwrite existing output directory", action="store_true"
+    )
+    parser.add_argument(
+        "-v", help="Verbose", action="store_true"
+    )
+    parser.add_argument(
+        "-u", help="Update existing - add new reference frame",
+        action="store_true"
+    )
+    args = parser.parse_args()
+
+    if os.path.isdir(args.output):
+        if args.o:
+            print("Removing existing output dir [{}]".format(args.output))
+            shutil.rmtree(args.output)
+        elif args.u:
+            print("Updating tiling for new reference frame")
+        else:
+            raise Exception("Target directory [{}] exists. "
+                            "Use -o flag to overwrite or remove it manually.")
+    return args
+
+
+if __name__ == "__main__":
+    my_args = _parse_args()
+    if not _check_scripts():
+        sys.exit(1)
+    if not my_args.u:
+        make_vrt(my_args.output, my_args.input.name, my_args.size, my_args.v)
+    (srange, tileranges) = get_ranges(my_args.output, my_args.input.name,
+                                      my_args.refframe, my_args.v)
+    print_confjson(my_args.id, my_args.output, my_args.comment,
+                   my_args.group, srange, tileranges, my_args.refframe)
+    print("Result saved in [{}]".format(my_args.output))

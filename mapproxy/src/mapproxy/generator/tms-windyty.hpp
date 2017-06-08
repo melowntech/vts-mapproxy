@@ -60,14 +60,32 @@ public:
     struct File {
         std::time_t timestamp;
         std::string path;
-        utility::Filedes fd;
 
-        File() {}
-        File(std::time_t timestamp, int pid, utility::Filedes &&fd)
-            : timestamp(timestamp)
-            , path(str(boost::format("/proc/%d/fd/%d") % pid % fd.get()))
-            , fd(std::move(fd))
+        File() = default;
+        File(const File&) = delete;
+        File& operator=(const File&) = delete;
+
+        File(std::time_t timestamp, const std::string &path)
+            : timestamp(timestamp), path(path)
         {}
+
+        File(File &&o)
+            : timestamp(o.timestamp), path(o.path)
+        {
+            o.path.clear();
+        }
+
+        File& operator=(File &&o) {
+            remove();
+            timestamp = o.timestamp;
+            std::swap(path, o.path);
+            return *this;
+        }
+
+        ~File() { remove(); }
+
+    private:
+        void remove();
     };
 
 private:

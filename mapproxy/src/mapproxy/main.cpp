@@ -256,6 +256,8 @@ void Daemon::configure(const po::variables_map &vars)
         generatorsConfig_.fileFlags |= FileFlags::browserEnabled;
     }
 
+    gdalWarperOptions_.tmpRoot = fs::absolute(gdalWarperOptions_.tmpRoot);
+
     LOG(info3, log_)
         << "Config:"
         << "\n\tstore.path = " << generatorsConfig_.root
