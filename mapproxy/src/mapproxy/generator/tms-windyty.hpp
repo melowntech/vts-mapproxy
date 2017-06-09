@@ -76,9 +76,16 @@ public:
         }
 
         File& operator=(File &&o) {
-            remove();
+            if (path == o.path) {
+                // same path -> do not remove and unsed from the other one
+                o.path.clear();
+            } else {
+                // different path, remove this one
+                remove();
+                std::swap(path, o.path);
+            }
+
             timestamp = o.timestamp;
-            std::swap(path, o.path);
             return *this;
         }
 
@@ -96,8 +103,7 @@ private:
     struct Dataset {
         std::mutex mutex;
 
-        File current;
-        File prev;
+        File file;
     };
 
     int pid_;

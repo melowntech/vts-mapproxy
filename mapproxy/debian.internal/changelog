@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.54) citationtech-wheezy; urgency=low
+
+  * tms-windyty: Fixed dataset update.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Fri, 09 Jun 2017 12:00:24 +0200
+
 ctt-vts-mapproxy (0.53) citationtech-wheezy; urgency=low
 
   * tms-windyty: Fixed access permission problems.
