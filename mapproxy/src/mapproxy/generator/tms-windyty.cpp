@@ -190,7 +190,8 @@ TmsWindyty::File writeWms(const fs::path &root
                           , std::time_t time)
 {
     auto path(root / "windyty" / resource.id.referenceFrame
-              / resource.id.group / (resource.id.id + ".xml"));
+              / resource.id.group /
+              str(boost::format("%s.%s.xml") % resource.id.id % time));
     fs::create_directories(path.parent_path());
 
     // temporary file
@@ -223,8 +224,8 @@ TmsWindyty::TmsWindyty(const Params &params)
     : TmsRaster(params)
     , dsConfig_(loadConfig(absoluteDataset(definition().dataset)))
 {
-    ds_.file = writeWms(config().tmpRoot, dsConfig_, resource()
-                        , normalizedTime(std::time(nullptr), dsConfig_));
+    ds_.current = writeWms(config().tmpRoot, dsConfig_, resource()
+                           , normalizedTime(std::time(nullptr), dsConfig_));
 }
 
 bool TmsWindyty::transparent_impl() const
@@ -251,14 +252,16 @@ TmsRaster::DatasetDesc TmsWindyty::dataset_impl() const
         // lock access
         std::unique_lock<std::mutex> lock(ds_.mutex);
 
-        if (now > ds_.file.timestamp) {
+        if (now > ds_.current.timestamp) {
             // Generate new file
-            ds_.file = writeWms(config().tmpRoot, dsConfig_, resource()
-                                , normalizedTime(now, dsConfig_));
+            auto file(writeWms(config().tmpRoot, dsConfig_, resource()
+                               , normalizedTime(now, dsConfig_)));
+            ds_.prev = std::move(ds_.current);
+            ds_.current = std::move(file);
         }
 
         // done
-        return { ds_.file.path, ds_.file.timestamp };
+        return { ds_.current.path, ds_.current.timestamp };
     }());
 
     // max age is time remaining till the end of this forecast

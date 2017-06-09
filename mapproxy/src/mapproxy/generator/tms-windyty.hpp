@@ -76,6 +76,8 @@ public:
         }
 
         File& operator=(File &&o) {
+            if (this == &o) { return *this; }
+
             if (path == o.path) {
                 // same path -> do not remove and unsed from the other one
                 o.path.clear();
@@ -103,7 +105,8 @@ private:
     struct Dataset {
         std::mutex mutex;
 
-        File file;
+        File current;
+        File prev;
     };
 
     int pid_;
