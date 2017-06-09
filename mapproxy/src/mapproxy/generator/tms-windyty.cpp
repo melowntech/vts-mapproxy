@@ -223,8 +223,8 @@ TmsWindyty::TmsWindyty(const Params &params)
     : TmsRaster(params)
     , dsConfig_(loadConfig(absoluteDataset(definition().dataset)))
 {
-    ds_.current = writeWms(config().tmpRoot, dsConfig_, resource()
-                           , normalizedTime(std::time(nullptr), dsConfig_));
+    ds_.file = writeWms(config().tmpRoot, dsConfig_, resource()
+                        , normalizedTime(std::time(nullptr), dsConfig_));
 }
 
 bool TmsWindyty::transparent_impl() const
@@ -251,17 +251,14 @@ TmsRaster::DatasetDesc TmsWindyty::dataset_impl() const
         // lock access
         std::unique_lock<std::mutex> lock(ds_.mutex);
 
-        if (now > ds_.current.timestamp) {
-            // generate new (in use previous dataset as a place holder)
-            ds_.prev = writeWms(config().tmpRoot, dsConfig_, resource()
+        if (now > ds_.file.timestamp) {
+            // Generate new file
+            ds_.file = writeWms(config().tmpRoot, dsConfig_, resource()
                                 , normalizedTime(now, dsConfig_));
-
-            // everything is fine, swap them
-            std::swap(ds_.current, ds_.prev);
         }
 
         // done
-        return { ds_.current.path, ds_.current.timestamp };
+        return { ds_.file.path, ds_.file.timestamp };
     }());
 
     // max age is time remaining till the end of this forecast
