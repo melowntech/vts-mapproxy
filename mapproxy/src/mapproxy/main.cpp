@@ -43,6 +43,7 @@
 #include "gdal-drivers/register.hpp"
 
 #include "vts-libs/registry/po.hpp"
+#include "vts-libs/vts/support.hpp"
 
 #include "http/http.hpp"
 
@@ -57,6 +58,7 @@ namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 
 namespace vr = vtslibs::registry;
+namespace vts = vtslibs::vts;
 
 class Daemon : public service::Service {
 public:
@@ -82,9 +84,7 @@ public:
 
         generatorsConfig_.variables = &variables_;
 
-        variables_["VTS_BUILTIN_BROWSER_URL"]
-            = "//cdn.melown.com/libs/melownjs/builtin/stable";
-
+        variables_ = vts::defaultSupportVars;
 
         // some file class defaults
         auto &fcs(resourceBackendGenericConfig_.fileClassSettings);

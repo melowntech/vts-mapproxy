@@ -26,6 +26,8 @@
 
 #include <deque>
 
+#include <opencv2/highgui/highgui.hpp>
+
 #include "utility/raise.hpp"
 
 #include "vts-libs/vts/io.hpp"
@@ -179,4 +181,69 @@ MetatileBlock::list metatileBlocks(const Resource &resource
         (*resource.referenceFrame, tileId, metaBinaryOrder, includeInvalid
          , vts::shiftRange
          (resource.lodRange.min, resource.tileRange, tileId.lod));
+}
+
+cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
+                                       , const MaskTree &maskTree
+                                       , const MetatileBlock::list &blocks)
+{
+    typedef vr::BoundLayer BL;
+
+    cv::Mat metatile(BL::rasterMetatileHeight, BL::rasterMetatileWidth
+                     , CV_8U, cv::Scalar(0));
+
+    std::vector<cv::Rect> boundsList;
+    for (const auto &block : blocks) {
+        if (!block.valid()) { continue; }
+        const auto &v(block.view);
+        boundsList.emplace_back(v.ll(0) - tileId.x, v.ll(1) - tileId.y
+                                , 1 + v.ur(0) - v.ll(0)
+                                , 1 + v.ur(1) - v.ll(1));
+    }
+    if (boundsList.empty()) { return metatile; }
+
+    // clip sampling depth
+    int depth(std::min(int(tileId.lod), int(maskTree.depth())));
+
+    // bit shift
+    int shift(maskTree.depth() - depth);
+
+    // setup constraints
+    MaskTree::Constraints con(depth);
+    con.extents.ll(0) = applyShift(tileId.x, shift);
+    con.extents.ll(1) = applyShift(tileId.y, shift);
+    con.extents.ur(0) = applyShift((tileId.x + metatile.cols), shift);
+    con.extents.ur(1) = applyShift((tileId.y + metatile.rows), shift);
+
+    const cv::Scalar available(BL::MetaFlags::available);
+    const cv::Scalar watertight(BL::MetaFlags::available
+                                | BL::MetaFlags::watertight);
+
+    auto draw([&](MaskTree::Node node, boost::tribool value)
+    {
+        // black -> nothing
+        if (!value) { return; }
+
+        // update to match level grid
+        node.shift(shift);
+
+        node.x -= tileId.x;
+        node.y -= tileId.y;
+
+        // construct rectangle and intersect it with all bounds
+        cv::Rect r(node.x, node.y, node.size, node.size);
+        for (const auto &bounds : boundsList) {
+            r = r & bounds;
+            if (!r.width || !r.height) { return; }
+        }
+
+        // draw rectangle, true -> watertight tile, indeterminate ->
+        // non-watertight
+        cv::rectangle(metatile, r, (value ? watertight : available)
+                      , CV_FILLED, 4);
+    });
+
+    maskTree.forEachQuad(draw, con);
+
+    return metatile;
 }

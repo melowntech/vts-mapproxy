@@ -24,38 +24,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_support_coverage_hpp_included_
-#define mapproxy_support_coverage_hpp_included_
+#ifndef mapproxy_generator_files_hpp_included_
+#define mapproxy_generator_files_hpp_included_
 
+#include "vts-libs/storage/support.hpp"
 
-#include "vts-libs/vts/nodeinfo.hpp"
-#include "imgproc/rastermask/mappedqtree.hpp"
+namespace vs = vtslibs::storage;
 
-namespace vts = vtslibs::vts;
+namespace files {
 
-typedef imgproc::mappedqtree::RasterMask MaskTree;
+extern const vtslibs::storage::SupportFile defaultStyle;
 
-/** Complex converage, used for surface mask.
- */
-vts::NodeInfo::CoverageMask
-generateCoverage(const int size, const vts::NodeInfo &nodeInfo
-                 , const imgproc::mappedqtree::RasterMask &maskTree
-                 , vts::NodeInfo::CoverageType type
-                 = vts::NodeInfo::CoverageType::pixel);
+} // namespace files
 
-/** Boundlayer mask, used for TMS mask.
- */
-cv::Mat boundlayerMask(const vts::TileId &tileId, const MaskTree &maskTree);
-
-/** Helper for positive/negative bit shift
- */
-template <typename T>
-T applyShift(T value, int shift)
-{
-    if (shift >= 0) {
-        return value << shift;
-    }
-    return value >> -shift;
-}
-
-#endif // mapproxy_support_coverage_hpp_included_
+#endif // mapproxy_generator_files_hpp_included_

@@ -218,6 +218,16 @@ Generator
         (utility::addExtension(*path, "." + referenceFrameId()));
 }
 
+boost::optional<boost::filesystem::path>
+Generator
+::ignoreNonexistent(const boost::optional<boost::filesystem::path> &path) const
+{
+    // valid path but file doesn't exist -> invalid
+    if (path && !fs::exists(*path)) { return boost::none; }
+    // pass parameter
+    return path;
+}
+
 void Generator::checkReady() const
 {
     if (ready_) { return; }

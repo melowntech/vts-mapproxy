@@ -26,20 +26,11 @@
 
 #include <opencv2/highgui/highgui.hpp>
 
+#include "vts-libs/registry/referenceframe.hpp"
+
 #include "./coverage.hpp"
 
-namespace {
-
-template <typename T>
-T applyShift(T value, int shift)
-{
-    if (shift >= 0) {
-        return value << shift;
-    }
-    return value >> -shift;
-}
-
-} // namespace
+namespace vr = vtslibs::registry;
 
 vts::NodeInfo::CoverageMask
 generateCoverage(const int size, const vts::NodeInfo &nodeInfo
@@ -207,3 +198,51 @@ generateCoverage(const int size, const vts::NodeInfo &nodeInfo
     return coverage;
 }
 
+cv::Mat boundlayerMask(const vts::TileId &coarseTileId
+                       , const imgproc::mappedqtree::RasterMask &maskTree)
+{
+    cv::Mat mask(vr::BoundLayer::tileHeight, vr::BoundLayer::tileWidth
+                 , CV_8UC1, cv::Scalar(0x00));
+
+    // map to detailed tileId
+    vts::TileId tileId(coarseTileId.lod + vr::BoundLayer::binaryOrder
+                         , coarseTileId.x << vr::BoundLayer::binaryOrder
+                         , coarseTileId.y << vr::BoundLayer::binaryOrder);
+
+
+    // clip sampling depth
+    int depth(std::min(int(tileId.lod), int(maskTree.depth())));
+
+    // bit shift; never negative since depth is clipped by tree depth
+    int shift(maskTree.depth() - depth);
+
+    // setup constraints
+    MaskTree::Constraints con(depth);
+    con.extents.ll(0) = applyShift(tileId.x, shift);
+    con.extents.ll(1) = applyShift(tileId.y, shift);
+    con.extents.ur(0) = applyShift((tileId.x + mask.cols), shift);
+    con.extents.ur(1) = applyShift((tileId.y + mask.rows), shift);
+
+    const cv::Scalar white(0xff);
+    const cv::Rect tileBounds(0, 0, mask.cols, mask.rows);
+    auto draw([&](MaskTree::Node node, boost::tribool value)
+    {
+        // black -> nothing
+        if (!value) { return; }
+
+        // update to match level grid
+        node.shift(shift);
+
+        node.x -= tileId.x;
+        node.y -= tileId.y;
+
+        // construct rectangle and intersect it with bounds
+        cv::Rect r(node.x, node.y, node.size, node.size);
+        auto rr(r & tileBounds);
+        cv::rectangle(mask, rr, white, CV_FILLED, 4);
+    });
+
+    maskTree.forEachQuad(draw, con);
+
+    return mask;
+}

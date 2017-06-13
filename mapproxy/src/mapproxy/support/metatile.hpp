@@ -109,4 +109,10 @@ private:
     const vts::NodeInfo::CoverageMask mask_;
 };
 
+/** Boundlayer metatile from mask
+ */
+cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
+                                       , const MaskTree &maskTree
+                                       , const MetatileBlock::list &blocks);
+
 #endif // mapproxy_support_metatile_hpp_included_

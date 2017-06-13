@@ -39,6 +39,13 @@ class GeodataVectorBase : public Generator {
 public:
     GeodataVectorBase(const Params &params, bool tiled);
 
+    struct Introspection {
+        boost::optional<Resource::Id> surface;
+
+        bool empty() const;
+        bool operator!=(const Introspection &other) const;
+    };
+
     struct Definition : public DefinitionBase {
         /** Input dataset (can be remote url, interpreted as a template by tiled
          *  version.
@@ -50,9 +57,7 @@ public:
         std::string styleUrl;
         int displaySize;
 
-        /** Introspection surface.
-         */
-        boost::optional<Resource::Id> introspectionSurface;
+        Introspection introspection;
 
         Definition()
             : format(geo::VectorFormat::geodataJson) , displaySize(256) {}
@@ -73,6 +78,8 @@ protected:
     viewspec2datasets(const std::string &query, const DemDataset &fallback)
         const;
 
+    const std::string& styleUrl() const { return styleUrl_; }
+
 private:
     virtual vr::FreeLayer freeLayer_impl(ResourceRoot root) const = 0;
 
@@ -90,6 +97,14 @@ private:
 private:
     const Definition &definition_;
     bool tiled_;
+
+    /** URL to style.
+     */
+    std::string styleUrl_;
+
+    /** Path to style file if definition.styleUrl starts with `file:`.
+     */
+    boost::filesystem::path stylePath_;
 };
 
 } // namespace generator

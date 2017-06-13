@@ -29,6 +29,7 @@
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 #include "dbglog/dbglog.hpp"
 
@@ -40,8 +41,10 @@
 #include "vts-libs/storage/fstreams.hpp"
 
 #include "../support/python.hpp"
+#include "../support/serialization.hpp"
 
 #include "./geodatavectorbase.hpp"
+#include "./files.hpp"
 
 namespace ba = boost::algorithm;
 
@@ -88,18 +91,14 @@ void parseDefinition(GeodataVectorBase::Definition &def
         }
     }
 
-    Json::get(def.styleUrl, value, "styleUrl");
+    Json::getOpt(def.styleUrl, value, "styleUrl");
     Json::get(def.displaySize, value, "displaySize");
 
     if (value.isMember("introspection")) {
-        const auto &introspection(value["introspection"]);
-        if (introspection.isMember("surface")) {
-            const auto &surface(introspection["surface"]);
-            Resource::Id rid;
-            Json::get(rid.group, surface, "group");
-            Json::get(rid.id, surface, "id");
-            def.introspectionSurface = rid;
-        }
+        const auto &jintrospection(value["introspection"]);
+
+        def.introspection.surface
+            = introspectionIdFrom(jintrospection, "surface");
     }
 }
 
@@ -124,11 +123,10 @@ void buildDefinition(Json::Value &value
     value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
 
-    if (def.introspectionSurface) {
-        auto &introspection(value["introspection"] = Json::objectValue);
-        auto &surface(introspection["surface"] = Json::objectValue);
-        surface["group"] = def.introspectionSurface->group;
-        surface["id"] = def.introspectionSurface->id;
+    if (!def.introspection.empty()) {
+        auto &jintrospection(value["introspection"] = Json::objectValue);
+        introspectionIdTo(jintrospection, "surface"
+                          , def.introspection.surface);
     }
 }
 
@@ -169,18 +167,27 @@ void parseDefinition(GeodataVectorBase::Definition &def
     def.styleUrl = py2utf8(value["styleUrl"]);
 
     if (value.has_key("introspection")) {
-        boost::python::dict introspection(value["introspection"]);
-        if (introspection.has_key("surface")) {
-            boost::python::dict surface(introspection["surface"]);
-            Resource::Id rid;
-            rid.group = py2utf8(surface["group"]);
-            rid.id = py2utf8(surface["id"]);
-            def.introspectionSurface = rid;
-        }
+        boost::python::dict pintrospection(value["introspection"]);
+        def.introspection.surface
+            = introspectionIdFrom(pintrospection, "surface");
     }
 }
 
 } // namespace
+
+bool GeodataVectorBase::Introspection::empty() const
+{
+    return (!surface);
+}
+
+bool GeodataVectorBase::Introspection::operator!=(const Introspection &other)
+    const
+{
+    // introspection can safely change
+    if (surface != other.surface) { return true; }
+
+    return false;
+}
 
 void GeodataVectorBase::Definition::from_impl(const boost::any &value)
 {
@@ -224,7 +231,7 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     // styleUrl can change
     if (styleUrl != other.styleUrl) { return Changed::safely; }
     // introspection can change
-    if (introspectionSurface != other.introspectionSurface) {
+    if (introspection != other.introspection) {
         return Changed::safely;
     }
     return Changed::no;
@@ -234,7 +241,16 @@ GeodataVectorBase::GeodataVectorBase(const Params &params, bool tiled)
     : Generator(params)
     , definition_(this->resource().definition<Definition>())
     , tiled_(tiled)
-{}
+    , styleUrl_(definition_.styleUrl)
+{
+    if (styleUrl_.empty()) {
+        styleUrl_ = "style.json";
+    } else if (ba::istarts_with(styleUrl_, "file:")) {
+        // pseudo file URL
+        stylePath_ = absoluteDataset(styleUrl_.substr(5));
+        styleUrl_ = "style.json";
+    }
+}
 
 Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
                                                      , Sink &sink) const
@@ -281,6 +297,18 @@ Generator::Task GeodataVectorBase::generateFile_impl(const FileInfo &fileInfo
         sink.content(vs::fileIStream
                       (fi.registry->contentType, fi.registry->path)
                      , FileClass::registry);
+        break;
+
+    case GeodataFileInfo::Type::style:
+        if (stylePath_.empty()) {
+            // return internal file
+            supportFile(files::defaultStyle, sink, fi.sinkFileInfo());
+        } else {
+            // return external file
+            sink.content(vs::fileIStream
+                         (files::defaultStyle.contentType, stylePath_)
+                         , FileClass::config);
+        }
         break;
 
     default:

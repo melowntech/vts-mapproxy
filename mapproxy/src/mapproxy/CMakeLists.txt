@@ -20,6 +20,7 @@ set(mapproxy_SOURCES
   support/coverage.hpp support/coverage.cpp
   support/tileindex.hpp support/tileindex.cpp
   support/fileclass.hpp support/fileclass.cpp
+  support/serialization.hpp support/serialization.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp
@@ -71,8 +72,18 @@ file_to_cpp(mapproxy_BROWSER_SOURCES
   browser2d::index_js
   browser2d/index.js)
 
+set(mapproxy_FILES_SOURCES
+  generator/files.hpp generator/files.cpp
+  )
+file_to_cpp(mapproxy_FILES_SOURCES
+  files::defaultstyle_json
+  generator/files/defaultstyle.json)
 
-add_executable(mapproxy ${mapproxy_SOURCES} ${mapproxy_BROWSER_SOURCES})
+
+add_executable(mapproxy
+  ${mapproxy_SOURCES}
+  ${mapproxy_BROWSER_SOURCES}
+  ${mapproxy_FILES_SOURCES})
 target_link_libraries(mapproxy ${MODULE_LIBRARIES})
 buildsys_target_compile_definitions(mapproxy ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy)

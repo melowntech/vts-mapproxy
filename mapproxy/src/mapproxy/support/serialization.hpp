@@ -24,38 +24,37 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_support_coverage_hpp_included_
-#define mapproxy_support_coverage_hpp_included_
+#ifndef mapproxy_support_serialization_hpp_included_
+#define mapproxy_support_serialization_hpp_included_
 
+#include <boost/python.hpp>
+#include <boost/optional.hpp>
 
-#include "vts-libs/vts/nodeinfo.hpp"
-#include "imgproc/rastermask/mappedqtree.hpp"
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
 
-namespace vts = vtslibs::vts;
+#include "../resource.hpp"
 
-typedef imgproc::mappedqtree::RasterMask MaskTree;
+Resource::Id::list introspectionListFrom(const Json::Value &introspection
+                                         , const std::string &key);
 
-/** Complex converage, used for surface mask.
- */
-vts::NodeInfo::CoverageMask
-generateCoverage(const int size, const vts::NodeInfo &nodeInfo
-                 , const imgproc::mappedqtree::RasterMask &maskTree
-                 , vts::NodeInfo::CoverageType type
-                 = vts::NodeInfo::CoverageType::pixel);
+void introspectionListTo(Json::Value &introspection
+                         , const std::string &key
+                         , const Resource::Id::list &resources);
 
-/** Boundlayer mask, used for TMS mask.
- */
-cv::Mat boundlayerMask(const vts::TileId &tileId, const MaskTree &maskTree);
+Resource::Id::list
+introspectionListFrom(const boost::python::dict &introspection
+                      , const std::string &key);
 
-/** Helper for positive/negative bit shift
- */
-template <typename T>
-T applyShift(T value, int shift)
-{
-    if (shift >= 0) {
-        return value << shift;
-    }
-    return value >> -shift;
-}
+boost::optional<Resource::Id>
+introspectionIdFrom(const Json::Value &introspection, const std::string &key);
 
-#endif // mapproxy_support_coverage_hpp_included_
+void introspectionIdTo(Json::Value &introspection
+                       , const std::string &key
+                       , const boost::optional<Resource::Id> &resource);
+
+boost::optional<Resource::Id>
+introspectionIdFrom(const boost::python::dict &introspection
+                    , const std::string &key);
+
+#endif // mapproxy_support_serialization_hpp_included_

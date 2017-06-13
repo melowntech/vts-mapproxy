@@ -29,6 +29,8 @@
 
 #include "vts-libs/vts/tileindex.hpp"
 
+#include "../support/coverage.hpp"
+
 #include "../generator.hpp"
 
 namespace generator {
@@ -88,6 +90,11 @@ private:
                           , const TmsFileInfo &fi
                           , Sink &sink, Arsenal &arsenal) const;
 
+    void generateTileMaskFromTree(const vts::TileId &tileId
+                                  , const TmsFileInfo &fi
+                                  , Sink &sink
+                                  , Arsenal&) const;
+
     void generateMetatile(const vts::TileId &tileId
                           , const TmsFileInfo &fi
                           , Sink &sink, Arsenal &arsenal) const;
@@ -121,6 +128,15 @@ private:
     bool hasMetatiles_;
 
     boost::optional<vts::TileIndex> index_;
+
+    bool complexDataset_;
+
+    // mask tree
+    MaskTree maskTree_;
+
+    /** Mask dataset path. Only when defined and not a RF tree.
+     */
+    boost::optional<std::string> maskDataset_;
 };
 
 inline TmsRaster::DatasetDesc TmsRaster::dataset() const {

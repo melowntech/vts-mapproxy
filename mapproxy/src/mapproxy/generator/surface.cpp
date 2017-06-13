@@ -60,6 +60,7 @@
 #include "../support/srs.hpp"
 #include "../support/grid.hpp"
 #include "../support/python.hpp"
+#include "../support/serialization.hpp"
 
 #include "./surface.hpp"
 
@@ -69,6 +70,21 @@ namespace vs = vtslibs::storage;
 namespace vts = vtslibs::vts;
 
 namespace generator {
+
+bool SurfaceBase::Introspection::empty() const
+{
+    return (tms.empty() && geodata.empty() && !position);
+}
+
+bool SurfaceBase::Introspection::operator!=(const Introspection &other) const
+{
+    // introspection can safely change
+    if (tms != other.tms) { return true; }
+    if (geodata != other.geodata) { return true; }
+    if (position != other.position) { return true; }
+
+    return false;
+}
 
 void SurfaceBase::SurfaceDefinition::parse(const Json::Value &value)
 {
@@ -83,29 +99,16 @@ void SurfaceBase::SurfaceDefinition::parse(const Json::Value &value)
     }
 
     if (value.isMember("introspection")) {
-        const auto &introspection(value["introspection"]);
-        if (introspection.isMember("tms")) {
-            const auto &boundLayers(introspection["tms"]);
-            auto getTms([](const Json::Value &bl) -> Resource::Id
-            {
-                Resource::Id rid;
-                Json::get(rid.group, bl, "group");
-                Json::get(rid.id, bl, "id");
-                return rid;
-            });
+        const auto &jintrospection(value["introspection"]);
 
-            if (boundLayers.isArray()) {
-                for (const auto &bl : boundLayers) {
-                    introspectionTms.push_back(getTms(bl));
-                }
-            } else {
-                introspectionTms.push_back(getTms(boundLayers));
-            }
-        }
+        introspection.tms
+            = introspectionListFrom(jintrospection, "tms");
+        introspection.geodata
+            = introspectionListFrom(jintrospection, "geodata");
 
-        if (introspection.isMember("position")) {
-            introspectionPosition
-                = vr::positionFromJson(introspection["position"]);
+        if (jintrospection.isMember("position")) {
+            introspection.position
+                = vr::positionFromJson(jintrospection["position"]);
         }
     }
 }
@@ -119,18 +122,13 @@ void SurfaceBase::SurfaceDefinition::build(Json::Value &value) const
         value["mergeBottomLod"] = *mergeBottomLod;
     }
 
-    if (!introspectionTms.empty() || introspectionPosition) {
-        auto &introspection(value["introspection"] = Json::objectValue);
-        if (!introspectionTms.empty()) {
-            auto &tmsList(introspection["tms"] = Json::arrayValue);
-            for (const auto &bl : introspectionTms) {
-                auto &tms(tmsList.append(Json::objectValue));
-                tms["group"] = bl.group;
-                tms["id"] = bl.id;
-            }
-        }
-        if (introspectionPosition) {
-            introspection["position"] = vr::asJson(*introspectionPosition);
+    if (!introspection.empty()) {
+        auto &jintrospection(value["introspection"] = Json::objectValue);
+        introspectionListTo(jintrospection, "tms", introspection.tms) ;
+        introspectionListTo(jintrospection, "geodata", introspection.geodata);
+
+        if (introspection.position) {
+            jintrospection["position"] = vr::asJson(*introspection.position);
         }
     }
 }
@@ -148,25 +146,16 @@ void SurfaceBase::SurfaceDefinition::parse(const boost::python::dict &value)
     }
 
     if (value.has_key("introspection")) {
-        boost::python::dict introspection(value["introspection"]);
-        if (introspection.has_key("tms")) {
-            auto getTms([](const boost::python::dict &bl) -> Resource::Id
-            {
-                Resource::Id rid;
-                rid.group = py2utf8(bl["group"]);
-                rid.id = py2utf8(bl["id"]);
-                return rid;
-            });
+        boost::python::dict pintrospection(value["introspection"]);
+        introspection.tms
+            = introspectionListFrom(pintrospection, "tms");
+        introspection.geodata
+            = introspectionListFrom(pintrospection, "geodata");
 
-            // TODO: support list
-            boost::python::dict tms(introspection["tms"]);
-            introspectionTms.push_back(getTms(tms));
-        }
-
-        if (introspection.has_key("position")) {
-            introspectionPosition = boost::in_place();
-            vr::fromPython(*introspectionPosition
-                           , introspection["position"]);
+        if (pintrospection.has_key("position")) {
+            introspection.position = boost::in_place();
+            vr::fromPython(*introspection.position
+                           , pintrospection["position"]);
         }
     }
 }
@@ -180,15 +169,12 @@ Changed SurfaceBase::SurfaceDefinition::changed_impl(const DefinitionBase &o)
     if (nominalTexelSize != other.nominalTexelSize) {
         return Changed::safely;
     }
+
     if (mergeBottomLod != other.mergeBottomLod) {
         return Changed::safely;
     }
 
-    // introspection can safely change
-    if (introspectionTms != other.introspectionTms) {
-        return Changed::safely;
-    }
-    if (introspectionPosition != other.introspectionPosition) {
+    if (introspection != other.introspection) {
         return Changed::safely;
     }
 
@@ -538,7 +524,7 @@ SurfaceBase::extraProperties(const SurfaceDefinition &def) const
 {
     vts::ExtraTileSetProperties extra;
 
-    Resource::Id::list introspectionTmsList(def.introspectionTms);
+    Resource::Id::list introspectionTmsList(def.introspection.tms);
     if (introspectionTmsList.empty()) {
         // defaults to patchwork
         introspectionTmsList.emplace_back(referenceFrameId()
@@ -546,13 +532,13 @@ SurfaceBase::extraProperties(const SurfaceDefinition &def) const
                                           , "tms-raster-patchwork");
     }
 
-    for (const auto &introspectionTms : introspectionTmsList) {
+    for (const auto &tms : introspectionTmsList) {
         if (auto other = otherGenerator
             (Resource::Generator::Type::tms
-             , addReferenceFrame(introspectionTms, referenceFrameId())))
+             , addReferenceFrame(tms, referenceFrameId())))
         {
             // we have found tms resource, use it as a boundlayer
-            const auto otherId(introspectionTms.fullId());
+            const auto otherId(tms.fullId());
             const auto &otherResource(other->resource());
             const auto resdiff(resolveRoot(resource(), otherResource));
 
@@ -567,8 +553,28 @@ SurfaceBase::extraProperties(const SurfaceDefinition &def) const
         };
     }
 
-    if (def.introspectionPosition) {
-        extra.position = *def.introspectionPosition;
+    for (const auto &geodata : def.introspection.geodata) {
+        if (auto other = otherGenerator
+            (Resource::Generator::Type::geodata
+             , addReferenceFrame(geodata, referenceFrameId())))
+        {
+            // we have found geodata resource, use it as a boundlayer
+            const auto otherId(geodata.fullId());
+            const auto &otherResource(other->resource());
+            const auto resdiff(resolveRoot(resource(), otherResource));
+
+            const fs::path flPath
+                (prependRoot(fs::path(), otherResource, resdiff)
+                 / "freelayer.json");
+
+            extra.freeLayers.add(vr::FreeLayer(otherId, flPath.string()));
+
+            extra.view.freeLayers[otherId];
+        };
+    }
+
+    if (def.introspection.position) {
+        extra.position = *def.introspection.position;
     }
 
     return extra;

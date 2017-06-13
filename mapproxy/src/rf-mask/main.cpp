@@ -28,6 +28,7 @@
 #include <utility>
 #include <functional>
 #include <map>
+#include <boost/regex.hpp>
 
 #include <boost/optional.hpp>
 #include <boost/utility/in_place_factory.hpp>
@@ -64,6 +65,22 @@ namespace vts = vtslibs::vts;
 
 namespace vr = vtslibs::registry;
 
+class FeatureFilter {
+public:
+    FeatureFilter(const std::string &name, const std::string &value)
+        : name_(name), value_(value)
+    {}
+
+    bool match(const std::string &name, const std::string &value) const {
+        if (name != name_) { return false; }
+        return boost::regex_search(value, value_);
+    }
+
+private:
+    std::string name_;
+    boost::regex value_;
+};
+
 class RfMask : public service::Cmdline {
 public:
     RfMask()
@@ -71,8 +88,7 @@ public:
         , dilate_(10.), segments_(30)
         , tileSizeOrder_(8), workBlock_(5)
         , generateGdalDatasets_(false)
-    {
-    }
+    {}
 
 private:
     void configuration(po::options_description &cmdline
@@ -100,6 +116,8 @@ private:
     math::Size2 tileSize_;
     int workBlock_;
     bool generateGdalDatasets_;
+
+    boost::optional<FeatureFilter> featureFilter_;
 };
 
 void RfMask::configuration(po::options_description &cmdline
@@ -143,6 +161,18 @@ void RfMask::configuration(po::options_description &cmdline
          ->default_value(false)->implicit_value(true)
          , "Generates gdal dataset per reference frame node."
          )
+
+        ("layer"
+         , po::value(&layer_)->required()->default_value(layer_)
+         , "Layer selector. Not needed if there is just one layer "
+         "in the input."
+         )
+
+        ("featureFilter"
+         , po::value<std::string>()
+         , "Feature fileter (format: FIELD=REGEX): rasterize only geometries "
+         "from features that contain field named FIELD which value matches "
+         "given REGEX. All features are rasterized by default.")
         ;
 
     pd.add("dataset", 1)
@@ -155,6 +185,19 @@ void RfMask::configuration(po::options_description &cmdline
 void RfMask::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
+
+    if (vars.count("featureFilter")) {
+        const auto value(vars["featureFilter"].as<std::string>());
+        auto eq(value.find('='));
+        if (eq == std::string::npos) {
+            throw po::validation_error
+                (po::validation_error::invalid_option_value
+                 , "featureFilter");
+        }
+
+        featureFilter_ = FeatureFilter
+            (value.substr(0, eq), value.substr(eq + 1));
+    }
 
     tileSize_ = math::Size2(1 << tileSizeOrder_, 1 <<  tileSizeOrder_);
 
@@ -200,8 +243,26 @@ inline ::OGRRawPoint rawPoint(double x, double y)
 geo::Geometries
 translateDilateClip(::OGRLayer *layer, const geo::SrsDefinition &srs
                     , double dilate, int segments
-                    , const math::Extents2 &extents)
+                    , const math::Extents2 &extents
+                    , const boost::optional<FeatureFilter> &featureFilter)
 {
+    auto matchFilter([&](geo::Feature &feature) -> bool
+    {
+        if (!featureFilter) { return true; }
+
+        for (int count(feature->GetFieldCount()), field(0);
+             field < count; ++field)
+        {
+            auto *defn(feature->GetFieldDefnRef(field));
+            if (featureFilter->match
+                (defn->GetNameRef(), feature->GetFieldAsString(field)))
+            {
+                return true;
+            }
+        }
+        return false;
+    });
+
     auto srsRef(srs.reference());
 
     geo::Geometries geometries;
@@ -211,6 +272,7 @@ translateDilateClip(::OGRLayer *layer, const geo::SrsDefinition &srs
     while (auto f = geo::feature(OGR_L_GetNextFeature(layer))) {
         auto g(static_cast< ::OGRGeometry*>(OGR_F_GetGeometryRef(f.get())));
         if (!g) { continue; }
+        if (!matchFilter(f)) { continue; }
 
         auto ng(geo::geometry(g->clone()));
         ng->transformTo(&srsRef);
@@ -534,7 +596,8 @@ void RfMask::rasterize(imgproc::quadtree::RasterMask &mask
 
     const auto srs(node.srsDef());
     auto geometries(translateDilateClip(layer, srs, dilate_, segments_
-                                        , node.extents()));
+                                        , node.extents()
+                                        , featureFilter_));
     auto ge(geometryExtents(geometries));
     if (!valid(ge)) {
         LOG(info3)

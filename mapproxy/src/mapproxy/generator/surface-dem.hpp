@@ -27,8 +27,6 @@
 #ifndef mapproxy_generator_surface_spheroid_hpp_included_
 #define mapproxy_generator_surface_spheroid_hpp_included_
 
-#include "imgproc/rastermask/mappedqtree.hpp"
-
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
 
