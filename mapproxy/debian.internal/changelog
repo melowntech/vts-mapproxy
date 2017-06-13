@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.55) citationtech-wheezy; urgency=low
+
+  * tms-windyty: WMS dataset has name based on forecast timestamp.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Fri, 09 Jun 2017 16:24:04 +0200
+
 ctt-vts-mapproxy (0.54) citationtech-wheezy; urgency=low
 
   * tms-windyty: Fixed dataset update.
