@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.56) citationtech-wheezy; urgency=low
+
+  * TMS: rf-tree mask support
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 13 Jun 2017 18:11:36 +0200
+
 ctt-vts-mapproxy (0.55) citationtech-wheezy; urgency=low
 
   * tms-windyty: WMS dataset has name based on forecast timestamp.
