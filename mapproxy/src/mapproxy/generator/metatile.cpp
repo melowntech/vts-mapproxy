@@ -150,7 +150,8 @@ typedef vts::TileIndex::Flag TiFlag;
 
 inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
 {
-    MetaFlag::value_type meta(MetaFlag::allChildren);
+    // no flags by default
+    MetaFlag::value_type meta(MetaFlag::none);
     if (ti & TiFlag::mesh) {
         meta |= MetaFlag::geometryPresent;
     }
@@ -183,23 +184,35 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
 
     vts::MetaTile metatile(tileId, rf.metaBinaryOrder);
 
-    auto setChildren([&](const vts::TileId &nodeId, vts::MetaNode &node)
+    auto setChildren([&](const MetatileBlock &block
+                         , const vts::TileId &nodeId, vts::MetaNode &node)
                      -> void
     {
-        // build children from tile index
-        //
-        // TODO: let tileindex generate validity flag for all children
-        // in this block
+        /** some subtrees may have false positives
+         * (i.e. melown2015 polar caps)
+         *
+         * Combine tile index with node validity.
+         *
+         * TODO: optimize
+         */
+
+        if (!block.commonAncestor.partial()) {
+            // fully covered RF subtree: just copy tileindex subtree validity
+
+            for (const auto &child : vts::children(nodeId)) {
+                node.setChildFromId(child, tileIndex.validSubtree(child));
+            }
+            return;
+        }
+
+        // not fully valid: generate this node's validty info
+        vts::NodeInfo ni(rf, nodeId);
+        if (!ni.valid()) { return; }
+
+        // check tileindex along with RF validity for each child
         for (const auto &child : vts::children(nodeId)) {
-            /** some subtrees may have false positives
-             * (i.e. melown2015 polar caps)
-             *
-             * Combine tile index with node validity.
-             *
-             * TODO: optimize
-             */
-            bool valid(tileIndex.validSubtree(child));
-            valid = valid && vts::NodeInfo(rf, child).valid();
+            bool valid(tileIndex.validSubtree(child)
+                       && ni.child(child).valid());
             node.setChildFromId(child, valid);
         }
     });
@@ -217,7 +230,7 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 // build metanode
                 vts::MetaNode node;
                 node.flags(ti2metaFlags(tileIndex.get(nodeId)));
-                setChildren(nodeId, node);
+                setChildren(block, nodeId, node);
                 metatile.set(nodeId, node);
             }
         }
@@ -361,7 +374,7 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 }
 
                 // build children from tile index
-                setChildren(nodeId, node);
+                setChildren(block, nodeId, node);
 
                 // set extents
                 node.extents = vr::normalizedExtents(rf, te);
