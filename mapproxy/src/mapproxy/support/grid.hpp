@@ -49,7 +49,7 @@ public:
         return grid_[index(x, y)];
     }
 
-    /** Returns pointer to pixel of non if pixel is invalid
+    /** Returns pointer to pixel or null if pixel is invalid
      */
     template <typename Mask>
     const T* operator()(const Mask &mask, int x, int y) const {
