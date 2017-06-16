@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.57) citationtech-wheezy; urgency=low
+
+  * Optimized metatile generation.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Fri, 16 Jun 2017 16:24:09 +0200
+
 ctt-vts-mapproxy (0.56) citationtech-wheezy; urgency=low
 
   * TMS: rf-tree mask support
