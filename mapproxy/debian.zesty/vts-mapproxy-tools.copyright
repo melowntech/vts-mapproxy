@@ -1,0 +1,6 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Disclaimer:
+ This package is not part of the GNU/Linux Debian distribution.
+
+Files: *
+Copyright: 2017 Melown Technologies SE.  All rights reserved.

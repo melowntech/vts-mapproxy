@@ -1,0 +1,5 @@
+vts-mapproxy (1.0) melown-zesty; urgency=low
+
+  * Initial build for Ubuntu/Zesty.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 19 Jun 2017 15:58:07 +0200
