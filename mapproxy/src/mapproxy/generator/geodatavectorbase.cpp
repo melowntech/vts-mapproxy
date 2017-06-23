@@ -93,6 +93,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
 
     Json::getOpt(def.styleUrl, value, "styleUrl");
     Json::get(def.displaySize, value, "displaySize");
+    Json::getOpt(def.mode, value, "mode");
 
     if (value.isMember("introspection")) {
         const auto &jintrospection(value["introspection"]);
@@ -122,6 +123,7 @@ void buildDefinition(Json::Value &value
     value["format"] = boost::lexical_cast<std::string>(def.format);
     value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
+    value["mode"] = boost::lexical_cast<std::string>(def.mode);
 
     if (!def.introspection.empty()) {
         auto &jintrospection(value["introspection"] = Json::objectValue);
@@ -165,6 +167,16 @@ void parseDefinition(GeodataVectorBase::Definition &def
 
     def.displaySize = boost::python::extract<int>(value["displaySize"]);
     def.styleUrl = py2utf8(value["styleUrl"]);
+
+    if (value.has_key("mode")) {
+        try {
+            def.mode = boost::lexical_cast<geo::heightcoding::Mode>
+                (py2utf8(value["mode"]));
+        } catch (boost::bad_lexical_cast) {
+            utility::raise<Error>
+                ("Value stored in mode is not a valid height coding mode.");
+        }
+    }
 
     if (value.has_key("introspection")) {
         boost::python::dict pintrospection(value["introspection"]);
@@ -223,6 +235,7 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     if (dataset != other.dataset) { return Changed::yes; }
     if (dem != other.dem) { return Changed::yes; }
     if (layers != other.layers) { return Changed::yes; }
+    if (mode != other.mode) { return Changed::yes; }
 
     // format can change
     if (format != other.format) { return Changed::safely; }

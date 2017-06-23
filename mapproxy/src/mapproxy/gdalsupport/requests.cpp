@@ -88,6 +88,7 @@ ShHeightCodeConfig::ShHeightCodeConfig(const geo::heightcoding::Config &config
 
     , clipWorkingExtents_(config.clipWorkingExtents)
     , format_(config.format)
+    , mode_(config.mode)
 {
     if (config.workingSrs) {
         workingSrs_.assign(config.workingSrs->srs.data()
@@ -126,6 +127,7 @@ ShHeightCodeConfig::operator geo::heightcoding::Config() const
     }
 
     config.format = format_;
+    config.mode = mode_;
 
     return config;
 }

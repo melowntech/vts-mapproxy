@@ -29,7 +29,7 @@
 
 #include <boost/optional.hpp>
 
-#include "geo/vectorformat.hpp"
+#include "geo/heightcoding.hpp"
 
 #include "../generator.hpp"
 
@@ -56,11 +56,14 @@ public:
         geo::VectorFormat format;
         std::string styleUrl;
         int displaySize;
+        geo::heightcoding::Mode mode;
 
         Introspection introspection;
 
         Definition()
-            : format(geo::VectorFormat::geodataJson) , displaySize(256) {}
+            : format(geo::VectorFormat::geodataJson) , displaySize(256)
+            , mode(geo::heightcoding::Mode::auto_)
+        {}
 
         virtual void from_impl(const boost::any &value);
         virtual void to_impl(boost::any &value) const;

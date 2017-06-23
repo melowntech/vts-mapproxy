@@ -293,6 +293,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     config.layers = definition_.layers;
     config.clipWorkingExtents = nodeInfo.extents();
     config.format = definition_.format;
+    config.mode = definition_.mode;
 
     // heightcode data using warper's machinery
     auto hc(arsenal.warper.heightcode
