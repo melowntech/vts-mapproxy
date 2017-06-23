@@ -170,7 +170,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
 
     if (value.has_key("mode")) {
         try {
-            def.format = boost::lexical_cast<geo::heightcoding::Mode>
+            def.mode = boost::lexical_cast<geo::heightcoding::Mode>
                 (py2utf8(value["mode"]));
         } catch (boost::bad_lexical_cast) {
             utility::raise<Error>
