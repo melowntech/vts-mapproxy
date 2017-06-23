@@ -417,11 +417,12 @@ heightcode(ManagedBuffer &mb, const VectorDataset &vds
     }
 
     if (vectorGeoidGrid && vds->GetLayerCount()) {
-        // set vertical srs
-        config.vectorDsSrs
-            = geo::SrsDefinition::fromReference
-            (geo::setGeoid(*vds->GetLayer(0)->GetSpatialRef()
-                           , *vectorGeoidGrid));
+        if (auto ref = vds->GetLayer(0)->GetSpatialRef()) {
+            // set vertical srs
+            config.vectorDsSrs
+                = geo::SrsDefinition::fromReference
+                (geo::setGeoid(*ref, *vectorGeoidGrid));
+        }
     }
 
     std::ostringstream os;
