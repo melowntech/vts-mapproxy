@@ -108,6 +108,7 @@ GeodataVector::heightcode(const DemDataset::list &datasets
     config.outputVerticalAdjust = physicalSrs_.adjustVertical();
     config.layers = definition_.layers;
     config.format = definition_.format;
+    config.mode = definition_.mode;
 
     // heightcode data using warper's machinery
     auto hc(warper.heightcode

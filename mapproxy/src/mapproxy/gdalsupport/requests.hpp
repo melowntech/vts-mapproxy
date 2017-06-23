@@ -85,6 +85,8 @@ struct ShHeightCodeConfig {
 
     geo::VectorFormat format_;
 
+    heightcoding::Mode mode_;
+
     ShHeightCodeConfig(const geo::heightcoding::Config &config
                        , ManagedBuffer &sm);
 
