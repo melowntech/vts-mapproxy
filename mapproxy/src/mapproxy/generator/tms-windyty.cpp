@@ -43,7 +43,11 @@
 
 #include "imgproc/rastermask/cvmat.hpp"
 
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
+
 #include "../error.hpp"
+#include "../support/python.hpp"
 
 #include "./factory.hpp"
 #include "./tms-windyty.hpp"
@@ -63,7 +67,7 @@ struct Factory : Generator::Factory {
     }
 
     virtual DefinitionBase::pointer definition() {
-        return std::make_shared<TmsRaster::Definition>();
+        return std::make_shared<TmsWindyty::Definition>();
     }
 
 private:
@@ -76,6 +80,31 @@ utility::PreMain Factory::register_([]()
         (Resource::Generator(Resource::Generator::Type::tms, "tms-windyty")
          , std::make_shared<Factory>());
 });
+
+// definition manipulation
+
+void parseDefinition(TmsWindyty::Definition &def, const Json::Value &value)
+{
+    Json::getOpt(def.forecastOffset, value, "forecastOffset");
+}
+
+void buildDefinition(Json::Value &value, const TmsWindyty::Definition &def)
+{
+    if (def.forecastOffset) {
+        value["forecastOffset"] = def.forecastOffset;
+    }
+}
+
+void parseDefinition(TmsWindyty::Definition &def
+                     , const boost::python::dict &value)
+{
+    if (value.has_key("forecastOffset")) {
+        def.forecastOffset = boost::python::extract<int>
+            (value["forecastOffset"]);
+    }
+}
+
+// definition dataset config
 
 TmsWindyty::DatasetConfig loadConfig(const fs::path &path)
 {
@@ -130,8 +159,8 @@ std::time_t normalizedTime(std::time_t time,
     // subtract partial period
     auto fixed(time - (diff % config.period));
 
-    // move to next period if inside
-    if (fixed < time) { fixed += config.period; }
+    // // move to next period if inside
+    // if (fixed < time) { fixed += config.period; }
 
     return fixed;
 }
@@ -187,7 +216,8 @@ void writeWms(std::ostream &os, const TmsWindyty::DatasetConfig &config
 TmsWindyty::File writeWms(const fs::path &root
                           , const TmsWindyty::DatasetConfig &config
                           , const Resource &resource
-                          , std::time_t time)
+                          , std::time_t time
+                          , int expires, int offset)
 {
     auto path(root / "windyty" / resource.id.referenceFrame
               / resource.id.group /
@@ -203,17 +233,67 @@ TmsWindyty::File writeWms(const fs::path &root
         std::ofstream os(tmpPath.string()
                          , std::fstream::out | std::fstream::trunc);
         os.exceptions(std::ios::badbit | std::ios::failbit);
-        writeWms(os, config, time);
+        writeWms(os, config, time + (offset * config.period));
         os.flush();
     }
 
     // move tmp file to proper path, release tmpFile erasure and go on
     fs::rename(tmpFile.path, path);
     tmpFile.path.clear();
-    return TmsWindyty::File(time, path.string());
+
+    // NB: we have to store the start time of the next period
+    return TmsWindyty::File(time + (expires * config.period)
+                            , path.string());
 }
 
 } // namespace
+
+void TmsWindyty::Definition::from_impl(const boost::any &value)
+{
+    // deserialize parent class first
+    TmsRaster::Definition::from_impl(value);
+
+    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
+        parseDefinition(*this, *json);
+    } else if (const auto *py
+               = boost::any_cast<boost::python::dict>(&value))
+    {
+        parseDefinition(*this, *py);
+    } else {
+        LOGTHROW(err1, Error)
+            << "TmsWindyty: Unsupported configuration from: <"
+            << value.type().name() << ">.";
+    }
+}
+
+void TmsWindyty::Definition::to_impl(boost::any &value) const
+{
+    // serialize parent class first
+    TmsRaster::Definition::to_impl(value);
+
+    if (auto *json = boost::any_cast<Json::Value>(&value)) {
+        buildDefinition(*json, *this);
+    } else {
+        LOGTHROW(err1, Error)
+            << "TmsWindyty:: Unsupported serialization into: <"
+            << value.type().name() << ">.";
+    }
+}
+
+Changed TmsWindyty::Definition::changed_impl(const DefinitionBase &o) const
+{
+    // first check parent class for change
+    const auto changed(TmsRaster::Definition::changed_impl(o));
+    if (changed != Changed::no) { return changed; }
+
+    const auto &other(o.as<Definition>());
+
+    // forecast offset can change
+    if (forecastOffset != other.forecastOffset) { return Changed::safely; }
+
+    // not changed at alla
+    return Changed::no;
+}
 
 void TmsWindyty::File::remove()
 {
@@ -222,10 +302,12 @@ void TmsWindyty::File::remove()
 
 TmsWindyty::TmsWindyty(const Params &params)
     : TmsRaster(params)
-    , dsConfig_(loadConfig(absoluteDataset(definition().dataset)))
+    , definition_(resource().definition<Definition>())
+    , dsConfig_(loadConfig(absoluteDataset(definition_.dataset)))
 {
     ds_.current = writeWms(config().tmpRoot, dsConfig_, resource()
-                           , normalizedTime(std::time(nullptr), dsConfig_));
+                           , normalizedTime(std::time(nullptr), dsConfig_)
+                           , 1, definition_.forecastOffset);
 }
 
 bool TmsWindyty::transparent_impl() const
@@ -255,7 +337,8 @@ TmsRaster::DatasetDesc TmsWindyty::dataset_impl() const
         if (now > ds_.current.timestamp) {
             // Generate new file
             auto file(writeWms(config().tmpRoot, dsConfig_, resource()
-                               , normalizedTime(now, dsConfig_)));
+                               , normalizedTime(now, dsConfig_)
+                               , 1, definition_.forecastOffset));
             ds_.prev = std::move(ds_.current);
             ds_.current = std::move(file);
         }
@@ -267,14 +350,8 @@ TmsRaster::DatasetDesc TmsWindyty::dataset_impl() const
     // max age is time remaining till the end of this forecast
     long tillEnd(info.timestamp - now);
 
-    // not less than 5 minutes
-    auto maxAge(std::max(tillEnd, long(300)));
-
-    // and not more than 1 hour
-    maxAge = std::min(maxAge, long(3600));
-
     // done
-    return { info.path, maxAge };
+    return { info.path, tillEnd };
 }
 
 } // namespace generator

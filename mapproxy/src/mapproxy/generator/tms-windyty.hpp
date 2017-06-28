@@ -50,6 +50,7 @@ public:
         int maxLod;
         int overviews;
         bool transparent;
+        int forecastOffset;
 
         DatasetConfig()
             : base(), period(), maxLod(), overviews()
@@ -97,6 +98,18 @@ public:
         void remove();
     };
 
+    struct Definition : public TmsRaster::Definition {
+        int forecastOffset;
+
+        Definition() : forecastOffset() {}
+
+    private:
+        virtual void from_impl(const boost::any &value);
+        virtual void to_impl(boost::any &value) const;
+        virtual Changed changed_impl(const DefinitionBase &other) const;
+        virtual bool frozenCredits_impl() const { return false; }
+    };
+
 private:
     virtual DatasetDesc dataset_impl() const;
     virtual bool transparent_impl() const;
@@ -109,6 +122,7 @@ private:
         File prev;
     };
 
+    const Definition &definition_;
     int pid_;
     DatasetConfig dsConfig_;
     mutable Dataset ds_;

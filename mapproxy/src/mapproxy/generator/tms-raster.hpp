@@ -47,7 +47,7 @@ public:
 
         Definition(): format(RasterFormat::jpg) {}
 
-    private:
+    protected:
         virtual void from_impl(const boost::any &value);
         virtual void to_impl(boost::any &value) const;
         virtual Changed changed_impl(const DefinitionBase &other) const;
