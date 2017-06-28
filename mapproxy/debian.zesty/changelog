@@ -1,4 +1,4 @@
-vts-mapproxy (1.0ubuntu1) zesty; urgency=medium
+vts-mapproxy (1.1) melown-zesty; urgency=medium
 
   * Added heightcoding mode support to geodata resources.
 
