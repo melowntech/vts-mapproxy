@@ -115,6 +115,15 @@ private:
     virtual bool transparent_impl() const;
     virtual bool hasMask_impl() const;
 
+    virtual vr::BoundLayer boundLayer(ResourceRoot root) const;
+
+    struct DsInfo {
+        std::string path;
+        std::time_t timestamp;
+    };
+
+    DsInfo dsInfo(std::time_t now) const;
+
     struct Dataset {
         std::mutex mutex;
 

@@ -460,16 +460,28 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
         return;
     }
 
-    auto ds(dataset());
+    // grab dataset to use
+    const auto ds(dataset());
+
+    // what operation should we do with the dataset? optimized or non-optimized
+    // return?
+    //
+    // * dynamic dataset: cannot use since we are unable report different
+    //                    caching for empty/full image
+    // * transparent: we cannot report transparecny for empty/full image
+    const auto operation
+        ((ds.dynamic || transparent())
+         ? GdalWarper::RasterRequest::Operation::imageNoOpt
+         : GdalWarper::RasterRequest::Operation::image);
 
     auto tile(arsenal.warper.warp
               (GdalWarper::RasterRequest
-               (GdalWarper::RasterRequest::Operation::image
+               (operation
                 , absoluteDataset(ds.path)
                 , nodeInfo.srsDef()
                 , nodeInfo.extents()
                 , math::Size2(256, 256)
-                           , geo::GeoDataset::Resampling::cubic
+                , geo::GeoDataset::Resampling::cubic
                 , absoluteDataset(maskDataset_))
                , sink));
     sink.checkAborted();

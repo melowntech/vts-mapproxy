@@ -69,11 +69,20 @@ protected:
          */
         boost::optional<long> maxAge;
 
+        /** Is dataset dynamic? No shortcuts are performed in the case of
+         *  dynamic processing.
+         */
+        bool dynamic;
+
         DatasetDesc(const std::string &path
-                    , const boost::optional<long> &maxAge = boost::none)
-            : path(path), maxAge(maxAge)
+                    , const boost::optional<long> &maxAge = boost::none
+                    , bool dynamic = false)
+            : path(path), maxAge(maxAge), dynamic(dynamic)
         {}
     };
+
+protected:
+    virtual vr::BoundLayer boundLayer(ResourceRoot root) const;
 
 private:
     virtual void prepare_impl(Arsenal &arsenal);
@@ -99,8 +108,6 @@ private:
                           , const TmsFileInfo &fi
                           , Sink &sink, Arsenal &arsenal) const;
 
-    vr::BoundLayer boundLayer(ResourceRoot root) const;
-
     DatasetDesc dataset() const;
 
     RasterFormat format() const;
@@ -108,6 +115,8 @@ private:
     bool transparent() const;
 
     bool hasMask() const;
+
+    void update(vr::BoundLayer &bl) const;
 
     // customizable stuff
 
@@ -122,6 +131,11 @@ private:
     /** Advertise mask definition to the user?
      */
     virtual bool hasMask_impl() const;
+
+    /** Update boundlayer information before sending to client. Defaults to
+     *  no-op.
+     */
+    virtual void update_impl(vr::BoundLayer &bl) const;
 
     const Definition &definition_;
 
@@ -139,6 +153,8 @@ private:
     boost::optional<std::string> maskDataset_;
 };
 
+// inlines
+
 inline TmsRaster::DatasetDesc TmsRaster::dataset() const {
     return dataset_impl();
 }
@@ -150,6 +166,12 @@ inline bool TmsRaster::transparent() const {
 inline bool TmsRaster::hasMask() const {
     return hasMask_impl();
 }
+
+inline void TmsRaster::update(vr::BoundLayer &bl) const {
+    return update_impl(bl);
+}
+
+inline void TmsRaster::update_impl(vr::BoundLayer&) const {}
 
 } // namespace generator
 

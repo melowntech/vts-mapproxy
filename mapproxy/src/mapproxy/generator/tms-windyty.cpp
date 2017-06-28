@@ -321,37 +321,53 @@ bool TmsWindyty::hasMask_impl() const
     return false;
 }
 
+TmsWindyty::DsInfo TmsWindyty::dsInfo(std::time_t now) const
+{
+    // lock access
+    std::unique_lock<std::mutex> lock(ds_.mutex);
+
+    if (now > ds_.current.timestamp) {
+        // Generate new file
+        auto file(writeWms(config().tmpRoot, dsConfig_, resource()
+                           , normalizedTime(now, dsConfig_)
+                           , 1, definition_.forecastOffset));
+        ds_.prev = std::move(ds_.current);
+        ds_.current = std::move(file);
+    }
+
+    // done
+    return { ds_.current.path, ds_.current.timestamp };
+}
+
 TmsRaster::DatasetDesc TmsWindyty::dataset_impl() const
 {
-    struct Info {
-        std::string path;
-        std::time_t timestamp;
-    };
-
-    auto now(std::time(nullptr));
-    auto info([&]() -> Info
-    {
-        // lock access
-        std::unique_lock<std::mutex> lock(ds_.mutex);
-
-        if (now > ds_.current.timestamp) {
-            // Generate new file
-            auto file(writeWms(config().tmpRoot, dsConfig_, resource()
-                               , normalizedTime(now, dsConfig_)
-                               , 1, definition_.forecastOffset));
-            ds_.prev = std::move(ds_.current);
-            ds_.current = std::move(file);
-        }
-
-        // done
-        return { ds_.current.path, ds_.current.timestamp };
-    }());
+    const auto now(std::time(nullptr));
+    const auto info(dsInfo(now));
 
     // max age is time remaining till the end of this forecast
     long tillEnd(info.timestamp - now);
 
     // done
-    return { info.path, tillEnd };
+    return { info.path, tillEnd, true };
+}
+
+vr::BoundLayer TmsWindyty::boundLayer(ResourceRoot root) const
+{
+    // ask parent for bound layer generation
+    auto bl(TmsRaster::boundLayer(root));
+
+    // grab current dataset info
+    const auto info(dsInfo(std::time(nullptr)));
+
+    // build revision
+    const auto revision(str(boost::format("?%s") % info.timestamp));
+
+    // append revision
+    bl.url += revision;
+    if (bl.maskUrl) { *bl.maskUrl += revision; }
+    if (bl.metaUrl) { *bl.metaUrl += revision; }
+
+    return bl;
 }
 
 } // namespace generator

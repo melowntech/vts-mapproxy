@@ -72,13 +72,14 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
                    , const math::Extents2 &extents
                    , const math::Size2 &size
                    , geo::GeoDataset::Resampling resampling
-                   , const boost::optional<std::string> &maskDataset)
+                   , const boost::optional<std::string> &maskDataset
+                   , bool optimize)
 {
     auto &src(cache(dataset));
     auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
     src.warpInto(dst, resampling);
 
-    if (dst.cmask().empty()) {
+    if (optimize && dst.cmask().empty()) {
         throw EmptyImage("No valid data.");
     }
 
@@ -90,7 +91,7 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
         srcMask.warpInto(dstMask, resampling);
         dst.applyMask(dstMask.cmask());
 
-        if (dst.cmask().empty()) {
+        if (optimize && dst.cmask().empty()) {
             throw EmptyImage("No valid data.");
         }
     }
@@ -285,9 +286,11 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
 
     switch (req.operation) {
     case Operation::image:
+    case Operation::imageNoOpt:
         return warpImage
             (cache, mb, req.dataset, req.srs, req.extents, req.size
-             , req.resampling, req.mask);
+             , req.resampling, req.mask
+             , (req.operation == Operation::image));
 
     case Operation::mask:
     case Operation::maskNoOpt:

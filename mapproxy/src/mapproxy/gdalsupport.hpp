@@ -74,8 +74,10 @@ public:
     public:
         /** Operations:
          *  * image:
+         *  * imageNoOpt:
          *        warps image from dataset, uses optional mask
          *        returns N channel 8bit image
+         *
          *  * mask:
          *  * maskNoOpt:
          *        warps dataset and return its mask
@@ -114,7 +116,8 @@ public:
          *       value and maximum value in each pixel
          */
         enum class Operation {
-            image, mask, maskNoOpt, detailMask, dem, demOptimal, valueMinMax
+            image, imageNoOpt, mask, maskNoOpt, detailMask, dem
+            , demOptimal, valueMinMax
         };
 
         Operation operation;
