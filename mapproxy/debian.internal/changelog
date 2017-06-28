@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.58) citationtech-wheezy; urgency=low
+
+  * Improved windyty driver.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 28 Jun 2017 16:38:36 +0200
+
 ctt-vts-mapproxy (0.57) citationtech-wheezy; urgency=low
 
   * Optimized metatile generation.
