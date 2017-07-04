@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.59) citationtech-wheezy; urgency=low
+
+  * Fixed memory leak in memory statistics accumulation.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 04 Jul 2017 14:44:24 +0200
+
 ctt-vts-mapproxy (0.58) citationtech-wheezy; urgency=low
 
   * Improved windyty driver.
