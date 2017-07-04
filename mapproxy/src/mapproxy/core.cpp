@@ -239,7 +239,7 @@ void Core::Detail::generate(const http::Request &request, Sink sink)
 
         case FileInfo::Type::dirRedir:
             // append slash to filename and let browser try luck again
-            sink.seeOther(fi.filename + "/");
+            sink.redirect(fi.filename + "/", utility::HttpCode::Found);
             return;
 
         case FileInfo::Type::referenceFrameListing:

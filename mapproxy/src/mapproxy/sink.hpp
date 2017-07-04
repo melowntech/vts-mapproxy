@@ -119,8 +119,8 @@ public:
 
     /** Tell client to look somewhere else.
      */
-    void seeOther(const std::string &url) {
-        sink_->seeOther(url);
+    void redirect(const std::string &url, utility::HttpCode code) {
+        sink_->redirect(url, code);
     }
 
     /** Generates listing.
