@@ -42,7 +42,6 @@ globPath(const boost::filesystem::path &pattern)
         ~Glob() { ::globfree(&g); }
 
         typedef char** const_iterator;
-        typedef const_iterator iterator;
 
         const_iterator begin() const { return g.gl_pathv; }
         const_iterator end() const { return g.gl_pathv + g.gl_pathc; }
