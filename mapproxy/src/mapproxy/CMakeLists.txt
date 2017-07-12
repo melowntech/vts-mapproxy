@@ -21,6 +21,7 @@ set(mapproxy_SOURCES
   support/tileindex.hpp support/tileindex.cpp
   support/fileclass.hpp support/fileclass.cpp
   support/serialization.hpp support/serialization.cpp
+  support/glob.hpp support/glob.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp

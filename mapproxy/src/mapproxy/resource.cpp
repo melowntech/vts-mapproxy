@@ -35,6 +35,8 @@
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/vts/tileop.hpp"
 
+#include "./support/glob.hpp"
+
 #include "./error.hpp"
 #include "./resource.hpp"
 #include "./generator.hpp"
@@ -158,8 +160,72 @@ Resource::list parseResource(const Json::Value &value
 }
 
 void parseResources(Resource::map &resources, const Json::Value &value
-                    , const FileClassSettings &fileClassSettings)
+                    , const FileClassSettings &fileClassSettings
+                    , const fs::path &path)
 {
+    const auto dir(path.parent_path());
+
+    // load part of include
+    const auto includeLoad([&](const fs::path &includePath) -> void
+    {
+        LOG(info2) << "Loading resources from file " << includePath
+                   << " included from " << path << ".";
+
+        // open stream
+        std::ifstream f;
+        f.exceptions(std::ios::badbit | std::ios::failbit);
+
+        try {
+            f.open(includePath.string(), std::ios_base::in);
+        } catch (const std::exception &e) {
+            LOGTHROW(err1, IOError)
+                << "Unable to load resources " << includePath
+                << ": <" << e.what() << ">.";
+        }
+
+        // load data
+        const auto config
+            (Json::read<FormatError>(f, includePath, "resources"));
+
+        // and recurse
+        try {
+            parseResources(resources, config, fileClassSettings
+                           , includePath);
+        } catch (const Json::Error &e) {
+            LOGTHROW(err1, FormatError)
+                << "Invalid resource config file " << includePath
+                << " format: <" << e.what() << ">.";
+        } catch (const vs::Error &e) {
+            LOGTHROW(err1, FormatError)
+                << "Invalid resource config file " << includePath
+                << " format: <" << e.what() << ">.";
+        }
+    });
+
+    // handle include of glob-expanded patter
+    const auto include([&](const fs::path &value) -> void
+    {
+        const auto includePath(fs::absolute(value, dir));
+
+        auto paths(globPath(includePath));
+        for (const auto &path : paths) {
+            // ignore directories
+            if (path.filename() == ".") { continue; }
+            includeLoad(path);
+        }
+    });
+
+    // distrute include hased on JSON value
+    const auto includeJson([&](const Json::Value &value) -> void
+    {
+        if (value.type() == Json::stringValue) {
+            return include(value.asString());
+        }
+
+        LOGTHROW(err1, Json::Error)
+            << "Include declaration must be a string or an array of strings.";
+    });
+
     if (!value.isArray()) {
         LOGTHROW(err1, Json::Error)
             << "Type of top-level configuration is not a list.";
@@ -167,6 +233,24 @@ void parseResources(Resource::map &resources, const Json::Value &value
 
     // process all definitions
     for (const auto &item : value) {
+        // check for special resources
+        if (!item.isObject()) {
+            LOGTHROW(err1, Json::Error)
+                << "Resource definition is not an object.";
+        }
+
+        if (item.isMember("include")) {
+            const auto &jinclude(item["include"]);
+            if (jinclude.type() == Json::arrayValue) {
+                for (const auto &element : jinclude) {
+                    includeJson(element);
+                }
+            } else {
+                includeJson(jinclude);
+            }
+            continue;
+        }
+
         // parse resource and remember
         auto resList(parseResource(item, fileClassSettings));
 
@@ -189,7 +273,7 @@ Resource::map loadResources(std::istream &in, const fs::path &path
     Resource::map resources;
 
     try {
-        parseResources(resources, config, fileClassSettings);
+        parseResources(resources, config, fileClassSettings, path);
     } catch (const Json::Error &e) {
         LOGTHROW(err1, FormatError)
             << "Invalid resource config file " << path
