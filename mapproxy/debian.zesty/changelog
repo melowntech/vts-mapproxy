@@ -1,3 +1,9 @@
+vts-mapproxy (1.5) melown-zesty; urgency=medium
+
+  * Fixed tms-raster transparent flag initialization.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 12 Jul 2017 21:53:00 +0200
+
 vts-mapproxy (1.4) melown-zesty; urgency=medium
 
   * Configurable resampling filter in tms-raster (and deriver drivers).

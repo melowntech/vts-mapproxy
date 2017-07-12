@@ -48,7 +48,7 @@ public:
         bool transparent;
         boost::optional<geo::GeoDataset::Resampling> resampling;
 
-        Definition(): format(RasterFormat::jpg) {}
+        Definition(): format(RasterFormat::jpg), transparent(false) {}
 
     protected:
         virtual void from_impl(const boost::any &value);
