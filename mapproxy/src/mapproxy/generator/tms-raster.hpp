@@ -29,6 +29,8 @@
 
 #include "vts-libs/vts/tileindex.hpp"
 
+#include "geo/geodataset.hpp"
+
 #include "../support/coverage.hpp"
 
 #include "../generator.hpp"
@@ -44,6 +46,7 @@ public:
         boost::optional<std::string> mask;
         RasterFormat format;
         bool transparent;
+        boost::optional<geo::GeoDataset::Resampling> resampling;
 
         Definition(): format(RasterFormat::jpg) {}
 

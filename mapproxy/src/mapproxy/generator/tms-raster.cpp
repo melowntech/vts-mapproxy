@@ -106,6 +106,8 @@ void parseDefinition(TmsRaster::Definition &def, const Json::Value &value)
     if (value.isMember("transparent")) {
         Json::get(def.transparent, value, "transparent");
     }
+
+    Json::get(def.resampling, value, "resampling");
 }
 
 void buildDefinition(Json::Value &value, const TmsRaster::Definition &def)
@@ -117,6 +119,11 @@ void buildDefinition(Json::Value &value, const TmsRaster::Definition &def)
     value["format"] = boost::lexical_cast<std::string>(def.format);
 
     value["transparent"] = def.transparent;
+
+    if (def.resampling) {
+        value["resampling"]
+            = boost::lexical_cast<std::string>(*def.resampling);
+    }
 }
 
 void parseDefinition(TmsRaster::Definition &def
@@ -134,13 +141,23 @@ void parseDefinition(TmsRaster::Definition &def
                 (py2utf8(value["format"]));
         } catch (boost::bad_lexical_cast) {
             utility::raise<Error>
-                ("Value stored in format is not RasterFormat value");
+                ("Value stored in format is not a RasterFormat value");
         }
     }
 
     if (value.has_key("transparent")) {
         def.transparent = boost::python::extract<bool>
             (value["transparent"]);
+    }
+
+    if (value.has_key("resampling")) {
+        try {
+            def.resampling = boost::lexical_cast<geo::GeoDataset::Resampling>
+                (py2utf8(value["resampling"]));
+        } catch (boost::bad_lexical_cast) {
+            utility::raise<Error>
+                ("Value stored in resampling is not a Resampling value");
+        }
     }
 }
 
@@ -185,6 +202,9 @@ Changed TmsRaster::Definition::changed_impl(const DefinitionBase &o) const
 
     // format can change
     if (format != other.format) { return Changed::safely; }
+
+    // format can change
+    if (resampling != other.resampling) { return Changed::safely; }
 
     // not changed
     return Changed::no;
@@ -474,6 +494,10 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
          ? GdalWarper::RasterRequest::Operation::imageNoOpt
          : GdalWarper::RasterRequest::Operation::image);
 
+    // choose resampling (configured or default)
+    const auto resampling(definition_.resampling ? *definition_.resampling
+                          : geo::GeoDataset::Resampling::cubic);
+
     auto tile(arsenal.warper.warp
               (GdalWarper::RasterRequest
                (operation
@@ -481,7 +505,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
                 , nodeInfo.srsDef()
                 , nodeInfo.extents()
                 , math::Size2(256, 256)
-                , geo::GeoDataset::Resampling::cubic
+                , resampling
                 , absoluteDataset(maskDataset_))
                , sink));
     sink.checkAborted();
