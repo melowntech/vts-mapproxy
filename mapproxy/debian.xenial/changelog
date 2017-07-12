@@ -1,3 +1,10 @@
+vts-mapproxy (1.2) melown-xenial; urgency=medium
+
+  * Fixed memory leak in memory statistics accumulation.
+  * Improved windyty driver.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 12 Jul 2017 13:16:00 +0200
+
 vts-mapproxy (1.1) melown-xenial; urgency=medium
 
   * mapproxy-calipers: better output, better help
