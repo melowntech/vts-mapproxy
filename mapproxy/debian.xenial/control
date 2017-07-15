@@ -24,12 +24,14 @@ Package: vts-mapproxy
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, vts-registry (>= 1.0)
          , vts-mapproxy-tools (= ${binary:Version})
+         , proj-data-vts
 Description: VTS MapProxy backend server
  Backend HTTP daemon.
 
 Package: vts-mapproxy-tools
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, vts-registry (>= 1.0)
+         , proj-data-vts
 Breaks: vts-mapproxy (<< 0.42)
 Replaces: vts-mapproxy (<< 0.42)
 Description: VTS MapProxy backend server tools
