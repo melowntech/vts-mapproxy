@@ -63,6 +63,21 @@ namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 
+namespace def {
+
+std::vector<std::string> createOptions {
+    "COMPRESS=DEFLATE"
+    , "PREDICTOR=2"
+    , "NUM_THREADS=ALL_CPUS"
+    , "ZLEVEL=9"
+};
+
+const math::Size2 tileSize(4096, 4096);
+
+const math::Size2 minOvrSize(1, 1);
+
+} // namespace def
+
 class NodeIterator {
 public:
     NodeIterator(::CPLXMLNode *node, const char *name = nullptr)
@@ -203,7 +218,9 @@ struct Config {
     geo::Options createOptions;
 
     Config()
-        : minOvrSize(256, 256), overwrite(false)
+        : tileSize(def::tileSize)
+        , minOvrSize(def::minOvrSize)
+        , overwrite(false)
     {}
 };
 
@@ -238,31 +255,42 @@ void VrtWo::configuration(po::options_description &cmdline
         ("output", po::value(&config_.output)->required()
          , "Path to output directory where to place "
          "GDAL dataset and its overviews.")
-        ("tileSize", po::value(&config_.tileSize)->required()
-        , "Tile size.")
+        ("tileSize", po::value(&config_.tileSize)
+         ->default_value(config_.tileSize)->required()
+        , "Tile size (size of individual GTiff files).")
         ("resampling", po::value(&config_.resampling)->required()
-        , "Resampling algorithm.")
+         , utility::concat
+         ("Resampling algorithm. One of ["
+          , enumerationString(decltype(config_.resampling)())
+          , "].").c_str())
         ("minOvrSize", po::value(&config_.minOvrSize)->required()
          ->default_value(config_.minOvrSize)
-        , "Minimum size of generated overview.")
+        , "Minimum size of generated overview. Overview generation is stoppend"
+         " when either width of height of last overview reaches given limit.")
         ("overwrite", po::value(&config_.overwrite)->required()
          ->default_value(false)->implicit_value(true)
         , "Overwrite existing dataset.")
         ("wrapx", po::value<int>()
          ->implicit_value(0)
         , "Wrap dataset in X direction. Optional. Value indicates number "
-         "of overlapping pixels.")
+         "of overlapping pixels. Useful only for global datasets spanning "
+         "longitude from -180 to +180. Probably could be guessed from input "
+         "data in future releases.")
         ("background", po::value<Color>()
         , "Optional background. If whole warped tile contains this "
          "color it is left empty in the output. Solid dataset with this color "
          "is created and places as a first source for each band in "
          "all overviews.")
         ("co", po::value(&config_.co)
-        , "GTiff extra create option; can be used multiple times.")
+        , utility::concat
+         ("GTiff extra create option; can be used multiple times. "
+          "If no extra option is specified a compiled-in default is "
+          "used instead (", utility::join(def::createOptions, ", "), ").")
+         .c_str())
         ("nodata", po::value<std::string>()
          , "Optional nodata value override. Can be NONE (to disable any "
-         "nodata value) or a (real) number. Input dataset's nodata "
-         "value is used if not used.")
+         "nodata value) or a (real) number. Original input dataset's nodata "
+         "value is used if not specified.")
         ;
 
     pd.add("input", 1)
@@ -280,6 +308,10 @@ void VrtWo::configure(const po::variables_map &vars)
 
     if (vars.count("wrapx")) {
         config_.wrapx = vars["wrapx"].as<int>();
+    }
+
+    if (!vars.count("co")) {
+        config_.co = def::createOptions;
     }
 
     config_.input = fs::absolute(config_.input);
