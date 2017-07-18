@@ -81,10 +81,8 @@ QTree::QTree(Memory &memory)
     // read data size
     bin::read(f, dataSize_);
 
-    {
-        // align start of data block
-        f.seekg(utility::align(f.tellg(), sizeof(std::uint16_t)));
-    }
+    // align start of data block
+    f.seekg(utility::align(f.tellg(), sizeof(std::uint32_t)));
 
     // remember memory
     data_ = memory.addr(f.tellg());
@@ -112,6 +110,11 @@ inline Flag::value_type vts2mm(vts::TileIndex::Flag::value_type in)
     return out;
 }
 
+inline Flag::value_type vts2mm(const vts::QTree::opt_value_type &in)
+{
+    return (in ? vts2mm(*in) : Flag::value_type(Flag::invalid));
+}
+
 void QTree::write(std::ostream &f, const vts::QTree &tree)
 {
     bin::write(f, MM_QTREE_MAGIC); // 4 bytes
@@ -122,21 +125,64 @@ void QTree::write(std::ostream &f, const vts::QTree &tree)
     bin::write(f, std::uint8_t(tree.order()));
 
     // make room for data size
-    auto sizePlace(f.tellp());
-    f.seekp(sizePlace + std::streampos(sizeof(std::uint32_t)));
+    std::size_t sizePlace(f.tellp());
+    // align address after size place
+    f.seekp(utility::align(sizePlace + sizeof(std::uint32_t)
+                           , sizeof(std::uint32_t)));
 
-    if (tree.empty()) {
-        // empty tree, write root maker
-        bin::write(f, std::uint8_t(Flag::rootMarker));
-    } else if (tree.full()) {
-        // only single value, write root marker with value
-        bin::write(f, std::uint8_t(Flag::rootMarker | vts2mm(tree.get(0, 0))));
-    } else {
-        // TODO: write actual tree here
+    struct Converter {
+        Converter(std::ostream &f) : f(f) {}
+
+        void root(vts::QTree::value_type value) {
+            // only single value, write root marker with value
+            bin::write(f, vts2mm(value));
+        }
+
+        void children(const vts::QTree::opt_value_type &ul
+                      , const vts::QTree::opt_value_type &ur
+                      , const vts::QTree::opt_value_type &ll
+                      , const vts::QTree::opt_value_type &lr)
+        {
+            // write values for all 4 children
+            bin::write(f, vts2mm(ul));
+            bin::write(f, vts2mm(ur));
+            bin::write(f, vts2mm(ll));
+            bin::write(f, vts2mm(lr));
+        }
+
+        std::streampos enter() {
+            // make room for data size
+            auto jump(f.tellp());
+            f.seekp(sizeof(std::uint32_t), std::ios_base::cur);
+            return jump;
+        }
+
+        void leave(std::streampos jump) {
+            // curren file position
+            auto end(f.tellp());
+
+            // rewind to allocated space
+            f.seekp(jump);
+
+            // calculate jump value (take size of jump value into account)
+            std::uint32_t jumpValue(end - jump - sizeof(jumpValue));
+            bin::write(f, jumpValue);
+
+            // jump to the end again
+            f.seekp(end);
+        }
+
+        std::ostream &f;
+    };
+
+    // convert tree
+    {
+        Converter converter(f);
+        tree.convert(converter);
     }
 
     // compute data size and write to pre-allocated place
-    auto end(f.tellp());
+    std::size_t end(f.tellp());
     f.seekp(sizePlace);
     std::uint32_t size(end - sizePlace - sizeof(std::uint32_t));
     bin::write(f, size);

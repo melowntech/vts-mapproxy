@@ -36,8 +36,8 @@ namespace vts = vtslibs::vts;
  *
  *  Used to save precious memory.
  *
- *  Handles only 3 flags: mesh, watertight and navtile flags, space for 4th flag
- *  is available.
+ *  Handles only 3 flags: mesh, watertight and navtile flags, space for 5 more
+ *  flags is available.
  *
  *  Non-leaf nodes are marked by invalid combination (mesh=false,
  *  watertight=true)
@@ -52,15 +52,13 @@ struct Flag {
     typedef std::uint8_t value_type;
 
     enum : value_type {
-        mesh = 0x01 // mesh (or some other data) present
-        , watertight = 0x02 // no holes in data
-        , navtile = 0x04 // navile present
+        mesh = vts::TileIndex::Flag::mesh // mesh (or some other data) present
+        , watertight = vts::TileIndex::Flag::watertight // no holes in data
+        , navtile = vts::TileIndex::Flag::navtile // navile present
 
         , data = mesh // alias for mesh
         , none = 0x00 // nothing set
-        , invalid = 0x0e // invalid value, used for internal tree nodes
-
-        , rootMarker = 0xf0 // marks that root has single value
+        , invalid = 0xfe // invalid value, used for internal tree nodes
     };
 };
 
