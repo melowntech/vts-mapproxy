@@ -22,6 +22,7 @@ set(mapproxy_SOURCES
   support/fileclass.hpp support/fileclass.cpp
   support/serialization.hpp support/serialization.cpp
   support/glob.hpp support/glob.cpp
+  support/mmtileindex.hpp support/mmtileindex.cpp
 
   resourcebackend.hpp
   resourcebackend/resourcebackend.cpp
@@ -97,3 +98,17 @@ set_target_version(mapproxy ${vts-mapproxy_VERSION})
 # binaries
 install(TARGETS mapproxy RUNTIME DESTINATION bin
   COMPONENT main)
+
+# ------------------------------------------------------------------------
+# --- test tools
+# ------------------------------------------------------------------------
+
+set(mapproxy-ti2mmti_SOURCES
+  support/mmtileindex.hpp support/mmtileindex.cpp
+  support/ti2mmti.cpp)
+
+add_executable(mapproxy-ti2mmti EXCLUDE_FROM_ALL ${mapproxy-ti2mmti_SOURCES})
+target_link_libraries(mapproxy-ti2mmti ${MODULE_LIBRARIES})
+buildsys_target_compile_definitions(mapproxy-ti2mmti ${MODULE_DEFINITIONS})
+buildsys_binary(mapproxy-ti2mmti)
+set_target_version(mapproxy-ti2mmti ${vts-mapproxy_VERSION})
