@@ -77,15 +77,19 @@ QTree::QTree(Memory &memory)
 
     // read tree depth (i.e. lod)
     depth_ = bin::read<std::uint8_t>(f);
+    size_ = 1 << depth_;
 
     // read data size
-    bin::read(f, dataSize_);
+    dataSize_ = bin::read<std::uint32_t>(f);
 
     // align start of data block
-    f.seekg(utility::align(f.tellg(), sizeof(std::uint32_t)));
+    std::size_t dataStart(utility::align(f.tellg(), sizeof(std::uint32_t)));
 
     // remember memory
-    data_ = memory.addr(f.tellg());
+    data_ = memory.addr(dataStart);
+
+    // skip data
+    f.seekg(dataStart + dataSize_);
 }
 
 TileIndex::TileIndex(const fs::path &path)
@@ -102,12 +106,7 @@ TileIndex::TileIndex(const fs::path &path)
 
 inline Flag::value_type vts2mm(vts::TileIndex::Flag::value_type in)
 {
-    Flag::value_type out(0);
-    if (in & vts::TileIndex::Flag::mesh) { out |= Flag::data; }
-    if (in & vts::TileIndex::Flag::watertight) { out |= Flag::watertight; }
-    if (in & vts::TileIndex::Flag::navtile) { out |= Flag::navtile; }
-
-    return out;
+    return Flag::value_type(in);
 }
 
 inline Flag::value_type vts2mm(const vts::QTree::opt_value_type &in)
@@ -126,15 +125,20 @@ void QTree::write(std::ostream &f, const vts::QTree &tree)
 
     // make room for data size
     std::size_t sizePlace(f.tellp());
+
     // align address after size place
     f.seekp(utility::align(sizePlace + sizeof(std::uint32_t)
                            , sizeof(std::uint32_t)));
+    std::size_t dataStart(f.tellp());
 
     struct Converter {
         Converter(std::ostream &f) : f(f) {}
 
-        void root(vts::QTree::value_type value) {
-            // only single value, write root marker with value
+        void root(vts::QTree::opt_value_type value) {
+            // write root value in all nodes
+            bin::write(f, vts2mm(value));
+            bin::write(f, vts2mm(value));
+            bin::write(f, vts2mm(value));
             bin::write(f, vts2mm(value));
         }
 
@@ -150,7 +154,10 @@ void QTree::write(std::ostream &f, const vts::QTree &tree)
             bin::write(f, vts2mm(lr));
         }
 
-        std::streampos enter() {
+        std::streampos enter(bool lastInternalNode) {
+            // last node -> invalid position
+            if (lastInternalNode) { return -1; }
+
             // make room for data size
             auto jump(f.tellp());
             f.seekp(sizeof(std::uint32_t), std::ios_base::cur);
@@ -158,7 +165,10 @@ void QTree::write(std::ostream &f, const vts::QTree &tree)
         }
 
         void leave(std::streampos jump) {
-            // curren file position
+            // ignore invalid stream pos
+            if (jump < 0) { return; }
+
+            // current file position
             auto end(f.tellp());
 
             // rewind to allocated space
@@ -184,7 +194,7 @@ void QTree::write(std::ostream &f, const vts::QTree &tree)
     // compute data size and write to pre-allocated place
     std::size_t end(f.tellp());
     f.seekp(sizePlace);
-    std::uint32_t size(end - sizePlace - sizeof(std::uint32_t));
+    std::uint32_t size(end - dataStart);
     bin::write(f, size);
 
     // move back to the end

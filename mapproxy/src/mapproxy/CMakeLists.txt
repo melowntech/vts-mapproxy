@@ -1,17 +1,5 @@
-# test program
-define_module(BINARY mapproxy
-  DEPENDS
-  pysupport pydbglog
-  vts-libs>=2.4 http>=1.0 service>=1.6 geo>=1.25 gdal-drivers>=1.14 geometry>=1.7
-  jsoncpp>=2.1
-
-  Boost_SERIALIZATION
-  Boost_FILESYSTEM
-  Boost_PROGRAM_OPTIONS
-  Boost_PYTHON
-  )
-
-set(mapproxy_SOURCES
+# core mapproxy library
+set(mapproxy-core_SOURCES
   error.hpp
   resource.hpp resource.cpp pyresource.cpp
   support/metatile.hpp support/metatile.cpp
@@ -31,10 +19,42 @@ set(mapproxy_SOURCES
   resourcebackend/python.hpp resourcebackend/python.cpp
 
   generator.hpp
-  generator/metatile.hpp generator/metatile.cpp
-  generator/demregistry.hpp generator/demregistry.cpp
   generator/generator.cpp
   generator/factory.hpp
+  )
+
+# test program
+define_module(LIBRARY mapproxy-core
+  DEPENDS
+  pysupport pydbglog
+  vts-libs>=2.4 http>=1.0 geo>=1.25 gdal-drivers>=1.14 geometry>=1.7
+  jsoncpp>=2.1
+
+  Boost_SERIALIZATION
+  Boost_FILESYSTEM
+  Boost_PROGRAM_OPTIONS
+  Boost_PYTHON
+  )
+
+add_library(mapproxy-core STATIC ${mapproxy-core_SOURCES})
+buildsys_library(mapproxy-core)
+target_link_libraries(mapproxy-core ${MODULE_LIBRARIES})
+buildsys_target_compile_definitions(mapproxy-core ${MODULE_DEFINITIONS})
+
+# test program
+define_module(BINARY mapproxy
+  DEPENDS
+  mapproxy-core service>=1.6
+
+  Boost_SERIALIZATION
+  Boost_FILESYSTEM
+  Boost_PROGRAM_OPTIONS
+  Boost_PYTHON
+  )
+
+set(mapproxy_SOURCES
+  generator/metatile.hpp generator/metatile.cpp
+  generator/demregistry.hpp generator/demregistry.cpp
   generator/tms-raster.hpp generator/tms-raster.cpp
   generator/tms-raster-remote.hpp generator/tms-raster-remote.cpp
   generator/tms-bing.hpp generator/tms-bing.cpp
@@ -81,12 +101,11 @@ file_to_cpp(mapproxy_FILES_SOURCES
   files::defaultstyle_json
   generator/files/defaultstyle.json)
 
-
 add_executable(mapproxy
   ${mapproxy_SOURCES}
   ${mapproxy_BROWSER_SOURCES}
   ${mapproxy_FILES_SOURCES})
-target_link_libraries(mapproxy ${MODULE_LIBRARIES})
+target_link_libraries(mapproxy mapproxy-core ${MODULE_LIBRARIES})
 buildsys_target_compile_definitions(mapproxy ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy)
 set_target_version(mapproxy ${vts-mapproxy_VERSION})
@@ -98,17 +117,3 @@ set_target_version(mapproxy ${vts-mapproxy_VERSION})
 # binaries
 install(TARGETS mapproxy RUNTIME DESTINATION bin
   COMPONENT main)
-
-# ------------------------------------------------------------------------
-# --- test tools
-# ------------------------------------------------------------------------
-
-set(mapproxy-ti2mmti_SOURCES
-  support/mmtileindex.hpp support/mmtileindex.cpp
-  support/ti2mmti.cpp)
-
-add_executable(mapproxy-ti2mmti EXCLUDE_FROM_ALL ${mapproxy-ti2mmti_SOURCES})
-target_link_libraries(mapproxy-ti2mmti ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-ti2mmti ${MODULE_DEFINITIONS})
-buildsys_binary(mapproxy-ti2mmti)
-set_target_version(mapproxy-ti2mmti ${vts-mapproxy_VERSION})

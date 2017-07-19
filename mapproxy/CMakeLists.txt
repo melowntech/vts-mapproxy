@@ -77,6 +77,7 @@ add_custom_target(.vts ALL DEPENDS vts vts02vts vts2vts ts2vts0 vts0)
 
 # project
 add_subdirectory(src/mapproxy)
+add_subdirectory(src/tools)
 add_subdirectory(src/tiling)
 add_subdirectory(src/rf-mask)
 add_subdirectory(src/generatevrtwo)
