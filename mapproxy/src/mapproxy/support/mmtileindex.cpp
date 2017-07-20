@@ -142,45 +142,83 @@ void QTree::write(std::ostream &f, const vts::QTree &tree)
             bin::write(f, vts2mm(value));
         }
 
-        void children(const vts::QTree::opt_value_type &ul
-                      , const vts::QTree::opt_value_type &ur
-                      , const vts::QTree::opt_value_type &ll
-                      , const vts::QTree::opt_value_type &lr)
+        typedef std::array<std::streampos, 4> IndexTable;
+
+        IndexTable children(const vts::QTree::opt_value_type &ul
+                            , const vts::QTree::opt_value_type &ur
+                            , const vts::QTree::opt_value_type &ll
+                            , const vts::QTree::opt_value_type &lr)
         {
             // write values for all 4 children
             bin::write(f, vts2mm(ul));
             bin::write(f, vts2mm(ur));
             bin::write(f, vts2mm(ll));
             bin::write(f, vts2mm(lr));
+
+            // grab current position and prepare table
+            std::size_t pos(f.tellp());
+            IndexTable table;
+
+            bool first(true);
+
+            auto isIndexable([&](const vts::QTree::opt_value_type &value)
+                             -> bool
+            {
+                // leaf -> non-indexable
+                if (value) { return false; }
+
+                // first internal node -> non-indexable
+                if (first) {
+                    first = false;
+                    return false;
+                }
+
+                // internal none
+                return true;
+            });
+
+            auto addIndex([&](const vts::QTree::opt_value_type &value
+                              , int index) -> void
+            {
+                if (isIndexable(value)) {
+                    // allocate space for an index in the index table
+                    table[index] = pos;
+                    pos += sizeof(std::uint32_t);
+                } else {
+                    // not indexable
+                    table[index] = -1;
+                }
+            });
+
+            addIndex(ul, 0);
+            addIndex(ur, 1);
+            addIndex(ll, 2);
+            addIndex(lr, 3);
+
+            // move past table space and done
+            f.seekp(pos);
+            return table;
         }
 
-        std::streampos enter(bool lastInternalNode) {
-            // last node -> invalid position
-            if (lastInternalNode) { return -1; }
+        void enter(const IndexTable &table, int index) {
+            const auto indexPos(table[index]);
+            if (indexPos < 0) { return; }
 
-            // make room for data size
-            auto jump(f.tellp());
-            f.seekp(sizeof(std::uint32_t), std::ios_base::cur);
-            return jump;
-        }
-
-        void leave(std::streampos jump) {
-            // ignore invalid stream pos
-            if (jump < 0) { return; }
-
-            // current file position
+            // current file position (here starts the node)
             auto end(f.tellp());
 
             // rewind to allocated space
-            f.seekp(jump);
+            f.seekp(indexPos);
 
             // calculate jump value (take size of jump value into account)
-            std::uint32_t jumpValue(end - jump - sizeof(jumpValue));
-            bin::write(f, jumpValue);
+            std::uint32_t indexValue(end - indexPos - sizeof(indexValue));
+            bin::write(f, indexValue);
 
             // jump to the end again
             f.seekp(end);
         }
+
+        void leave(const IndexTable&, int) {}
 
         std::ostream &f;
     };

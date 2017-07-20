@@ -33,7 +33,7 @@
 #include "vts-libs/vts/tileindex.hpp"
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 
-// #define MMAPTI_DEBUG
+#define MMAPTI_DEBUG
 
 #ifdef MMAPTI_DEBUG
 #include "dbglog/dbglog.hpp"
@@ -61,26 +61,27 @@ class MemoryReader {
 public:
     MemoryReader(const char *mem) : origin_(mem), mem_(mem) {}
 
+    /** Read value of type T.
+     */
     template <typename T> const T& read() {
         const T *ptr(reinterpret_cast<const T*>(mem_));
 #ifdef MMAPTI_DEBUG
         LOG(info4) << "Reading from " << (void*)(ptr)
-                   << " (index: " << index(mem_) << ")";
+                   << " (offset: " << offset(mem_) << ")";
 #endif
         mem_ += sizeof(T);
         return *ptr;
     }
 
-    template <typename T> void skip() {
+    /** Skip of count elements of size of T.
+     */
+    template <typename T> void skip(int count = 1) {
 #ifdef MMAPTI_DEBUG
-        LOG(info4) << "Skipping " << sizeof(T) << " bytes from "
-                   << (void*)(mem_) << " (index: " << index(mem_) << ")";
+        LOG(info4)
+            << "Skipping " << count << " * " << sizeof(T) << " bytes from "
+            << (void*)(mem_) << " (offset: " << offset(mem_) << ")";
 #endif
-        mem_ += sizeof(T);
-    }
-
-    template <typename T> void skip(bool proceed) {
-        if (proceed) { skip<T>(); }
+        mem_ += (count * sizeof(T));
     }
 
     // read and apply jump value
@@ -88,42 +89,18 @@ public:
         const auto value(read<T>());
 #ifdef MMAPTI_DEBUG
         LOG(info4) << "Jumped from " << (void*)(mem_)
-                   << " (index: " << index(mem_) << ")"
+                   << " (offset: " << offset(mem_) << ")"
                    << " by " << value
                    << " to " << (void*)(mem_ + value)
-                   << " (index: " << index(mem_ + value) << ")";
+                   << " (offset: " << offset(mem_ + value) << ")";
 #endif
         mem_ += value;
     }
 
-    // Conditional jump
-    template <typename T> void jump(bool proceed) {
-        if (proceed) { jump<T>(); }
-    }
-
-    // Conditional jump chain
-    template <typename T, typename ...Args>
-    void jump(bool proceed, Args &&...args) {
-        jump<T>(proceed);
-        jump<T>(std::forward<Args>(args)...);
-    }
-
-    // Conditional jump chain terminated with skip
-    template <typename T, typename ...Args>
-    void jumpAndSkip(bool proceed) {
-        skip<T>(proceed);
-    }
-
-    // Conditional jump chain terminated with skip
-    template <typename T, typename ...Args>
-    void jumpAndSkip(bool proceed, Args &&...args) {
-        jump<T>(proceed);
-        jumpAndSkip<T>(std::forward<Args>(args)...);
-    }
+    std::size_t offset() const { return mem_ - origin_; }
+    std::size_t offset(const char *ptr) const { return ptr - origin_; }
 
 private:
-    std::size_t index(const char *ptr) const { return ptr - origin_; }
-
     const char *origin_;
     const char *mem_;
 };
@@ -204,18 +181,55 @@ public:
             int leafCount;
             int internalCount;
             int jumpableLimit;
+            int firstInternalNode;
 
             Flags(const NodeValue &nv)
                 : flags{{ nv.leaf(0), nv.leaf(1), nv.leaf(2), nv.leaf(3) }}
                 , leafCount(flags[0] + flags[1] + flags[2] + flags[3])
                 , internalCount(4 - leafCount)
                 , jumpableLimit(internalCount - 1)
-            {}
+                , firstInternalNode()
+            {
+                for (; firstInternalNode < 4; ++firstInternalNode) {
+                    if (!flags[firstInternalNode]) { break; }
+                }
+                // firstInternalNode is set to 4 -> no internal node
+            }
 
             bool operator[](std::size_t index) const { return flags[index]; }
 
             bool jumpable(int index) const {
                 return ((index < jumpableLimit) && !flags[index]);
+            }
+
+            /** Jumps to node referenced by node's index.
+             *
+             *  Causes error if node is not internal node
+             *
+             * This function assumes that reader is positioned at the start of
+             * the index table
+             */
+            void jumpTo(MemoryReader &reader, int node) const {
+                if (node == firstInternalNode) {
+                    // skip whole table and land at the first internal node's
+                    // data
+                    reader.skip<std::uint32_t>(internalCount - 1);
+                    return;
+                }
+
+                // skip intermediate internal nodes
+                for (int i(firstInternalNode + 1); i < node; ++i) {
+                    reader.skip<std::uint32_t>(!flags[i]);
+                }
+
+                if (flags[node]) {
+                    LOGTHROW(err2, std::runtime_error)
+                        << "Node " << node << " is not an internal node "
+                        << " at offset " << reader.offset() << ".";
+                }
+
+                // and jump to node only if not the first one
+                reader.jump<std::uint32_t>();
             }
         };
 
@@ -343,17 +357,16 @@ inline QTree::value_type QTree::get(MemoryReader &reader, const Node &node
             // UL
             if (flags[0]) { return nodeValue[0]; }
 
-            // skip over jump value and descend
-            reader.skip<std::uint32_t>(flags.jumpable(0));
+            // jump to the start of node data
+            flags.jumpTo(reader, 0);
             return get(reader, child, x, y);
         }
 
         // UR
         if (flags[1]) { return nodeValue[1]; }
 
-        // jump over UL node, skip UR node jump value
-        reader.jumpAndSkip<std::uint32_t>
-            (flags.jumpable(0), flags.jumpable(1));
+        // jump to the start of node data
+        flags.jumpTo(reader, 1);
 
         // fix-up child and descend
         child.x += child.size;
@@ -366,11 +379,10 @@ inline QTree::value_type QTree::get(MemoryReader &reader, const Node &node
         // LL
         if (flags[2]) { return nodeValue[2]; }
 
-        // jump over UL and UR nodes, skip LL node jump value
-        reader.jumpAndSkip<std::uint32_t>
-            (flags.jumpable(0), flags.jumpable(1), flags.jumpable(2));
+        // jump to the start of node data
+        flags.jumpTo(reader, 2);
 
-        // skip over jump value, fix-up child and descend
+        // fix-up child and descend
         child.y += child.size;
         return get(reader, child, x, y);
     }
@@ -378,9 +390,8 @@ inline QTree::value_type QTree::get(MemoryReader &reader, const Node &node
     // LR
     if (flags[3]) { return nodeValue[3]; }
 
-    // jump over UL, UR and LL nodes, there is no LR node jump value
-    reader.jump<std::uint32_t>
-        (flags.jumpable(0), flags.jumpable(1), flags.jumpable(2));
+    // jump to the start of node data
+    flags.jumpTo(reader, 3);
 
     // fix-up child and descend
     child.x += child.size;
