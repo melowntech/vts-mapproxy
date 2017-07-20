@@ -1,7 +1,7 @@
 #include "utility/buildsys.hpp"
 #include "service/cmdline.hpp"
 
-#include "mapproxy/support/mmtileindex.hpp"
+#include "mapproxy/support/mmapped/tileindex.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;

@@ -12,7 +12,7 @@
 #include "utility/binaryio.hpp"
 #include "utility/align.hpp"
 
-#include "./mmtileindex.hpp"
+#include "./tileindex.hpp"
 
 namespace mmapped {
 
@@ -104,14 +104,14 @@ TileIndex::TileIndex(const fs::path &path)
     }
 }
 
-inline Flag::value_type vts2mm(vts::TileIndex::Flag::value_type in)
+inline TileFlag::value_type vts2mm(vts::TileIndex::Flag::value_type in)
 {
-    return Flag::value_type(in);
+    return TileFlag::value_type(in);
 }
 
-inline Flag::value_type vts2mm(const vts::QTree::opt_value_type &in)
+inline TileFlag::value_type vts2mm(const vts::QTree::opt_value_type &in)
 {
-    return (in ? vts2mm(*in) : Flag::value_type(Flag::invalid));
+    return (in ? vts2mm(*in) : TileFlag::value_type(TileFlag::invalid));
 }
 
 void QTree::write(std::ostream &f, const vts::QTree &tree)
