@@ -27,6 +27,7 @@
 #ifndef mapproxy_support_mmtileindex_hpp_included_
 #define mapproxy_support_mmtileindex_hpp_included_
 
+#include <array>
 #include <iostream>
 
 #include "vts-libs/vts/tileindex.hpp"
@@ -78,6 +79,10 @@ public:
         mem_ += sizeof(T);
     }
 
+    template <typename T> void skip(bool proceed) {
+        if (proceed) { skip<T>(); }
+    }
+
     // read and apply jump value
     template <typename T> void jump() {
         const auto value(read<T>());
@@ -101,6 +106,19 @@ public:
     void jump(bool proceed, Args &&...args) {
         jump<T>(proceed);
         jump<T>(std::forward<Args>(args)...);
+    }
+
+    // Conditional jump chain terminated with skip
+    template <typename T, typename ...Args>
+    void jumpAndSkip(bool proceed) {
+        skip<T>(proceed);
+    }
+
+    // Conditional jump chain terminated with skip
+    template <typename T, typename ...Args>
+    void jumpAndSkip(bool proceed, Args &&...args) {
+        jump<T>(proceed);
+        jumpAndSkip<T>(std::forward<Args>(args)...);
     }
 
 private:
@@ -173,7 +191,35 @@ public:
 
     struct NodeValue {
         value_type value[4];
+
         value_type operator[](std::size_t index) const { return value[index]; }
+
+        bool leaf(std::size_t index) const { return Flag::leaf(value[index]); }
+        bool internal(std::size_t index) const {
+            return Flag::internal(value[index]);
+        }
+
+        struct Flags {
+            std::array<bool, 4> flags;
+            int leafCount;
+            int internalCount;
+            int jumpableLimit;
+
+            Flags(const NodeValue &nv)
+                : flags{{ nv.leaf(0), nv.leaf(1), nv.leaf(2), nv.leaf(3) }}
+                , leafCount(flags[0] + flags[1] + flags[2] + flags[3])
+                , internalCount(4 - leafCount)
+                , jumpableLimit(internalCount - 1)
+            {}
+
+            bool operator[](std::size_t index) const { return flags[index]; }
+
+            bool jumpable(int index) const {
+                return ((index < jumpableLimit) && !flags[index]);
+            }
+        };
+
+        Flags flags() const { return Flags(*this); }
     };
 
 private:
@@ -279,6 +325,7 @@ inline QTree::value_type QTree::get(MemoryReader &reader, const Node &node
 {
     // load value
     const auto &nodeValue(reader.read<NodeValue>());
+    const auto flags(nodeValue.flags());
 
     // upper-left child
     Node child(node.child());
@@ -294,49 +341,48 @@ inline QTree::value_type QTree::get(MemoryReader &reader, const Node &node
         // upper row
         if (x < (child.x + child.size)) {
             // UL
-            if (Flag::leaf(nodeValue[0])) { return nodeValue[0]; }
+            if (flags[0]) { return nodeValue[0]; }
 
             // skip over jump value and descend
-            reader.skip<std::uint32_t>();
+            reader.skip<std::uint32_t>(flags.jumpable(0));
             return get(reader, child, x, y);
         }
 
-        // jump over UL node
-        reader.jump<std::uint32_t>(Flag::internal(nodeValue[0]));
-
         // UR
-        if (Flag::leaf(nodeValue[1])) { return nodeValue[1]; }
+        if (flags[1]) { return nodeValue[1]; }
 
-        // skip over jump value, fix-up child and descend
-        reader.skip<std::uint32_t>();
+        // jump over UL node, skip UR node jump value
+        reader.jumpAndSkip<std::uint32_t>
+            (flags.jumpable(0), flags.jumpable(1));
+
+        // fix-up child and descend
         child.x += child.size;
         return get(reader, child, x, y);
     }
 
     // lower row
 
-    // jump over UL and UR nodes
-    reader.jump<std::uint32_t>(Flag::internal(nodeValue[0])
-                               , Flag::internal(nodeValue[1]));
-
     if (x < (child.x + child.size)) {
         // LL
-        if (Flag::leaf(nodeValue[2])) { return nodeValue[2]; }
+        if (flags[2]) { return nodeValue[2]; }
+
+        // jump over UL and UR nodes, skip LL node jump value
+        reader.jumpAndSkip<std::uint32_t>
+            (flags.jumpable(0), flags.jumpable(1), flags.jumpable(2));
 
         // skip over jump value, fix-up child and descend
-        reader.skip<std::uint32_t>();
         child.y += child.size;
         return get(reader, child, x, y);
     }
 
-    // skip over LL node
-    reader.jump<std::uint32_t>(Flag::internal(nodeValue[2]));
-
     // LR
-    if (Flag::leaf(nodeValue[3])) { return nodeValue[3]; }
+    if (flags[3]) { return nodeValue[3]; }
 
-    // skip over jump value, fix-up child and descend
-    reader.skip<std::uint32_t>();
+    // jump over UL, UR and LL nodes, there is no LR node jump value
+    reader.jump<std::uint32_t>
+        (flags.jumpable(0), flags.jumpable(1), flags.jumpable(2));
+
+    // fix-up child and descend
     child.x += child.size;
     child.y += child.size;
     return get(reader, child, x, y);
