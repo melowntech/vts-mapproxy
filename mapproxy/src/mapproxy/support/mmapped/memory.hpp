@@ -61,7 +61,7 @@ public:
         const T *ptr(reinterpret_cast<const T*>(mem_));
 #ifdef MMAPTI_DEBUG
         LOG(info4) << "Reading from " << (void*)(ptr)
-                   << " (offset: " << offset(mem_) << ")";
+                   << " (offset: " << address(mem_) << ")";
 #endif
         mem_ += sizeof(T);
         return *ptr;
@@ -73,7 +73,7 @@ public:
 #ifdef MMAPTI_DEBUG
         LOG(info4)
             << "Skipping " << count << " * " << sizeof(T) << " bytes from "
-            << (void*)(mem_) << " (offset: " << offset(mem_) << ")";
+            << (void*)(mem_) << " (offset: " << address(mem_) << ")";
 #endif
         mem_ += (count * sizeof(T));
     }
@@ -83,16 +83,27 @@ public:
         const auto value(read<T>());
 #ifdef MMAPTI_DEBUG
         LOG(info4) << "Jumped from " << (void*)(mem_)
-                   << " (offset: " << offset(mem_) << ")"
+                   << " (offset: " << address(mem_) << ")"
                    << " by " << value
                    << " to " << (void*)(mem_ + value)
-                   << " (offset: " << offset(mem_ + value) << ")";
+                   << " (offset: " << address(mem_ + value) << ")";
 #endif
         mem_ += value;
     }
 
-    std::size_t offset() const { return mem_ - origin_; }
-    std::size_t offset(const char *ptr) const { return ptr - origin_; }
+    // read jump value and compute new address
+    template <typename T> std::size_t jumpAddress() {
+        const auto value(read<T>());
+        return address() + value;
+    }
+
+    // rewind to given address
+    void seek(std::size_t address) {
+        mem_ = origin_ + address;
+    }
+
+    std::size_t address() const { return mem_ - origin_; }
+    std::size_t address(const char *ptr) const { return ptr - origin_; }
 
 private:
     const char *origin_;

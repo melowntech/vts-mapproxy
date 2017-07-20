@@ -10,17 +10,12 @@ set(mapproxy-core_SOURCES
   support/fileclass.hpp support/fileclass.cpp
   support/serialization.hpp support/serialization.cpp
   support/glob.hpp support/glob.cpp
-  support/mmtileindex.hpp support/mmtileindex.cpp
 
-  resourcebackend.hpp
-  resourcebackend/resourcebackend.cpp
-  resourcebackend/factory.hpp
-  resourcebackend/conffile.hpp resourcebackend/conffile.cpp
-  resourcebackend/python.hpp resourcebackend/python.cpp
-
-  generator.hpp
-  generator/generator.cpp
-  generator/factory.hpp
+  support/mmapped/tileindex.hpp support/mmapped/tileindex.cpp
+  support/mmapped/qtree.hpp
+  support/mmapped/memory.hpp
+  support/mmapped/tileflags.hpp
+  support/mmapped/qtree-rasterize.hpp
   )
 
 # test program
@@ -53,6 +48,15 @@ define_module(BINARY mapproxy
   )
 
 set(mapproxy_SOURCES
+  resourcebackend.hpp
+  resourcebackend/resourcebackend.cpp
+  resourcebackend/factory.hpp
+  resourcebackend/conffile.hpp resourcebackend/conffile.cpp
+  resourcebackend/python.hpp resourcebackend/python.cpp
+
+  generator.hpp
+  generator/generator.cpp
+  generator/factory.hpp
   generator/metatile.hpp generator/metatile.cpp
   generator/demregistry.hpp generator/demregistry.cpp
   generator/tms-raster.hpp generator/tms-raster.cpp

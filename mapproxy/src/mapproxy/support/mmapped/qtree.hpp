@@ -78,12 +78,20 @@ public:
     void forEachNode(unsigned int depth, unsigned int x, unsigned int y
                      , const Op &op, Filter filter = Filter::both) const;
 
+    typedef math::Extents2_<unsigned int> Extents;
+
 private:
     struct Node;
     struct NodeValue;
 
     value_type get(MemoryReader &reader, const Node &node
                    , unsigned int x, unsigned int y) const;
+
+    /** Called from forEachQuad */
+    template <typename Op>
+    void descend(MemoryReader &reader, const Node &node
+                 , const Op &op, Filter filter
+                 , const Extents *extents) const;
 
     unsigned int depth_;
     unsigned int size_;
@@ -117,6 +125,11 @@ struct QTree::Node {
             y <<= -diff;
         }
     }
+
+    template <typename Op>
+    void call(const Op &op, Filter filter, value_type value) const;
+
+    bool checkExtents(const Extents *&extents) const;
 };
 
 struct QTree::NodeValue {
@@ -178,11 +191,39 @@ struct QTree::NodeValue {
             if (flags[node]) {
                 LOGTHROW(err2, std::runtime_error)
                     << "Node " << node << " is not an internal node "
-                    << " at offset " << reader.offset() << ".";
+                    << " at address " << reader.address() << ".";
             }
 
             // and jump to node only if not the first one
             reader.jump<std::uint32_t>();
+        }
+
+        /** Loads index table for all 4 nodes. All indices are fixed to absolute
+         * address from memory origin.
+         *
+         * This function assumes that reader is positioned at the start of
+         * the index table
+         */
+        std::array<std::uint32_t, 4> indexTable(MemoryReader &reader) const {
+            std::array<std::uint32_t, 4> it{{ 0, 0, 0, 0 }};
+
+            // done if no internal node
+            if (!internalCount) { return it; }
+
+            // skip first internal node and load explicit table
+            for (int node(firstInternalNode + 1); node < 4; ++node) {
+                if (flags[node]) { continue; }
+
+                // load absolute jump address
+                it[node] = reader.jumpAddress<std::uint32_t>();
+            }
+
+            // we stand at the start of the first internal node, record current
+            // for this node
+            it[firstInternalNode] = reader.address();
+
+            // done
+            return it;
         }
     };
 
@@ -217,6 +258,30 @@ operator<<(std::basic_ostream<CharT, Traits> &os, const QTree::NodeValue &nv)
     if (TileFlag::internal(nv[3])) { os << "*"; }
     else { os << std::bitset<8>(nv[3]); }
     return os << ")";
+}
+
+template <typename Op>
+void QTree::Node::call(const Op &op, Filter filter, value_type value) const
+{
+    switch (filter) {
+    case Filter::black: if (value) { return; }; break;
+    case Filter::white: if (!value) { return; }; break;
+    default: break;
+    }
+
+    op(x, y, size, value);
+}
+
+inline bool QTree::Node::checkExtents(const Extents *&extents) const
+{
+    if (!extents) { return true; }
+
+    if ((x + size) <= extents->ll(0)) { return false; }
+    if (x >= extents->ur(0)) { return false; }
+    if ((y + size) <= extents->ll(1)) { return false; }
+    if (y >= extents->ur(1)) { return false; }
+
+    return true;
 }
 
 inline QTree::value_type QTree::get(unsigned int x, unsigned int y) const
@@ -307,21 +372,92 @@ inline QTree::value_type QTree::get(MemoryReader &reader, const Node &node
 template <typename Op>
 void QTree::forEachNode(const Op &op, Filter filter) const
 {
-    // TODO: implement me
-    (void) op;
-    (void) filter;
+    MemoryReader reader(data_);
+
+    // load root value
+    const auto &root(reader.read<NodeValue>());
+
+    // shortcut for root node
+    if (TileFlag::leaf(root[0])) {
+        Node(size_).call(op, filter, root[0]);
+        return;
+    }
+
+    // descend
+    descend(reader, Node(size_), op, filter, nullptr);
 }
 
 template <typename Op>
 void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
                         , const Op &op, Filter filter) const
 {
-    // TODO: implement me
-    (void) depth;
-    (void) x;
-    (void) y;
-    (void) op;
-    (void) filter;
+    if ((x >= size_) || (y >= size_)) {
+        // inside?
+        return Node(size_).call(op, filter, TileFlag::none);
+    }
+
+    MemoryReader reader(data_);
+
+    // load root value
+    const auto &root(reader.read<NodeValue>());
+
+    // shortcut for root node
+    if (TileFlag::leaf(root[0])) {
+        return Node(size_).call(op, filter, root[0]);
+    }
+
+    // fix depth
+    if (depth > depth_) {
+        const auto diff(depth - depth_);
+        depth = depth_;
+        x >>= diff;
+        y >>= diff;
+    }
+
+    // compute extents
+    const auto diff(depth_ - depth);
+    const auto size(size_ >> diff);
+    Extents::point_type ll(x << depth, y << depth);
+    Extents::point_type ur(ll(0) + size, ll(1) + size);
+    Extents extents(ll, ur);
+
+    // and descend
+    descend(reader, Node(size_), op, filter, &extents);
+}
+
+template <typename Op>
+void QTree::descend(MemoryReader &reader, const Node &node
+                    , const Op &op, Filter filter
+                    , const Extents *extents) const
+{
+    // load value
+    const auto &nodeValue(reader.read<NodeValue>());
+    const auto flags(nodeValue.flags());
+    const auto indexTable(flags.indexTable(reader));
+
+    auto processSubtree([&](int i, const Node &node) -> void
+    {
+        if (flags[i]) {
+            // leaf
+            return node.call(op, filter, nodeValue[i]);
+        }
+
+        // internal node
+
+        // terminate descent if out of extents
+        if (!node.checkExtents(extents)) { return; }
+
+        // inside valid area
+        reader.seek(indexTable[i]);
+        descend(reader, node, op, filter, extents);
+    });
+
+    // descend to subtrees
+    const auto ul(node.child());
+    processSubtree(0, ul);
+    processSubtree(1, node.child(ul.size));
+    processSubtree(2, node.child(0, ul.size));
+    processSubtree(2, node.child(ul.size, ul.size));
 }
 
 } // namespace mmapped

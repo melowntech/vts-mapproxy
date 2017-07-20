@@ -31,6 +31,7 @@
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/path.hpp"
 
 #include "geo/geodataset.hpp"
 
@@ -42,11 +43,12 @@
 
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
-#include "vts-libs/vts/qtree-rasterize.hpp"
+#include "vts-libs/vts/tileindex.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
 #include "../support/tileindex.hpp"
+#include "../support/mmapped/qtree-rasterize.hpp"
 
 #include "./tms-raster.hpp"
 #include "./factory.hpp"
@@ -229,15 +231,36 @@ TmsRaster::TmsRaster(const Params &params)
     , maskTree_(ignoreNonexistent(absoluteDatasetRf(asPath(definition_.mask))))
 {
     const auto indexPath(root() / "tileset.index");
-    if (fs::exists(indexPath)) {
-        index_ = boost::in_place();
-        index_->load(indexPath);
+    const auto deliveryIndexpath(root() / "delivery.index");
+
+    if (fs::exists(deliveryIndexpath)) {
+        index_ = boost::in_place(deliveryIndexpath);
+    } else if (fs::exists(indexPath)) {
+        // convertion from tileset index to delivery index
+        LOG(info2)
+            << "<" << id() << ">: Converting from tileset.index to "
+            "delivery.index.";
+
+        // load tileset index
+        vts::TileIndex index;
+        index.load(indexPath);
+
+        // convert it to delivery index (using a temporary file)
+        const auto tmpPath(utility::addExtension(deliveryIndexpath, ".tmp"));
+        mmapped::TileIndex::write(tmpPath, index);
+        fs::rename(tmpPath, deliveryIndexpath);
+
+        // and open
+        index_ = boost::in_place(deliveryIndexpath);
+    }
+
+    if (index_) {
         hasMetatiles_ = true;
         complexDataset_
             = fs::exists(absoluteDataset(definition_.dataset + "/ophoto"));
         makeReady();
         return;
-    }
+    };
 
     // not seen or index-less
     LOG(info1) << "Generator for <" << id() << "> not ready.";
@@ -268,13 +291,18 @@ void TmsRaster::prepare_impl(Arsenal&)
 
         const auto &r(resource());
 
-        index_ = boost::in_place();
-        prepareTileIndex(*index_
+        vts::TileIndex index;
+        prepareTileIndex(index
                          , (absoluteDataset(definition_.dataset)
                             + "/tiling." + r.id.referenceFrame)
                          , r, false, maskTree_);
 
-        index_->save(root() / "tileset.index");
+        // store and open
+        const auto deliveryIndexpath(root() / "delivery.index");
+        const auto tmpPath(utility::addExtension(deliveryIndexpath, ".tmp"));
+        mmapped::TileIndex::write(tmpPath, index);
+        fs::rename(tmpPath, deliveryIndexpath);
+        index_ = boost::in_place(deliveryIndexpath);
 
         // done
         makeReady();
@@ -288,10 +316,13 @@ void TmsRaster::prepare_impl(Arsenal&)
         hasMetatiles_ = true;
 
         // build tileindex
-        index_ = boost::in_place();
-        prepareTileIndex(*index_, resource(), false, maskTree_);
+        vts::TileIndex index;
+        prepareTileIndex(index, resource(), false, maskTree_);
 
-        index_->save(root() / "tileset.index");
+        // store and open
+        const auto deliveryIndexpath(root() / "delivery.index");
+        mmapped::TileIndex::write(deliveryIndexpath, index);
+        index_ = boost::in_place(deliveryIndexpath);
     } else if (definition_.mask) {
         maskDataset_ = definition_.mask;
         geo::GeoDataset::open(absoluteDataset(*maskDataset_));
@@ -630,7 +661,7 @@ namespace MetaFlags {
 
 namespace {
 
-void meta2d(const vts::TileIndex &tileIndex, const vts::TileId &tileId
+void meta2d(const mmapped::TileIndex &tileIndex, const vts::TileId &tileId
             , const TmsFileInfo &fi, Sink &sink)
 {
     bgil::gray8_image_t out(Constants::RasterMetatileSize.width

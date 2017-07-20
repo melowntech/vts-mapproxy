@@ -27,11 +27,10 @@
 #ifndef mapproxy_generator_tms_raster_hpp_included_
 #define mapproxy_generator_tms_raster_hpp_included_
 
-#include "vts-libs/vts/tileindex.hpp"
-
 #include "geo/geodataset.hpp"
 
 #include "../support/coverage.hpp"
+#include "../support/mmapped/tileindex.hpp"
 
 #include "../generator.hpp"
 
@@ -144,7 +143,7 @@ private:
 
     bool hasMetatiles_;
 
-    boost::optional<vts::TileIndex> index_;
+    boost::optional<mmapped::TileIndex> index_;
 
     bool complexDataset_;
 
