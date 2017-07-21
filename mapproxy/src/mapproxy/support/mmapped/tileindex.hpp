@@ -61,9 +61,16 @@ public:
      */
     value_type get(const vts::TileId &tileId) const;
 
+    bool validSubtree(vts::Lod lod, const vts::TileId &tileId) const;
+
+    bool validSubtree(const vts::TileId &tileId) const;
+
     /** Get quad tree for given lod.
      */
     const QTree* tree(vts::Lod lod) const;
+
+    value_type checkMask(const vts::TileId &tileId, QTree::value_type mask)
+        const;
 
     /** Save vts TileIndex into this mmapped tile index.
      */
@@ -81,20 +88,12 @@ private:
 
 // inlines
 
-inline const QTree* TileIndex::tree(vts::Lod lod) const
+inline TileIndex::value_type
+TileIndex::checkMask(const vts::TileId &tileId, QTree::value_type mask) const
 {
-    if (lod >= trees_.size()) { return nullptr; }
-    return &trees_[lod];
+    return get(tileId) & mask;
 }
 
-inline TileIndex::value_type TileIndex::get(const vts::TileId &tileId) const
-{
-    if (const auto *t = tree(tileId.lod)) {
-        return t->get(tileId.x, tileId.y);
-    }
-
-    return TileFlag::none;
-}
 
 } // namespace mmapped
 

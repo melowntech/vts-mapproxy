@@ -58,6 +58,13 @@ public:
 
     value_type get(unsigned int x, unsigned int y) const;
 
+    /** Read value from pixel from node (x, y) in tree reduced to given depth.
+     *  Coordinates (x, y) are interpreted as if they point into trimmed tree.
+     *  Returns either value from first valid node or value_type(~0) if internal
+     *  node is hit first
+     */
+    value_type get(unsigned int depth, unsigned int x, unsigned int y) const;
+
     static void write(std::ostream &out, const vts::QTree &tree);
 
     enum class Filter {
@@ -281,80 +288,6 @@ inline bool QTree::Node::checkExtents(const int *clipSize) const
     if ((y + size) <= 0) { return false; }
 
     return true;
-}
-
-inline QTree::value_type QTree::get(unsigned int x, unsigned int y) const
-{
-    if ((x >= size_) || (y >= size_)) { return TileFlag::none; }
-
-    MemoryReader reader(data_);
-
-    // load root value
-    const auto &root(reader.read<NodeValue>());
-
-    // shortcut for node
-    if (TileFlag::leaf(root[0])) { return root[0]; }
-
-    // descend
-    return get(reader, Node(size_), x, y);
-}
-
-inline QTree::value_type QTree::get(MemoryReader &reader, const Node &node
-                                    , unsigned int x, unsigned int y) const
-{
-    // load value
-    const auto &nodeValue(reader.read<NodeValue>());
-    const auto flags(nodeValue.flags());
-
-    // upper-left child
-    Node child(node.child());
-
-    if (y < (child.y + child.size)) {
-        // upper row
-        if (x < (child.x + child.size)) {
-            // UL
-            if (flags[0]) { return nodeValue[0]; }
-
-            // jump to the start of node data
-            flags.jumpTo(reader, 0);
-            return get(reader, child, x, y);
-        }
-
-        // UR
-        if (flags[1]) { return nodeValue[1]; }
-
-        // jump to the start of node data
-        flags.jumpTo(reader, 1);
-
-        // fix-up child and descend
-        child.x += child.size;
-        return get(reader, child, x, y);
-    }
-
-    // lower row
-
-    if (x < (child.x + child.size)) {
-        // LL
-        if (flags[2]) { return nodeValue[2]; }
-
-        // jump to the start of node data
-        flags.jumpTo(reader, 2);
-
-        // fix-up child and descend
-        child.y += child.size;
-        return get(reader, child, x, y);
-    }
-
-    // LR
-    if (flags[3]) { return nodeValue[3]; }
-
-    // jump to the start of node data
-    flags.jumpTo(reader, 3);
-
-    // fix-up child and descend
-    child.x += child.size;
-    child.y += child.size;
-    return get(reader, child, x, y);
 }
 
 template <typename Op>

@@ -12,10 +12,12 @@ set(mapproxy-core_SOURCES
   support/glob.hpp support/glob.cpp
 
   support/mmapped/tileindex.hpp support/mmapped/tileindex.cpp
-  support/mmapped/qtree.hpp
-  support/mmapped/memory.hpp
+  support/mmapped/qtree.hpp support/mmapped/qtree.cpp
+  support/mmapped/memory.hpp support/mmapped/memory-impl.hpp
   support/mmapped/tileflags.hpp
   support/mmapped/qtree-rasterize.hpp
+
+  support/mmapped/tilesetindex.hpp support/mmapped/tilesetindex.cpp
   )
 
 # test program
