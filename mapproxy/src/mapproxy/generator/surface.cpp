@@ -48,6 +48,7 @@
 #include "vts-libs/vts/mesh.hpp"
 #include "vts-libs/vts/opencv/navtile.hpp"
 #include "vts-libs/vts/types2d.hpp"
+#include "vts-libs/vts/qtree-rasterize.hpp"
 #include "vts-libs/vts/2d.hpp"
 #include "vts-libs/vts/debug.hpp"
 #include "vts-libs/vts/mapconfig.hpp"
