@@ -35,7 +35,7 @@
 
 #include "./tileflags.hpp"
 
-#define MMAPTI_DEBUG
+// #define MMAPTI_DEBUG
 
 #ifdef MMAPTI_DEBUG
 #include "dbglog/dbglog.hpp"
@@ -99,6 +99,10 @@ public:
 
     // rewind to given address
     void seek(std::size_t address) {
+#ifdef MMAPTI_DEBUG
+        LOG(info4)
+            << "Seeking to " << address << ".";
+#endif
         mem_ = origin_ + address;
     }
 

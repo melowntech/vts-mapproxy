@@ -48,6 +48,7 @@
 #include "../error.hpp"
 #include "../support/metatile.hpp"
 #include "../support/tileindex.hpp"
+#include "../support/mmapped/qtree.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
 
 #include "./tms-raster.hpp"

@@ -78,8 +78,6 @@ public:
     void forEachNode(unsigned int depth, unsigned int x, unsigned int y
                      , const Op &op, Filter filter = Filter::both) const;
 
-    typedef math::Extents2_<unsigned int> Extents;
-
 private:
     struct Node;
     struct NodeValue;
@@ -91,7 +89,7 @@ private:
     template <typename Op>
     void descend(MemoryReader &reader, const Node &node
                  , const Op &op, Filter filter
-                 , const Extents *extents) const;
+                 , const int *clipSize) const;
 
     unsigned int depth_;
     unsigned int size_;
@@ -102,10 +100,10 @@ private:
 struct QTree::Node {
     unsigned int size;
     unsigned int depth;
-    unsigned int x;
-    unsigned int y;
+    int x;
+    int y;
 
-    Node(unsigned int size, unsigned int depth = 0, unsigned int x = 0
+    Node(unsigned int size, unsigned int depth = 0, int x = 0
          , unsigned int y = 0)
         : size(size), depth(depth), x(x), y(y)
     {}
@@ -114,22 +112,11 @@ struct QTree::Node {
         return { size >> 1, depth + 1, x + ix, y + iy };
     }
 
-    void shift(int diff) {
-        if (diff >= 0) {
-            size >>= diff;
-            x >>= diff;
-            y >>= diff;
-        } else {
-            size <<= -diff;
-            x <<= -diff;
-            y <<= -diff;
-        }
-    }
-
     template <typename Op>
-    void call(const Op &op, Filter filter, value_type value) const;
+    void call(const Op &op, Filter filter, value_type value
+              , const int *clipSize = nullptr) const;
 
-    bool checkExtents(const Extents *&extents) const;
+    bool checkExtents(const int *clipSize) const;
 };
 
 struct QTree::NodeValue {
@@ -146,14 +133,12 @@ struct QTree::NodeValue {
         std::array<bool, 4> flags;
         int leafCount;
         int internalCount;
-        int jumpableLimit;
         int firstInternalNode;
 
         Flags(const NodeValue &nv)
             : flags{{ nv.leaf(0), nv.leaf(1), nv.leaf(2), nv.leaf(3) }}
             , leafCount(flags[0] + flags[1] + flags[2] + flags[3])
             , internalCount(4 - leafCount)
-            , jumpableLimit(internalCount - 1)
             , firstInternalNode()
         {
             for (; firstInternalNode < 4; ++firstInternalNode) {
@@ -163,10 +148,6 @@ struct QTree::NodeValue {
         }
 
         bool operator[](std::size_t index) const { return flags[index]; }
-
-        bool jumpable(int index) const {
-            return ((index < jumpableLimit) && !flags[index]);
-        }
 
         /** Jumps to node referenced by node's index.
          *
@@ -260,8 +241,12 @@ operator<<(std::basic_ostream<CharT, Traits> &os, const QTree::NodeValue &nv)
     return os << ")";
 }
 
+/** If clipsize is valie then this function must be called only when node's
+ *  rectantle intersect with rectangle (0, 0, *clipSize, *clipSize).
+ */
 template <typename Op>
-void QTree::Node::call(const Op &op, Filter filter, value_type value) const
+void QTree::Node::call(const Op &op, Filter filter, value_type value
+                       , const int *clipSize) const
 {
     switch (filter) {
     case Filter::black: if (value) { return; }; break;
@@ -269,17 +254,31 @@ void QTree::Node::call(const Op &op, Filter filter, value_type value) const
     default: break;
     }
 
+    if (clipSize) {
+        int xx((x < 0) ? 0 : x);
+        int yy((y < 0) ? 0 : y);
+
+        int xe(x + size);
+        if (xe > *clipSize) { xe = *clipSize; }
+
+        // LOG(info4) << "Calling op(" << xx << ", " << yy << ", " << (xe - xx)
+        //            << ", " << std::bitset<8>(value) << ").";
+        op(xx, yy, xe - xx, value);
+    }
+
+    // LOG(info4) << "Calling op(" << x << ", " << y << ", " << size
+    //            << ", " << std::bitset<8>(value) << ").";
     op(x, y, size, value);
 }
 
-inline bool QTree::Node::checkExtents(const Extents *&extents) const
+inline bool QTree::Node::checkExtents(const int *clipSize) const
 {
-    if (!extents) { return true; }
+    if (!clipSize) { return true; }
 
-    if ((x + size) <= extents->ll(0)) { return false; }
-    if (x >= extents->ur(0)) { return false; }
-    if ((y + size) <= extents->ll(1)) { return false; }
-    if (y >= extents->ur(1)) { return false; }
+    if (x >= *clipSize) { return false; }
+    if (y >= *clipSize) { return false; }
+    if ((x + size) <= 0) { return false; }
+    if ((y + size) <= 0) { return false; }
 
     return true;
 }
@@ -292,10 +291,6 @@ inline QTree::value_type QTree::get(unsigned int x, unsigned int y) const
 
     // load root value
     const auto &root(reader.read<NodeValue>());
-
-// #ifdef MMAPTI_DEBUG
-//     LOG(info4) << "Root: " << std::bitset<8>(root[0]);
-// #endif
 
     // shortcut for node
     if (TileFlag::leaf(root[0])) { return root[0]; }
@@ -313,13 +308,6 @@ inline QTree::value_type QTree::get(MemoryReader &reader, const Node &node
 
     // upper-left child
     Node child(node.child());
-
-// #ifdef MMAPTI_DEBUG
-//     LOG(info4) << "node=" << node << "; "
-//                << "ul=" << child << "; "
-//                << nodeValue
-//                << "; x=" << x << ", y=" << y << ".";
-// #endif
 
     if (y < (child.y + child.size)) {
         // upper row
@@ -391,20 +379,7 @@ template <typename Op>
 void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
                         , const Op &op, Filter filter) const
 {
-    if ((x >= size_) || (y >= size_)) {
-        // inside?
-        return Node(size_).call(op, filter, TileFlag::none);
-    }
-
-    MemoryReader reader(data_);
-
-    // load root value
-    const auto &root(reader.read<NodeValue>());
-
-    // shortcut for root node
-    if (TileFlag::leaf(root[0])) {
-        return Node(size_).call(op, filter, root[0]);
-    }
+    // LOG(info4) << "forEachNode(" << depth << ", " << x << ", " << y << ").";
 
     // fix depth
     if (depth > depth_) {
@@ -414,21 +389,41 @@ void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
         y >>= diff;
     }
 
-    // compute extents
+    // compute extents, origin placed at (0, 0)
+    const int size(size_ >> depth);
     const auto diff(depth_ - depth);
-    const auto size(size_ >> diff);
-    Extents::point_type ll(x << depth, y << depth);
-    Extents::point_type ur(ll(0) + size, ll(1) + size);
-    Extents extents(ll, ur);
+
+    if ((x >= unsigned(size)) || (y >= unsigned(size))) {
+        // completely outside, nothing to do
+        return;
+    }
+
+    // localize root node so 0, 0 is at extents LL point
+    Node rootNode(size_, 0, -(x << diff), -(y << diff));
+
+    // fix extents
+
+    // LOG(info4) << "Rasterizing in window: " << size
+    //            << " at (" << rootNode.x << ", " << rootNode.y << ").";
+
+    MemoryReader reader(data_);
+
+    // load root value
+    const auto &rootValue(reader.read<NodeValue>());
+
+    // shortcut for root node
+    if (TileFlag::leaf(rootValue[0])) {
+        return rootNode.call(op, filter, rootValue[0], &size);
+    }
 
     // and descend
-    descend(reader, Node(size_), op, filter, &extents);
+    descend(reader, rootNode, op, filter, &size);
 }
 
 template <typename Op>
 void QTree::descend(MemoryReader &reader, const Node &node
                     , const Op &op, Filter filter
-                    , const Extents *extents) const
+                    , const int *clipSize) const
 {
     // load value
     const auto &nodeValue(reader.read<NodeValue>());
@@ -437,19 +432,22 @@ void QTree::descend(MemoryReader &reader, const Node &node
 
     auto processSubtree([&](int i, const Node &node) -> void
     {
+        // LOG(info4) << "Processing node [" << i << "]: " << node
+        //            << ": " << std::bitset<8>(nodeValue[i]);
+
+        // terminate descent if out of extents
+        if (!node.checkExtents(clipSize)) { return; }
+
         if (flags[i]) {
             // leaf
-            return node.call(op, filter, nodeValue[i]);
+            return node.call(op, filter, nodeValue[i], clipSize);
         }
 
         // internal node
 
-        // terminate descent if out of extents
-        if (!node.checkExtents(extents)) { return; }
-
         // inside valid area
         reader.seek(indexTable[i]);
-        descend(reader, node, op, filter, extents);
+        descend(reader, node, op, filter, clipSize);
     });
 
     // descend to subtrees
@@ -457,7 +455,7 @@ void QTree::descend(MemoryReader &reader, const Node &node
     processSubtree(0, ul);
     processSubtree(1, node.child(ul.size));
     processSubtree(2, node.child(0, ul.size));
-    processSubtree(2, node.child(ul.size, ul.size));
+    processSubtree(3, node.child(ul.size, ul.size));
 }
 
 } // namespace mmapped
