@@ -27,11 +27,13 @@
 #ifndef mapproxy_generator_geodata_vector_tiled_hpp_included_
 #define mapproxy_generator_geodata_vector_tiled_hpp_included_
 
+#include <boost/optional.hpp>
+
 #include "geo/geodataset.hpp"
 
 #include "vts-libs/vts/urltemplate.hpp"
-#include "vts-libs/vts/tileset/tilesetindex.hpp"
 
+#include "../support/mmapped/tilesetindex.hpp"
 #include "./geodatavectorbase.hpp"
 
 namespace generator {
@@ -68,7 +70,7 @@ private:
 
     const vr::Srs &physicalSrs_;
 
-    vts::tileset::Index index_;
+    boost::optional<mmapped::Index> index_;
 };
 
 } // namespace generator

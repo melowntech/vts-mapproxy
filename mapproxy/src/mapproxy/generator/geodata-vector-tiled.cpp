@@ -30,6 +30,7 @@
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
 #include "utility/format.hpp"
+#include "utility/path.hpp"
 
 #include "geo/heightcoding.hpp"
 #include "geo/srsfactors.hpp"
@@ -93,7 +94,6 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
     , tileFile_(definition_.dataset)
     , physicalSrs_
       (vr::system.srs(resource().referenceFrame->model.physicalSrs))
-    , index_(resource().referenceFrame->metaBinaryOrder)
 {
     {
         // open dataset and get descriptor + metadata
@@ -140,9 +140,24 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
 
     try {
         auto indexPath(root() / "tileset.index");
+        auto deliveryIndexPath(root() / "delivery.index");
+
         if (fs::exists(indexPath)) {
-            // OK, load
-            vts::tileset::loadTileSetIndex(index_, indexPath);
+            if (!fs::exists(deliveryIndexPath)) {
+                // no delivery index -> create
+                vts::tileset::Index index(referenceFrame().metaBinaryOrder);
+                vts::tileset::loadTileSetIndex(index, indexPath);
+
+                // convert it to delivery index (using a temporary file)
+                const auto tmpPath(utility::addExtension
+                                   (deliveryIndexPath, ".tmp"));
+                mmapped::TileIndex::write(tmpPath, index.tileIndex);
+                fs::rename(tmpPath, deliveryIndexPath);
+            }
+
+            // load delivery index
+            index_ = boost::in_place(referenceFrame().metaBinaryOrder
+                                     , deliveryIndexPath);
             makeReady();
             return;
         }
@@ -165,13 +180,23 @@ void GeodataVectorTiled::prepare_impl(Arsenal&)
     geo::GeoDataset::open(dem_.dataset + ".max");
 
     // prepare tile index
-    prepareTileIndex(index_
-                     , (absoluteDataset(definition_.dem.dataset)
-                        + "/tiling." + r.id.referenceFrame)
-                     , r);
+    {
+        vts::tileset::Index index(referenceFrame().metaBinaryOrder);
+        prepareTileIndex(index
+                         , (absoluteDataset(definition_.dem.dataset)
+                            + "/tiling." + r.id.referenceFrame)
+                         , r);
 
-    // save it all
-    vts::tileset::saveTileSetIndex(index_, root() / "tileset.index");
+        // save it all
+        vts::tileset::saveTileSetIndex(index, root() / "tileset.index");
+
+        const auto deliveryIndexPath(root() / "delivery.index");
+        // convert it to delivery index (using a temporary file)
+        const auto tmpPath(utility::addExtension
+                           (deliveryIndexPath, ".tmp"));
+        mmapped::TileIndex::write(tmpPath, index.tileIndex);
+        fs::rename(tmpPath, deliveryIndexPath);
+    }
 }
 
 vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
@@ -241,14 +266,14 @@ void GeodataVectorTiled::generateMetatile(Sink &sink
 {
     sink.checkAborted();
 
-    if (!index_.meta(fi.tileId)) {
+    if (!index_->meta(fi.tileId)) {
         sink.error(utility::makeError<NotFound>("Metatile not found."));
         return;
     }
 
     auto metatile(metatileFromDem
                   (fi.tileId, sink, arsenal, resource()
-                   , index_.tileIndex, dem_.dataset
+                   , index_->tileIndex, dem_.dataset
                    , dem_.geoidGrid
                    , MaskTree(), definition_.displaySize));
 
@@ -263,7 +288,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
                                          , Arsenal &arsenal) const
 {
     const auto &tileId(fi.tileId);
-    auto flags(index_.tileIndex.get(tileId));
+    auto flags(index_->tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
         sink.error(utility::makeError<NotFound>("No geodata for this tile."));
         return;

@@ -29,7 +29,6 @@
 
 #include <boost/optional.hpp>
 
-#include "vts-libs/vts/tileset/tilesetindex.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
 #include "vts-libs/vts/mesh.hpp"
 
