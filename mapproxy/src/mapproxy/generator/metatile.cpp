@@ -162,16 +162,15 @@ inline MetaFlag::value_type ti2metaFlags(TiFlag::value_type ti)
     return meta;
 }
 
-} // namespace
-
+template <typename TileIndexType>
 vts::MetaTile
-metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
-                , const Resource &resource
-                , const vts::TileIndex &tileIndex
-                , const std::string &demDataset
-                , const boost::optional<std::string> &geoidGrid
-                , const MaskTree &maskTree
-                , const boost::optional<int> &displaySize)
+metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
+                    , const Resource &resource
+                    , const TileIndexType &tileIndex
+                    , const std::string &demDataset
+                    , const boost::optional<std::string> &geoidGrid
+                    , const MaskTree &maskTree
+                    , const boost::optional<int> &displaySize)
 {
     auto blocks(metatileBlocks(resource, tileId));
 
@@ -438,4 +437,37 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
     }
 
     return metatile;
+}
+
+} // namespace
+
+vts::MetaTile
+metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
+                , const Resource &resource
+                , const vts::TileIndex &tileIndex
+                , const std::string &demDataset
+                , const boost::optional<std::string> &geoidGrid
+                , const MaskTree &maskTree
+                , const boost::optional<int> &displaySize)
+
+{
+    return metatileFromDemImpl(tileId, sink, arsenal, resource, tileIndex
+                               , demDataset, geoidGrid, maskTree, displaySize);
+
+}
+
+
+vts::MetaTile
+metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
+                , const Resource &resource
+                , const mmapped::TileIndex &tileIndex
+                , const std::string &demDataset
+                , const boost::optional<std::string> &geoidGrid
+                , const MaskTree &maskTree
+                , const boost::optional<int> &displaySize)
+
+{
+    return metatileFromDemImpl(tileId, sink, arsenal, resource, tileIndex
+                               , demDataset, geoidGrid, maskTree, displaySize);
+
 }

@@ -28,10 +28,13 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
+#include <boost/utility/in_place_factory.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
 
 #include "utility/raise.hpp"
+#include "utility/path.hpp"
+
 #include "imgproc/rastermask/cvmat.hpp"
 #include "imgproc/png.hpp"
 
@@ -61,6 +64,7 @@
 #include "../support/grid.hpp"
 #include "../support/python.hpp"
 #include "../support/serialization.hpp"
+#include "../support/mmapped/qtree-rasterize.hpp"
 
 #include "./surface.hpp"
 
@@ -196,17 +200,16 @@ fs::path SurfaceBase::filePath(vts::File fileType) const
 
 SurfaceBase::SurfaceBase(const Params &params)
     : Generator(params)
-    , index_(resource().referenceFrame->metaBinaryOrder)
 {}
 
 bool SurfaceBase::loadFiles(const SurfaceDefinition &definition)
 {
     try {
         auto indexPath(filePath(vts::File::tileIndex));
+        auto deliveryIndexPath(root() / "delivery.index");
         auto propertiesPath(filePath(vts::File::config));
         if (fs::exists(indexPath) && fs::exists(propertiesPath)) {
             // both paths exist -> ok
-            vts::tileset::loadTileSetIndex(index_, indexPath);
             properties_ = vts::tileset::loadConfig(propertiesPath);
             if (updateProperties(definition)) {
                 // something changed in properties, update
@@ -214,6 +217,21 @@ bool SurfaceBase::loadFiles(const SurfaceDefinition &definition)
                                          , properties_);
             }
 
+            if (!fs::exists(deliveryIndexPath)) {
+                // no delivery index -> create
+                vts::tileset::Index index(referenceFrame().metaBinaryOrder);
+                vts::tileset::loadTileSetIndex(index, indexPath);
+
+                // convert it to delivery index (using a temporary file)
+                const auto tmpPath(utility::addExtension
+                                   (deliveryIndexPath, ".tmp"));
+                mmapped::TileIndex::write(tmpPath, index.tileIndex);
+                fs::rename(tmpPath, deliveryIndexPath);
+            }
+
+            // load delivery index
+            index_ = boost::in_place(referenceFrame().metaBinaryOrder
+                                     , deliveryIndexPath);
             makeReady();
             return true;
         }
@@ -405,7 +423,7 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
                                , const SurfaceFileInfo &fi
                                , Arsenal &arsenal) const
 {
-    auto flags(index_.tileIndex.get(tileId));
+    auto flags(index_->tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
         utility::raise<NotFound>("No mesh for this tile.");
     }
@@ -443,7 +461,7 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
 {
     const auto debug(fi.flavor == vts::FileFlavor::debug);
 
-    auto flags(index_.tileIndex.get(tileId));
+    auto flags(index_->tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
         if (debug) {
             return sink.error(utility::makeError<EmptyDebugMask>
@@ -489,7 +507,7 @@ void SurfaceBase::generate2dMetatile(const vts::TileId &tileId
 
 {
     sink.content(imgproc::png::serialize
-                 (vts::meta2d(index_.tileIndex, tileId), 9)
+                 (vts::meta2d(index_->tileIndex, tileId), 9)
                  , fi.sinkFileInfo());
 }
 
@@ -512,7 +530,7 @@ void SurfaceBase::generateDebugNode(const vts::TileId &tileId
                                     , Arsenal &) const
 {
     // generate debug metanode
-    const auto debugNode(vts::getNodeDebugInfo(index_.tileIndex, tileId));
+    const auto debugNode(vts::getNodeDebugInfo(index_->tileIndex, tileId));
 
     std::ostringstream os;
     vts::saveDebug(os, debugNode);

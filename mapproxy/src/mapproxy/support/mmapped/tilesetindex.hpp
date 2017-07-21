@@ -50,6 +50,8 @@ public:
 
     bool meta(const vts::TileId &tileId) const;
 
+    bool navtile(const vts::TileId &tileId) const;
+
     /** Checks file type and returns flags in case of match.
      */
     vts::TileIndex::Flag::value_type
@@ -67,6 +69,10 @@ inline bool Index::real(const vts::TileId &tileId) const
 {
     return (tileIndex.get(tileId) & vts::TileIndex::Flag::real);
 
+}
+
+inline bool Index::navtile(const vts::TileId &tileId) const {
+    return (tileIndex.get(tileId) & vts::TileIndex::Flag::navtile);
 }
 
 } // namespace mmapped

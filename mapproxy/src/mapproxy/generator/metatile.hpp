@@ -31,6 +31,7 @@
 #include "vts-libs/vts/metatile.hpp"
 
 #include "../support/coverage.hpp"
+#include "../support/mmapped/tileindex.hpp"
 
 #include "../generator.hpp"
 
@@ -38,6 +39,16 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , Arsenal &arsenal
                               , const Resource &resource
                               , const vts::TileIndex &tileIndex
+                              , const std::string &demDataset
+                              , const boost::optional<std::string> &geoidGrid
+                              , const MaskTree &maskTree = MaskTree()
+                              , const boost::optional<int> &displaySize
+                              = boost::none);
+
+vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
+                              , Arsenal &arsenal
+                              , const Resource &resource
+                              , const mmapped::TileIndex &tileIndex
                               , const std::string &demDataset
                               , const boost::optional<std::string> &geoidGrid
                               , const MaskTree &maskTree = MaskTree()

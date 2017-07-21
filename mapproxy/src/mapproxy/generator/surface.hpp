@@ -27,10 +27,13 @@
 #ifndef mapproxy_generator_surface_hpp_included_
 #define mapproxy_generator_surface_hpp_included_
 
+#include <boost/optional.hpp>
+
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
 #include "vts-libs/vts/mesh.hpp"
 
+#include "../support/mmapped/tilesetindex.hpp"
 #include "../generator.hpp"
 
 namespace vts = vtslibs::vts;
@@ -75,7 +78,7 @@ protected:
         const;
 
 protected:
-    vts::tileset::Index index_;
+    boost::optional<mmapped::Index> index_;
     vts::FullTileSetProperties properties_;
 
 private:

@@ -266,14 +266,24 @@ void SurfaceDem::prepare_impl(Arsenal&)
         properties_.mergeBottomLod = *definition_.mergeBottomLod;
     }
 
-    prepareTileIndex(index_
-                     , (absoluteDataset(definition_.dem.dataset)
-                        + "/tiling." + r.id.referenceFrame)
-                     , r, true, maskTree_);
+    {
+        vts::tileset::Index index(referenceFrame().metaBinaryOrder);
+        prepareTileIndex(index
+                         , (absoluteDataset(definition_.dem.dataset)
+                            + "/tiling." + r.id.referenceFrame)
+                         , r, true, maskTree_);
 
-    // save it all
-    vts::tileset::saveConfig(filePath(vts::File::config), properties_);
-    vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
+        // save it all
+        vts::tileset::saveConfig(filePath(vts::File::config), properties_);
+        vts::tileset::saveTileSetIndex(index, filePath(vts::File::tileIndex));
+
+        const auto deliveryIndexPath(root() / "delivery.index");
+        // convert it to delivery index (using a temporary file)
+        const auto tmpPath(utility::addExtension
+                           (deliveryIndexPath, ".tmp"));
+        mmapped::TileIndex::write(tmpPath, index.tileIndex);
+        fs::rename(tmpPath, deliveryIndexPath);
+    }
 
     addToRegistry();
 }
@@ -340,7 +350,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
 {
     sink.checkAborted();
 
-    if (!index_.meta(tileId)) {
+    if (!index_->meta(tileId)) {
         sink.error(utility::makeError<NotFound>("Metatile not found."));
         return;
     }
@@ -359,7 +369,7 @@ SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
                                  , Arsenal &arsenal) const
 {
     return metatileFromDem(tileId, sink, arsenal, resource()
-                           , index_.tileIndex, dem_.dataset
+                           , index_->tileIndex, dem_.dataset
                            , dem_.geoidGrid
                            , maskTree_);
 }
@@ -502,7 +512,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
 
     const auto &rf(referenceFrame());
 
-    if (!index_.tileIndex.navtile(tileId)) {
+    if (!index_->navtile(tileId)) {
         sink.error(utility::makeError<NotFound>("No navtile for this tile."));
         return;
     }

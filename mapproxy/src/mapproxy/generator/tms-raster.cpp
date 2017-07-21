@@ -232,10 +232,10 @@ TmsRaster::TmsRaster(const Params &params)
     , maskTree_(ignoreNonexistent(absoluteDatasetRf(asPath(definition_.mask))))
 {
     const auto indexPath(root() / "tileset.index");
-    const auto deliveryIndexpath(root() / "delivery.index");
+    const auto deliveryIndexPath(root() / "delivery.index");
 
-    if (fs::exists(deliveryIndexpath)) {
-        index_ = boost::in_place(deliveryIndexpath);
+    if (fs::exists(deliveryIndexPath)) {
+        index_ = boost::in_place(deliveryIndexPath);
     } else if (fs::exists(indexPath)) {
         // convertion from tileset index to delivery index
         LOG(info2)
@@ -247,12 +247,12 @@ TmsRaster::TmsRaster(const Params &params)
         index.load(indexPath);
 
         // convert it to delivery index (using a temporary file)
-        const auto tmpPath(utility::addExtension(deliveryIndexpath, ".tmp"));
+        const auto tmpPath(utility::addExtension(deliveryIndexPath, ".tmp"));
         mmapped::TileIndex::write(tmpPath, index);
-        fs::rename(tmpPath, deliveryIndexpath);
+        fs::rename(tmpPath, deliveryIndexPath);
 
         // and open
-        index_ = boost::in_place(deliveryIndexpath);
+        index_ = boost::in_place(deliveryIndexPath);
     }
 
     if (index_) {
@@ -298,12 +298,15 @@ void TmsRaster::prepare_impl(Arsenal&)
                             + "/tiling." + r.id.referenceFrame)
                          , r, false, maskTree_);
 
+        // save vts::TileIndex anyway
+        index.save(root() / "tileset.index");
+
         // store and open
-        const auto deliveryIndexpath(root() / "delivery.index");
-        const auto tmpPath(utility::addExtension(deliveryIndexpath, ".tmp"));
+        const auto deliveryIndexPath(root() / "delivery.index");
+        const auto tmpPath(utility::addExtension(deliveryIndexPath, ".tmp"));
         mmapped::TileIndex::write(tmpPath, index);
-        fs::rename(tmpPath, deliveryIndexpath);
-        index_ = boost::in_place(deliveryIndexpath);
+        fs::rename(tmpPath, deliveryIndexPath);
+        index_ = boost::in_place(deliveryIndexPath);
 
         // done
         makeReady();
@@ -320,10 +323,13 @@ void TmsRaster::prepare_impl(Arsenal&)
         vts::TileIndex index;
         prepareTileIndex(index, resource(), false, maskTree_);
 
+        // save vts::TileIndex anyway
+        index.save(root() / "tileset.index");
+
         // store and open
-        const auto deliveryIndexpath(root() / "delivery.index");
-        mmapped::TileIndex::write(deliveryIndexpath, index);
-        index_ = boost::in_place(deliveryIndexpath);
+        const auto deliveryIndexPath(root() / "delivery.index");
+        mmapped::TileIndex::write(deliveryIndexPath, index);
+        index_ = boost::in_place(deliveryIndexPath);
     } else if (definition_.mask) {
         maskDataset_ = definition_.mask;
         geo::GeoDataset::open(absoluteDataset(*maskDataset_));

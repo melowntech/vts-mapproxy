@@ -220,6 +220,9 @@ QTree::value_type QTree::get(unsigned int depth, unsigned int x
     // shortcut for root node
     if (TileFlag::leaf(root[0])) { return root[0]; }
 
+    // shortcut for too shallow virtual tree
+    if (size == 1) { return TileFlag::any; }
+
     // descend
     return get(reader, Node(size), x, y);
 }
@@ -239,7 +242,7 @@ QTree::value_type QTree::get(MemoryReader &reader, const Node &node
         if (x < (child.x + child.size)) {
             // UL
             if (flags[0]) { return nodeValue[0]; }
-            if (node.size == 1) { return TileFlag::any; }
+            if (child.size == 1) { return TileFlag::any; }
 
             // jump to the start of node data
             flags.jumpTo(reader, 0);
@@ -248,7 +251,7 @@ QTree::value_type QTree::get(MemoryReader &reader, const Node &node
 
         // UR
         if (flags[1]) { return nodeValue[1]; }
-        if (node.size == 1) { return TileFlag::any; }
+        if (child.size == 1) { return TileFlag::any; }
 
         // jump to the start of node data
         flags.jumpTo(reader, 1);
@@ -263,7 +266,7 @@ QTree::value_type QTree::get(MemoryReader &reader, const Node &node
     if (x < (child.x + child.size)) {
         // LL
         if (flags[2]) { return nodeValue[2]; }
-        if (node.size == 1) { return TileFlag::any; }
+        if (child.size == 1) { return TileFlag::any; }
 
         // jump to the start of node data
         flags.jumpTo(reader, 2);
@@ -275,7 +278,7 @@ QTree::value_type QTree::get(MemoryReader &reader, const Node &node
 
     // LR
     if (flags[3]) { return nodeValue[3]; }
-    if (node.size == 1) { return TileFlag::any; }
+    if (child.size == 1) { return TileFlag::any; }
 
     // jump to the start of node data
     flags.jumpTo(reader, 3);

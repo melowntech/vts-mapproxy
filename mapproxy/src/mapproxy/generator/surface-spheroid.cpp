@@ -33,6 +33,7 @@
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/path.hpp"
 
 #include "geometry/mesh.hpp"
 
@@ -217,8 +218,10 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
     // quite wide angle camera
     properties_.position.verticalFov = 55;
 
+    vts::tileset::Index index(referenceFrame().metaBinaryOrder);
+
     // grab and reset tile index
-    auto &ti(index_.tileIndex);
+    auto &ti(index.tileIndex);
     ti = {};
 
     // build tile index
@@ -257,7 +260,14 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
 
     // save it all
     vts::tileset::saveConfig(filePath(vts::File::config), properties_);
-    vts::tileset::saveTileSetIndex(index_, filePath(vts::File::tileIndex));
+    vts::tileset::saveTileSetIndex(index, filePath(vts::File::tileIndex));
+
+    const auto deliveryIndexPath(root() / "delivery.index");
+    // convert it to delivery index (using a temporary file)
+    const auto tmpPath(utility::addExtension
+                       (deliveryIndexPath, ".tmp"));
+    mmapped::TileIndex::write(tmpPath, index.tileIndex);
+    fs::rename(tmpPath, deliveryIndexPath);
 }
 
 vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root) const
@@ -304,7 +314,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 {
     sink.checkAborted();
 
-    if (!index_.meta(tileId)) {
+    if (!index_->meta(tileId)) {
         sink.error(utility::makeError<NotFound>("Metatile not found."));
         return;
     }
@@ -414,7 +424,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
                 // build metanode
                 vts::MetaNode node;
-                node.flags(ti2metaFlags(index_.tileIndex.get(nodeId)));
+                node.flags(ti2metaFlags(index_->tileIndex.get(nodeId)));
                 bool geometry(node.geometry());
                 bool navtile(node.navtile());
 
@@ -582,7 +592,7 @@ void SurfaceSpheroid::generateNavtile(const vts::TileId &tileId
 
     const auto &rf(referenceFrame());
 
-    if (!index_.tileIndex.navtile(tileId)) {
+    if (!index_->navtile(tileId)) {
         sink.error(utility::makeError<NotFound>("No navtile for this tile."));
         return;
     }
