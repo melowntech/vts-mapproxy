@@ -441,6 +441,14 @@ Setup makeSetup(const geo::GeoDataset::Descriptor &ds
            || (size.height >= config.minOvrSize.height))
     {
         setup.ovrSizes.push_back(size);
+
+        if ((size.width == config.minOvrSize.width)
+            || (size.height == config.minOvrSize.height))
+        {
+            // special case
+            break;
+        }
+
         halve();
     }
 
@@ -1177,7 +1185,7 @@ int VrtWo::run()
 {
     if (!fs::create_directories(config_.output) && !config_.overwrite) {
         LOG(fatal) << "Destination directory already exits. Use --overwrite "
-            "to force rewrite.";
+            "to force existing output overwrite.";
         return EXIT_FAILURE;
     }
 
