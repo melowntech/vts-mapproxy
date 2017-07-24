@@ -347,6 +347,10 @@ void VrtWo::configure(const po::variables_map &vars)
         }
     }
 
+    // sanitize min ovr size
+    if (config_.minOvrSize.width <= 0) { config_.minOvrSize.width = 1; }
+    if (config_.minOvrSize.height <= 0) { config_.minOvrSize.height = 1; }
+
     LOG(info3, log_)
         << "Config:"
         << "\n\tinput = " << config_.input
