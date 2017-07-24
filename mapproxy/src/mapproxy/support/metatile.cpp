@@ -25,6 +25,7 @@
  */
 
 #include <deque>
+#include <set>
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -36,6 +37,9 @@
 
 #include "../error.hpp"
 #include "./metatile.hpp"
+
+// Uncomment to get debug information for metatile block generation
+//#define DEBUG_META_BLOCKS 1
 
 MetatileBlock::MetatileBlock(vts::Lod lod
                              , const vr::ReferenceFrame &referenceFrame
@@ -113,15 +117,28 @@ MetatileBlock::list metatileBlocksImpl(const vr::ReferenceFrame &referenceFrame
     // seed queue of nodes to inspect with ll node
     std::deque<vts::NodeInfo> queue(1, llNode);
 
+    // tile index
+    typedef math::Point2_<unsigned int> Index;
+
+    // set of already seen nodes
+    std::set<Index> seen;
+
+    // push tile
     auto push([&](unsigned int x, unsigned int y)
     {
-        if ((x <= view.ur(0)) && (y <= view.ur(1))) {
-            // push node, masked node is not invalidated
-            vts::NodeInfo ni(referenceFrame, vts::TileId(tileId.lod, x, y)
-                             , false);
-            // LOG(info4) << "push(" << x << ", " << y << ")";
-            queue.push_back(ni);
-        }
+        // check if this tile has been already seen
+        if (!seen.insert(Index(x, y)).second) { return; }
+
+        if ((x > view.ur(0)) || (y > view.ur(1))) { return; }
+
+#if DEBUG_META_BLOCKS
+        LOG(info4) << "push(" << x << ", " << y << ")";
+#endif
+
+        // push node, masked node is not invalidated
+        queue.push_back(vts::NodeInfo
+                        (referenceFrame, vts::TileId(tileId.lod, x, y)
+                         , false));
     });
 
     // process nodes in the queue until empty
@@ -129,20 +146,28 @@ MetatileBlock::list metatileBlocksImpl(const vr::ReferenceFrame &referenceFrame
         // pop
         const auto node(queue.front());
         queue.pop_front();
-        // LOG(info4) << "Processing " << node.nodeId() << ".";
+
+#if DEBUG_META_BLOCKS
+        LOG(info4) << "Processing " << node.nodeId() << ".";
+#endif
 
         // grab stuff
         const auto &rootId(node.subtree().id());
 
-        // LOG(info4) << "rootId " << rootId << ".";
-        // LOG(info4) << "rootId.lod: " << rootId.lod;
-        // LOG(info4) << "tileId.lod: " << tileId.lod;
+#if DEBUG_META_BLOCKS
+        LOG(info4) << "rootId " << rootId << ".";
+        LOG(info4) << "rootId.lod: " << rootId.lod;
+        LOG(info4) << "tileId.lod: " << tileId.lod;
+#endif
 
         // compute tile range covered by root at current lod
         auto blockRange(vts::childRange
                         (vts::TileRange(rootId.x, rootId.y, rootId.x, rootId.y)
                          , tileId.lod - rootId.lod));
-        // LOG(info4) << "blockRange: " << blockRange;
+
+#if DEBUG_META_BLOCKS
+        LOG(info4) << "blockRange: " << blockRange;
+#endif
 
         // now, clip it by view
         auto blockView(vts::tileRangesIntersect(view, blockRange));

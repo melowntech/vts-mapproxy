@@ -124,13 +124,15 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
         throw FullImage("All data valid.");
     }
 
-    auto nonzero(cv::countNonZero(m));
-    if (!nonzero) {
-        // empty mask -> no valid data
-        throw EmptyImage("No valid data.");
-    } else if (optimize && (nonzero == area(size))) {
-        // all pixels valid
-        throw FullImage("All data valid.");
+    if (optimize) {
+        auto nonzero(cv::countNonZero(m));
+        if (!nonzero) {
+            // empty mask -> no valid data
+            throw EmptyImage("No valid data.");
+        } else if (nonzero == area(size)) {
+            // all pixels valid
+            throw FullImage("All data valid.");
+        }
     }
 
     auto *mask(allocateMat(mb, size, m.type()));
