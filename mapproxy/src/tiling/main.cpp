@@ -236,16 +236,23 @@ void Tiling::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
 
-    if (exists(input_ / "dem")) {
+    bool complexDataset(true);
+
+    if (fs::exists(input_ / "dem")) {
         dataset_ = input_ / "dem";
-    } else if (exists(input_ / "ophoto")) {
+    } else if (fs::exists(input_ / "ophoto")) {
         dataset_ = input_ / "ophoto";
+    } else {
+        dataset_ = input_;
+        complexDataset = false;
     }
 
     if (vars.count("output")) {
         output_ = vars["output"].as<fs::path>();
-    } else {
+    } else if (complexDataset) {
         output_ = input_ / ("tiling." + referenceFrame_);
+    } else {
+        throw po::required_option("output");
     }
 
     noexcept_ = vars.count("noexcept");
