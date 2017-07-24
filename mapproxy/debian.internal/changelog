@@ -1,3 +1,9 @@
+ctt-vts-mapproxy (0.60) citationtech-wheezy; urgency=low
+
+  * Delivery index support (mmapped tileindex).
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Mon, 24 Jul 2017 12:12:55 +0200
+
 ctt-vts-mapproxy (0.59) citationtech-wheezy; urgency=low
 
   * Fixed memory leak in memory statistics accumulation.
