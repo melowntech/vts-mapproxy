@@ -139,8 +139,9 @@ make install DESTDIR=/home/user/tmp/
 
 ## Install from Melown repository
 
-Yes, we [are working on it](https://github.com/Melown/vts-mapproxy/issues/3) ...
-but till we do, you have to compile VTS-Mapproxy manually. 
+We provide precompiled packages for some popular linux distributions. See [Melown OSS package repository
+](http://cdn.melown.com/packages/) for more information. This repository contains all needed packages to run
+VTS OSS software.
 
 ## Run VTS-Mapproxy server
 

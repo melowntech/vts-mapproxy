@@ -27,7 +27,6 @@
 #ifndef mapproxy_generator_geodata_vector_hpp_included_
 #define mapproxy_generator_geodata_vector_hpp_included_
 
-#include "vts-libs/vts/urltemplate.hpp"
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 
 #include "./geodatavectorbase.hpp"
