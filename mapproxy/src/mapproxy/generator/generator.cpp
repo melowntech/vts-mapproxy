@@ -462,9 +462,11 @@ void Generators::Detail::updater()
 {
     dbglog::thread_id("updater");
 
+    // invalidate any update request
     updateRequest_ = false;
 
     while (running_) {
+        // default sleep time in seconds
         std::chrono::seconds sleep(config_.resourceUpdatePeriod);
 
         try {
@@ -473,18 +475,30 @@ void Generators::Detail::updater()
             // pass
         } catch (const std::exception &e) {
             LOG(err2) << "Resource info update failed: <" << e.what() << ">.";
-            sleep = std::chrono::seconds(5);
+            if (config_.resourceUpdatePeriod > 0) {
+                sleep = std::chrono::seconds(5);
+            }
         }
 
-        // sleep for 5 minutes
+        // sleep for configured time minutes
         {
             std::unique_lock<std::mutex> lock(updaterLock_);
-            updaterCond_.wait_for(lock, sleep, [this]() -> bool
+
+            // condition variable wait predicate
+            const auto predicate([this]() -> bool
             {
                 auto updateRequest
                     (std::atomic_exchange(&updateRequest_, false));
                 return !running_ || updateRequest;
             });
+
+            if (config_.resourceUpdatePeriod > 0) {
+                // wait for given duration
+                updaterCond_.wait_for(lock, sleep, predicate);
+            } else {
+                // wait untill bugged
+                updaterCond_.wait(lock, predicate);
+            }
         }
     }
 }
