@@ -1,6 +1,8 @@
-vts-mapproxy (1.6) stable; urgency=low
+vts-mapproxy (1.8) stable; urgency=low
 
   * Delivery index support (mmapped tileindex).
+  * Unified packaging.
+  * Version bump.
 
  -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 25 Jul 2017 14:27:00 +0200
 
