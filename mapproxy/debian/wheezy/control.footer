@@ -1,0 +1,18 @@
+
+Package: ctt-vts-mapproxy
+Architecture: any
+Depends: vts-mapproxy (= ${binary:Version})
+Description: VTS MapProxy backend server (transitional package)
+ Package rename ctt-vts-mapproxy -> vts-mapproxy
+
+Package: ctt-vts-mapproxy-tools
+Architecture: any
+Depends: vts-mapproxy-tools (= ${binary:Version})
+Description: VTS MapProxy backend server (transitional package)
+ Package rename ctt-vts-mapproxy-tools -> vts-mapproxy-tools
+
+Package: ctt-vts-mapproxy-dbg
+Architecture: any
+Depends: vts-mapproxy-dbg (= ${binary:Version})
+Description: VTS MapProxy backend server (transitional package)
+Package rename ctt-vts-mapproxy-dbg -> vts-mapproxy-dbg
