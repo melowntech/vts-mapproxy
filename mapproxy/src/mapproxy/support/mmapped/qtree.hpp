@@ -116,7 +116,7 @@ struct QTree::Node {
     {}
 
     Node child(unsigned int ix = 0, unsigned int iy = 0) const {
-        return { size >> 1, depth + 1, x + ix, y + iy };
+        return Node(size >> 1, depth + 1, x + ix, y + iy);
     }
 
     template <typename Op>
