@@ -1,0 +1,49 @@
+#!/usr/bin/make -f
+# -*- gnumakefile -*-
+
+# include common debian support
+include buildsys/common/include/debian.mk
+
+# list of packages to build
+PACKAGES=MAPPROXY MAPPROXY_TOOLS
+
+# package names
+DEB_PACKAGE_MAPPROXY=$(DEB_SOURCE)
+DEB_PACKAGE_MAPPROXY_TOOLS=$(DEB_SOURCE)-tools
+
+PREFIX=/opt/vts
+
+# install components
+INSTALL_COMPONENTS_MAPPROXY=main
+INSTALL_COMPONENTS_MAPPROXY_TOOLS=tools
+
+# include cmake debian support
+include buildsys/cmake/include/debian.mk
+
+# ignore these:
+override_dh_auto_test:
+override_dh_installcatalogs:
+override_dh_installcron:
+override_dh_installdebconf:
+override_dh_installemacsen:
+override_dh_installifupdown:
+override_dh_installinfo:
+override_dh_pysupport:
+override_dh_installmenu:
+override_dh_installmime:
+override_dh_installmodules:
+override_dh_installlogcheck:
+override_dh_installpam:
+override_dh_installppp:
+override_dh_installudev:
+override_dh_installwm:
+override_dh_installxfonts:
+override_dh_installgsettings:
+override_dh_bugfiles:
+override_dh_ucf:
+override_dh_lintian:
+override_dh_gconf:
+override_dh_icons:
+override_dh_perl:
+override_dh_usrlocal:
+override_dh_installexamples:

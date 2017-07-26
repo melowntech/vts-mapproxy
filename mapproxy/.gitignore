@@ -2,10 +2,9 @@ bin
 build
 build.*
 lib
-obj-x86_64-linux-gnu
+obj-*
 core
 tmp
 *.log
 gdalwmscache
 .gdb_history
-debian

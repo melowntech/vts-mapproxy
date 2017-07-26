@@ -1,0 +1,32 @@
+Source: vts-mapproxy
+Section: non-free/citationtech
+Priority: extra
+Maintainer: Vaclav Blazek <vaclav.blazek@citationtech.net>
+Build-Depends: VAR_BuildDepends
+Standards-Version: 3.8.4
+Homepage: https://www.melown.com/maps
+
+Package: vts-mapproxy
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, vts-registry (>= 1.0)
+         , vts-mapproxy-tools (= ${binary:Version})
+Replaces: ctt-vts-mapproxy
+Breaks: ctt-vts-mapproxy
+Description: VTS MapProxy backend server
+ Backend HTTP daemon.
+
+Package: vts-mapproxy-tools
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, vts-registry (>= 1.0)
+Replaces: ctt-vts-mapproxy-tools
+Breaks: ctt-vts-mapproxy-tools
+Description: VTS MapProxy backend server tools
+ Contains collection of tools for mapproxy dataset preparation.
+
+Package: vts-mapproxy-dbg
+Architecture: any
+Depends: ${misc:Depends}, vts-mapproxy (= ${binary:Version})
+         , vts-mapproxy-tools (= ${binary:Version})
+Replaces: ctt-vts-mapproxy-dbg
+Breaks: ctt-vts-mapproxy-dbg
+Description: Debug Symbols for vts-mapproxy*

@@ -1,4 +1,10 @@
-ctt-vts-mapproxy (0.60) citationtech-wheezy; urgency=low
+vts-mapproxy (1.6) stable; urgency=low
+
+  * Delivery index support (mmapped tileindex).
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 25 Jul 2017 14:27:00 +0200
+
+ctt-vts-mapproxy (0.60) stable; urgency=low
 
   * Delivery index support (mmapped tileindex).
 

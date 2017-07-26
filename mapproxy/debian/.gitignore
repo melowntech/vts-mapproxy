@@ -1,0 +1,12 @@
+*debhelper*
+*.substvars
+/vts-mapproxy
+/vts-mapproxy-tools
+/vts-mapproxy-dbg
+files
+
+/control
+/ctt-vts-mapproxy-dbg/
+/ctt-vts-mapproxy-tools/
+/ctt-vts-mapproxy/
+
