@@ -1,3 +1,6 @@
+m4_dnl ###############################################################
+m4_dnl ## Added at the end of control file
+m4_dnl ###############################################################
 
 Package: ctt-vts-mapproxy
 Architecture: any

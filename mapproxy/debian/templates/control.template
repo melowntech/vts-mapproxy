@@ -1,5 +1,5 @@
 Source: vts-mapproxy
-Section: non-free/citationtech
+Section: misc
 Priority: extra
 Maintainer: Vaclav Blazek <vaclav.blazek@citationtech.net>
 Build-Depends: VAR_BuildDepends
