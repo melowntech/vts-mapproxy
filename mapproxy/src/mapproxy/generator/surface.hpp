@@ -50,6 +50,7 @@ public:
         Resource::Id::list tms;
         Resource::Id::list geodata;
         boost::optional<vr::Position> position;
+        boost::any browserOptions;
 
         bool empty() const;
         bool operator!=(const Introspection &other) const;

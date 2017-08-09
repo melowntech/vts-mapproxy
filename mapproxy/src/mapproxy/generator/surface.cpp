@@ -88,6 +88,16 @@ bool SurfaceBase::Introspection::operator!=(const Introspection &other) const
     if (geodata != other.geodata) { return true; }
     if (position != other.position) { return true; }
 
+    if (browserOptions.empty() != other.browserOptions.empty()) {
+        return true;
+    }
+    if (!browserOptions.empty()
+        && (boost::any_cast<const Json::Value&>(browserOptions)
+            != boost::any_cast<const Json::Value&>(other.browserOptions)))
+    {
+        return true;
+    }
+
     return false;
 }
 
@@ -115,6 +125,12 @@ void SurfaceBase::SurfaceDefinition::parse(const Json::Value &value)
             introspection.position
                 = vr::positionFromJson(jintrospection["position"]);
         }
+
+        if (jintrospection.isMember("browserOptions")) {
+            introspection.browserOptions
+                = Json::check(jintrospection["browserOptions"]
+                              , Json::objectValue);
+        }
     }
 }
 
@@ -134,6 +150,12 @@ void SurfaceBase::SurfaceDefinition::build(Json::Value &value) const
 
         if (introspection.position) {
             jintrospection["position"] = vr::asJson(*introspection.position);
+        }
+
+        if (!introspection.browserOptions.empty()) {
+            jintrospection["browserOptions"]
+                = boost::any_cast<const Json::Value&>
+                (introspection.browserOptions);
         }
     }
 }
@@ -595,6 +617,10 @@ SurfaceBase::extraProperties(const SurfaceDefinition &def) const
     if (def.introspection.position) {
         extra.position = *def.introspection.position;
     }
+
+    // browser options (must be Json::Value!)
+    extra.browserOptions = def.introspection.browserOptions;
+
 
     return extra;
 }
