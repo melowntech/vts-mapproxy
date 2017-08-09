@@ -157,7 +157,8 @@ Introspection is extended configuration for mapproxy served `mapConfig.json` (on
 introspection = {
     Optional Array position;                       // VTS position in JSON/python format
     Optional ResourceId/Array<ResourceId> tms      // bound layer(s) mapped on the surface, see below 
-    Optional ResourceId/Array<ResourceId> geodata  // free layer(s) (geodata) mapped on the surface, see below 
+    Optional ResourceId/Array<ResourceId> geodata  // free layer(s) (geodata) mapped on the surface, see below
+    Optional Object browserOptions                 // browser options passed to mapConfig.json
 }
 ```
 
