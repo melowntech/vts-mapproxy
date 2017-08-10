@@ -1,4 +1,4 @@
-vts-mapproxy (1.9) stable; urgency=medium
+vts-mapproxy (1.10) stable; urgency=medium
 
   * Surface drivers: added support for browserOptions in introspection
 

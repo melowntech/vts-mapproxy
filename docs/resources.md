@@ -246,9 +246,12 @@ introspection configuration.
 ```javascript
 
 introspection = {
-    Optional ResourceId surface // optional surface mapping
+    Optional ResourceId surface    // optional surface mapping
+    Optional Object browserOptions // browser options passed to mapConfig.json
 }
 ```
+
+Browser options override any browser options from associated surface.
 
 ### geodata-vector-tiled
 
