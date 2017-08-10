@@ -18,4 +18,4 @@ Package: ctt-vts-mapproxy-dbg
 Architecture: any
 Depends: vts-mapproxy-dbg (= ${binary:Version})
 Description: VTS MapProxy backend server (transitional package)
-Package rename ctt-vts-mapproxy-dbg -> vts-mapproxy-dbg
+ Package rename ctt-vts-mapproxy-dbg -> vts-mapproxy-dbg
