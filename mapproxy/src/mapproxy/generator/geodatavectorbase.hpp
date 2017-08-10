@@ -41,6 +41,7 @@ public:
 
     struct Introspection {
         boost::optional<Resource::Id> surface;
+        boost::any browserOptions;
 
         bool empty() const;
         bool operator!=(const Introspection &other) const;

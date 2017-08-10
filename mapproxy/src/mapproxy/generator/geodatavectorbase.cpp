@@ -100,6 +100,12 @@ void parseDefinition(GeodataVectorBase::Definition &def
 
         def.introspection.surface
             = introspectionIdFrom(jintrospection, "surface");
+
+        if (jintrospection.isMember("browserOptions")) {
+            def.introspection.browserOptions
+                = Json::check(jintrospection["browserOptions"]
+                              , Json::objectValue);
+        }
     }
 }
 
@@ -129,6 +135,12 @@ void buildDefinition(Json::Value &value
         auto &jintrospection(value["introspection"] = Json::objectValue);
         introspectionIdTo(jintrospection, "surface"
                           , def.introspection.surface);
+
+        if (!def.introspection.browserOptions.empty()) {
+            jintrospection["browserOptions"]
+                = boost::any_cast<const Json::Value&>
+                (def.introspection.browserOptions);
+        }
     }
 }
 
@@ -189,7 +201,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
 
 bool GeodataVectorBase::Introspection::empty() const
 {
-    return (!surface);
+    return (!surface && browserOptions.empty());
 }
 
 bool GeodataVectorBase::Introspection::operator!=(const Introspection &other)
@@ -197,6 +209,16 @@ bool GeodataVectorBase::Introspection::operator!=(const Introspection &other)
 {
     // introspection can safely change
     if (surface != other.surface) { return true; }
+
+    if (browserOptions.empty() != other.browserOptions.empty()) {
+        return true;
+    }
+    if (!browserOptions.empty()
+        && (boost::any_cast<const Json::Value&>(browserOptions)
+            != boost::any_cast<const Json::Value&>(other.browserOptions)))
+    {
+        return true;
+    }
 
     return false;
 }

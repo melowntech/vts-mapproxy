@@ -78,7 +78,8 @@ namespace generator {
 
 bool SurfaceBase::Introspection::empty() const
 {
-    return (tms.empty() && geodata.empty() && !position);
+    return (tms.empty() && geodata.empty()
+            && !position && browserOptions.empty());
 }
 
 bool SurfaceBase::Introspection::operator!=(const Introspection &other) const
