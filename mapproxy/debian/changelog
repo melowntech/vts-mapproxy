@@ -1,3 +1,9 @@
+vts-mapproxy (1.11) stable; urgency=low
+
+  * Fixed metatile generation in reference frames that contain unproductive nodes (*-qsc).
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Thu, 10 Aug 2017 18:23:48 +0200
+
 vts-mapproxy (1.10) stable; urgency=medium
 
   * Surface drivers: added support for browserOptions in introspection
