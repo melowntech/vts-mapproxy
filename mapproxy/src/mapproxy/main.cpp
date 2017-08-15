@@ -213,7 +213,12 @@ void Daemon::configuration(po::options_description &cmdline
 
         ("vts.builtinBrowserUrl"
          , po::value(&variables_["VTS_BUILTIN_BROWSER_URL"])
-         , "URL of built in browser.");
+         , "URL of built in browser.")
+
+        ("introspection.defaultFov"
+         , po::value(&generatorsConfig_.defaultFov)
+         ->default_value(generatorsConfig_.defaultFov)->required()
+         , "Camera FOV used when no introspection position is provided.")
         ;
 
         resourceBackendGenericConfig_.fileClassSettings

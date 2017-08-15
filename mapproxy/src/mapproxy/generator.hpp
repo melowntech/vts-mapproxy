@@ -96,8 +96,12 @@ public:
         int fileFlags;
         const vs::SupportFile::Vars *variables;
         const vs::SupportFile::Vars *defaults;
+        double defaultFov;
 
-        Config() : fileFlags(), variables(), defaults() {}
+        Config()
+            : fileFlags(), variables(), defaults()
+            , defaultFov(vr::Position::naturalFov())
+        {}
     };
 
     virtual ~Generator() {}

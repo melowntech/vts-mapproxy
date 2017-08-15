@@ -330,8 +330,7 @@ vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
         mc.position.verticalExtent
             = math::size(referenceFrame().division.extents).height;
 
-        // quite wide angle camera
-        mc.position.verticalFov = 55;
+        mc.position.verticalFov = config().defaultFov;
     }
 
     return mc;

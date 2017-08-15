@@ -215,8 +215,8 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
     // take Y size of reference frame's 3D extents extents
     properties_.position.verticalExtent
         = math::size(referenceFrame().division.extents).height;
-    // quite wide angle camera
-    properties_.position.verticalFov = 55;
+
+    properties_.position.verticalFov = config().defaultFov;
 
     vts::tileset::Index index(referenceFrame().metaBinaryOrder);
 
@@ -276,6 +276,19 @@ vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root) const
             (properties_, resource().registry
              , extraProperties(definition_)
              , prependRoot(fs::path(), resource(), root)));
+
+    if (!definition_.introspection.position) {
+        // no introspection position, generate some
+
+        // look down
+        mc.position.orientation = { 0.0, -90.0, 0.0 };
+
+        // take Y size of reference frame's 3D extents extents
+        mc.position.verticalExtent
+            = math::size(referenceFrame().division.extents).height;
+
+        mc.position.verticalFov = config().defaultFov;
+    }
 
     return mc;
 }
