@@ -1,3 +1,10 @@
+vts-mapproxy (1.12) stable; urgency=low
+
+  * Updated dependencies.
+  * Added --introspection.defaultFov, defaulting to VTS natural FOV (45 deg).
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 15 Aug 2017 14:55:26 +0200
+
 vts-mapproxy (1.11) stable; urgency=low
 
   * Fixed metatile generation in reference frames that contain unproductive nodes (*-qsc).
