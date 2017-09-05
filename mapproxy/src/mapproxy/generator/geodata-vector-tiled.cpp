@@ -196,6 +196,9 @@ void GeodataVectorTiled::prepare_impl(Arsenal&)
                            (deliveryIndexPath, ".tmp"));
         mmapped::TileIndex::write(tmpPath, index.tileIndex);
         fs::rename(tmpPath, deliveryIndexPath);
+
+        index_ = boost::in_place(referenceFrame().metaBinaryOrder
+                                 , deliveryIndexPath);
     }
 }
 

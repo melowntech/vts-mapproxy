@@ -283,7 +283,12 @@ void SurfaceDem::prepare_impl(Arsenal&)
                            (deliveryIndexPath, ".tmp"));
         mmapped::TileIndex::write(tmpPath, index.tileIndex);
         fs::rename(tmpPath, deliveryIndexPath);
+
+        // open delivery index
+        index_ = boost::in_place(referenceFrame().metaBinaryOrder
+                                 , deliveryIndexPath);
     }
+
 
     addToRegistry();
 }
