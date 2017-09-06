@@ -1,3 +1,9 @@
+vts-mapproxy (1.13) stable; urgency=medium
+
+  * Fixed tileindex initialization after resource creation. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Tue, 05 Sep 2017 16:58:13 +0200
+
 vts-mapproxy (1.12) stable; urgency=low
 
   * Updated dependencies.
