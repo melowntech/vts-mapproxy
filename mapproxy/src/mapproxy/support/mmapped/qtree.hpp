@@ -323,7 +323,9 @@ void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
     }
 
     // compute extents, origin placed at (0, 0)
-    const int size(size_ >> depth);
+
+    // calculate size of a trimmed tree
+    const int size(1 << depth);
     const auto diff(depth_ - depth);
 
     if ((x >= unsigned(size)) || (y >= unsigned(size))) {
@@ -335,8 +337,7 @@ void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
     Node rootNode(size_, 0, -(x << diff), -(y << diff));
 
     // fix extents
-
-    // LOG(info4) << "Rasterizing in window: " << size
+    // LOG(info4) << "Rasterizing in window: " << rootNode.size
     //            << " at (" << rootNode.x << ", " << rootNode.y << ").";
 
     MemoryReader reader(data_);

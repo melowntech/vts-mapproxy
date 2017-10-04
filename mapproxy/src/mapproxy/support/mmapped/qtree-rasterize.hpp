@@ -35,26 +35,26 @@
 
 namespace mmapped {
 
-template <typename View, typename Covert>
-void rasterize(const QTree &tree, View &view, const Covert &convert);
+template <typename View, typename Convert>
+void rasterize(const QTree &tree, View &view, const Convert &convert);
 
 template <typename View>
 void rasterize(const QTree &tree, View &view);
 
-template <typename View, typename Covert>
+template <typename View, typename Convert>
 void rasterize(const QTree &tree
                , unsigned int depth, unsigned int x, unsigned int y
-               , View &view, const Covert &convert);
+               , View &view, const Convert &convert);
 
-template <typename View, typename Covert>
+template <typename View, typename Convert>
 void rasterize(const QTree &tree
                , unsigned int depth, unsigned int x, unsigned int y
                , View &view);
 
 // inlines
 
-template <typename View, typename Covert>
-inline void rasterize(const QTree &tree, View &view, const Covert &convert)
+template <typename View, typename Convert>
+inline void rasterize(const QTree &tree, View &view, const Convert &convert)
 {
     if (tree.size() != math::Size2(view.width(), view.height())) {
         LOGTHROW(err1, std::runtime_error)
@@ -80,16 +80,11 @@ inline void rasterize(const QTree &tree, View &view)
                      });
 }
 
-template <typename View, typename Covert>
+template <typename View, typename Convert>
 inline void rasterize(const QTree &tree
                , unsigned int depth, unsigned int x, unsigned int y
-               , View &view, const Covert &convert)
+               , View &view, const Convert &convert)
 {
-    // if (tree.size() != math::Size2(view.width(), view.height())) {
-    //     LOGTHROW(err1, std::runtime_error)
-    //         << "Tree and view have incompatible sizes.";
-    // }
-
     tree.forEachNode(depth, x, y
                      , [&](unsigned int x, unsigned int y, unsigned int size
                            , QTree::value_type value)
@@ -100,7 +95,7 @@ inline void rasterize(const QTree &tree
     }, QTree::Filter::white);
 }
 
-template <typename View, typename Covert>
+template <typename View, typename Convert>
 inline void rasterize(const QTree &tree
                       , unsigned int depth, unsigned int x, unsigned int y
                       , View &view)

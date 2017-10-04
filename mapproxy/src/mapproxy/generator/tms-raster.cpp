@@ -31,6 +31,7 @@
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/format.hpp"
 #include "utility/path.hpp"
 
 #include "geo/geodataset.hpp"
@@ -64,6 +65,10 @@ namespace vr = vtslibs::registry;
 namespace generator {
 
 namespace {
+
+/** NOTICE: increment each time some data-related bug is fixed.
+ */
+int GeneratorRevision(0);
 
 struct Factory : Generator::Factory {
     virtual Generator::pointer create(const Generator::Params &params)
@@ -377,8 +382,11 @@ vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
         bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
                                  , resource(), root);
         if (hasMetatiles_) {
-            bl.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
-                                     , resource(), root);
+            const auto fname
+                (utility::format("{lod}-{x}-{y}.meta?gr=%d"
+                                 , GeneratorRevision));
+
+            bl.metaUrl = prependRoot(fname, resource(), root);
         }
     }
 

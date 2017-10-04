@@ -207,7 +207,7 @@ QTree::value_type QTree::get(unsigned int depth, unsigned int x
         return get(x >> (depth - depth_), y >> (depth - depth_));
     }
 
-    // calculate size in of a trimmed tree
+    // calculate size of a trimmed tree
     unsigned int size(1 << depth);
 
     if ((x >= size) || (y >= size)) { return TileFlag::none; }

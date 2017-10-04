@@ -17,6 +17,9 @@ PREFIX=/opt/vts
 INSTALL_COMPONENTS_MAPPROXY=main
 INSTALL_COMPONENTS_MAPPROXY_TOOLS=tools
 
+# do not build VTS tools provided by vts-libs
+CMAKE_FLAGS=-DBUILDSYS_NOBUILD_TARGET_vts-tools=TRUE
+
 # include cmake debian support
 include buildsys/cmake/include/debian.mk
 

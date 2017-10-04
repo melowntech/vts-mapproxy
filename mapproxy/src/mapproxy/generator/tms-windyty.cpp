@@ -39,6 +39,7 @@
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/format.hpp"
 #include "utility/path.hpp"
 
 #include "imgproc/rastermask/cvmat.hpp"
@@ -360,12 +361,18 @@ vr::BoundLayer TmsWindyty::boundLayer(ResourceRoot root) const
     const auto info(dsInfo(std::time(nullptr)));
 
     // build revision
-    const auto revision(str(boost::format("?%s") % info.timestamp));
+    const auto revision(utility::format("%s", info.timestamp));
+
+    const auto addRevision([&](std::string &url)
+    {
+        url.push_back("&?"[url.find('?') == std::string::npos]);
+        url.append(revision);
+    });
 
     // append revision
-    bl.url += revision;
-    if (bl.maskUrl) { *bl.maskUrl += revision; }
-    if (bl.metaUrl) { *bl.metaUrl += revision; }
+    addRevision(bl.url);
+    if (bl.maskUrl) { addRevision(*bl.maskUrl); }
+    if (bl.metaUrl) { addRevision(*bl.metaUrl); }
 
     return bl;
 }

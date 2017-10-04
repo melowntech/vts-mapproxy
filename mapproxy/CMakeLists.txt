@@ -71,9 +71,14 @@ add_subdirectory(src/pysupport)
 
 # vts libraries
 set(VTS_REGISTRY_PYTHON true)
+
+# vts libraries
 add_subdirectory(src/vts-libs)
-# force build of vts tool
-add_custom_target(.vts ALL DEPENDS vts vts02vts vts2vts vts0)
+
+if(NOT DEFINED BUILDSYS_NOBUILD_TARGET_vts-tools)
+  # force build of vts tool
+  add_custom_target(.vts ALL DEPENDS vts vts02vts vts2vts vts0)
+endif()
 
 # project
 add_subdirectory(src/mapproxy)
