@@ -1,3 +1,9 @@
+vts-mapproxy (1.14) stable; urgency=low
+
+  * Fixed Float64 DEM processing.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Mon, 18 Sep 2017 16:40:38 +0200
+
 vts-mapproxy (1.13) stable; urgency=medium
 
   * Fixed tileindex initialization after resource creation. 
