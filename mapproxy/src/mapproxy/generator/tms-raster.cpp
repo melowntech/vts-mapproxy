@@ -68,7 +68,7 @@ namespace {
 
 /** NOTICE: increment each time some data-related bug is fixed.
  */
-int GeneratorRevision(0);
+int GeneratorRevision(1);
 
 struct Factory : Generator::Factory {
     virtual Generator::pointer create(const Generator::Params &params)

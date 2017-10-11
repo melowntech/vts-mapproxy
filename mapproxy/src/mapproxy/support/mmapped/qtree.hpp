@@ -323,20 +323,23 @@ void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
     }
 
     // compute extents, origin placed at (0, 0)
+    {
+        // calculate size of a trimmed tree
+        const int size(1 << depth);
 
-    // calculate size of a trimmed tree
-    const int size(1 << depth);
-    const auto diff(depth_ - depth);
-
-    if ((x >= unsigned(size)) || (y >= unsigned(size))) {
-        // completely outside, nothing to do
-        return;
+        if ((x >= unsigned(size)) || (y >= unsigned(size))) {
+            // completely outside, nothing to do
+            return;
+        }
     }
+
+    // compute LOD diff and compute size limit
+    const auto diff(depth_ - depth);
+    const int limit(1 << diff);
 
     // localize root node so 0, 0 is at extents LL point
     Node rootNode(size_, 0, -(x << diff), -(y << diff));
 
-    // fix extents
     // LOG(info4) << "Rasterizing in window: " << rootNode.size
     //            << " at (" << rootNode.x << ", " << rootNode.y << ").";
 
@@ -347,11 +350,11 @@ void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
 
     // shortcut for root node
     if (TileFlag::leaf(rootValue[0])) {
-        return rootNode.call(op, filter, rootValue[0], &size);
+        return rootNode.call(op, filter, rootValue[0], &limit);
     }
 
     // and descend
-    descend(reader, rootNode, op, filter, &size);
+    descend(reader, rootNode, op, filter, &limit);
 }
 
 template <typename Op>
