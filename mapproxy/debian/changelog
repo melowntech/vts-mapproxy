@@ -1,3 +1,9 @@
+vts-mapproxy (1.16) stable; urgency=low
+
+  * tms-raster: Fixed metatile generation (again).
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 11 Oct 2017 13:57:27 +0200
+
 vts-mapproxy (1.15) stable; urgency=low
 
   * tms-raster: Fixed metatile generation.
