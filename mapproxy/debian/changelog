@@ -1,3 +1,9 @@
+vts-mapproxy (1.17) stable; urgency=low
+
+  * mmapped tileindex: fixed node rasterization
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Sat, 14 Oct 2017 19:44:49 +0200
+
 vts-mapproxy (1.16) stable; urgency=low
 
   * tms-raster: Fixed metatile generation (again).
