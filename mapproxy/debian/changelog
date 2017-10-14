@@ -1,3 +1,9 @@
+vts-mapproxy (1.18) stable; urgency=low
+
+  * mmapped tileindex: polished node rasterization
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Sat, 14 Oct 2017 22:01:14 +0200
+
 vts-mapproxy (1.17) stable; urgency=low
 
   * mmapped tileindex: fixed node rasterization
