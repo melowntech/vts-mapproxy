@@ -89,6 +89,9 @@ inline void rasterize(const QTree &tree
                      , [&](unsigned int x, unsigned int y, unsigned int size
                            , QTree::value_type value)
     {
+#ifdef QTREE_DEBUG
+        LOG(info4) << "node(" << x << ", " << y << ", " << size << ")";
+#endif
         boost::gil::fill_pixels
             (boost::gil::subimage_view(view, x, y, size, size)
              , convert(value));

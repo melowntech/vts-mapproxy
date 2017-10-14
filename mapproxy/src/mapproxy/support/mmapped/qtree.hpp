@@ -35,6 +35,9 @@
 #include "./tileflags.hpp"
 #include "./memory.hpp"
 
+#undef QTREE_DEBUG
+//#define QTREE_DEBUG
+
 /** Simplified tileindex that employs memory mapped quadtrees.
  *
  *  Used to save precious memory.
@@ -110,12 +113,11 @@ struct QTree::Node {
     int x;
     int y;
 
-    Node(unsigned int size, unsigned int depth = 0, int x = 0
-         , unsigned int y = 0)
+    Node(unsigned int size, unsigned int depth = 0, int x = 0, int y = 0)
         : size(size), depth(depth), x(x), y(y)
     {}
 
-    Node child(unsigned int ix = 0, unsigned int iy = 0) const {
+    Node child(int ix = 0, int iy = 0) const {
         return Node(size >> 1, depth + 1, x + ix, y + iy);
     }
 
@@ -268,13 +270,18 @@ void QTree::Node::call(const Op &op, Filter filter, value_type value
         int xe(x + size);
         if (xe > *clipSize) { xe = *clipSize; }
 
-        // LOG(info4) << "Calling op(" << xx << ", " << yy << ", " << (xe - xx)
-        //            << ", " << std::bitset<8>(value) << ").";
+#ifdef QTREE_DEBUG
+        LOG(info4) << "Calling op(" << xx << ", " << yy << ", " << (xe - xx)
+                   << ", " << std::bitset<8>(value) << ").";
+#endif
         op(xx, yy, xe - xx, value);
+        return;
     }
 
-    // LOG(info4) << "Calling op(" << x << ", " << y << ", " << size
-    //            << ", " << std::bitset<8>(value) << ").";
+#ifdef QTREE_DEBUG
+    LOG(info4) << "Calling op(" << x << ", " << y << ", " << size
+               << ", " << std::bitset<8>(value) << ").";
+#endif
     op(x, y, size, value);
 }
 
@@ -312,7 +319,9 @@ template <typename Op>
 void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
                         , const Op &op, Filter filter) const
 {
-    // LOG(info4) << "forEachNode(" << depth << ", " << x << ", " << y << ").";
+#ifdef QTREE_DEBUG
+    LOG(info4) << "forEachNode(" << depth << ", " << x << ", " << y << ").";
+#endif
 
     // fix depth
     if (depth > depth_) {
@@ -340,8 +349,11 @@ void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
     // localize root node so 0, 0 is at extents LL point
     Node rootNode(size_, 0, -(x << diff), -(y << diff));
 
-    // LOG(info4) << "Rasterizing in window: " << rootNode.size
-    //            << " at (" << rootNode.x << ", " << rootNode.y << ").";
+#ifdef QTREE_DEBUG
+    LOG(info4) << "Rasterizing in window: " << rootNode.size
+               << " at (" << rootNode.x << ", " << rootNode.y
+               << "); clipping limit: " << limit;
+#endif
 
     MemoryReader reader(data_);
 
@@ -369,8 +381,10 @@ void QTree::descend(MemoryReader &reader, const Node &node
 
     auto processSubtree([&](int i, const Node &node) -> void
     {
-        // LOG(info4) << "Processing node [" << i << "]: " << node
-        //            << ": " << std::bitset<8>(nodeValue[i]);
+#ifdef QTREE_DEBUG
+        LOG(info4) << "Processing node [" << i << "]: " << node
+                   << ": " << std::bitset<8>(nodeValue[i]);
+#endif
 
         // terminate descent if out of extents
         if (!node.checkExtents(clipSize)) { return; }
