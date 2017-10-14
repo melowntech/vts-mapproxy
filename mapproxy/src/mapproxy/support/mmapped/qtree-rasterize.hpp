@@ -61,11 +61,12 @@ inline void rasterize(const QTree &tree, View &view, const Convert &convert)
             << "Tree and view have incompatible sizes.";
     }
 
-    tree.forEachNode([&](unsigned int x, unsigned int y, unsigned int size
+    tree.forEachNode([&](unsigned int x, unsigned int y
+                         , unsigned int xsize, unsigned int ysize
                          , QTree::value_type value)
     {
         boost::gil::fill_pixels
-            (boost::gil::subimage_view(view, x, y, size, size)
+            (boost::gil::subimage_view(view, x, y, xsize, ysize)
              , convert(value));
     }, QTree::Filter::white);
 }
@@ -86,14 +87,16 @@ inline void rasterize(const QTree &tree
                , View &view, const Convert &convert)
 {
     tree.forEachNode(depth, x, y
-                     , [&](unsigned int x, unsigned int y, unsigned int size
+                     , [&](unsigned int x, unsigned int y
+                           , unsigned int xsize, unsigned int ysize
                            , QTree::value_type value)
     {
 #ifdef QTREE_DEBUG
-        LOG(info4) << "node(" << x << ", " << y << ", " << size << ")";
+        LOG(info4) << "draw(" << x << ", " << y
+                   << ", " << xsize << "x" << ysize << ")";
 #endif
         boost::gil::fill_pixels
-            (boost::gil::subimage_view(view, x, y, size, size)
+            (boost::gil::subimage_view(view, x, y, xsize, ysize)
              , convert(value));
     }, QTree::Filter::white);
 }

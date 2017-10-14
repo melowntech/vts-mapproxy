@@ -29,6 +29,7 @@
 
 #include <array>
 #include <iostream>
+#include <algorithm>
 
 #include "dbglog/dbglog.hpp"
 
@@ -36,6 +37,7 @@
 #include "./memory.hpp"
 
 #undef QTREE_DEBUG
+// uncomment for QTREE traversal debug
 //#define QTREE_DEBUG
 
 /** Simplified tileindex that employs memory mapped quadtrees.
@@ -76,13 +78,13 @@ public:
 
     math::Size2 size() const { return math::Size2(size_, size_); }
 
-    /** Runs op(x, y, xsize, value) for each node based on filter.
+    /** Runs op(x, y, xsize, ysize, value) for each node based on filter.
      */
     template <typename Op>
     void forEachNode(const Op &op, Filter filter = Filter::both) const;
 
-    /** Runs op(x, y, value) for each node based on filter in subtree starting
-     *  at given index.
+    /** Runs op(x, y, xsize, ysize, value) for each node based on filter in
+     *  subtree starting at given index.
      */
     template <typename Op>
     void forEachNode(unsigned int depth, unsigned int x, unsigned int y
@@ -250,8 +252,8 @@ operator<<(std::basic_ostream<CharT, Traits> &os, const QTree::NodeValue &nv)
     return os << ")";
 }
 
-/** If clipsize is valie then this function must be called only when node's
- *  rectantle intersect with rectangle (0, 0, *clipSize, *clipSize).
+/** If clipsize is valid then this function must be called only when node's
+ *  rectangle intersects with rectangle (0, 0, *clipSize, *clipSize).
  */
 template <typename Op>
 void QTree::Node::call(const Op &op, Filter filter, value_type value
@@ -263,26 +265,40 @@ void QTree::Node::call(const Op &op, Filter filter, value_type value
     default: break;
     }
 
-    if (clipSize) {
-        int xx((x < 0) ? 0 : x);
-        int yy((y < 0) ? 0 : y);
-
-        int xe(x + size);
-        if (xe > *clipSize) { xe = *clipSize; }
-
+    if (!clipSize) {
+        // full node
 #ifdef QTREE_DEBUG
-        LOG(info4) << "Calling op(" << xx << ", " << yy << ", " << (xe - xx)
+        LOG(info4) << "Calling op(" << x << ", " << y << ", "
+                   << size << "x" << size
                    << ", " << std::bitset<8>(value) << ").";
 #endif
-        op(xx, yy, xe - xx, value);
+        op(x, y, size, size, value);
         return;
     }
 
+    // clipping node to half open extents (0, 0, *clipSize, *clipSize)
+
+    // NB: not checking for extents intersection (as stated above)!
+    const int cs(*clipSize);
+
+    // compute lower bound
+    int xs(std::max(0, x));
+    int ys(std::max(0, y));
+
+    // compute upper bound
+    int xe(std::min(x + int(size), cs));
+    int ye(std::min(y + int(size), cs));
+
+    // width/height
+    int w(xe - xs);
+    int h(ye - ys);
+
 #ifdef QTREE_DEBUG
-    LOG(info4) << "Calling op(" << x << ", " << y << ", " << size
+    LOG(info4) << "Calling op(" << xs << ", " << ys << ", "
+               << w << "x" << h
                << ", " << std::bitset<8>(value) << ").";
 #endif
-    op(x, y, size, value);
+    op(xs, ys, w, h, value);
 }
 
 inline bool QTree::Node::checkExtents(const int *clipSize) const
@@ -291,8 +307,8 @@ inline bool QTree::Node::checkExtents(const int *clipSize) const
 
     if (x >= *clipSize) { return false; }
     if (y >= *clipSize) { return false; }
-    if ((x + size) <= 0) { return false; }
-    if ((y + size) <= 0) { return false; }
+    if ((x + int(size)) <= 0) { return false; }
+    if ((y + int(size)) <= 0) { return false; }
 
     return true;
 }
@@ -362,7 +378,10 @@ void QTree::forEachNode(unsigned int depth, unsigned int x, unsigned int y
 
     // shortcut for root node
     if (TileFlag::leaf(rootValue[0])) {
-        return rootNode.call(op, filter, rootValue[0], &limit);
+        if (rootNode.checkExtents(&limit)) {
+            rootNode.call(op, filter, rootValue[0], &limit);
+        }
+        return;
     }
 
     // and descend
