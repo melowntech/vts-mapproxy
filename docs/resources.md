@@ -24,16 +24,27 @@ a JSON file on disk (for JSON resource backend) or a python data tree.
  * `Boolean`: boolean JSON/python value
  * `Array<type>`: array of given type(s)
  * `Optional` given entry is optional
+ * `Enum` string data type limited to enumerated values
  * `?` no fixed name
  
 Complex datatypes:
 
 ```javascript
-ResourceId`: {
+ResourceId: {
     String group        // group this resource belongs to
     String id           // resource identifier (withing group)
 }
 ```
+
+```javascript
+Resampling: Enum {
+    <GDAL-supported resampling algorithms>
+    texture
+    dem
+}
+```
+Where `texture` is resampling suitable for rextures (`average` for scales smaller than 0.5, `cubic` otherwise) 
+and `dem` is suitable for terrain (`average` for scales smaller than 0.5, `cubicspline` otherwise).
 
 Basic resource layout:
 
@@ -92,10 +103,11 @@ Raster-based bound layer generator. Uses any raster GDAL dataset as its data sou
 
 ```javascript
 definition = {
-    String dataset               // path to GDAL dataset
-    Optional String mask         // path to RF mask or masking GDAL dataset
-    Optional String format       // output image format, "jpg" or "png" (defaults to "jpg")
-    Optional Boolean transparent // Boundlayer is transparent, forces format to "png"
+    String dataset                 // path to GDAL dataset
+    Optional String mask           // path to RF mask or masking GDAL dataset
+    Optional String format         // output image format, "jpg" or "png" (defaults to "jpg")
+    Optional Boolean transparent   // Boundlayer is transparent, forces format to "png"
+    Optional Resampling resampling // Resampling to use for tile texture generation, default 'texture'
 }
 ```
 
