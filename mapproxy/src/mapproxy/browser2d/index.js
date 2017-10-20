@@ -8,7 +8,6 @@ function quadKey(x, y, z) {
 
 var BingLayer = L.TileLayer.extend({
     getTileUrl: function (tilePoint) {
-        this._adjustTilePoint(tilePoint);
         return L.Util.template(this._url, {
             quad: quadKey(tilePoint.x, tilePoint.y, this._getZoomForUrl())
         });
