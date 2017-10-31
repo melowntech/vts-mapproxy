@@ -10,13 +10,14 @@ The resource definition file can contain resource definitions or include
 subsequent definition files:
 ```
 [
-    Resource,    // see below
+    Resource,    // see Basic resource layout below
     Resource,
     ...
-    { "include": String }, // path to other definition file to include.
-    ...                    // may be relative to current directory
+    { "include": String }, // see below
+    ...
 ]
 ```
+where include `String` can be either exact path or a glob pattern (expansion to zero files is not an error) and may be relative to current resource file.
 
 # Supported resource types/drivers
 
