@@ -1,3 +1,9 @@
+vts-mapproxy (1.19) stable; urgency=low
+
+  * Fixed missing tiles in generatevrtwo.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Thu, 02 Nov 2017 14:30:16 +0100
+
 vts-mapproxy (1.18) stable; urgency=low
 
   * mmapped tileindex: polished node rasterization
