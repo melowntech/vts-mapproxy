@@ -67,7 +67,7 @@ namespace def {
 
 std::vector<std::string> createOptions {
     "COMPRESS=DEFLATE"
-    , "PREDICTOR=2"
+    , "PREDICTOR" // if not set, predictor will be set to 2/3 for int/float
  // buggy in GDAL 2.1, some tiles are not writen
  // , "NUM_THREADS=ALL_CPUS"
     , "ZLEVEL=9"
@@ -1061,9 +1061,51 @@ fs::path createOverview(const Config &config, int ovrIndex
         << " of " << math::area(tiled) << " tiles in "
         << ovrPath << " from " << srcPath << ".";
 
+    // copy options so that the PREDICTOR can be possibly modified
+    geo::Options createOptions(config.createOptions);
+
     VrtDs ovr([&]() -> VrtDs
     {
         auto src(geo::GeoDataset::open(srcPath));
+
+        // If create options contain PREDICTOR, check/set its value based on
+        // original dataset type.
+        auto &opts(createOptions.options);
+        auto it(std::find_if( opts.begin(), opts.end()
+                             , [](const geo::Options::Option &op)
+                               {
+                                    return op.first == "PREDICTOR";
+                               }));
+
+        if (it != opts.end()) {
+            // find out what the value of predictor should be
+            auto predictor([&]() -> std::string {
+                switch (src.descriptor().dataType) {
+                case ::GDT_Float32:
+                case ::GDT_Float64:
+                    return "3";
+                default:
+                    break;
+                }
+                return "2";
+            }());
+
+            // set predictor to optimal
+            if (it->second.empty()) {
+                it->second = predictor;
+
+            // leave it if predictor is turned off
+            } else if (it->second == "1") {
+
+            // if predictor is set, check if the value is right
+            } else if (it->second != predictor) {
+                LOGTHROW(err2, std::runtime_error)
+                    << "PREDICTOR value and bandtype mismatch. Use 2 for "
+                    << "integer and 3 for floating point or leave without "
+                    << "value to be determined automatically.";
+            }
+        }
+
         return VrtDs(ovrPath, src.srs(), src.extents()
                      , size, src.getFormat(), src.rawNodataValue()
                      , maskType);
@@ -1158,7 +1200,7 @@ fs::path createOverview(const Config &config, int ovrIndex
             fs::remove(tilePath);
 
             createOutputDataset(src, tmp, tilePath
-                                , config.createOptions
+                                , createOptions // use modified options
                                 , maskType);
 
             // store result
