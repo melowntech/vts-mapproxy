@@ -1,3 +1,9 @@
+vts-mapproxy (1.20) stable; urgency=low
+
+  * Fixed generatevrtwo for floating point data.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Mon, 13 Nov 2017 16:28:23 +0100
+
 vts-mapproxy (1.19) stable; urgency=low
 
   * Fixed missing tiles in generatevrtwo.
