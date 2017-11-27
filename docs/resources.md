@@ -63,6 +63,22 @@ Resampling: Enum {
 Where `texture` is resampling suitable for rextures (`average` for scales smaller than 0.5, `cubic` otherwise) 
 and `dem` is suitable for terrain (`average` for scales smaller than 0.5, `cubicspline` otherwise).
 
+```javascript
+Credits: {
+    Object <string-id> : {
+        Int id
+        String notice
+    }
+}
+```
+Both string and numeric id should be unique across particular VTS installation. Use numeric ids in range [200, 65535]. Notice supports `{Y}` and `{copy}` templates and hyperlinks using syntax `[<URL> <link text>]`.
+
+```javascript
+Registry: {
+    Credits credits
+}
+```
+
 Basic resource definition:
 
 ```javascript
@@ -72,7 +88,7 @@ Object Resource = {
     String id           // resource identifier (withing group)
     String type         // data type (tms, surface, geodata)
     String driver       // data generator (see below)
-    Object registry     // additional local resource registry, see below
+    Registry registry   // additional local resource registry, see above
     Array<String, Int> credits // list of credits identifiers (either textual or numeric)
     Object referenceFrames = { // range definitions for different reference frames
         Object ? = { // reference frame ID, for example melown2015
@@ -111,6 +127,8 @@ Available expansion strings. Only some make sense for templates used in mapproxy
  * `{alt(1,2,3,4)}` exands to one of given strings
  * `{ppx}`    tile's old PP space X index (makes sense only in ppspace)
  * `{ppy}`    tile's old PP space Y index (makes sense only in ppspace)
+ * `{Y}`      current year (used in credits definition)
+ * `{copy}`   copyright symbol (used in credits definition)
  
 ## TMS drivers
 
