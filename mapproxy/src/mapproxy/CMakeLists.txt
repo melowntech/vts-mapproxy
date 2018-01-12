@@ -24,7 +24,7 @@ set(mapproxy-core_SOURCES
 define_module(LIBRARY mapproxy-core
   DEPENDS
   pysupport pydbglog
-  vts-libs>=2.4 http>=1.0 geo>=1.25 gdal-drivers>=1.14 geometry>=1.7
+  vts-libs>=2.4 http>=1.0 geo>=1.28 gdal-drivers>=1.14 geometry>=1.7
   jsoncpp>=2.1
 
   Boost_SERIALIZATION

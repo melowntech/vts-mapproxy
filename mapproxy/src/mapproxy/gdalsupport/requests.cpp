@@ -78,8 +78,9 @@ void ShRaster::response(bi::interprocess_mutex &mutex, cv::Mat *response)
     owner_->done();
 }
 
-ShHeightCodeConfig::ShHeightCodeConfig(const geo::heightcoding::Config &config
-                                       , ManagedBuffer &sm)
+ShHeightCodeConfig
+::ShHeightCodeConfig(const geo::heightcoding::Config &config
+                     , ManagedBuffer &sm)
     : workingSrs_(sm.get_allocator<char>())
     , workingSrsType_()
 
@@ -155,6 +156,7 @@ ShHeightCode
                , const DemDataset::list &rasterDs
                , const geo::heightcoding::Config &config
                , const boost::optional<std::string> &vectorGeoidGrid
+               , const std::vector<std::string> &openOptions
                , ManagedBuffer &sm, ShRequestBase *owner)
     : sm_(sm), owner_(owner)
     , vectorDs_(vectorDs.data(), vectorDs.size()
@@ -172,6 +174,15 @@ ShHeightCode
     if (vectorGeoidGrid) {
         vectorGeoidGrid_.assign(vectorGeoidGrid->data()
                                 , vectorGeoidGrid->size());
+    }
+
+    if (!openOptions.empty()) {
+        openOptions_ = boost::in_place(sm.get_allocator<String>());
+
+        for (const auto &str : openOptions) {
+            openOptions_->push_back(String(str.data(), str.size()
+                                           , sm.get_allocator<char>()));
+        }
     }
 }
 
@@ -203,6 +214,17 @@ boost::optional<std::string> ShHeightCode::vectorGeoidGrid() const
     return std::string(vectorGeoidGrid_.data(), vectorGeoidGrid_.size());
 }
 
+std::vector<std::string> ShHeightCode::openOptions() const
+{
+    if (!openOptions_) { return {}; }
+
+    std::vector<std::string> openOptions;
+    for (const auto &str : *openOptions_) {
+        openOptions.emplace_back(str.data(), str.size());
+    }
+    return openOptions;
+}
+
 /** Steals response.
  */
 GdalWarper::Heightcoded* ShHeightCode::response() {
@@ -213,101 +235,6 @@ GdalWarper::Heightcoded* ShHeightCode::response() {
 
 void ShHeightCode::response(bi::interprocess_mutex &mutex
                             , GdalWarper::Heightcoded *response)
-{
-    Lock lock(mutex);
-    if (response_) { return; }
-    response_ = response;
-    owner_->done();
-}
-
-ShNavtile::ShNavtile(const GdalWarper::Navtile &navtile, ManagedBuffer &sm)
-    : path(navtile.path.data(), navtile.path.size(), sm.get_allocator<char>())
-    , raw(navtile.raw.data(), navtile.raw.size(), sm.get_allocator<char>())
-    , extents(navtile.extents)
-    , sdsSrs(navtile.sdsSrs.data(), navtile.sdsSrs.size()
-             , sm.get_allocator<char>())
-    , navSrs(navtile.navSrs.data(), navtile.navSrs.size()
-             , sm.get_allocator<char>())
-    , heightRange(navtile.heightRange)
-{}
-
-GdalWarper::Navtile ShNavtile::navtile(bool noRaw) const
-{
-    GdalWarper::Navtile navtile;
-    navtile.path = asString(path);
-    if (!noRaw) { navtile.raw = asString(raw); }
-    navtile.extents = extents;
-    navtile.sdsSrs = asString(sdsSrs);
-    navtile.navSrs = asString(navSrs);
-    navtile.heightRange = heightRange;
-    return navtile;
-}
-
-ConstBlock ShNavtile::rawData() const
-{
-    return { raw.data(), raw.size() };
-}
-
-ShNavHeightCode
-::ShNavHeightCode(const std::string &vectorDs
-                 , const GdalWarper::Navtile &navtile
-                 , const geo::heightcoding::Config &config
-                  , const std::string &fallbackDs
-                  , const boost::optional<std::string> &geoidGrid
-                 , ManagedBuffer &sm, ShRequestBase *owner)
-    : sm_(sm), owner_(owner)
-    , vectorDs_(vectorDs.data(), vectorDs.size()
-                , sm.get_allocator<char>())
-    , navtile_(navtile, sm)
-    , config_(config, sm)
-    , fallbackDs_(fallbackDs.data(), fallbackDs.size()
-                  , sm.get_allocator<char>())
-    , geoidGrid_(sm.get_allocator<char>())
-    , response_()
-{
-    if (geoidGrid) {
-        geoidGrid_.assign(geoidGrid->data(), geoidGrid->size());
-    }
-}
-
-ShNavHeightCode::~ShNavHeightCode() {
-    if (response_) { sm_.deallocate(response_); }
-}
-
-std::string ShNavHeightCode::vectorDs() const {
-    return asString(vectorDs_);
-}
-
-GdalWarper::Navtile ShNavHeightCode::navtile(bool noRaw) const {
-    return navtile_.navtile(noRaw);
-}
-
-ConstBlock ShNavHeightCode::rawData() const {
-    return navtile_.rawData();
-}
-
-geo::heightcoding::Config ShNavHeightCode::config() const {
-    return config_;
-}
-
-std::string ShNavHeightCode::fallbackDs() const {
-    return asString(fallbackDs_);
-}
-
-boost::optional<std::string> ShNavHeightCode::geoidGrid() const {
-    return asOptional(geoidGrid_);
-}
-
-/** Steals response.
- */
-GdalWarper::Heightcoded* ShNavHeightCode::response() {
-    auto response(response_);
-    response_ = 0;
-    return response;
-}
-
-void ShNavHeightCode::response(bi::interprocess_mutex &mutex
-                              , GdalWarper::Heightcoded *response)
 {
     Lock lock(mutex);
     if (response_) { return; }

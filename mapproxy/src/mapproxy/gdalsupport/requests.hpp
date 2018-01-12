@@ -72,7 +72,14 @@ private:
     cv::Mat *response_;
 };
 
-struct ShHeightCodeConfig {
+class ShHeightCodeConfig {
+public:
+    ShHeightCodeConfig(const geo::heightcoding::Config &config
+                       , ManagedBuffer &sm);
+
+    operator geo::heightcoding::Config() const;
+
+private:
     String workingSrs_;
     geo::SrsDefinition::Type workingSrsType_;
 
@@ -86,11 +93,6 @@ struct ShHeightCodeConfig {
     geo::VectorFormat format_;
 
     geo::heightcoding::Mode mode_;
-
-    ShHeightCodeConfig(const geo::heightcoding::Config &config
-                       , ManagedBuffer &sm);
-
-    operator geo::heightcoding::Config() const;
 };
 
 struct ShDemDataset {
@@ -111,6 +113,7 @@ public:
                  , const DemDataset::list &rasterDs
                  , const geo::heightcoding::Config &config
                  , const boost::optional<std::string> &vectorGeoidGrid
+                 , const std::vector<std::string> &openOptions
                  , ManagedBuffer &sm, ShRequestBase *owner);
 
     ~ShHeightCode();
@@ -122,6 +125,8 @@ public:
     geo::heightcoding::Config config() const;
 
     boost::optional<std::string> vectorGeoidGrid() const;
+
+    std::vector<std::string> openOptions() const;
 
     /** Steals response.
      */
@@ -137,65 +142,7 @@ private:
     ShDemDatasetList rasterDs_;
     ShHeightCodeConfig config_;
     String vectorGeoidGrid_;
-
-    // response memory block
-    GdalWarper::Heightcoded *response_;
-};
-
-struct ShNavtile {
-    String path;
-    String raw;
-    math::Extents2 extents;
-    String sdsSrs;
-    String navSrs;
-    vts::NavTile::HeightRange heightRange;
-
-    ShNavtile(const GdalWarper::Navtile &navtile, ManagedBuffer &sm);
-
-    GdalWarper::Navtile navtile(bool noRaw = false) const;
-
-    ConstBlock rawData() const;
-};
-
-class ShNavHeightCode : boost::noncopyable {
-public:
-    ShNavHeightCode(const std::string &vectorDs
-                    , const GdalWarper::Navtile &navtile
-                    , const geo::heightcoding::Config &config
-                    , const std::string &fallbackDs
-                    , const boost::optional<std::string> &geoidGrid
-                    , ManagedBuffer &sm, ShRequestBase *owner);
-
-    ~ShNavHeightCode();
-
-    std::string vectorDs() const;
-
-    GdalWarper::Navtile navtile(bool noRaw = false) const;
-
-    geo::heightcoding::Config config() const;
-
-    ConstBlock rawData() const;
-
-    std::string fallbackDs() const;
-
-    boost::optional<std::string> geoidGrid() const;
-
-    /** Steals response.
-     */
-    GdalWarper::Heightcoded* response();
-
-    void response(bi::interprocess_mutex &mutex
-                  , GdalWarper::Heightcoded *response);
-
-private:
-    ManagedBuffer &sm_;
-    ShRequestBase *owner_;
-
-    String vectorDs_;
-    ShNavtile navtile_;
-    ShHeightCodeConfig config_;
-    String fallbackDs_;
-    String geoidGrid_;
+    boost::optional<StringVector> openOptions_;
 
     // response memory block
     GdalWarper::Heightcoded *response_;

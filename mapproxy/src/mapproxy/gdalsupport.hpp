@@ -42,7 +42,6 @@
 #include "geo/vectorformat.hpp"
 #include "geo/heightcoding.hpp"
 
-#include "vts-libs/vts/opencv/navtile.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 
 #include "./support/geo.hpp"
@@ -161,6 +160,8 @@ public:
 
     // Vector operations
 
+    typedef std::vector<std::string> OpenOptions;
+
     /** Heightcode vector ds using raster ds
      */
     Heightcoded::pointer
@@ -168,29 +169,7 @@ public:
                , const DemDataset::list &rasterDs
                , const geo::heightcoding::Config &config
                , const boost::optional<std::string> &vectorGeoidGrid
-               , Aborter &aborter);
-
-    /** Navigation tile info.
-     */
-    struct Navtile {
-        std::string path;
-        std::string raw;
-        math::Extents2 extents;
-        std::string sdsSrs;
-        std::string navSrs;
-        vts::NavTile::HeightRange heightRange;
-
-        Navtile() {}
-    };
-
-    /** Heightcode vector ds using navtile ds
-     */
-    Heightcoded::pointer
-    heightcode(const std::string &vectorDs
-               , const Navtile &navtile
-               , const geo::heightcoding::Config &config
-               , const std::string &fallbackDs
-               , const boost::optional<std::string> &geoidGrid
+               , const OpenOptions &openOptions
                , Aborter &aborter);
 
     /** Do housekeeping. Must be called in the process where internals are being

@@ -38,6 +38,9 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
+#include "../support/python.hpp"
+#include "../support/serialization.hpp"
+
 #include "vts-libs/vts/opencv/navtile.hpp"
 
 #include "../support/python.hpp"
@@ -57,6 +60,15 @@ namespace generator {
 
 namespace {
 
+void parseDefinition(GeodataVectorTiled::Definition &def
+                     , const Json::Value &value)
+{
+    if (value.isMember("maxSourceLod")) {
+        def.maxSourceLod = boost::in_place();
+        Json::get(*def.maxSourceLod, value, "maxSourceLod");
+    }
+}
+
 struct Factory : Generator::Factory {
     virtual Generator::pointer create(const Generator::Params &params)
     {
@@ -64,12 +76,28 @@ struct Factory : Generator::Factory {
     }
 
     virtual DefinitionBase::pointer definition() {
-        return std::make_shared<GeodataVectorBase::Definition>();
+        return std::make_shared<GeodataVectorTiled::Definition>();
     }
 
 private:
     static utility::PreMain register_;
 };
+
+void parseDefinition(GeodataVectorTiled::Definition &def
+                     , const boost::python::dict &value)
+{
+    if (value.has_key("maxSourceLod")) {
+        def.maxSourceLod = boost::python::extract<int>(value["maxSourceLod"]);
+    }
+}
+
+void buildDefinition(Json::Value &value
+                     , const GeodataVectorTiled::Definition &def)
+{
+    if (def.maxSourceLod) {
+        value["maxSourceLod"] = *def.maxSourceLod;
+    }
+}
 
 utility::PreMain Factory::register_([]()
 {
@@ -84,6 +112,54 @@ utility::PreMain Factory::register_([]()
 int GeneratorRevision(0);
 
 } // namespace
+
+void GeodataVectorTiled::Definition::from_impl(const boost::any &value)
+{
+    // deserialize parent class first
+    GeodataVectorBase::Definition::from_impl(value);
+
+    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
+        parseDefinition(*this, *json);
+    } else if (const auto *py
+               = boost::any_cast<boost::python::dict>(&value))
+    {
+        parseDefinition(*this, *py);
+    } else {
+        LOGTHROW(err1, Error)
+            << "GeodataVectorTiled: Unsupported configuration from: <"
+            << value.type().name() << ">.";
+    }
+}
+
+void GeodataVectorTiled::Definition::to_impl(boost::any &value) const
+{
+    // serialize parent class first
+    GeodataVectorBase::Definition::to_impl(value);
+
+    if (auto *json = boost::any_cast<Json::Value>(&value)) {
+        buildDefinition(*json, *this);
+    } else {
+        LOGTHROW(err1, Error)
+            << "GeodataVectorTiled:: Unsupported serialization into: <"
+            << value.type().name() << ">.";
+    }
+}
+
+Changed GeodataVectorTiled::Definition::changed_impl(const DefinitionBase &o)
+    const
+{
+    // first check parent class for change
+    const auto changed(GeodataVectorBase::Definition::changed_impl(o));
+    if (changed != Changed::no) { return changed; }
+
+    const auto &other(o.as<Definition>());
+
+    // forecast offset can change
+    if (maxSourceLod != other.maxSourceLod) { return Changed::yes; }
+
+    // not changed at all
+    return Changed::no;
+}
 
 GeodataVectorTiled::GeodataVectorTiled(const Params &params)
     : GeodataVectorBase(params, true)
@@ -310,12 +386,28 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
         return;
     }
 
+    auto sourceTileId(tileId);
+    auto sourceLocalId(vts::local(nodeInfo.rootLod(), sourceTileId));
+    auto tileExtents(nodeInfo.extents());
+
+    bool cutting(false);
+
+    if (definition_.maxSourceLod && (sourceLocalId.lod
+                                     > *definition_.maxSourceLod))
+    {
+        // shift source to proper layer
+        auto lodDiff(sourceLocalId.lod - *definition_.maxSourceLod);
+        sourceTileId = vts::parent(sourceTileId, lodDiff);
+        sourceLocalId = vts::parent(sourceLocalId, lodDiff);
+        tileExtents = vts::NodeInfo(referenceFrame(), sourceTileId).extents();
+        cutting = true;
+    }
+
     const auto tileFile
         (absoluteDataset
-         (tileFile_(vts::UrlTemplate::Vars
-                    (tileId, vts::local(nodeInfo.rootLod(), tileId)))));
+         (tileFile_(vts::UrlTemplate::Vars(sourceTileId, sourceLocalId))));
 
-    LOG(debug) << "Using geo file: <" << tileFile << ">.";
+    LOG(info1) << "Using geo file: <" << tileFile << ">.";
 
     // combine all dem datasets and default/fallback dem dataset
     auto datasets(viewspec2datasets(fi.fileInfo.query, dem_));
@@ -325,14 +417,30 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     config.outputSrs = physicalSrs_.srsDef;
     config.outputVerticalAdjust = physicalSrs_.adjustVertical();
     config.layers = definition_.layers;
-    config.clipWorkingExtents = nodeInfo.extents();
     config.format = definition_.format;
     config.mode = definition_.mode;
+
+    if (cutting) {
+        // set clipping extents only when cutting
+        config.clipWorkingExtents = nodeInfo.extents();
+    }
+
+    // build open options for MVT driver
+    GdalWarper::OpenOptions openOptions;
+    {
+        std::ostringstream os;
+        os << "@MVT_EXTENTS=" << std::fixed << tileExtents;
+        openOptions.push_back(os.str());
+
+        os.str("");
+        os << "@MVT_SRS=" << *config.workingSrs;
+        openOptions.push_back(os.str());
+    }
 
     // heightcode data using warper's machinery
     auto hc(arsenal.warper.heightcode
             (tileFile, datasets.first, config, dem_.geoidGrid
-             , sink));
+             , openOptions, sink));
 
     // force 1 hour max age if not all views from viewspec have been found
     boost::optional<long> maxAge;

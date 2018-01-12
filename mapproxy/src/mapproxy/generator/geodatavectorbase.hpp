@@ -69,7 +69,7 @@ public:
         virtual void from_impl(const boost::any &value);
         virtual void to_impl(boost::any &value) const;
 
-    private:
+    protected:
         virtual Changed changed_impl(const DefinitionBase &other) const;
     };
 
