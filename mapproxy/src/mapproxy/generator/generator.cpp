@@ -96,7 +96,9 @@ Generator::pointer Generator::create(const Params &params)
 Generator::Generator(const Params &params)
     : generatorFinder_(params.generatorFinder), config_(params.config)
     , resource_(params.resource), savedResource_(params.resource)
-    , fresh_(false), system_(params.system), ready_(false)
+    , fresh_(false), system_(params.system)
+    , changeEnforced_(false)
+    , ready_(false)
     , demRegistry_(params.demRegistry)
     , replace_(params.replace)
 {
@@ -122,6 +124,7 @@ Generator::Generator(const Params &params)
         case Changed::withRevisionBump:
             // update revision
             ++resource_.revision;
+            changeEnforced_ = true;
             LOG(info3)
                 << "Bumped resource <" << resource_.id
                 << "> revision to " << resource_.revision
@@ -167,7 +170,13 @@ Changed Generator::changed(const Resource &resource) const
 
 void Generator::makeReady()
 {
+    if (changeEnforced_) {
+        save(root() / ResourceFile, resource_);
+        changeEnforced_ = false;
+    }
+
     ready_ = true;
+
     LOG(info2) << "Ready to serve resource <" << id()
                << "> (type <" << resource().generator << ">).";
 }

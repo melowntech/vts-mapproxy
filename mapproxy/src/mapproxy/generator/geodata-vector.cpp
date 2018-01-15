@@ -28,6 +28,7 @@
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/format.hpp"
 #include "utility/path.hpp"
 
 #include "geo/heightcoding.hpp"
@@ -40,6 +41,7 @@
 #include "../support/python.hpp"
 #include "../support/tileindex.hpp"
 #include "../support/srs.hpp"
+#include "../support/revision.hpp"
 
 #include "./geodata-vector.hpp"
 #include "./factory.hpp"
@@ -84,17 +86,20 @@ GeodataVector::GeodataVector(const Params &params)
                                   .referenceFrame->model.physicalSrs))
     , dataPath_(root() / "geodata")
 {
-    try {
-        metadata_ = geo::heightcoding::loadMetadata(root() / "metadata.json");
-        if (fs::file_size(dataPath_) == metadata_.fileSize) {
-            // valid file
-            makeReady();
-            return;
-        }
-        LOG(info1) << "Sizes differ, regenerate.";
-    } catch (const std::exception &e) {
-        // not ready
+    // load geodata only if there is no enforced change
+    if (!changeEnforced()) {
+        try {
+            metadata_ = geo::heightcoding::loadMetadata
+                (root() / "metadata.json");
+            if (fs::file_size(dataPath_) == metadata_.fileSize) {
+                // valid file
+                makeReady();
+                return;
+            }
+            LOG(info1) << "Sizes differ, regenerate.";
+        } catch (const std::exception &e) { /* not ready */ }
     }
+
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
@@ -144,8 +149,10 @@ vr::FreeLayer GeodataVector::freeLayer_impl(ResourceRoot root) const
     def.extents = metadata_.extents;
     def.displaySize = definition_.displaySize;
     def.label = res.comment;
-    def.geodata = prependRoot(std::string("geo?viewspec={viewspec}")
-                              , res, root);
+    def.geodata = prependRoot
+        (utility::format("geo?viewspec={viewspec}%s"
+                         , RevisionWrapper(res.revision, "&"))
+         , res, root);
     def.style = styleUrl();
 
     // done

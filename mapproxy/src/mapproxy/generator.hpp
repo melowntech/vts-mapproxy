@@ -172,6 +172,10 @@ public:
 
     static std::string systemGroup() { return ".system"; }
 
+    /** Writes any pending changes.
+     */
+    void commitEnforcedChange();
+
 protected:
     Generator(const Params &params);
 
@@ -213,6 +217,11 @@ protected:
     DemRegistry& demRegistry() { return *demRegistry_; }
     const DemRegistry& demRegistry() const { return *demRegistry_; }
 
+    /** This function must be checked in derived class ctor and resource must
+     *  not be made ready.
+     */
+    bool changeEnforced() const { return changeEnforced_; }
+
 private:
     virtual void prepare_impl(Arsenal &arsenal) = 0;
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
@@ -226,6 +235,7 @@ private:
     Resource savedResource_;
     bool fresh_;
     bool system_;
+    bool changeEnforced_;
     std::atomic<bool> ready_;
     DemRegistry::pointer demRegistry_;
     Generator::pointer replace_;
@@ -295,7 +305,7 @@ private:
 
 inline void Generator::prepare(Arsenal &arsenal)
 {
-    // prepare only when ready
+    // prepare only when not ready
     if (ready_) { return; }
 
     // prepare and make ready
