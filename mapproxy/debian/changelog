@@ -1,3 +1,10 @@
+vts-mapproxy (1.21) stable; urgency=low
+
+  * Added resource change support (used in geodata-vector* drivers).
+  * geodata-vector-tiled supports maxSourceLod option to generate finer data from coarse ones
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Mon, 15 Jan 2018 14:25:03 +0100
+
 vts-mapproxy (1.20) stable; urgency=low
 
   * Fixed generatevrtwo for floating point data.
