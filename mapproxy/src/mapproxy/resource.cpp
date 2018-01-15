@@ -125,6 +125,9 @@ Resource::list parseResource(const Json::Value &value
     if (value.isMember("comment")) {
         Json::get(r.comment, value, "comment");
     }
+    if (value.isMember("revision")) {
+        Json::get(r.revision, value, "revision");
+    }
 
     if (value.isMember("registry")) {
         fromJson(r.registry, value["registry"]);
@@ -314,6 +317,7 @@ void buildResource(Json::Value &value, const Resource &r)
     value["type"] = boost::lexical_cast<std::string>(r.generator.type);
     value["driver"] = r.generator.driver;
     value["comment"] = r.comment;
+    value["revision"] = r.revision;
 
     value["registry"] = vr::asJson(r.registry);
 

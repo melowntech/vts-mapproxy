@@ -45,7 +45,7 @@
 
 #include "./support/fileclass.hpp"
 
-enum class Changed { yes, no, safely };
+enum class Changed { yes, no, safely, withRevisionBump };
 
 /** Base of all resource definitions.
  */
@@ -171,6 +171,11 @@ struct Resource {
     Generator generator;
     std::string comment;
 
+    /** Resource revision. Bumped automatically when resorce definition
+     *  comparison says revision bump is needed; max(update, stored) is used.
+     */
+    unsigned int revision;
+
     DualId::set credits;
 
     const vr::ReferenceFrame *referenceFrame;
@@ -197,7 +202,7 @@ struct Resource {
     typedef std::vector<Resource> list;
 
     Resource(const FileClassSettings &fileClassSettings)
-        : fileClassSettings(fileClassSettings)
+        : revision(), fileClassSettings(fileClassSettings)
     {}
 
     Changed changed(const Resource &o) const;

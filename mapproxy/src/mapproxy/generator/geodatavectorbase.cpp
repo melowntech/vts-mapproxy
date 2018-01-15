@@ -254,21 +254,31 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
 {
     const auto &other(o.as<Definition>());
 
-    if (dataset != other.dataset) { return Changed::yes; }
+
+    // do not allow dem change (breaks meatadata)
     if (dem != other.dem) { return Changed::yes; }
-    if (layers != other.layers) { return Changed::yes; }
-    if (mode != other.mode) { return Changed::yes; }
+
+    // accumulate revision bump/safe changes
+    bool bump(false);
+    bool safe(false);
+
+    // changing these bumps version
+    if (dataset != other.dataset) { bump = true; }
+    if (layers != other.layers) { bump = true; }
+    if (mode != other.mode) { bump = true; }
 
     // format can change
-    if (format != other.format) { return Changed::safely; }
+    if (format != other.format) { safe = true; }
     // displaySize can change
-    if (displaySize != other.displaySize) { return Changed::safely; }
+    if (displaySize != other.displaySize) { safe = true; }
     // styleUrl can change
-    if (styleUrl != other.styleUrl) { return Changed::safely; }
+    if (styleUrl != other.styleUrl) { safe = true; }
     // introspection can change
-    if (introspection != other.introspection) {
-        return Changed::safely;
-    }
+    if (introspection != other.introspection) { safe = true; }
+
+    // interpret change type
+    if (bump) { return Changed::withRevisionBump; }
+    if (safe) { return Changed::safely; }
     return Changed::no;
 }
 

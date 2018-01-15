@@ -126,7 +126,12 @@ Resource::list parseResource(const Resource::Id &id, const python::dict &value
     std::string tmp(py2utf8(value["type"]));
     r.generator.type = boost::lexical_cast<Resource::Generator::Type>(tmp);
     r.generator.driver = py2utf8(value["driver"]);
-    r.comment = py2utf8(value["comment"]);
+    if (value.has_key("comment")) {
+        r.comment = py2utf8(value["comment"]);
+    }
+    if (value.has_key("revision")) {
+        r.revision = python::extract<unsigned int>(value["revision"]);
+    }
 
     if (value.has_key("registry")) {
         fromPython(r.registry, python::dict(value["registry"]));

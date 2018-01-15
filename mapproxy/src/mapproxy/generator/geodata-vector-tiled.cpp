@@ -46,6 +46,7 @@
 #include "../support/python.hpp"
 #include "../support/tileindex.hpp"
 #include "../support/srs.hpp"
+#include "../support/revision.hpp"
 
 #include "./geodata-vector-tiled.hpp"
 #include "./factory.hpp"
@@ -150,15 +151,17 @@ Changed GeodataVectorTiled::Definition::changed_impl(const DefinitionBase &o)
 {
     // first check parent class for change
     const auto changed(GeodataVectorBase::Definition::changed_impl(o));
-    if (changed != Changed::no) { return changed; }
+    if (changed == Changed::yes) { return changed; }
 
     const auto &other(o.as<Definition>());
 
-    // forecast offset can change
-    if (maxSourceLod != other.maxSourceLod) { return Changed::yes; }
+    // max source lod leads to revision bump
+    if (maxSourceLod != other.maxSourceLod) {
+        return Changed::withRevisionBump;
+    }
 
-    // not changed at all
-    return Changed::no;
+    // pass result from parent
+    return changed;
 }
 
 GeodataVectorTiled::GeodataVectorTiled(const Params &params)
@@ -288,12 +291,14 @@ vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
 
     auto &def(fl.createDefinition<vr::FreeLayer::GeodataTiles>());
     def.metaUrl = prependRoot
-        (utility::format("{lod}-{x}-{y}.meta?gr=%d-%d", GeneratorRevision
-                         , vts::MetaTile::currentVersion())
+        (utility::format("{lod}-{x}-{y}.meta?gr=%d-%d%s", GeneratorRevision
+                         , vts::MetaTile::currentVersion()
+                         , RevisionWrapper(res.revision, "&"))
          , resource(), root);
     def.geodataUrl = prependRoot
-        (utility::format("{lod}-{x}-{y}.geo?gr=%d&viewspec={viewspec}"
-                         , GeneratorRevision)
+        (utility::format("{lod}-{x}-{y}.geo?gr=%d%s&viewspec={viewspec}"
+                         , GeneratorRevision
+                         , RevisionWrapper(res.revision, "&"))
          , resource(), root);
     def.style = styleUrl();
 

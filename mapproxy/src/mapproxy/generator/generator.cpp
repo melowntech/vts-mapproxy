@@ -112,13 +112,27 @@ Generator::Generator(const Params &params)
         save(rfile, resource_);
     } else {
         // reopen of existing dataset
-        savedResource_
-            = loadResource(rfile).front();
+        savedResource_ = loadResource(rfile).front();
+
+        // merge both revisions; at least manually changed revision is used
+        savedResource_.revision = resource_.revision
+            = std::max(resource_.revision, savedResource_.revision);
+
         switch (savedResource_.changed(resource_)) {
-        case Changed::no:
+        case Changed::withRevisionBump:
+            // update revision
+            ++resource_.revision;
+            LOG(info3)
+                << "Bumped resource <" << resource_.id
+                << "> revision to " << resource_.revision
+                << " due to definition change.";
+            // [[fallthrough]]
+
+        case Changed::no: // [[fallthrough]]
         case Changed::safely:
             // nothing or something non-destructive changed -> re-save
             save(rfile, resource_);
+            savedResource_ = resource_;
             break;
 
         case Changed::yes:
@@ -710,6 +724,7 @@ void Generators::Detail::update(const Resource::map &resources)
                 break;
 
             case Changed::safely:
+            case Changed::withRevisionBump:
                 // here comes the fun
                 replace(resource, *iserving);
                 break;

@@ -6,5 +6,6 @@ obj-*
 core
 tmp
 *.log
+*.pid
 gdalwmscache
 .gdb_history
