@@ -97,13 +97,14 @@ public:
               , const geo::heightcoding::Config &config
               , const boost::optional<std::string> &vectorGeoidGrid
               , const GdalWarper::OpenOptions &openOptions
+              , const LayerEnhancer::map &layerEnhancers
               , ManagedBuffer &sm)
         : sm_(sm)
         , raster_()
         , heightcode_(sm.construct<ShHeightCode>
                       (bi::anonymous_instance)
                       (vectorDs, rasterDs, config, vectorGeoidGrid
-                       , openOptions, sm, this))
+                       , openOptions, layerEnhancers, sm, this))
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
@@ -148,12 +149,13 @@ public:
                           , const geo::heightcoding::Config &config
                           , const boost::optional<std::string> &vectorGeoidGrid
                           , const std::vector<std::string> &openOptions
+                          , const LayerEnhancer::map &layerEnhancers
                           , ManagedBuffer &mb)
     {
         return pointer(mb.construct<ShRequest>
                        (bi::anonymous_instance)
                        (vectorDs, rasterDs, config, vectorGeoidGrid
-                        , openOptions, mb)
+                        , openOptions, layerEnhancers, mb)
                        , mb.get_allocator<void>()
                        , mb.get_deleter<ShRequest>());
     }
@@ -194,7 +196,8 @@ void ShRequest::process(bi::interprocess_mutex &mutex
                                  , heightcode_->rasterDs()
                                  , heightcode_->config()
                                  , heightcode_->vectorGeoidGrid()
-                                 , heightcode_->openOptions()));
+                                 , heightcode_->openOptions()
+                                 , heightcode_->layerEnhancers()));
         return;
     }
 
@@ -438,6 +441,7 @@ public:
                , const geo::heightcoding::Config &config
                , const boost::optional<std::string> &vectorGeoidGrid
                , const GdalWarper::OpenOptions &openOptions
+               , const LayerEnhancer::map &layerEnhancers
                , Aborter &aborter);
 
     void housekeeping();
@@ -490,10 +494,11 @@ GdalWarper::heightcode(const std::string &vectorDs
                        , const geo::heightcoding::Config &config
                        , const boost::optional<std::string> &vectorGeoidGrid
                        , const GdalWarper::OpenOptions &openOptions
+                       , const LayerEnhancer::map &layerEnhancers
                        , Aborter &aborter)
 {
     return detail().heightcode(vectorDs, rasterDs, config, vectorGeoidGrid
-                               , openOptions, aborter);
+                               , openOptions, layerEnhancers, aborter);
 }
 
 void GdalWarper::housekeeping()
@@ -852,12 +857,13 @@ GdalWarper::Heightcoded::pointer GdalWarper::Detail
              , const geo::heightcoding::Config &config
              , const boost::optional<std::string> &vectorGeoidGrid
              , const GdalWarper::OpenOptions &openOptions
+             , const LayerEnhancer::map &layerEnhancers
              , Aborter &aborter)
 {
     Lock lock(mutex());
     ShRequest::pointer shReq
         (ShRequest::create(vectorDs, rasterDs, config, vectorGeoidGrid
-                           , openOptions, mb_));
+                           , openOptions, layerEnhancers, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 

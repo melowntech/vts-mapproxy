@@ -32,6 +32,7 @@
 #include "geo/heightcoding.hpp"
 
 #include "../generator.hpp"
+#include "../support/layerenancer.hpp"
 
 namespace generator {
 
@@ -58,6 +59,7 @@ public:
         std::string styleUrl;
         int displaySize;
         geo::heightcoding::Mode mode;
+        LayerEnhancer::map layerEnhancers;
 
         Introspection introspection;
 

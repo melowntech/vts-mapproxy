@@ -45,6 +45,7 @@
 #include "vts-libs/vts/nodeinfo.hpp"
 
 #include "./support/geo.hpp"
+#include "./support/layerenancer.hpp"
 #include "./sink.hpp"
 
 namespace vts = vtslibs::vts;
@@ -170,6 +171,7 @@ public:
                , const geo::heightcoding::Config &config
                , const boost::optional<std::string> &vectorGeoidGrid
                , const OpenOptions &openOptions
+               , const LayerEnhancer::map &layerEnancers
                , Aborter &aborter);
 
     /** Do housekeeping. Must be called in the process where internals are being

@@ -114,6 +114,7 @@ public:
                  , const geo::heightcoding::Config &config
                  , const boost::optional<std::string> &vectorGeoidGrid
                  , const std::vector<std::string> &openOptions
+                 , const LayerEnhancer::map &layerEnhancers
                  , ManagedBuffer &sm, ShRequestBase *owner);
 
     ~ShHeightCode();
@@ -127,6 +128,8 @@ public:
     boost::optional<std::string> vectorGeoidGrid() const;
 
     std::vector<std::string> openOptions() const;
+
+    LayerEnhancer::map layerEnhancers() const;
 
     /** Steals response.
      */
@@ -143,6 +146,7 @@ private:
     ShHeightCodeConfig config_;
     String vectorGeoidGrid_;
     boost::optional<StringVector> openOptions_;
+    StringVector layerEnhancers_; // NB: encoded as 3 strings each
 
     // response memory block
     GdalWarper::Heightcoded *response_;

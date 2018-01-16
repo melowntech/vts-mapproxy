@@ -68,8 +68,8 @@ void parseDefinition(GeodataVectorBase::Definition &def
     if (value.isMember("layers")) {
         const auto layers(value["layers"]);
         if (!layers.isArray()) {
-            LOGTHROW(err1, InternalError)
-                << "Cannot find imageUrl in bind metadata reply.";
+            LOGTHROW(err1, FormatError)
+                << "Geodata dedinition[layers] is not an array.";
         }
 
         def.layers = boost::in_place();
@@ -85,7 +85,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
             def.format
                 = boost::lexical_cast<geo::VectorFormat>(s);
         } catch (boost::bad_lexical_cast) {
-            utility::raise<Error>
+            utility::raise<FormatError>
                 ("Value stored in format is not a valid height"
                  " coded data format.");
         }
@@ -94,6 +94,21 @@ void parseDefinition(GeodataVectorBase::Definition &def
     Json::getOpt(def.styleUrl, value, "styleUrl");
     Json::get(def.displaySize, value, "displaySize");
     Json::getOpt(def.mode, value, "mode");
+
+    if (value.isMember("enhance")) {
+        const auto enhance(value["enhance"]);
+        if (!enhance.isObject()) {
+            LOGTHROW(err1, FormatError)
+                << "Geodata dedinition[enhance] is not an object.";
+        }
+
+        for (const auto &layerName : enhance.getMemberNames()) {
+            const auto &layer(enhance[layerName]);
+            auto &lh(def.layerEnhancers[layerName]);
+            Json::get(lh.key, layer, "key");
+            Json::get(lh.databasePath, layer, "db");
+        }
+    }
 
     if (value.isMember("introspection")) {
         const auto &jintrospection(value["introspection"]);
@@ -130,6 +145,15 @@ void buildDefinition(Json::Value &value
     value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
     value["mode"] = boost::lexical_cast<std::string>(def.mode);
+
+    if (!def.layerEnhancers.empty()) {
+        auto &layerEnhancers(value["enhance"] = Json::objectValue);
+        for (const auto &item : def.layerEnhancers) {
+            auto &layer(layerEnhancers[item.first] = Json::objectValue);
+            layer["key"] = item.second.key;
+            layer["db"] = item.second.databasePath;
+        }
+    }
 
     if (!def.introspection.empty()) {
         auto &jintrospection(value["introspection"] = Json::objectValue);
@@ -187,6 +211,20 @@ void parseDefinition(GeodataVectorBase::Definition &def
         } catch (boost::bad_lexical_cast) {
             utility::raise<Error>
                 ("Value stored in mode is not a valid height coding mode.");
+        }
+    }
+
+    if (value.has_key("enhance")) {
+        const auto enhance(value["enhance"]);
+        for (boost::python::stl_input_iterator<boost::python::str>
+                 ilayer(enhance), elayer; ilayer != elayer; ++ilayer)
+        {
+            const auto name(py2utf8(*ilayer));
+            const auto content(enhance[*ilayer]);
+
+            auto &lh(def.layerEnhancers[name]);
+            lh.key = py2utf8(content["key"]);
+            lh.databasePath = py2utf8(content["db"]);
         }
     }
 
@@ -266,6 +304,7 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     if (dataset != other.dataset) { bump = true; }
     if (layers != other.layers) { bump = true; }
     if (mode != other.mode) { bump = true; }
+    if (layerEnhancers != other.layerEnhancers) { bump = true; }
 
     // format can change
     if (format != other.format) { safe = true; }

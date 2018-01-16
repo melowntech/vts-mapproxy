@@ -157,6 +157,7 @@ ShHeightCode
                , const geo::heightcoding::Config &config
                , const boost::optional<std::string> &vectorGeoidGrid
                , const std::vector<std::string> &openOptions
+               , const LayerEnhancer::map &layerEnhancers
                , ManagedBuffer &sm, ShRequestBase *owner)
     : sm_(sm), owner_(owner)
     , vectorDs_(vectorDs.data(), vectorDs.size()
@@ -164,6 +165,7 @@ ShHeightCode
     , rasterDs_(sm.get_allocator<ShDemDataset>())
     , config_(config, sm)
     , vectorGeoidGrid_(sm.get_allocator<char>())
+    , layerEnhancers_(sm.get_allocator<char>())
     , response_()
 {
     // copy strings to shared memory
@@ -183,6 +185,19 @@ ShHeightCode
             openOptions_->push_back(String(str.data(), str.size()
                                            , sm.get_allocator<char>()));
         }
+    }
+
+    // serialize layer enhancers: 3 strings per element
+    for (const auto &item : layerEnhancers) {
+        layerEnhancers_.emplace_back
+            (item.first.data(), item.first.size()
+             , sm.get_allocator<char>());
+        layerEnhancers_.emplace_back
+            (item.second.key.data(), item.second.key.size()
+             , sm.get_allocator<char>());
+        layerEnhancers_.emplace_back
+            (item.second.databasePath.data(), item.second.databasePath.size()
+             , sm.get_allocator<char>());
     }
 }
 
@@ -223,6 +238,33 @@ std::vector<std::string> ShHeightCode::openOptions() const
         openOptions.emplace_back(str.data(), str.size());
     }
     return openOptions;
+}
+
+LayerEnhancer::map ShHeightCode::layerEnhancers() const
+{
+    LayerEnhancer::map layerEnhancers;
+
+    auto ilayerEnhancers(layerEnhancers_.begin());
+
+    const auto nextString([&]() -> std::string
+    {
+        const auto &src(*ilayerEnhancers++);
+        return std::string(src.data(), src.size());
+    });
+
+    for (auto elayerEnhancers(layerEnhancers_.end());
+         ilayerEnhancers != elayerEnhancers; )
+    {
+        auto layer(nextString());
+        auto key(nextString());
+        auto db(nextString());
+        layerEnhancers.insert
+            (LayerEnhancer::map::value_type
+             (std::move(layer)
+              , LayerEnhancer(std::move(key), std::move(db))));
+    }
+
+    return layerEnhancers;
 }
 
 /** Steals response.

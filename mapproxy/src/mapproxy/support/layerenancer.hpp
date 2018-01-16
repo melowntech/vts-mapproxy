@@ -24,23 +24,30 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_gdalsupport_operations_hpp_included_
-#define mapproxy_gdalsupport_operations_hpp_included_
+#ifndef mapproxy_support_layerenhancer_hpp_included_
+#define mapproxy_support_layerenhancer_hpp_included_
 
-#include "../gdalsupport.hpp"
-#include "./types.hpp"
-#include "datasetcache.hpp"
+#include <map>
+#include <string>
 
-cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
-              , const GdalWarper::RasterRequest &req);
+struct LayerEnhancer {
+    std::string key;
+    std::string databasePath;
 
-GdalWarper::Heightcoded*
-heightcode(DatasetCache &cache, ManagedBuffer &mb
-           , const std::string &vectorDs
-           , const DemDataset::list &rasterDs
-           , geo::heightcoding::Config config
-           , const boost::optional<std::string> &vectorGeoidGrid
-           , const GdalWarper::OpenOptions &openOptions
-           , const LayerEnhancer::map &layerEnancers);
+    LayerEnhancer() = default;
+    LayerEnhancer(std::string key, std::string databasePath)
+        : key(std::move(key)), databasePath(std::move(databasePath))
+    {}
 
-#endif // mapproxy_gdalsupport_operations_hpp_included_
+    bool operator==(const LayerEnhancer &o) const {
+        return ((key == o.key) && (databasePath == o.databasePath));
+    }
+
+    bool operator!=(const LayerEnhancer &o) const {
+        return ((key != o.key) || (databasePath != o.databasePath));
+    }
+
+    typedef std::map<std::string, LayerEnhancer> map;
+};
+
+#endif // mapproxy_support_layerenhancer_hpp_included_

@@ -403,12 +403,21 @@ allocateHc(ManagedBuffer &mb
         (dataPtr, data.size(), metadata);
 }
 
+void enhanceLayers(const LayerEnhancer::map &layerEnancers
+                   , geo::FeatureLayers &layers)
+{
+    // TODO: implement me
+    (void) layerEnancers;
+    (void) layers;
+}
+
 GdalWarper::Heightcoded*
 heightcode(ManagedBuffer &mb, const VectorDataset &vds
            , std::vector<const geo::GeoDataset*> rds
            , geo::heightcoding::Config config
-           , const boost::optional<std::string> &geoidGrid = boost::none
-           , const boost::optional<std::string> &vectorGeoidGrid = boost::none)
+           , const boost::optional<std::string> &geoidGrid
+           , const boost::optional<std::string> &vectorGeoidGrid
+           , const LayerEnhancer::map &layerEnancers)
 {
     if (geoidGrid) {
         // apply geoid grid to SRS of rasterDs and set to rasterDsSrs
@@ -422,6 +431,12 @@ heightcode(ManagedBuffer &mb, const VectorDataset &vds
                 = geo::SrsDefinition::fromReference
                 (geo::setGeoid(*ref, *vectorGeoidGrid));
         }
+    }
+
+    if (!layerEnancers.empty()) {
+        // config.postprocess = [&](geo::FeatureLayers &layers) -> void {
+        //     enhanceLayers(layerEnancers, layers);
+        // }
     }
 
     std::ostringstream os;
@@ -438,7 +453,8 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
            , const DemDataset::list &rasterDs
            , geo::heightcoding::Config config
            , const boost::optional<std::string> &vectorGeoidGrid
-           , const GdalWarper::OpenOptions &openOptions)
+           , const GdalWarper::OpenOptions &openOptions
+           , const LayerEnhancer::map &layerEnancers)
 {
     std::vector<const geo::GeoDataset*> rasterDsStack;
     for (const auto &ds : rasterDs) {
@@ -448,5 +464,5 @@ heightcode(DatasetCache &cache, ManagedBuffer &mb
     return heightcode(mb, openVectorDataset(vectorDs, config, openOptions)
                       , rasterDsStack
                       , config, rasterDs.back().geoidGrid
-                      , vectorGeoidGrid);
+                      , vectorGeoidGrid, layerEnancers);
 }
