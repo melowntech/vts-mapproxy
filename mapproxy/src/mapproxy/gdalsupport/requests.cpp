@@ -187,7 +187,7 @@ ShHeightCode
         }
     }
 
-    // serialize layer enhancers: 3 strings per element
+    // serialize layer enhancers: 4 strings per element
     for (const auto &item : layerEnhancers) {
         layerEnhancers_.emplace_back
             (item.first.data(), item.first.size()
@@ -197,6 +197,9 @@ ShHeightCode
              , sm.get_allocator<char>());
         layerEnhancers_.emplace_back
             (item.second.databasePath.data(), item.second.databasePath.size()
+             , sm.get_allocator<char>());
+        layerEnhancers_.emplace_back
+            (item.second.table.data(), item.second.table.size()
              , sm.get_allocator<char>());
     }
 }
@@ -258,10 +261,12 @@ LayerEnhancer::map ShHeightCode::layerEnhancers() const
         auto layer(nextString());
         auto key(nextString());
         auto db(nextString());
+        auto table(nextString());
         layerEnhancers.insert
             (LayerEnhancer::map::value_type
              (std::move(layer)
-              , LayerEnhancer(std::move(key), std::move(db))));
+              , LayerEnhancer
+              (std::move(key), std::move(db), std::move(table))));
     }
 
     return layerEnhancers;

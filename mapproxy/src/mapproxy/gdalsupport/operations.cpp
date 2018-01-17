@@ -32,6 +32,8 @@
 
 #include <opencv2/highgui/highgui.hpp>
 
+#include <sqlite3.h>
+
 #include <ogrsf_frmts.h>
 
 #include "imgproc/rastermask/cvmat.hpp"
@@ -403,12 +405,117 @@ allocateHc(ManagedBuffer &mb
         (dataPtr, data.size(), metadata);
 }
 
+struct DbError : public std::runtime_error {
+    DbError(const std::string &msg) : std::runtime_error(msg) {}
+};
+
+class SQLStatement {
+public:
+    SQLStatement() : stmt_() {}
+    ~SQLStatement() { if (stmt_) { ::sqlite3_finalize(stmt_); } }
+    operator ::sqlite3_stmt*() { return stmt_; }
+    operator ::sqlite3_stmt**() { return &stmt_; }
+
+private:
+    ::sqlite3_stmt *stmt_;
+};
+
+typedef geo::FeatureLayers::Features::Properties FeatureProperties;
+
+class EnhanceDatabase {
+public:
+    EnhanceDatabase(const std::string &path
+                    , const std::string &table)
+        : path_(path), table_(table), db_()
+    {
+        check(::sqlite3_open_v2
+              (path.c_str(), &db_, SQLITE_OPEN_READONLY, nullptr)
+              , "sqlite3_open_v2");
+
+        std::ostringstream os;
+        os << "SELECT * FROM `" << table << "` WHERE `id`=?";
+
+        const auto &str(os.str());
+        check(::sqlite3_prepare_v2(db_, str.data(), str.size()
+                                , select_, nullptr)
+              , "sqlite3_prepare");
+    }
+
+    ~EnhanceDatabase() { if (db_) { ::sqlite3_close(db_); } }
+
+    void enhance(FeatureProperties &properties, const std::string &id) {
+        check(::sqlite3_reset(select_), "sqlite3_reset");
+        check(::sqlite3_bind_text(select_, 1, id.data(), id.size(), nullptr)
+              , "sqlite3_bind_text");
+
+        switch (auto res = ::sqlite3_step(select_)) {
+        case SQLITE_ROW: break;
+
+        case SQLITE_DONE:
+            // nothing found
+            return;
+
+        default:
+            check(res, "sqlite3_step");
+        }
+
+        // process all columns
+        const int columns(::sqlite3_column_count(select_));
+        for (int column(0); column < columns; ++column) {
+            const auto name(::sqlite3_column_name(select_, column));
+            // skip id itself
+            if (name == id) { continue; }
+            const auto *text(reinterpret_cast<const char*>
+                             (::sqlite3_column_text(select_, column)));
+            const auto size(::sqlite3_column_bytes(select_, column));
+            properties.insert(FeatureProperties::value_type
+                              (name, std::string(text, size)));
+        }
+    }
+
+private:
+    void check(int status, const char *what) const {
+        if (status) {
+            const char *msg(::sqlite3_errmsg(db_));
+            LOGTHROW(err1, DbError)
+                << "Sqlite3 operation " << what << " failed: <"
+                << msg << "> (file \"" << path_ << "\").";
+        }
+    }
+
+    const std::string path_;
+    const std::string table_;
+    ::sqlite3 *db_;
+    SQLStatement select_;
+};
+
+void enhanceLayer(const LayerEnhancer &enhancer
+                   , geo::FeatureLayers::Layer &layer)
+{
+    EnhanceDatabase db(enhancer.databasePath, enhancer.table);
+
+    (void) db;
+
+    const auto manipulator([&](FeatureProperties &properties)
+    {
+        const auto fkey(properties.find(enhancer.key));
+        if (fkey == properties.end()) { return; }
+        db.enhance(properties, fkey->second);
+    });
+
+    layer.features.updateProperties(manipulator);
+}
+
 void enhanceLayers(const LayerEnhancer::map &layerEnancers
                    , geo::FeatureLayers &layers)
 {
-    // TODO: implement me
-    (void) layerEnancers;
-    (void) layers;
+    for (auto &layer : layers.layers) {
+        auto flayerEnancers(layerEnancers.find(layer.name));
+        if (flayerEnancers == layerEnancers.end()) { continue; }
+
+        const auto &enhancer(flayerEnancers->second);
+        enhanceLayer(enhancer, layer);
+    }
 }
 
 GdalWarper::Heightcoded*
@@ -434,9 +541,9 @@ heightcode(ManagedBuffer &mb, const VectorDataset &vds
     }
 
     if (!layerEnancers.empty()) {
-        // config.postprocess = [&](geo::FeatureLayers &layers) -> void {
-        //     enhanceLayers(layerEnancers, layers);
-        // }
+        config.postprocess = [&](geo::FeatureLayers &layers) -> void {
+            enhanceLayers(layerEnancers, layers);
+        };
     }
 
     std::ostringstream os;

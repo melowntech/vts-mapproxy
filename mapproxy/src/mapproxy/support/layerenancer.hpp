@@ -33,18 +33,25 @@
 struct LayerEnhancer {
     std::string key;
     std::string databasePath;
+    std::string table;
 
     LayerEnhancer() = default;
-    LayerEnhancer(std::string key, std::string databasePath)
+    LayerEnhancer(std::string key, std::string databasePath
+                  , std::string table)
         : key(std::move(key)), databasePath(std::move(databasePath))
+        , table(std::move(table))
     {}
 
     bool operator==(const LayerEnhancer &o) const {
-        return ((key == o.key) && (databasePath == o.databasePath));
+        return ((key == o.key)
+                && (databasePath == o.databasePath)
+                && (table == o.table));
     }
 
     bool operator!=(const LayerEnhancer &o) const {
-        return ((key != o.key) || (databasePath != o.databasePath));
+        return ((key != o.key)
+                || (databasePath != o.databasePath)
+                || (table != o.table));
     }
 
     typedef std::map<std::string, LayerEnhancer> map;

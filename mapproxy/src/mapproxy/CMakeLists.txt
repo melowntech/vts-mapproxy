@@ -31,6 +31,7 @@ define_module(LIBRARY mapproxy-core
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS
   Boost_PYTHON
+  Sqlite3
   )
 
 add_library(mapproxy-core STATIC ${mapproxy-core_SOURCES})

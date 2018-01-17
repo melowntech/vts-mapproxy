@@ -86,6 +86,10 @@ protected:
 
     const std::string& styleUrl() const { return styleUrl_; }
 
+    const LayerEnhancer::map& layerEnhancers() const {
+        return layerEnhancers_;
+    }
+
 private:
     virtual vr::FreeLayer freeLayer_impl(ResourceRoot root) const = 0;
 
@@ -102,6 +106,9 @@ private:
 
 private:
     const Definition &definition_;
+    /** Layer enhancers with absolute paths.
+     */
+    LayerEnhancer::map layerEnhancers_;
     bool tiled_;
 
     /** URL to style.

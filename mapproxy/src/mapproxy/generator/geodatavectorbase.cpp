@@ -107,6 +107,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
             auto &lh(def.layerEnhancers[layerName]);
             Json::get(lh.key, layer, "key");
             Json::get(lh.databasePath, layer, "db");
+            Json::get(lh.table, layer, "table");
         }
     }
 
@@ -152,6 +153,7 @@ void buildDefinition(Json::Value &value
             auto &layer(layerEnhancers[item.first] = Json::objectValue);
             layer["key"] = item.second.key;
             layer["db"] = item.second.databasePath;
+            layer["table"] = item.second.table;
         }
     }
 
@@ -225,6 +227,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
             auto &lh(def.layerEnhancers[name]);
             lh.key = py2utf8(content["key"]);
             lh.databasePath = py2utf8(content["db"]);
+            lh.table = py2utf8(content["table"]);
         }
     }
 
@@ -324,6 +327,7 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
 GeodataVectorBase::GeodataVectorBase(const Params &params, bool tiled)
     : Generator(params)
     , definition_(this->resource().definition<Definition>())
+    , layerEnhancers_(definition_.layerEnhancers)
     , tiled_(tiled)
     , styleUrl_(definition_.styleUrl)
 {
@@ -333,6 +337,10 @@ GeodataVectorBase::GeodataVectorBase(const Params &params, bool tiled)
         // pseudo file URL
         stylePath_ = absoluteDataset(styleUrl_.substr(5));
         styleUrl_ = "style.json";
+    }
+
+    for (auto &item : layerEnhancers_) {
+        item.second.databasePath = absoluteDataset(item.second.databasePath);
     }
 }
 

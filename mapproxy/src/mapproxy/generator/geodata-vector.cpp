@@ -119,7 +119,7 @@ GeodataVector::heightcode(const DemDataset::list &datasets
     auto hc(warper.heightcode
             (absoluteDataset(definition_.dataset)
              , datasets, config, dem_.geoidGrid, {}
-             , definition_.layerEnhancers, aborter));
+             , layerEnhancers(), aborter));
     return hc;
 }
 
