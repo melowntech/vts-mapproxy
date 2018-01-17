@@ -1,3 +1,9 @@
+vts-mapproxy (1.22) stable; urgency=low
+
+  * geodata: added property enhancement support via external sqlite database
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 17 Jan 2018 14:54:41 +0100
+
 vts-mapproxy (1.21) stable; urgency=low
 
   * Added resource change support (used in geodata-vector* drivers).
