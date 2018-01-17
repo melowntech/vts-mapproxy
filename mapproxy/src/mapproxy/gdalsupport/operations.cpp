@@ -26,6 +26,7 @@
 
 #include <new>
 #include <algorithm>
+#include <cstring>
 
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -464,7 +465,7 @@ public:
         for (int column(0); column < columns; ++column) {
             const auto name(::sqlite3_column_name(select_, column));
             // skip id itself
-            if (name == id) { continue; }
+            if (std::strcmp(name, "id")) { continue; }
             const auto *text(reinterpret_cast<const char*>
                              (::sqlite3_column_text(select_, column)));
             const auto size(::sqlite3_column_bytes(select_, column));
