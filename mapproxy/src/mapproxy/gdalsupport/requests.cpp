@@ -86,6 +86,7 @@ ShHeightCodeConfig
 
     , outputSrs_(sm.get_allocator<char>())
     , outputSrsType_()
+    , outputAdjustVertical_()
 
     , clipWorkingExtents_(config.clipWorkingExtents)
     , format_(config.format)
@@ -98,9 +99,10 @@ ShHeightCodeConfig
     }
 
     if (config.outputSrs) {
-        outputSrs_.assign(config.outputSrs->srs.data()
-                          , config.outputSrs->srs.size());
-        outputSrsType_ = config.outputSrs->type;
+        outputSrs_.assign(config.outputSrs->srs.srs.data()
+                          , config.outputSrs->srs.srs.size());
+        outputSrsType_ = config.outputSrs->srs.type;
+        outputAdjustVertical_ = config.outputSrs->adjustVertical;
     }
 
     if (config.layers) {
@@ -117,7 +119,13 @@ ShHeightCodeConfig::operator geo::heightcoding::Config() const
 {
     geo::heightcoding::Config config;
     config.workingSrs = asOptional(workingSrs_, workingSrsType_);
-    config.outputSrs = asOptional(outputSrs_, outputSrsType_);
+    if (!outputSrs_.empty()) {
+        config.outputSrs
+            = boost::in_place
+            (geo::SrsDefinition(asString(outputSrs_), outputSrsType_)
+             , outputAdjustVertical_);
+    }
+
     config.clipWorkingExtents = clipWorkingExtents_;
 
     if (layers_) {

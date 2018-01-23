@@ -419,8 +419,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
 
     geo::heightcoding::Config config;
     config.workingSrs = sds(nodeInfo, dem_.geoidGrid);
-    config.outputSrs = physicalSrs_.srsDef;
-    config.outputVerticalAdjust = physicalSrs_.adjustVertical();
+    config.outputSrs = { physicalSrs_.srsDef, physicalSrs_.adjustVertical() };
     config.layers = definition_.layers;
     config.format = definition_.format;
     config.mode = definition_.mode;
