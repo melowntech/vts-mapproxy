@@ -1,3 +1,9 @@
+vts-mapproxy (1.23) stable; urgency=low
+
+  * geodata: fixed heightcoding (vertical adjustment)
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 23 Jan 2018 12:44:46 +0100
+
 vts-mapproxy (1.22) stable; urgency=low
 
   * geodata: added property enhancement support via external sqlite database
