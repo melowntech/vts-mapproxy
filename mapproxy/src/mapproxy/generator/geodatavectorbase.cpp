@@ -184,7 +184,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
         def.layers = boost::in_place();
         auto pylayers(value["layers"]);
         for (boost::python::stl_input_iterator<boost::python::object>
-                 ipylayers(pylayers), epylayers(pylayers);
+                 ipylayers(pylayers), epylayers;
              ipylayers != epylayers; ++ipylayers)
         {
             def.layers->push_back(py2utf8(*ipylayers));
