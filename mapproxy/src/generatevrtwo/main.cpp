@@ -75,7 +75,7 @@ std::vector<std::string> createOptions {
 
 const math::Size2 tileSize(4096, 4096);
 
-const math::Size2 minOvrSize(1, 1);
+const math::Size2 minOvrSize(2, 2);
 
 } // namespace def
 
@@ -349,8 +349,8 @@ void VrtWo::configure(const po::variables_map &vars)
     }
 
     // sanitize min ovr size
-    if (config_.minOvrSize.width <= 0) { config_.minOvrSize.width = 1; }
-    if (config_.minOvrSize.height <= 0) { config_.minOvrSize.height = 1; }
+    if (config_.minOvrSize.width <= 1) { config_.minOvrSize.width = 2; }
+    if (config_.minOvrSize.height <= 1) { config_.minOvrSize.height = 2; }
 
     LOG(info3, log_)
         << "Config:"
