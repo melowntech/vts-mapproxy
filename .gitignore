@@ -1,6 +1,7 @@
-*.changes
-*.upload
-*.deb
+/*.changes
+/*.upload
+/*.buildinfo
+/*.deb
 *~
 DEADJOE
 *.sw*
