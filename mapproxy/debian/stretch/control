@@ -1,0 +1,19 @@
+m4_dnl ###############################################################
+m4_dnl ## Build dependencies
+m4_dnl ###############################################################
+m4_dnl
+m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 9.20150101+deb8u2), libboost1.62-all-dev
+    , libopencv-core-dev (>= 2.4.9)
+    , libopencv-highgui-dev (>= 2.4.9)
+    , libopencv-photo-dev (>= 2.4.9)
+    , libopencv-imgproc-dev (>= 2.4.9)
+    , libeigen3-dev (>= 3.1.0-1)
+    , libgdal-dev (>= 2.1), libproj-dev (>= 4.9)
+    , libopenmesh-dev (>= 6.3)
+    , libgeographic-dev (>= 1.37)
+    , libjsoncpp-dev (>= 1.7.2)
+    , libprotobuf-dev (>= 2.6.1)
+    , protobuf-compiler
+    , libprocps-dev (>= 3.3.9)
+    , libmagic-dev (>= 5.25)
+    , gawk}}})m4_dnl
