@@ -20,7 +20,7 @@ include_directories(SYSTEM ${GDAL_INCLUDE_DIR})
 find_package(Proj REQUIRED)
 include_directories(${PROJ_INCLUDE_DIR})
 find_package(GeographicLib REQUIRED)
-include_directories(${GEOGRAPHICLIB_INCLUDE_DIR})
+include_directories(${GeographicLib_INCLUDE_DIR})
 
 find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)

@@ -54,7 +54,8 @@ public:
          */
         std::string dataset;
         DemDataset dem;
-        boost::optional<std::vector<std::string>> layers;
+        boost::optional<geo::heightcoding::Config::LayerNames> layers;
+        boost::optional<geo::heightcoding::Config::LayerNames> clipLayers;
         geo::VectorFormat format;
         std::string styleUrl;
         int displaySize;

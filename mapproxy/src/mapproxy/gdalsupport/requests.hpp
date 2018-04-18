@@ -87,6 +87,7 @@ private:
     geo::SrsDefinition::Type outputSrsType_;
     bool outputAdjustVertical_;
     boost::optional<StringVector> layers_;
+    boost::optional<StringVector> clipLayers_;
 
     boost::optional<math::Extents2> clipWorkingExtents_;
 

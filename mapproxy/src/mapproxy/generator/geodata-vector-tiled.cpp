@@ -425,8 +425,12 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
     config.mode = definition_.mode;
 
     if (cutting) {
-        // set clipping extents only when cutting
+        // clip whole tile to node extents
         config.clipWorkingExtents = nodeInfo.extents();
+    } else if (definition_.clipLayers) {
+        // clip only given layers
+        config.clipWorkingExtents = nodeInfo.extents();
+        config.clipLayers = definition_.clipLayers;
     }
 
     // build open options for MVT driver

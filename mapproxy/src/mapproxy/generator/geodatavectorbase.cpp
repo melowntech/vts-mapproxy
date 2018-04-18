@@ -52,6 +52,24 @@ namespace generator {
 
 namespace {
 
+void parseLayers(boost::optional<geo::heightcoding::Config::LayerNames> &result
+                 , const std::string &name, const Json::Value &value)
+{
+    if (!value.isMember(name)) { return; }
+
+    const auto layers(value[name]);
+    if (!layers.isArray()) {
+        LOGTHROW(err1, FormatError)
+            << "Geodata definition[layers] is not an array.";
+    }
+
+    result = boost::in_place();
+    for (const auto &layer : layers) {
+        result->push_back(layer.asString());
+    }
+    std::sort(result->begin(), result->end());
+}
+
 void parseDefinition(GeodataVectorBase::Definition &def
                      , const Json::Value &value)
 {
@@ -65,19 +83,8 @@ void parseDefinition(GeodataVectorBase::Definition &def
         Json::get(*def.dem.geoidGrid, value, "geoidGrid");
     }
 
-    if (value.isMember("layers")) {
-        const auto layers(value["layers"]);
-        if (!layers.isArray()) {
-            LOGTHROW(err1, FormatError)
-                << "Geodata dedinition[layers] is not an array.";
-        }
-
-        def.layers = boost::in_place();
-        for (const auto &layer : layers) {
-            def.layers->push_back(layer.asString());
-        }
-        std::sort(def.layers->begin(), def.layers->end());
-    }
+    parseLayers(def.layers, "layers", value);
+    parseLayers(def.clipLayers, "clipLayers", value);
 
     if (value.isMember("format")) {
         Json::get(s, value, "format");
@@ -99,7 +106,7 @@ void parseDefinition(GeodataVectorBase::Definition &def
         const auto enhance(value["enhance"]);
         if (!enhance.isObject()) {
             LOGTHROW(err1, FormatError)
-                << "Geodata dedinition[enhance] is not an object.";
+                << "Geodata definition[enhance] is not an object.";
         }
 
         for (const auto &layerName : enhance.getMemberNames()) {
@@ -170,6 +177,22 @@ void buildDefinition(Json::Value &value
     }
 }
 
+void parseLayers(boost::optional<geo::heightcoding::Config::LayerNames> &result
+                 , const std::string &name, const boost::python::dict &value)
+{
+    if (!value.has_key(name)) { return; }
+
+    result = boost::in_place();
+    auto pylayers(value[name]);
+    for (boost::python::stl_input_iterator<boost::python::object>
+             ipylayers(pylayers), epylayers;
+         ipylayers != epylayers; ++ipylayers)
+    {
+        result->push_back(py2utf8(*ipylayers));
+    }
+    std::sort(result->begin(), result->end());
+}
+
 void parseDefinition(GeodataVectorBase::Definition &def
                      , const boost::python::dict &value)
 {
@@ -180,17 +203,8 @@ void parseDefinition(GeodataVectorBase::Definition &def
         def.dem.geoidGrid = py2utf8(value["geoidGrid"]);
     }
 
-    if (value.has_key("layers")) {
-        def.layers = boost::in_place();
-        auto pylayers(value["layers"]);
-        for (boost::python::stl_input_iterator<boost::python::object>
-                 ipylayers(pylayers), epylayers;
-             ipylayers != epylayers; ++ipylayers)
-        {
-            def.layers->push_back(py2utf8(*ipylayers));
-        }
-        std::sort(def.layers->begin(), def.layers->end());
-    }
+    parseLayers(def.layers, "layers", value);
+    parseLayers(def.clipLayers, "clipLayers", value);
 
     if (value.has_key("format")) {
         try {
@@ -306,6 +320,7 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     // changing these bumps version
     if (dataset != other.dataset) { bump = true; }
     if (layers != other.layers) { bump = true; }
+    if (clipLayers != other.clipLayers) { bump = true; }
     if (mode != other.mode) { bump = true; }
     if (layerEnhancers != other.layerEnhancers) { bump = true; }
 

@@ -78,6 +78,35 @@ void ShRaster::response(bi::interprocess_mutex &mutex, cv::Mat *response)
     owner_->done();
 }
 
+namespace {
+
+void copyLayers(boost::optional<StringVector> &dst
+                , const boost::optional<geo::heightcoding
+                ::Config::LayerNames> &src
+                , ManagedBuffer &sm)
+{
+    if (!src) { return; }
+
+    dst = boost::in_place(sm.get_allocator<String>());
+    for (const auto &str : *src) {
+        dst->push_back(String(str.data(), str.size()
+                              , sm.get_allocator<char>()));
+    }
+}
+
+void copyLayers(boost::optional<geo::heightcoding::Config::LayerNames> &dst
+                , const boost::optional<StringVector> &src)
+{
+    if (!src) { return; }
+
+    dst = boost::in_place();
+    for (const auto &str : *src) {
+        dst->emplace_back(str.data(), str.size());
+    }
+}
+
+} // namespace
+
 ShHeightCodeConfig
 ::ShHeightCodeConfig(const geo::heightcoding::Config &config
                      , ManagedBuffer &sm)
@@ -105,14 +134,8 @@ ShHeightCodeConfig
         outputAdjustVertical_ = config.outputSrs->adjustVertical;
     }
 
-    if (config.layers) {
-        layers_ = boost::in_place(sm.get_allocator<String>());
-
-        for (const auto &str : *config.layers) {
-            layers_->push_back(String(str.data(), str.size()
-                                      , sm.get_allocator<char>()));
-        }
-    }
+    copyLayers(layers_, config.layers, sm);
+    copyLayers(clipLayers_, config.clipLayers, sm);
 }
 
 ShHeightCodeConfig::operator geo::heightcoding::Config() const
@@ -128,12 +151,8 @@ ShHeightCodeConfig::operator geo::heightcoding::Config() const
 
     config.clipWorkingExtents = clipWorkingExtents_;
 
-    if (layers_) {
-        config.layers = boost::in_place();
-        for (const auto &str : *layers_) {
-            config.layers->emplace_back(str.data(), str.size());
-        }
-    }
+    copyLayers(config.layers, layers_);
+    copyLayers(config.clipLayers, clipLayers_);
 
     config.format = format_;
     config.mode = mode_;
