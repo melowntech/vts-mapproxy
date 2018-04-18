@@ -1,3 +1,9 @@
+vts-mapproxy (1.25) stable; urgency=low
+
+  * geodata-vector-tiles: (optional) definition.clipLayers specify layers to be clipped to node extents
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 18 Apr 2018 12:35:39 +0200
+
 vts-mapproxy (1.24) stable; urgency=low
 
   * geodata-vector*: fixed layer definition parsing
