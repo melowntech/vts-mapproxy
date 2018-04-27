@@ -132,6 +132,17 @@ void parseDefinition(GeodataVectorBase::Definition &def
     }
 }
 
+void buildLayers(const boost::optional
+                 <geo::heightcoding::Config::LayerNames> &layers
+                 , const std::string &name, Json::Value &value)
+{
+    if (!layers) { return; }
+    auto &players(value[name] = Json::arrayValue);
+    for (const auto &layer : *layers) {
+        players.append(layer);
+    }
+}
+
 void buildDefinition(Json::Value &value
                      , const GeodataVectorBase::Definition &def)
 {
@@ -142,12 +153,8 @@ void buildDefinition(Json::Value &value
         value["geoidGrid"] = *def.dem.geoidGrid;
     }
 
-    if (def.layers) {
-        auto &layers(value["layers"] = Json::arrayValue);
-        for (const auto &layer : *def.layers) {
-            layers.append(layer);
-        }
-    }
+    buildLayers(def.layers, "layers", value);
+    buildLayers(def.clipLayers, "clipLayers", value);
 
     value["format"] = boost::lexical_cast<std::string>(def.format);
     value["displaySize"] = def.displaySize;
