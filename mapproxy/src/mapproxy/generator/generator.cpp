@@ -41,6 +41,7 @@
 
 #include "dbglog/dbglog.hpp"
 #include "utility/path.hpp"
+#include "utility/gccversion.hpp"
 
 #include "../error.hpp"
 #include "../generator.hpp"
@@ -129,9 +130,9 @@ Generator::Generator(const Params &params)
                 << "Bumped resource <" << resource_.id
                 << "> revision to " << resource_.revision
                 << " due to definition change.";
-            // [[fallthrough]]
+            UTILITY_FALLTHROUGH;
 
-        case Changed::no: // [[fallthrough]]
+        case Changed::no: UTILITY_FALLTHROUGH;
         case Changed::safely:
             // nothing or something non-destructive changed -> re-save
             save(rfile, resource_);

@@ -232,6 +232,7 @@ void Core::Detail::generate(const http::Request &request, Sink sink)
         switch (fi.type) {
         case FileInfo::Type::referenceFrameMapConfig:
             generateRfMapConfig(fi.resourceId.referenceFrame, sink);
+            return;
 
         case FileInfo::Type::resourceFile:
             generateResourceFile(fi, sink);

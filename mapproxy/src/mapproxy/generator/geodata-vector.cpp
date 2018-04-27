@@ -109,7 +109,8 @@ GeodataVector::heightcode(const DemDataset::list &datasets
 {
     // height code dataset
     geo::heightcoding::Config config;
-    config.outputSrs = { physicalSrs_.srsDef, physicalSrs_.adjustVertical() };
+    config.outputSrs = boost::in_place
+        (physicalSrs_.srsDef, physicalSrs_.adjustVertical());
     config.layers = definition_.layers;
     config.format = definition_.format;
     config.mode = definition_.mode;

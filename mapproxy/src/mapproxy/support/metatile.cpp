@@ -28,6 +28,7 @@
 #include <set>
 
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 #include "utility/raise.hpp"
 
