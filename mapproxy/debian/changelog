@@ -1,4 +1,4 @@
-vts-mapproxy (1.25) stable; urgency=low
+vts-mapproxy (1.27) stable; urgency=low
 
   * geodata-vector-tiles: (optional) definition.clipLayers specify layers to be clipped to node extents
 
