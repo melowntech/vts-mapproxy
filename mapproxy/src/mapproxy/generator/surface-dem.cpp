@@ -259,6 +259,7 @@ void SurfaceDem::prepare_impl(Arsenal&)
     // keep driverOptions empty -> no driver
     properties_.lodRange = r.lodRange;
     properties_.tileRange = r.tileRange;
+    properties_.revision = r.revision;
 
     // optional tuning properties
     properties_.nominalTexelSize = definition_.nominalTexelSize;

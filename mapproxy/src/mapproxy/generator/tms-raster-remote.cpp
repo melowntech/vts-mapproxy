@@ -44,6 +44,7 @@
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
+#include "../support/revision.hpp"
 
 #include "./tms-raster-remote.hpp"
 #include "./factory.hpp"
@@ -186,12 +187,16 @@ vr::BoundLayer TmsRasterRemote::boundLayer(ResourceRoot root) const
 
     // build url
     bl.url = definition_.remoteUrl;
-    bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
-                             , resource(), root);
+    bl.maskUrl = prependRoot
+        (utility::format("{lod}-{x}-{y}.mask%s"
+                         , RevisionWrapper(res.revision, "?"))
+         , resource(), root);
 
     if (hasMetatiles_) {
-        bl.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
-                                 , resource(), root);
+        bl.metaUrl = prependRoot
+            (utility::format("{lod}-{x}-{y}.meta%s"
+                             , RevisionWrapper(res.revision, "?"))
+             , resource(), root);
     }
 
     bl.lodRange = res.lodRange;

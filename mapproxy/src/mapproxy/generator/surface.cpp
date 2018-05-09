@@ -286,6 +286,11 @@ bool SurfaceBase::updateProperties(const SurfaceDefinition &def)
         changed = true;
     }
 
+    // update revision if changed
+    if (resource().revision > properties_.revision) {
+        properties_.revision = resource().revision;
+    }
+
     return changed;
 }
 
@@ -325,7 +330,7 @@ Generator::Task SurfaceBase
             case vts::FileFlavor::raw:
                 sink.content(vs::fileIStream
                              (fi.fileType, filePath(vts::File::config))
-                             , FileClass::data);
+                             , FileClass::unknown);
                 break;
 
             case vts::FileFlavor::debug: {
@@ -353,7 +358,7 @@ Generator::Task SurfaceBase
         case vts::File::tileIndex:
             sink.content(vs::fileIStream
                           (fi.fileType, filePath(vts::File::tileIndex))
-                         , FileClass::data);
+                         , FileClass::unknown);
             break;
 
         case vts::File::registry: {

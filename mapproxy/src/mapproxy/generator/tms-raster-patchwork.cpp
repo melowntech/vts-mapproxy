@@ -25,12 +25,12 @@
  */
 
 #include <boost/filesystem.hpp>
-#include <boost/format.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
+#include "utility/format.hpp"
 
 #include "geo/geodataset.hpp"
 
@@ -48,6 +48,7 @@
 #include "../error.hpp"
 #include "../support/metatile.hpp"
 #include "../support/tileindex.hpp"
+#include "../support/revision.hpp"
 
 #include "./tms-raster-patchwork.hpp"
 #include "./factory.hpp"
@@ -209,14 +210,21 @@ vr::BoundLayer TmsRasterPatchwork::boundLayer(ResourceRoot root) const
 
     // build url
     bl.url = prependRoot
-        (str(boost::format("{lod}-{x}-{y}.%s") % definition_.format)
+        (utility::format("{lod}-{x}-{y}.%s%s"
+                         , definition_.format
+                         , RevisionWrapper(res.revision, "?"))
          , resource(), root);
     if (definition_.mask) {
-        bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
-                                 , resource(), root);
+        bl.maskUrl = prependRoot
+            (utility::format("{lod}-{x}-{y}.mask%s"
+                             , RevisionWrapper(res.revision, "?"))
+             , resource(), root);
         if (hasMetatiles_) {
-            bl.metaUrl = prependRoot(std::string("{lod}-{x}-{y}.meta")
-                                     , resource(), root);
+            const auto fname
+                (utility::format("{lod}-{x}-{y}.meta%s"
+                                 , RevisionWrapper(res.revision, "?")));
+
+            bl.metaUrl = prependRoot(fname, resource(), root);
         }
     }
 

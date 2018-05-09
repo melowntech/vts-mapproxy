@@ -25,7 +25,6 @@
  */
 
 #include <boost/filesystem.hpp>
-#include <boost/format.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -51,6 +50,7 @@
 #include "../support/tileindex.hpp"
 #include "../support/mmapped/qtree.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
+#include "../support/revision.hpp"
 
 #include "./tms-raster.hpp"
 #include "./factory.hpp"
@@ -376,15 +376,19 @@ vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
 
     // build url
     bl.url = prependRoot
-        (str(boost::format("{lod}-{x}-{y}.%s") % format())
+        (utility::format("{lod}-{x}-{y}.%s%s"
+                         , format(), RevisionWrapper(res.revision, "?"))
          , resource(), root);
     if (hasMask()) {
-        bl.maskUrl = prependRoot(std::string("{lod}-{x}-{y}.mask")
-                                 , resource(), root);
+        bl.maskUrl = prependRoot
+            (utility::format("{lod}-{x}-{y}.mask%s"
+                             , RevisionWrapper(res.revision, "?"))
+             , resource(), root);
         if (hasMetatiles_) {
             const auto fname
-                (utility::format("{lod}-{x}-{y}.meta?gr=%d"
-                                 , GeneratorRevision));
+                (utility::format("{lod}-{x}-{y}.meta?gr=%d%s"
+                                 , GeneratorRevision
+                                 , RevisionWrapper(res.revision, "&")));
 
             bl.metaUrl = prependRoot(fname, resource(), root);
         }
