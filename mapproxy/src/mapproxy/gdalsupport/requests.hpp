@@ -92,6 +92,10 @@ private:
     boost::optional<math::Extents2> clipWorkingExtents_;
 
     geo::VectorFormat format_;
+    /** Use variant of custom types if there is anything that needs an allocator
+     *  (like a string) in any format config alternative
+     */
+    boost::variant<geo::vectorformat::GeodataConfig> formatConfig_;
 
     geo::heightcoding::Mode mode_;
 };

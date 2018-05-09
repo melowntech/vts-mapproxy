@@ -113,6 +113,7 @@ GeodataVector::heightcode(const DemDataset::list &datasets
         (physicalSrs_.srsDef, physicalSrs_.adjustVertical());
     config.layers = definition_.layers;
     config.format = definition_.format;
+    config.formatConfig = definition_.formatConfig;
     config.mode = definition_.mode;
 
     // heightcode data using warper's machinery
@@ -155,6 +156,7 @@ vr::FreeLayer GeodataVector::freeLayer_impl(ResourceRoot root) const
                          , RevisionWrapper(res.revision, "&"))
          , res, root);
     def.style = styleUrl();
+    fl.credits = asInlineCredits(res);
 
     // done
     return fl;

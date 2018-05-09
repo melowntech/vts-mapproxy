@@ -47,6 +47,7 @@
 #include "./files.hpp"
 
 namespace ba = boost::algorithm;
+namespace vf = geo::vectorformat;
 
 namespace generator {
 
@@ -70,6 +71,11 @@ void parseLayers(boost::optional<geo::heightcoding::Config::LayerNames> &result
     std::sort(result->begin(), result->end());
 }
 
+void parse(vf::GeodataConfig &config, const Json::Value &value)
+{
+    Json::getOpt(config.resolution, value, "resolution");
+}
+
 void parseDefinition(GeodataVectorBase::Definition &def
                      , const Json::Value &value)
 {
@@ -89,12 +95,29 @@ void parseDefinition(GeodataVectorBase::Definition &def
     if (value.isMember("format")) {
         Json::get(s, value, "format");
         try {
-            def.format
-                = boost::lexical_cast<geo::VectorFormat>(s);
+            def.format  = boost::lexical_cast<geo::VectorFormat>(s);
         } catch (boost::bad_lexical_cast) {
             utility::raise<FormatError>
                 ("Value stored in format is not a valid height"
                  " coded data format.");
+        }
+    }
+
+    if (value.isMember("formatConfig")) {
+        const auto formatConfig(value["formatConfig"]);
+        if (!formatConfig.isObject()) {
+            LOGTHROW(err1, FormatError)
+                << "Geodata definition[formatConfig] is not an object.";
+        }
+
+        switch (def.format) {
+        case geo::VectorFormat::geodataJson:
+            parse(createGeodataConfig(def.formatConfig), formatConfig);
+            break;
+
+        default:
+            // ignore
+            break;
         }
     }
 
@@ -143,6 +166,12 @@ void buildLayers(const boost::optional
     }
 }
 
+void build(Json::Value &value, const vf::GeodataConfig *config)
+{
+    if (!config) { return; }
+    value["resolution"] = config->resolution;
+}
+
 void buildDefinition(Json::Value &value
                      , const GeodataVectorBase::Definition &def)
 {
@@ -157,6 +186,18 @@ void buildDefinition(Json::Value &value
     buildLayers(def.clipLayers, "clipLayers", value);
 
     value["format"] = boost::lexical_cast<std::string>(def.format);
+    auto &formatConfig(value["formatConfig"] = Json::objectValue);
+    switch (def.format) {
+
+    case geo::VectorFormat::geodataJson:
+        build(formatConfig, boost::get<vf::GeodataConfig>(&def.formatConfig));
+        break;
+
+    default:
+        // ignore
+        break;
+    }
+
     value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
     value["mode"] = boost::lexical_cast<std::string>(def.mode);
@@ -200,6 +241,14 @@ void parseLayers(boost::optional<geo::heightcoding::Config::LayerNames> &result
     std::sort(result->begin(), result->end());
 }
 
+void parse(vf::GeodataConfig &config, const boost::python::dict &value)
+{
+    if (value.has_key("resolution")) {
+        config.resolution
+            = boost::python::extract<int>(value["resolution"]);
+    }
+}
+
 void parseDefinition(GeodataVectorBase::Definition &def
                      , const boost::python::dict &value)
 {
@@ -221,6 +270,19 @@ void parseDefinition(GeodataVectorBase::Definition &def
             utility::raise<Error>
                 ("Value stored in format is not a valid height"
                  " coded data format.");
+        }
+    }
+
+    if (value.has_key("formatConfig")) {
+        boost::python::dict formatConfig(value["formatConfig"]);
+        switch (def.format) {
+        case geo::VectorFormat::geodataJson:
+            parse(createGeodataConfig(def.formatConfig), formatConfig);
+            break;
+
+        default:
+            // ignore
+            break;
         }
     }
 
@@ -311,11 +373,28 @@ void GeodataVectorBase::Definition::to_impl(boost::any &value) const
     }
 }
 
+bool differ(const vf::GeodataConfig &l, const vf::GeodataConfig *r)
+{
+    // different type?
+    if (!r) { return true; }
+    // same types
+    if (l.resolution != r->resolution) { return true; }
+    return false;
+}
+
+bool differ(const vf::Config &l, const vf::Config &r)
+{
+    if (const auto *cl = boost::get<vf::GeodataConfig>(&l)) {
+        return differ(*cl, boost::get<vf::GeodataConfig>(&r));
+    }
+    // add more config types here
+    return true;
+}
+
 Changed
 GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
 {
     const auto &other(o.as<Definition>());
-
 
     // do not allow dem change (breaks meatadata)
     if (dem != other.dem) { return Changed::yes; }
@@ -331,8 +410,10 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     if (mode != other.mode) { bump = true; }
     if (layerEnhancers != other.layerEnhancers) { bump = true; }
 
-    // format can change
-    if (format != other.format) { safe = true; }
+    // different format leads to version bump!
+    if (format != other.format) { bump = true; }
+    // different format config leads to version bump!
+    if (differ(formatConfig, other.formatConfig)) { bump = true; }
     // displaySize can change
     if (displaySize != other.displaySize) { safe = true; }
     // styleUrl can change

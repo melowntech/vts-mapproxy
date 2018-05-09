@@ -423,6 +423,7 @@ void GeodataVectorTiled::generateGeodata(Sink &sink
         (physicalSrs_.srsDef, physicalSrs_.adjustVertical());
     config.layers = definition_.layers;
     config.format = definition_.format;
+    config.formatConfig = definition_.formatConfig;
     config.mode = definition_.mode;
 
     if (cutting) {

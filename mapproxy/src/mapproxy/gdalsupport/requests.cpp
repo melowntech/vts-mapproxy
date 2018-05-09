@@ -119,6 +119,7 @@ ShHeightCodeConfig
 
     , clipWorkingExtents_(config.clipWorkingExtents)
     , format_(config.format)
+    , formatConfig_(config.formatConfig)
     , mode_(config.mode)
 {
     if (config.workingSrs) {
@@ -155,6 +156,7 @@ ShHeightCodeConfig::operator geo::heightcoding::Config() const
     copyLayers(config.clipLayers, clipLayers_);
 
     config.format = format_;
+    config.formatConfig = formatConfig_;
     config.mode = mode_;
 
     return config;

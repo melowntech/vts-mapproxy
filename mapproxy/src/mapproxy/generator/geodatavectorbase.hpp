@@ -57,6 +57,7 @@ public:
         boost::optional<geo::heightcoding::Config::LayerNames> layers;
         boost::optional<geo::heightcoding::Config::LayerNames> clipLayers;
         geo::VectorFormat format;
+        geo::vectorformat::Config formatConfig;
         std::string styleUrl;
         int displaySize;
         geo::heightcoding::Mode mode;
@@ -107,6 +108,7 @@ private:
 
 private:
     const Definition &definition_;
+
     /** Layer enhancers with absolute paths.
      */
     LayerEnhancer::map layerEnhancers_;
