@@ -342,12 +342,6 @@ vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
     return mc;
 }
 
-namespace {
-
-typedef vs::Range<double> HeightRange;
-
-} // namespace
-
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
                                   , Sink &sink
                                   , const SurfaceFileInfo &fi
@@ -375,8 +369,8 @@ SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
 {
     return metatileFromDem(tileId, sink, arsenal, resource()
                            , index_->tileIndex, dem_.dataset
-                           , dem_.geoidGrid
-                           , maskTree_);
+                           , dem_.geoidGrid, maskTree_, boost::none
+                           , definition_.heightFunction);
 }
 
 namespace {
@@ -393,8 +387,9 @@ public:
      *  Pixels masked by external mask are not valid (i.e. the mask must be
      *  dilated by 1 pixel beforehand)
      */
-    DemSampler(const cv::Mat &dem, const vts::NodeInfo::CoverageMask &mask)
-        : dem_(dem), mask_(mask)
+    DemSampler(const cv::Mat &dem, const vts::NodeInfo::CoverageMask &mask
+               , const HeightFunction::pointer &heightFunction)
+        : dem_(dem), mask_(mask), heightFunction_(heightFunction)
     {}
 
     bool operator()(int i, int j, double &h) const {
@@ -402,7 +397,10 @@ public:
         if (!mask_.get(i, j)) { return false; }
 
         h = dem_.at<double>(j, i);
-        if (validSample(h)) { return true; }
+        if (validSample(h)) {
+            if (heightFunction_) { h = (*heightFunction_)(h); }
+            return true;
+        }
 
         h = 0;
         int count(0);
@@ -431,7 +429,11 @@ public:
         }
 
         if (!count) { return false; }
-        h /= count;
+        if (heightFunction_) {
+            h = (*heightFunction_)(h / count);
+        } else {
+            h = (h / count);
+        }
 
         return true;
     }
@@ -439,6 +441,7 @@ public:
 private:
     cv::Mat dem_;
     const vts::NodeInfo::CoverageMask &mask_;
+    const HeightFunction::pointer &heightFunction_;
 };
 
 } // namespace
@@ -473,7 +476,7 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
     auto coverage(generateCoverage(dem->cols - 1, nodeInfo, maskTree_
                                    , vts::NodeInfo::CoverageType::grid));
 
-    DemSampler ds(*dem, coverage);
+    DemSampler ds(*dem, coverage, definition_.heightFunction);
 
     // generate mesh
     auto meshInfo(meshFromNode(nodeInfo, size
@@ -575,7 +578,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     // set height range
     nt.heightRange(vts::NavTile::HeightRange
                    (std::floor(heightRange.min), std::ceil(heightRange.max)));
-    DemSampler ds(*dem, coverage);
+    DemSampler ds(*dem, coverage, definition_.heightFunction);
 
     // calculate navtile values
     math::Size2f npx(ts.width / (ntd.cols - 1)

@@ -98,20 +98,19 @@ inline bool validSample(double value)
 
 class ValueMinMaxSampler {
 public:
-    ValueMinMaxSampler(const GdalWarper::Raster &dem)
-        : dem_(dem)
+    ValueMinMaxSampler(const GdalWarper::Raster &dem
+                       , const HeightFunction::pointer &heightFunction)
+        : dem_(dem), heightFunction_(heightFunction)
     {}
 
     boost::optional<cv::Vec3d> operator()(int i, int j) const {
         // first, try exact value
         const auto &v(dem_->at<cv::Vec3d>(j, i));
-        if (validSample(v[0])) { return v; }
+        if (validSample(v[0])) { return applyHeightFunction(v); }
 
         // output vector and count of valid samples
-        boost::optional<cv::Vec3d> outFull;
-        outFull = boost::in_place(0, std::numeric_limits<double>::max()
-                                  , std::numeric_limits<double>::lowest());
-        auto &out(*outFull);
+        cv::Vec3d out(0, std::numeric_limits<double>::max()
+                      , std::numeric_limits<double>::lowest());
         int count(0);
 
         for (int jj(-1); jj <= +1; ++jj) {
@@ -138,11 +137,20 @@ public:
         if (!count) { return boost::none; }
 
         out[0] /= count;
-        return out;
+        return applyHeightFunction(out);
     }
 
 private:
+    cv::Vec3d applyHeightFunction(cv::Vec3d value) const {
+        if (!heightFunction_) { return std::move(value); }
+        value[0] = (*heightFunction_)(value[0]);
+        value[1] = (*heightFunction_)(value[1]);
+        value[2] = (*heightFunction_)(value[2]);
+        return std::move(value);
+    }
+
     GdalWarper::Raster dem_;
+    const HeightFunction::pointer &heightFunction_;
 };
 
 typedef vts::MetaNode::Flag MetaFlag;
@@ -170,7 +178,8 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                     , const std::string &demDataset
                     , const boost::optional<std::string> &geoidGrid
                     , const MaskTree &maskTree
-                    , const boost::optional<int> &displaySize)
+                    , const boost::optional<int> &displaySize
+                    , const HeightFunction::pointer &heightFunction)
 {
     auto blocks(metatileBlocks(resource, tileId));
 
@@ -291,7 +300,7 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
         const ShiftMask rfmask(block, metatileSamplesPerTile, maskTree);
 
         // fill in grid
-        ValueMinMaxSampler vmm(dem);
+        ValueMinMaxSampler vmm(dem, heightFunction);
         for (int j(0), je(gridSize.height); j < je; ++j) {
             auto y(extents.ur(1) - j * gts.height);
             for (int i(0), ie(gridSize.width); i < ie; ++i) {
@@ -448,12 +457,13 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 , const std::string &demDataset
                 , const boost::optional<std::string> &geoidGrid
                 , const MaskTree &maskTree
-                , const boost::optional<int> &displaySize)
+                , const boost::optional<int> &displaySize
+                , const HeightFunction::pointer &heightFunction)
 
 {
     return metatileFromDemImpl(tileId, sink, arsenal, resource, tileIndex
-                               , demDataset, geoidGrid, maskTree, displaySize);
-
+                               , demDataset, geoidGrid, maskTree, displaySize
+                               , heightFunction);
 }
 
 
@@ -464,10 +474,11 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 , const std::string &demDataset
                 , const boost::optional<std::string> &geoidGrid
                 , const MaskTree &maskTree
-                , const boost::optional<int> &displaySize)
-
+                , const boost::optional<int> &displaySize
+                , const HeightFunction::pointer &heightFunction)
 {
     return metatileFromDemImpl(tileId, sink, arsenal, resource, tileIndex
-                               , demDataset, geoidGrid, maskTree, displaySize);
+                               , demDataset, geoidGrid, maskTree, displaySize
+                               , heightFunction);
 
 }

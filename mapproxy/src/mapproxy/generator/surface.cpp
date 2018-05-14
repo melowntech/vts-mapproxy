@@ -114,6 +114,8 @@ void SurfaceBase::SurfaceDefinition::parse(const Json::Value &value)
         Json::get(*mergeBottomLod, value, "mergeBottomLod");
     }
 
+    heightFunction = HeightFunction::parse(value, "heightFunction");
+
     if (value.isMember("introspection")) {
         const auto &jintrospection(value["introspection"]);
 
@@ -144,6 +146,12 @@ void SurfaceBase::SurfaceDefinition::build(Json::Value &value) const
         value["mergeBottomLod"] = *mergeBottomLod;
     }
 
+    if (heightFunction) {
+        boost::any tmp(Json::Value(Json::objectValue));
+        heightFunction->build(tmp);
+        value["heightFunction"] = boost::any_cast<const Json::Value&>(tmp);
+    }
+
     if (!introspection.empty()) {
         auto &jintrospection(value["introspection"] = Json::objectValue);
         introspectionListTo(jintrospection, "tms", introspection.tms) ;
@@ -172,6 +180,8 @@ void SurfaceBase::SurfaceDefinition::parse(const boost::python::dict &value)
         mergeBottomLod = boost::python::extract
             <vts::Lod>(value["mergeBottomLod"]);
     }
+
+    heightFunction = HeightFunction::parse(value, "heightFunction");
 
     if (value.has_key("introspection")) {
         boost::python::dict pintrospection(value["introspection"]);
@@ -204,6 +214,10 @@ Changed SurfaceBase::SurfaceDefinition::changed_impl(const DefinitionBase &o)
 
     if (introspection != other.introspection) {
         return Changed::safely;
+    }
+
+    if (heightFunction != other.heightFunction) {
+        return Changed::yes;
     }
 
     return Changed::no;

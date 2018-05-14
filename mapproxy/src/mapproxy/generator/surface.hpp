@@ -32,6 +32,7 @@
 #include "vts-libs/vts/tileset/properties.hpp"
 #include "vts-libs/vts/mesh.hpp"
 
+#include "./heightfunction.hpp"
 #include "../support/mmapped/tilesetindex.hpp"
 #include "../generator.hpp"
 
@@ -59,6 +60,7 @@ public:
     struct SurfaceDefinition : public DefinitionBase {
         boost::optional<double> nominalTexelSize;
         boost::optional<vts::Lod> mergeBottomLod;
+        HeightFunction::pointer heightFunction;
         Introspection introspection;
 
         void parse(const Json::Value &value);

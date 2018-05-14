@@ -35,6 +35,8 @@
 
 #include "../generator.hpp"
 
+#include "./heightfunction.hpp"
+
 vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , Arsenal &arsenal
                               , const Resource &resource
@@ -43,7 +45,9 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , const boost::optional<std::string> &geoidGrid
                               , const MaskTree &maskTree = MaskTree()
                               , const boost::optional<int> &displaySize
-                              = boost::none);
+                              = boost::none
+                              , const HeightFunction::pointer &heightFunction
+                              = HeightFunction::pointer());
 
 vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , Arsenal &arsenal
@@ -53,6 +57,8 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , const boost::optional<std::string> &geoidGrid
                               , const MaskTree &maskTree = MaskTree()
                               , const boost::optional<int> &displaySize
-                              = boost::none);
+                              = boost::none
+                              , const HeightFunction::pointer &heightFunction
+                              = HeightFunction::pointer());
 
 #endif // mapproxy_metatile_hpp_included_

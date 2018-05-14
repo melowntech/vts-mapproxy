@@ -33,6 +33,7 @@
 #include <boost/utility/in_place_factory.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/thread.hpp>
 
 #include "utility/streams.hpp"
@@ -210,6 +211,17 @@ void Daemon::configuration(po::options_description &cmdline
          , po::value(&generatorsConfig_.resourceRoot)
          ->default_value(generatorsConfig_.resourceRoot)->required()
          , "Root of datasets defined as relative path.")
+        ("resource-backend.freeze"
+         , po::value<std::string>()
+         ->default_value(utility::concat
+                         (utility::join
+                          (generatorsConfig_.freezeResourceTypes, ",")))
+         ->required()
+         , utility::concat
+         ("List of resource types that should be immutable once "
+          "successfully configured for the first time. Use one or more of ["
+          , enumerationString(Resource::Generator::Type{})
+          , "].").c_str())
 
         ("vts.builtinBrowserUrl"
          , po::value(&variables_["VTS_BUILTIN_BROWSER_URL"])
@@ -263,6 +275,24 @@ void Daemon::configure(const po::variables_map &vars)
 
     gdalWarperOptions_.tmpRoot = fs::absolute(gdalWarperOptions_.tmpRoot);
 
+    {
+        const auto &value(vars["resource-backend.freeze"].as<std::string>());
+        std::vector<std::string> parts;
+        ba::split(parts, value, ba::is_any_of(", "), ba::token_compress_on);
+
+        generatorsConfig_.freezeResourceTypes.clear();
+        for (const auto &part : parts) {
+            if (part.empty()) { continue; }
+            try {
+                generatorsConfig_.freezeResourceTypes.insert
+                    (boost::lexical_cast<Resource::Generator::Type>(part));
+            } catch (boost::bad_lexical_cast) {
+                throw po::validation_error
+                    (po::validation_error::invalid_option_value, value);
+            }
+        }
+    }
+
     LOG(info3, log_)
         << "Config:"
         << "\n\tstore.path = " << generatorsConfig_.root
@@ -277,7 +307,9 @@ void Daemon::configure(const po::variables_map &vars)
         << generatorsConfig_.resourceUpdatePeriod
         << "\n\tresource-backend.root = "
         << generatorsConfig_.resourceRoot
-        << "\n"
+        << "\n\tresource-backend.freeze = ["
+        << utility::join(generatorsConfig_.freezeResourceTypes, ",")
+        << "]\n"
         << utility::LManip([&](std::ostream &os) {
                 ResourceBackend::printConfig(os, "\t" + RBPrefixDotted
                                              , resourceBackendConfig_);

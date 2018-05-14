@@ -121,7 +121,9 @@ Generator::Generator(const Params &params)
         savedResource_.revision = resource_.revision
             = std::max(resource_.revision, savedResource_.revision);
 
-        switch (savedResource_.changed(resource_)) {
+        switch (savedResource_.changed
+                (resource_, config().freezes(savedResource_.generator.type)))
+        {
         case Changed::withRevisionBump:
             // update revision
             ++resource_.revision;
@@ -156,7 +158,9 @@ Generator::Generator(const Params &params)
 
 Changed Generator::changed(const Resource &resource) const
 {
-    switch (auto changed = resource.changed(resource_)) {
+    switch (auto changed = resource.changed
+            (resource_, config().freezes(resource.generator.type)))
+    {
     case Changed::yes:
         LOG(warn2)
             << "Definition of resource <" << resource.id

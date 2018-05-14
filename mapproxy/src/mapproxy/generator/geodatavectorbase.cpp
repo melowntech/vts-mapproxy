@@ -141,6 +141,8 @@ void parseDefinition(GeodataVectorBase::Definition &def
         }
     }
 
+    def.heightFunction = HeightFunction::parse(value, "heightFunction");
+
     if (value.isMember("introspection")) {
         const auto &jintrospection(value["introspection"]);
 
@@ -210,6 +212,12 @@ void buildDefinition(Json::Value &value
             layer["db"] = item.second.databasePath;
             layer["table"] = item.second.table;
         }
+    }
+
+    if (def.heightFunction) {
+        boost::any tmp(Json::Value(Json::objectValue));
+        def.heightFunction->build(tmp);
+        value["heightFunction"] = boost::any_cast<const Json::Value&>(tmp);
     }
 
     if (!def.introspection.empty()) {
@@ -314,6 +322,8 @@ void parseDefinition(GeodataVectorBase::Definition &def
         }
     }
 
+    def.heightFunction = HeightFunction::parse(value, "heightFunction");
+
     if (value.has_key("introspection")) {
         boost::python::dict pintrospection(value["introspection"]);
         def.introspection.surface
@@ -396,19 +406,18 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
 {
     const auto &other(o.as<Definition>());
 
-    // do not allow dem change (breaks meatadata)
-    if (dem != other.dem) { return Changed::yes; }
-
     // accumulate revision bump/safe changes
     bool bump(false);
     bool safe(false);
 
     // changing these bumps version
+    if (dem != other.dem) { bump = true; }
     if (dataset != other.dataset) { bump = true; }
     if (layers != other.layers) { bump = true; }
     if (clipLayers != other.clipLayers) { bump = true; }
     if (mode != other.mode) { bump = true; }
     if (layerEnhancers != other.layerEnhancers) { bump = true; }
+    if (heightFunction != other.heightFunction) { bump = true; }
 
     // different format leads to version bump!
     if (format != other.format) { bump = true; }
@@ -418,6 +427,7 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     if (displaySize != other.displaySize) { safe = true; }
     // styleUrl can change
     if (styleUrl != other.styleUrl) { safe = true; }
+
     // introspection can change
     if (introspection != other.introspection) { safe = true; }
 

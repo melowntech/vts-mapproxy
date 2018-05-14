@@ -97,11 +97,17 @@ public:
         const vs::SupportFile::Vars *variables;
         const vs::SupportFile::Vars *defaults;
         double defaultFov;
+        std::set<Resource::Generator::Type> freezeResourceTypes;
 
         Config()
             : fileFlags(), variables(), defaults()
             , defaultFov(vr::Position::naturalFov())
+            , freezeResourceTypes{Resource::Generator::Type::surface}
         {}
+
+        bool freezes(Resource::Generator::Type type) const {
+            return freezeResourceTypes.find(type) != freezeResourceTypes.end();
+        }
     };
 
     virtual ~Generator() {}

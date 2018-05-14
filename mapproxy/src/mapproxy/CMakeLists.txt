@@ -61,6 +61,7 @@ set(mapproxy_SOURCES
   generator/generator.cpp
   generator/factory.hpp
   generator/metatile.hpp generator/metatile.cpp
+  generator/heightfunction.hpp generator/heightfunction.cpp
   generator/demregistry.hpp generator/demregistry.cpp
   generator/tms-raster.hpp generator/tms-raster.cpp
   generator/tms-raster-remote.hpp generator/tms-raster-remote.cpp

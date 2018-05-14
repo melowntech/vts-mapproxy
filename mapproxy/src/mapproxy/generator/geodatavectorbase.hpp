@@ -31,6 +31,7 @@
 
 #include "geo/heightcoding.hpp"
 
+#include "./heightfunction.hpp"
 #include "../generator.hpp"
 #include "../support/layerenancer.hpp"
 
@@ -62,6 +63,7 @@ public:
         int displaySize;
         geo::heightcoding::Mode mode;
         LayerEnhancer::map layerEnhancers;
+        HeightFunction::pointer heightFunction;
 
         Introspection introspection;
 
