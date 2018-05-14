@@ -205,7 +205,7 @@ struct Resource {
         : revision(), fileClassSettings(fileClassSettings)
     {}
 
-    Changed changed(const Resource &o, bool freezing = true) const;
+    Changed changed(const Resource &o) const;
 
 private:
     /** Definition: based on type and driver, created by resource

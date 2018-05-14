@@ -404,44 +404,34 @@ void save(const boost::filesystem::path &path, const Resource &resource)
     detail::saveResource(f, resource);
 }
 
-Changed Resource::changed(const Resource &o, bool freezing) const
+Changed Resource::changed(const Resource &o) const
 {
-    // check resource change
-    const auto changed([&]() -> Changed
-    {
-        // mandatory stuff first
-        if (!(id == o.id)) { return Changed::yes; }
-        if (!(generator == o.generator)) { return Changed::yes; }
+    // mandatory stuff first
+    if (!(id == o.id)) { return Changed::yes; }
+    if (!(generator == o.generator)) { return Changed::yes; }
 
-        if (lodRange != o.lodRange) { return Changed::yes; }
-        if (tileRange != o.tileRange) { return Changed::yes; }
+    if (lodRange != o.lodRange) { return Changed::yes; }
+    if (tileRange != o.tileRange) { return Changed::yes; }
 
-        // compare credits only if frozen
-        bool changedCredits(credits != o.credits);
-        if (definition_->frozenCredits() && changedCredits) {
-            return Changed::yes;
-        }
-
-        // TODO: registry ?
-
-        // check definition, it must check mandatory stuff first, save stuff
-        // second
-        auto def(definition_->changed(*o.definition()));
-        if (def != Changed::no) { return def; }
-
-        // from here down only safely-changed stuff can follow
-
-        if (changedCredits) { return Changed::safely; }
-
-        // not changed at all
-        return Changed::no;
-    }());
-
-    // unfreeze if not freezing
-    if (changed == Changed::yes) {
-        return (freezing ? Changed::yes : Changed::withRevisionBump);
+    // compare credits only if frozen
+    bool changedCredits(credits != o.credits);
+    if (definition_->frozenCredits() && changedCredits) {
+        return Changed::yes;
     }
-    return changed;
+
+    // TODO: registry ?
+
+    // check definition, it must check mandatory stuff first, save stuff
+    // second
+    auto def(definition_->changed(*o.definition()));
+    if (def != Changed::no) { return def; }
+
+    // from here down only safely-changed stuff can follow
+
+    if (changedCredits) { return Changed::safely; }
+
+    // not changed at all
+    return Changed::no;
 }
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path

@@ -417,7 +417,9 @@ GeodataVectorBase::Definition::changed_impl(const DefinitionBase &o) const
     if (clipLayers != other.clipLayers) { bump = true; }
     if (mode != other.mode) { bump = true; }
     if (layerEnhancers != other.layerEnhancers) { bump = true; }
-    if (heightFunction != other.heightFunction) { bump = true; }
+    if (HeightFunction::changed(heightFunction, other.heightFunction)) {
+        bump = true;
+    }
 
     // different format leads to version bump!
     if (format != other.format) { bump = true; }

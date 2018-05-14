@@ -121,9 +121,9 @@ Generator::Generator(const Params &params)
         savedResource_.revision = resource_.revision
             = std::max(resource_.revision, savedResource_.revision);
 
-        switch (savedResource_.changed
-                (resource_, config().freezes(savedResource_.generator.type)))
-        {
+        const auto freeze(config().freezes(savedResource_.generator.type));
+
+        switch (savedResource_.changed(resource_)) {
         case Changed::withRevisionBump:
             // update revision
             ++resource_.revision;
@@ -142,30 +142,45 @@ Generator::Generator(const Params &params)
             break;
 
         case Changed::yes:
-            // different setup, use stored definition
-            LOG(warn3)
-                << "Definition of resource <" << resource_.id
-                << "> differs from the one stored in store at "
-                << root() << "; using stored definition.";
-            resource_ = savedResource_;
+            if (freeze) {
+                // different setup, use stored definition
+                LOG(warn3)
+                    << "Definition of resource <" << resource_.id
+                    << "> differs from the one stored in store at "
+                    << root() << "; using stored definition.";
+                resource_ = savedResource_;
 
-            // force received file class setings even for saved resource
-            resource_.fileClassSettings = params.resource.fileClassSettings;
-            break;
+                // force received file class setings even for saved resource
+                resource_.fileClassSettings
+                    = params.resource.fileClassSettings;
+                break;
+            } else {
+                // changed but not freezing bump revision
+                LOG(warn3)
+                    << "Definition of resource <" << resource_.id
+                    << "> differs from the one stored in store at "
+                    << root() << "; bumped revision to "
+                    << resource_.revision
+                    << " due to disabled resource freezing.";
+
+                ++resource_.revision;
+                fresh_ = true;
+                save(rfile, resource_);
+            }
         }
     }
 }
 
 Changed Generator::changed(const Resource &resource) const
 {
-    switch (auto changed = resource.changed
-            (resource_, config().freezes(resource.generator.type)))
-    {
+    switch (auto changed = resource.changed(resource_)) {
     case Changed::yes:
-        LOG(warn2)
-            << "Definition of resource <" << resource.id
-            << "> differs from the one stored in store at "
-            << root() << "; using stored definition.";
+        if (!config().freezes(resource.generator.type)) {
+            LOG(warn2)
+                << "Definition of resource <" << resource.id
+                << "> differs from the one stored in store at "
+                << root() << "; using stored definition.";
+        }
         return changed;
 
     default:
@@ -733,8 +748,14 @@ void Generators::Detail::update(const Resource::map &resources)
             // existing resource
             switch ((*iserving)->changed(resource)) {
             case Changed::no:
+                // same stuff, do nothing
+                break;
+
             case Changed::yes:
-                // same or completety different stuff, do nothing
+                // changed
+                if (!config().freezes(resource.generator.type)) {
+                    replace(resource, *iserving);
+                }
                 break;
 
             case Changed::safely:

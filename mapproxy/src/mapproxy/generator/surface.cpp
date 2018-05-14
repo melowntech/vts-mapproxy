@@ -216,7 +216,7 @@ Changed SurfaceBase::SurfaceDefinition::changed_impl(const DefinitionBase &o)
         return Changed::safely;
     }
 
-    if (heightFunction != other.heightFunction) {
+    if (HeightFunction::changed(heightFunction, other.heightFunction)) {
         return Changed::yes;
     }
 
