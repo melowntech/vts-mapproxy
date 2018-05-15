@@ -292,8 +292,9 @@ definition = {
     String dataset                 // path to OGR dataset
     String demDataset              // path to complex dem dataset
     Optional String geoidGrid      // name of Proj.4's geoid grid file (e.g. `egm96_15.gtx`)
-    Optional Array<String> layers  // list of layers names
+    Optional Array<String> layers  // list of layer names
     Optional String format         // output file format, so far only "geodataJson" is supported (default)
+    Optional Object formatConfig   // format-specific configuration, see below
     Optional String styleUrl       // URL to default geodata style
     Int displaySize                // Nominal size of tile in pixels.
     Optional Object enhance        // Per-layer OGR dataset enhancement.
@@ -306,6 +307,15 @@ definition = {
  * if there is no `styleUrl` element present mapproxy serves its built-in default style via `style.json` file under resources URL;
  * or if `styleUrl` element is present and starts with `file:` prefix then contents of this file (either absolute or relative to dataset directory) are server via the same `style.json` file (NB: this is not a file URI);
  * otherwise, the URL from `styleUrl` element is reported in the `freelayer.json` as is
+ 
+Available format configurations:
+
+* `geodataJson`:
+```javascript
+{
+    Int resolution // number of samples the bounding box is divided to, defaults to 4096
+}
+```
 
 Layer enhancement allows supplying additional data to features from sqlite database. Configuration:
 
@@ -319,7 +329,7 @@ enhance = {
 }
 ```
 
-When generator encounteres layer with matching name it tries to get a row from `<db>.<table>` with column `id` (hardcoded name) equal to the value of the attribute `key` for each feature. If matching row is found all other collumns are added as attributes to the output.
+When generator encounteres layer with matching name it tries to get a row from `<db>.<table>` with column `id` (hardcoded name) equal to the value of the attribute `key` for each feature. If matching row is found all other columns are added as attributes to the output.
 
 
 Height function support is not implemented yet.
@@ -354,5 +364,6 @@ definition += {
     Optional Int maxSourceLod // Maximum available LOD in the source data. Detailed LODs
                               // will be generated from coarser tiles at maxSourceLod.
                               // LOD is in local subtree.
+    Optional Array<String> clipLayers // list of layers that are clipped to tile extents (in spatial division SRS)
 }
 ```
