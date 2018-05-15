@@ -6,8 +6,7 @@ This file is the authoritative mapproxy resource documentation. Please, keep it 
 
 Most common way to define resources for mapproxy is to provide JSON resource definition file and point mapproxy to it by specifying its path in `resource-backend.path` configuration parameter.
 
-The resource definition file can contain resource definitions or include
-subsequent definition files:
+The resource definition file can contain resource definitions or include of subsequent definition files:
 ```
 [
     Resource,    // see Basic resource layout below
@@ -18,6 +17,8 @@ subsequent definition files:
 ]
 ```
 where include `String` can be either exact path or a glob pattern (expansion to zero files is not an error) and may be relative to current resource file.
+
+☛ If the file contains single entry (resource or include) the surrounding array is not required.
 
 # Supported resource types/drivers
 
@@ -123,13 +124,18 @@ Available expansion strings. Only some make sense for templates used in mapproxy
  * `{loclod}` local tile LOD
  * `{locx}`   local tile X index
  * `{locy}`   local tile Y index
- * `{sub}`    sub-tile identifier (e.g. submesh index in atlas image)'
+ * `{sub}`    sub-tile identifier (e.g. submesh index in atlas image)
+ * `{srs}`    symbolic name of SRS in the current reference frame subtree
  * `{alt(1,2,3,4)}` exands to one of given strings
  * `{ppx}`    tile's old PP space X index (makes sense only in ppspace)
  * `{ppy}`    tile's old PP space Y index (makes sense only in ppspace)
  * `{Y}`      current year (used in credits definition)
  * `{copy}`   copyright symbol (used in credits definition)
- 
+ * `{switch(var,src:dst,src:dst,...,*:dst}`:
+     * if value == src then output dst
+     * special source value `*` marks default handler
+     * special destination value `*` means to output the value as is
+
 ## TMS drivers
 
 ### tms-raster
@@ -194,6 +200,7 @@ All surface drivers support these (optional) options:
                                         // reported by mapproxy-calipers
     Optional Int mergeBottomLod         // Reported in generated tileset.conf, speeds up merge
                                         // with other surfaces
+    Optional Object heightFunction      // Height manipulation function. See below.
     Optional Object/Array introspection // Introspection info used when using mapConfig.json served
                                         // by mapproxy. See below.
 ```
@@ -209,6 +216,20 @@ introspection = {
 }
 ```
 
+Height function is a function that takes the original height value and modifies it. Currently, the only supported
+height function is `superelevation`.
+
+```javascript
+heightFunction = {
+    String function; // must be "superelevation"
+    Array<double>[2] heightRange; // source mapping range
+    Array<souble>[2] scaleRange; // destination mapping range
+}
+```
+
+Superelevation maps height from `heightRange` to scale in `scaleRange` and outputs original height scaled by computed scale.
+The `heightRange[0]` must be lower than `heightRange[1]` and heights below `heightRange[0]` and above `heightRange[1]` are clipped.
+
 ### surface-spheroid
 
 This driver generates meshed surface for reference frame's spheroid. If geoid grid is provided the resulting body
@@ -219,6 +240,8 @@ definition = {
     // see common surface driver configuration options above
 }
 ```
+
+☛ Since `superelevation` has no effect here (all heights are 0) the heightFunction is not implemented yet.
 
 ### surface-dem
 
@@ -273,6 +296,8 @@ definition = {
     Optional String format         // output file format, so far only "geodataJson" is supported (default)
     Optional String styleUrl       // URL to default geodata style
     Int displaySize                // Nominal size of tile in pixels.
+    Optional Object enhance        // Per-layer OGR dataset enhancement.
+    Optional Object heightFunction // Height manipulation function. Same as for the surface drivers.
     Optional Object introspection  // Extended configuration for mapConfig.json served by mapproxy
 }
 ```
@@ -281,6 +306,23 @@ definition = {
  * if there is no `styleUrl` element present mapproxy serves its built-in default style via `style.json` file under resources URL;
  * or if `styleUrl` element is present and starts with `file:` prefix then contents of this file (either absolute or relative to dataset directory) are server via the same `style.json` file (NB: this is not a file URI);
  * otherwise, the URL from `styleUrl` element is reported in the `freelayer.json` as is
+
+Layer enhancement allows supplying additional data to features from sqlite database. Configuration:
+
+```javascript
+enhance = {
+   Object ? = {      // layer name
+       String key    // name of afeature attribute used as a key to database
+       String db     // path to a sqlite database file, relative to dataset directory
+       String table  // name of source table inside the sqlite database
+   }
+}
+```
+
+When generator encounteres layer with matching name it tries to get a row from `<db>.<table>` with column `id` (hardcoded name) equal to the value of the attribute `key` for each feature. If matching row is found all other collumns are added as attributes to the output.
+
+
+Height function support is not implemented yet.
 
 Introspection can be used to serve mapConfig where geodata are show with some surface which in turn can have its own
 introspection configuration.
@@ -305,3 +347,12 @@ Configuration is the same as for `geodata-vector` driver but input interpretatio
 
 Geodata's metatiles are generated purely from heightcoding GDAL dataset.
 
+Extra parameters available in this driver:
+
+```javascript
+definition += {
+    Optional Int maxSourceLod // Maximum available LOD in the source data. Detailed LODs
+                              // will be generated from coarser tiles at maxSourceLod.
+                              // LOD is in local subtree.
+}
+```
