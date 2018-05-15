@@ -824,7 +824,7 @@ void Generators::Detail::update(const Resource::map &resources)
     }
 
     // wait till all pending resources are available; not nice but should work
-    while (preparing_) {
+    while (preparing_ && running_) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
