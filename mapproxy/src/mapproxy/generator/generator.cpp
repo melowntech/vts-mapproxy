@@ -109,10 +109,11 @@ Generator::Generator(const Params &params)
     // TODO: handle failed creation
     auto rfile(root() / ResourceFile);
 
-    if (create_directories(root()) || system_) {
-        // new or system resource
+    const auto freshlyCreated(create_directories(root()));
+
+    if (freshlyCreated || !fs::exists(rfile) || system_) {
+        // new or forced new resource (system)
         fresh_ = true;
-        save(rfile, resource_);
     } else {
         // reopen of existing dataset
         savedResource_ = loadResource(rfile).front();
@@ -164,8 +165,7 @@ Generator::Generator(const Params &params)
                     << " due to disabled resource freezing.";
 
                 ++resource_.revision;
-                fresh_ = true;
-                save(rfile, resource_);
+                changeEnforced_ = true;
             }
         }
     }
@@ -190,7 +190,7 @@ Changed Generator::changed(const Resource &resource) const
 
 void Generator::makeReady()
 {
-    if (changeEnforced_) {
+    if (fresh_ || changeEnforced_) {
         save(root() / ResourceFile, resource_);
         changeEnforced_ = false;
     }
@@ -337,8 +337,8 @@ public:
     Detail(const Generators::Config &config
            , const ResourceBackend::pointer &resourceBackend)
         : config_(config), resourceBackend_(resourceBackend)
-        , arsenal_(), running_(false), ready_(false), work_(ios_)
-        , demRegistry_(std::make_shared<DemRegistry>())
+        , arsenal_(), running_(false), ready_(false), preparing_(0)
+        , work_(ios_), demRegistry_(std::make_shared<DemRegistry>())
     {
         registerSystemGenerators();
     }
@@ -435,11 +435,12 @@ private:
 
 
 
-        // internals
+    // internals
     mutable std::mutex lock_;
     GeneratorMap serving_;
 
     std::atomic<bool> ready_;
+    std::atomic<int> preparing_;
 
     // prepare stuff
     asio::io_service ios_;
@@ -566,6 +567,8 @@ void Generators::Detail::worker(std::size_t id)
 
 void Generators::Detail::prepare(const Generator::pointer &generator)
 {
+    ++preparing_;
+
     ios_.post([=]()
     {
         try {
@@ -585,6 +588,7 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
             std::unique_lock<std::mutex> lock(lock_);
             serving_.erase(generator);
         }
+        --preparing_;
     });
 }
 
@@ -817,6 +821,11 @@ void Generators::Detail::update(const Resource::map &resources)
     if (!ready_) {
         ready_ = true;
         LOG(info3) << "Ready to serve.";
+    }
+
+    // wait till all pending resources are available; not nice but should work
+    while (preparing_) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 

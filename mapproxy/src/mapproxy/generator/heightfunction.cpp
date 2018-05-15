@@ -27,7 +27,6 @@ SuperElevation::SuperElevation(const Config &config)
 
 bool SuperElevation::Config::changed(const Config &other) const
 {
-    LOG(info4) << "compare";
     if (heightRange != other.heightRange) { return true; }
     if (scaleRange != other.scaleRange) { return true; }
     return false;
@@ -162,6 +161,6 @@ void SuperElevation::build(boost::any &value) const
 bool HeightFunction::changed(const HeightFunction::pointer &l
                              , const HeightFunction::pointer &r)
 {
-    if (!l) { return true; }
+    if (!l) { return bool(r); }
     return l->changed(r);
 }

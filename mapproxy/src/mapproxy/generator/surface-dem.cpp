@@ -290,7 +290,6 @@ void SurfaceDem::prepare_impl(Arsenal&)
                                  , deliveryIndexPath);
     }
 
-
     addToRegistry();
 }
 

@@ -63,16 +63,20 @@ set(mapproxy_SOURCES
   generator/metatile.hpp generator/metatile.cpp
   generator/heightfunction.hpp generator/heightfunction.cpp
   generator/demregistry.hpp generator/demregistry.cpp
+
+  # bound layers
   generator/tms-raster.hpp generator/tms-raster.cpp
   generator/tms-raster-remote.hpp generator/tms-raster-remote.cpp
   generator/tms-bing.hpp generator/tms-bing.cpp
   generator/tms-windyty.hpp generator/tms-windyty.cpp
   generator/tms-raster-patchwork.hpp generator/tms-raster-patchwork.cpp
 
+  # surfaces
   generator/surface.hpp generator/surface.cpp
   generator/surface-spheroid.hpp generator/surface-spheroid.cpp
   generator/surface-dem.hpp generator/surface-dem.cpp
 
+  # free layers
   generator/geodatavectorbase.hpp generator/geodatavectorbase.cpp
   generator/geodata-vector-tiled.hpp generator/geodata-vector-tiled.cpp
   generator/geodata-vector.hpp generator/geodata-vector.cpp

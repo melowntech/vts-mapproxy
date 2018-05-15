@@ -217,6 +217,11 @@ GeodataVectorTiled::GeodataVectorTiled(const Params &params)
         }
     }
 
+    if (changeEnforced()) {
+        LOG(info1) << "Generator for <" << id() << "> not ready.";
+        return;
+    }
+
     try {
         auto indexPath(root() / "tileset.index");
         auto deliveryIndexPath(root() / "delivery.index");

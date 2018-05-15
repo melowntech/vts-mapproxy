@@ -242,6 +242,11 @@ SurfaceBase::SurfaceBase(const Params &params)
 
 bool SurfaceBase::loadFiles(const SurfaceDefinition &definition)
 {
+    if (changeEnforced()) {
+        LOG(info1) << "Generator for <" << id() << "> not ready.";
+        return false;
+    }
+
     try {
         auto indexPath(filePath(vts::File::tileIndex));
         auto deliveryIndexPath(root() / "delivery.index");

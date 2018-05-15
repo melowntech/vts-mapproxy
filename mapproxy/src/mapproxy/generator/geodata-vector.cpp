@@ -87,18 +87,20 @@ GeodataVector::GeodataVector(const Params &params)
     , dataPath_(root() / "geodata")
 {
     // load geodata only if there is no enforced change
-    if (!changeEnforced()) {
-        try {
-            metadata_ = geo::heightcoding::loadMetadata
-                (root() / "metadata.json");
-            if (fs::file_size(dataPath_) == metadata_.fileSize) {
-                // valid file
-                makeReady();
-                return;
-            }
-            LOG(info1) << "Sizes differ, regenerate.";
-        } catch (const std::exception &e) { /* not ready */ }
+    if (changeEnforced()) {
+        LOG(info1) << "Generator for <" << id() << "> not ready.";
     }
+
+    try {
+        metadata_ = geo::heightcoding::loadMetadata
+            (root() / "metadata.json");
+        if (fs::file_size(dataPath_) == metadata_.fileSize) {
+            // valid file
+            makeReady();
+            return;
+        }
+        LOG(info1) << "Sizes differ, regenerate.";
+    } catch (const std::exception &e) { /* not ready */ }
 
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }

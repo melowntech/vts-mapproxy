@@ -239,24 +239,12 @@ TmsRaster::TmsRaster(const Params &params)
     const auto indexPath(root() / "tileset.index");
     const auto deliveryIndexPath(root() / "delivery.index");
 
+    if (changeEnforced()) {
+        LOG(info1) << "Generator for <" << id() << "> not ready.";
+        return;
+    }
+
     if (fs::exists(deliveryIndexPath)) {
-        index_ = boost::in_place(deliveryIndexPath);
-    } else if (fs::exists(indexPath)) {
-        // convertion from tileset index to delivery index
-        LOG(info2)
-            << "<" << id() << ">: Converting from tileset.index to "
-            "delivery.index.";
-
-        // load tileset index
-        vts::TileIndex index;
-        index.load(indexPath);
-
-        // convert it to delivery index (using a temporary file)
-        const auto tmpPath(utility::addExtension(deliveryIndexPath, ".tmp"));
-        mmapped::TileIndex::write(tmpPath, index);
-        fs::rename(tmpPath, deliveryIndexPath);
-
-        // and open
         index_ = boost::in_place(deliveryIndexPath);
     }
 
