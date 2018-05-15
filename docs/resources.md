@@ -287,6 +287,16 @@ part is used. This DEM can be accompanied with its geoid grid in the same way as
 By default all layers from the source dataset are served. Optionally, layer subset can be configured by providing list
 of layer names.
 
+The Z-coordinate of all points from the original dataset undergoes heightcoding operation.
+
+```javascript
+HeightcodingMode: Enum {
+    never  // keep original Z coordinate from source dataset
+    always // always replace Z coordinate from source dataset with height from DEM
+    auto   // use height from DEM only for 2D points, keep Z coordinate in 3D points
+}
+```
+
 ```javascript
 definition = {
     String dataset                 // path to OGR dataset
@@ -297,6 +307,7 @@ definition = {
     Optional Object formatConfig   // format-specific configuration, see below
     Optional String styleUrl       // URL to default geodata style
     Int displaySize                // Nominal size of tile in pixels.
+    HeightcodingMode mode          // heightcoding mode (defaults to auto).
     Optional Object enhance        // Per-layer OGR dataset enhancement.
     Optional Object heightFunction // Height manipulation function. Same as for the surface drivers.
     Optional Object introspection  // Extended configuration for mapConfig.json served by mapproxy
