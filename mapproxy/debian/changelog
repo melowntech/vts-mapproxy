@@ -1,3 +1,13 @@
+vts-mapproxy (1.29) stable; urgency=medium
+
+  * Allowed resource non-freezing. By default, only surfaces is freezed.
+  * Added height-function to surface-dem driver; currenlty suporting only
+    superelevation
+  * Relaxed resource definition file format: either single object or array of
+    objects.
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Tue, 15 May 2018 13:42:06 +0200
+
 vts-mapproxy (1.28) stable; urgency=medium
 
   * Fixed geodata heightcoding.
