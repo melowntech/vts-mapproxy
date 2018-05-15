@@ -219,9 +219,10 @@ void Daemon::configuration(po::options_description &cmdline
          ->required()
          , utility::concat
          ("List of resource types that should be immutable once "
-          "successfully configured for the first time. Use one or more of ["
+          "successfully configured for the first time. Comma-separated list "
+          "of resource types (available types: "
           , enumerationString(Resource::Generator::Type{})
-          , "].").c_str())
+          , ").").c_str())
 
         ("vts.builtinBrowserUrl"
          , po::value(&variables_["VTS_BUILTIN_BROWSER_URL"])

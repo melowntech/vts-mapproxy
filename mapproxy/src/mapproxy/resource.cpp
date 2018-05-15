@@ -218,7 +218,7 @@ void parseResources(Resource::map &resources, const Json::Value &value
         }
     });
 
-    // distrute include hased on JSON value
+    // distribute include hased on JSON value
     const auto includeJson([&](const Json::Value &value) -> void
     {
         if (value.type() == Json::stringValue) {
@@ -229,19 +229,14 @@ void parseResources(Resource::map &resources, const Json::Value &value
             << "Include declaration must be a string or an array of strings.";
     });
 
-    if (!value.isArray()) {
-        LOGTHROW(err1, Json::Error)
-            << "Type of top-level configuration is not a list.";
-    }
-
-    // process all definitions
-    for (const auto &item : value) {
-        // check for special resources
+    const auto processDefinition([&](const Json::Value &item) -> void
+    {
         if (!item.isObject()) {
             LOGTHROW(err1, Json::Error)
                 << "Resource definition is not an object.";
         }
 
+        // check for special resources
         if (item.isMember("include")) {
             const auto &jinclude(item["include"]);
             if (jinclude.type() == Json::arrayValue) {
@@ -251,7 +246,7 @@ void parseResources(Resource::map &resources, const Json::Value &value
             } else {
                 includeJson(jinclude);
             }
-            continue;
+            return;
         }
 
         // parse resource and remember
@@ -265,7 +260,26 @@ void parseResources(Resource::map &resources, const Json::Value &value
                     << "Duplicate entry for <" << res.id << ">.";
             }
         }
-    }
+    });
+
+    switch (value.type()) {
+    case Json::arrayValue:
+        // process all definitions
+        for (const auto &item : value) {
+            processDefinition(item);
+        }
+        break;
+
+    case Json::objectValue:
+        // single definition
+        processDefinition(value);
+        break;
+
+    default:
+        LOGTHROW(err1, Json::Error)
+            << path << ": Type of top-level configuration is "
+            "not an array nor an object.";
+    };
 }
 
 Resource::map loadResources(std::istream &in, const fs::path &path
