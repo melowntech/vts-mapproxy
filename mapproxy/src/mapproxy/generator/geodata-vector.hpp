@@ -42,6 +42,8 @@ public:
         Definition() : GeodataVectorBase::Definition() {}
     private:
         virtual bool frozenCredits_impl() const { return false; }
+
+        virtual bool needsRanges_impl() const { return false; }
     };
 
 private:

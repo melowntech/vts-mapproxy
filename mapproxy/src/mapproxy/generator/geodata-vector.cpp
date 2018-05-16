@@ -89,6 +89,7 @@ GeodataVector::GeodataVector(const Params &params)
     // load geodata only if there is no enforced change
     if (changeEnforced()) {
         LOG(info1) << "Generator for <" << id() << "> not ready.";
+        return;
     }
 
     try {

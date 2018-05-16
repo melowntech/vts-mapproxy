@@ -64,6 +64,10 @@ public:
      */
     bool frozenCredits() const { return frozenCredits_impl(); }
 
+    /** Returns true if resource needs lod and tile ranges.
+     */
+    bool needsRanges() const { return needsRanges_impl(); }
+
     template <typename T> const T& as() const {
         if (const auto *value = dynamic_cast<const T*>(this)) {
             return *value;
@@ -95,6 +99,10 @@ private:
      *  credits cannot be changed.
      */
     virtual bool frozenCredits_impl() const { return true; }
+
+    /** Returns true if resource needs lod and tile ranges.
+     */
+    virtual bool needsRanges_impl() const { return true; }
 };
 
 namespace vr = vtslibs::registry;

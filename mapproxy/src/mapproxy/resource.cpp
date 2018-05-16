@@ -77,10 +77,22 @@ void parseCredits(Resource &r, const Json::Value &object
     }
 }
 
-void parseDefinition(Resource &r, const Json::Value &value)
+void parseDefinition(Resource &r, const Json::Value &value, bool hasRanges)
 {
     auto definition(Generator::definition(r.generator));
     definition->from(value);
+    if (definition->needsRanges()) {
+        if (!hasRanges) {
+            LOGTHROW(err1, Error)
+                << "Resource <" << r.id
+                << ">: missing mandatory lot/tile ranges.";
+        }
+    } else if (hasRanges) {
+        LOG(warn2)
+            << "Resource <" << r.id
+            << "> doesn't need lod/tile ranges; ignored.";
+    }
+
     r.definition(definition);
 }
 
@@ -135,28 +147,57 @@ Resource::list parseResource(const Json::Value &value
     parseCredits(r, value, "credits");
 
     const Json::Value &referenceFrames(value["referenceFrames"]);
-    if (!referenceFrames.isObject()) {
+    bool hasRanges(referenceFrames.isObject());
+    if (!hasRanges && !referenceFrames.isArray()) {
         LOGTHROW(err1, Json::Error)
-            << "Type of referenceFrames is not an object.";
+            << "Error parsing <" << r.id
+            << ">: Type of referenceFrames is not an object nor an array.";
     }
 
-    parseDefinition(r, value["definition"]);
+    parseDefinition(r, value["definition"], hasRanges);
 
     Resource::list out;
 
-    for (const auto &name : referenceFrames.getMemberNames()) {
-        const auto &content(referenceFrames[name]);
+    if (hasRanges) {
+        for (const auto &name : referenceFrames.getMemberNames()) {
+            const auto &content(referenceFrames[name]);
 
-        out.push_back(r);
-        auto &rr(out.back());
-        rr.id.referenceFrame = name;
+            out.push_back(r);
+            auto &rr(out.back());
+            rr.id.referenceFrame = name;
 
-        // NB: function either returns valid reference of throws
-        rr.referenceFrame = &vr::system.referenceFrames(name);
+            // NB: function either returns valid reference or throws
+            rr.referenceFrame = &vr::system.referenceFrames(name);
 
-        Json::get(rr.lodRange.min, content, "lodRange", 0);
-        Json::get(rr.lodRange.max, content, "lodRange", 1);
-        rr.tileRange = vr::tileRangeFromJson(content["tileRange"]);
+            Json::get(rr.lodRange.min, content, "lodRange", 0);
+            Json::get(rr.lodRange.max, content, "lodRange", 1);
+            rr.tileRange = vr::tileRangeFromJson(content["tileRange"]);
+
+            if (rr.lodRange.empty()) {
+                LOGTHROW(err1, Json::Error)
+                    << "Error parsing <" << r.id << ">: invalid lod range.";
+            }
+        }
+    } else {
+        for (const auto &name : referenceFrames) {
+            if (!name.isString()) {
+                LOGTHROW(err1, Json::Error)
+                    << "Error parsing <" << r.id
+                    << ">: Type of referenceFrame is not a string.";
+            }
+
+            out.push_back(r);
+            auto &rr(out.back());
+
+            rr.id.referenceFrame = name.asString();
+
+            // NB: function either returns valid reference or throws
+            rr.referenceFrame
+                = &vr::system.referenceFrames(rr.id.referenceFrame);
+
+            // invalidate
+            rr.lodRange = vr::LodRange::emptyRange();
+        }
     }
 
     return out;
@@ -338,20 +379,28 @@ void buildResource(Json::Value &value, const Resource &r)
     auto &credits(value["credits"] = Json::arrayValue);
     for (auto cid : r.credits) { credits.append(cid.id); }
 
-    Json::Value &referenceFrames(value["referenceFrames"]);
-    auto &content(referenceFrames[r.id.referenceFrame] = Json::objectValue);
+    if (r.definition()->needsRanges()) {
+        auto &referenceFrames
+            (value["referenceFrames"] = Json::objectValue);
+        auto &content
+            (referenceFrames[r.id.referenceFrame] = Json::objectValue);
 
-    auto &lodRange(content["lodRange"] = Json::arrayValue);
-    lodRange.append(r.lodRange.min);
-    lodRange.append(r.lodRange.max);
+        auto &lodRange(content["lodRange"] = Json::arrayValue);
+        lodRange.append(r.lodRange.min);
+        lodRange.append(r.lodRange.max);
 
-    auto &tileRange(content["tileRange"] = Json::arrayValue);
-    auto &tileRange0(tileRange.append(Json::arrayValue));
-    tileRange0.append(r.tileRange.ll(0));
-    tileRange0.append(r.tileRange.ll(1));
-    auto &tileRange1(tileRange.append(Json::arrayValue));
-    tileRange1.append(r.tileRange.ur(0));
-    tileRange1.append(r.tileRange.ur(1));
+        auto &tileRange(content["tileRange"] = Json::arrayValue);
+        auto &tileRange0(tileRange.append(Json::arrayValue));
+        tileRange0.append(r.tileRange.ll(0));
+        tileRange0.append(r.tileRange.ll(1));
+        auto &tileRange1(tileRange.append(Json::arrayValue));
+        tileRange1.append(r.tileRange.ur(0));
+        tileRange1.append(r.tileRange.ur(1));
+    } else {
+        auto &referenceFrames
+            (value["referenceFrames"] = Json::arrayValue);
+        referenceFrames.append(r.id.referenceFrame);
+    }
 
     value["definition"] = buildDefinition(r);
 }
@@ -424,8 +473,11 @@ Changed Resource::changed(const Resource &o) const
     if (!(id == o.id)) { return Changed::yes; }
     if (!(generator == o.generator)) { return Changed::yes; }
 
-    if (lodRange != o.lodRange) { return Changed::yes; }
-    if (tileRange != o.tileRange) { return Changed::yes; }
+    // compare ranges only when needed
+    if (definition()->needsRanges()) {
+        if (lodRange != o.lodRange) { return Changed::yes; }
+        if (tileRange != o.tileRange) { return Changed::yes; }
+    }
 
     // compare credits only if frozen
     bool changedCredits(credits != o.credits);
