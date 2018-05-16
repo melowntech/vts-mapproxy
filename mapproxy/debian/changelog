@@ -1,3 +1,9 @@
+vts-mapproxy (1.30) stable; urgency=medium
+
+  * geodata-vector resources don't need lod/tile ranges
+
+ -- Vaclav Blazek <vaclav.blazek@citationtech.net>  Wed, 16 May 2018 12:52:04 +0200
+
 vts-mapproxy (1.29) stable; urgency=medium
 
   * Allowed resource non-freezing. By default, only surfaces is freezed.
