@@ -1,3 +1,9 @@
+vts-mapproxy (1.31) stable; urgency=medium
+
+  * Fixed opencv issues on Ununtu Bionic.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 28 May 2018 11:15:18 +0200
+
 vts-mapproxy (1.30) stable; urgency=medium
 
   * geodata-vector resources don't need lod/tile ranges
