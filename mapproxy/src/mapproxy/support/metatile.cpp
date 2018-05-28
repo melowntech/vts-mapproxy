@@ -32,6 +32,8 @@
 
 #include "utility/raise.hpp"
 
+#include "imgproc/fillrect.hpp"
+
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/tileop.hpp"
@@ -256,6 +258,8 @@ cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
         node.x -= tileId.x;
         node.y -= tileId.y;
 
+        // FIXME: is this correct?
+
         // construct rectangle and intersect it with all bounds
         cv::Rect r(node.x, node.y, node.size, node.size);
         for (const auto &bounds : boundsList) {
@@ -263,10 +267,7 @@ cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
             if (!r.width || !r.height) { return; }
         }
 
-        // draw rectangle, true -> watertight tile, indeterminate ->
-        // non-watertight
-        cv::rectangle(metatile, r, (value ? watertight : available)
-                      , CV_FILLED, 4);
+        imgproc::fillRectangle(metatile, r, (value ? watertight : available));
     });
 
     maskTree.forEachQuad(draw, con);

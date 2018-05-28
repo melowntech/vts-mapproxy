@@ -27,6 +27,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include "imgproc/fillrect.hpp"
+
 #include "vts-libs/registry/referenceframe.hpp"
 
 #include "./coverage.hpp"
@@ -124,7 +126,7 @@ generateCoverage(const int size, const vts::NodeInfo &nodeInfo
             int y2(std::round(node.y + node.size + scale));
             cv::Rect r(x1, y1, x2 - x1, y2 - y1);
             auto rr(r & tileBounds);
-            cv::rectangle(tile, rr, white, CV_FILLED, 4);
+            imgproc::fillRectangle(tile, rr, white);
         });
 
         maskTree.forEachQuad(draw, con);
@@ -240,7 +242,7 @@ cv::Mat boundlayerMask(const vts::TileId &coarseTileId
         // construct rectangle and intersect it with bounds
         cv::Rect r(node.x, node.y, node.size, node.size);
         auto rr(r & tileBounds);
-        cv::rectangle(mask, rr, white, CV_FILLED, 4);
+        imgproc::fillRectangle(mask, rr, white);
     });
 
     maskTree.forEachQuad(draw, con);
