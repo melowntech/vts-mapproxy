@@ -8,7 +8,7 @@ Homepage: https://www.melown.com/maps
 
 Package: vts-mapproxy
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, vts-registry (>= 1.0)
+Depends: ${shlibs:Depends}, ${misc:Depends}, vts-registry (>= 1.21)
          , vts-mapproxy-tools (= ${binary:Version})
 Replaces: ctt-vts-mapproxy (<< 1.0)
 Breaks: ctt-vts-mapproxy (<< 1.0)
@@ -17,7 +17,7 @@ Description: VTS MapProxy backend server
 
 Package: vts-mapproxy-tools
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, vts-registry (>= 1.0)
+Depends: ${shlibs:Depends}, ${misc:Depends}, vts-registry (>= 1.21)
 Replaces: ctt-vts-mapproxy-tools (<< 1.0)
 Breaks: ctt-vts-mapproxy-tools (<< 1.0)
 Description: VTS MapProxy backend server tools

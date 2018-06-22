@@ -1,3 +1,9 @@
+vts-mapproxy (1.32) stable; urgency=medium
+
+  * Updated libs; body support.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Fri, 22 Jun 2018 10:08:13 +0200
+
 vts-mapproxy (1.31) stable; urgency=medium
 
   * Fixed opencv issues on Ununtu Bionic.
