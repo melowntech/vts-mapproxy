@@ -1,3 +1,10 @@
+vts-mapproxy (1.33) stable; urgency=medium
+
+  * Added services.
+  * Generating atmosphere density texture
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Wed, 27 Jun 2018 18:59:40 +0200
+
 vts-mapproxy (1.32) stable; urgency=medium
 
   * Updated libs; body support.
