@@ -35,6 +35,7 @@
 #include "vts-libs/vts/tileop.hpp"
 #include "vts-libs/vts/support.hpp"
 #include "vts-libs/vts/mapconfig.hpp"
+#include "vts-libs/vts/service.hpp"
 
 #include "./error.hpp"
 #include "./fileinfo.hpp"
@@ -137,11 +138,7 @@ FileInfo::FileInfo(const http::Request &request, int f)
         resourceId.referenceFrame = checkReferenceFrame(components[1]);
         filename = components[2];
 
-        if (filename == constants::Config) {
-            // /rf/mapConfig.json
-            type = Type::referenceFrameMapConfig;
-            return;
-        } else if (filename == constants::Index) {
+        if (filename == constants::Index) {
             // /rf/index.html -> browser
             type = Type::referenceFrameBrowser;
             return;
@@ -166,11 +163,7 @@ FileInfo::FileInfo(const http::Request &request, int f)
             (components[2], generatorType, "Unknown generator type.");
         filename = components[3];
 
-        if (filename == constants::Config) {
-            // /rf/type/mapConfig.json
-            type = Type::typeMapConfig;
-            return;
-        } else if (filename == constants::Index) {
+        if (filename == constants::Index) {
             // /rf/type/index.html -> browser
             type = Type::typeBrowser;
             return;
@@ -192,11 +185,7 @@ FileInfo::FileInfo(const http::Request &request, int f)
         resourceId.group = components[3];
         filename = components[4];
 
-        if (filename == constants::Config) {
-            // /rf/type/group/mapConfig.json
-            type = Type::groupMapConfig;
-            return;
-        } else if (filename == constants::Index) {
+        if (filename == constants::Index) {
             // /rf/type/group/index.html -> browser
             type = Type::groupBrowser;
             return;
@@ -369,7 +358,7 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
 SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), fileType(vs::File::config)
     , tileType(vts::TileFile::meta), flavor(vts::FileFlavor::regular)
-    , support(), registry()
+    , support(), registry(), serviceFile()
 {
     if (vts::fromFilename
         (tileId, tileType, subTileIndex, fi.filename, 0, &flavor))
@@ -435,6 +424,12 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
         return;
     }
 
+    serviceFile = vts::service::match(fi.filename);
+    if (serviceFile) {
+        type = Type::service;
+        return;
+    }
+
     if (constants::DebugConfig == fi.filename) {
         type = Type::file;
         fileType = vs::File::config;
@@ -477,6 +472,10 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
     case Type::registry:
         return Sink::FileInfo(registry->contentType, lastModified)
             .setFileClass(FileClass::registry);
+
+    case Type::service:
+        // service privides its own file info
+        return {};
 
     case Type::definition:
         return Sink::FileInfo("application/json", lastModified)

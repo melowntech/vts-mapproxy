@@ -65,8 +65,6 @@ public:
 
     void generate(const http::Request &request, Sink sink);
 
-    void generateRfMapConfig(const std::string &referenceFrame, Sink &sink);
-
     void generateResourceFile(const FileInfo &fi, Sink &sink);
 
     void generateListing(const FileInfo &fi, Sink &sink);
@@ -230,10 +228,6 @@ void Core::Detail::generate(const http::Request &request, Sink sink)
         FileInfo fi(request, generators_.config().fileFlags);
 
         switch (fi.type) {
-        case FileInfo::Type::referenceFrameMapConfig:
-            generateRfMapConfig(fi.resourceId.referenceFrame, sink);
-            return;
-
         case FileInfo::Type::resourceFile:
             generateResourceFile(fi, sink);
             return;
@@ -261,28 +255,6 @@ void Core::Detail::generate(const http::Request &request, Sink sink)
     } catch (...) {
         sink.error();
     }
-}
-
-void Core::Detail::generateRfMapConfig(const std::string &referenceFrame
-                                       , Sink &sink)
-{
-    auto genlist(generators_.referenceFrame(referenceFrame));
-    if (genlist.empty()) {
-        sink.error(utility::makeError<NotFound>
-                    ("No data for <%s>.", referenceFrame));
-        return;
-    }
-
-    // build map
-    vts::MapConfig mapConfig;
-    for (const auto &generator : genlist) {
-        mapConfig.merge(generator->mapConfig(ResourceRoot::type));
-    }
-
-    std::ostringstream os;
-    vts::saveMapConfig(mapConfig, os);
-    sink.content(os.str(), Sink::FileInfo("application/json")
-                 .setFileClass(FileClass::config));
 }
 
 void Core::Detail::generateResourceFile(const FileInfo &fi, Sink &sink)
@@ -338,18 +310,24 @@ void Core::Detail::generateReferenceFrameDems(const FileInfo &fi, Sink &sink)
 namespace {
 
 Sink::Listing browsableDirectoryContent = {
+#if 0
     { "index.html" }
     , { "mapConfig.json" }
+#endif
 };
 
 Sink::Listing otherDirectoryContent = {
+#if 0
     { "index.html" }
+#endif
 };
 
 Sink::Listing rfDirectoryContent = {
-    { "index.html" }
-    , { "mapConfig.json" }
-    , { "dems.html" }
+#if 0
+    { "index.html" },
+    { "mapConfig.json" },
+#endif
+    { "dems.html" }
 };
 
 } // namespace

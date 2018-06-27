@@ -55,6 +55,7 @@
 #include "vts-libs/vts/2d.hpp"
 #include "vts-libs/vts/debug.hpp"
 #include "vts-libs/vts/mapconfig.hpp"
+#include "vts-libs/vts/service.hpp"
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/registry/py.hpp"
 
@@ -456,6 +457,12 @@ Generator::Task SurfaceBase
         sink.content(vs::fileIStream
                       (fi.registry->contentType, fi.registry->path)
                      , FileClass::registry);
+        break;
+
+    case SurfaceFileInfo::Type::service:
+        sink.content(vts::service::generate
+                     (fi.serviceFile, fi.fileInfo.filename, fi.fileInfo.query)
+                     , FileClass::data);
         break;
 
     default:

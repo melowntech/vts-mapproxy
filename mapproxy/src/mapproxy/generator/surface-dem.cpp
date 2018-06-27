@@ -56,6 +56,7 @@
 #include "vts-libs/vts/math.hpp"
 #include "vts-libs/vts/mesh.hpp"
 #include "vts-libs/vts/opencv/navtile.hpp"
+#include "vts-libs/vts/service.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -318,9 +319,11 @@ void SurfaceDem::removeFromRegistry()
 
 vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
 {
+    const auto path(prependRoot(fs::path(), resource(), root));
+
     auto mc(vts::mapConfig
             (properties_, resource().registry, extraProperties(definition_)
-             , prependRoot(fs::path(), resource(), root)));
+             , path));
 
     // force 2d interface existence
     mc.surfaces.front().has2dInterface = true;
@@ -337,6 +340,9 @@ vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
 
         mc.position.verticalFov = config().defaultFov;
     }
+
+    // add local services
+    vts::service::addLocal(mc, path);
 
     return mc;
 }

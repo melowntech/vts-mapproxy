@@ -71,7 +71,6 @@ struct FileInfo {
 
         , referenceFrameBrowser, typeBrowser, groupBrowser
 
-        , referenceFrameMapConfig, typeMapConfig, groupMapConfig
         , resourceFile
         , referenceFrameDems
     };
@@ -138,7 +137,9 @@ struct SurfaceFileInfo {
      */
     FileInfo fileInfo;
 
-    enum class Type { unknown, file, tile, definition, support, registry };
+    enum class Type {
+        unknown, file, tile, definition, support, registry, service
+    };
 
     /** File type.
      */
@@ -165,13 +166,17 @@ struct SurfaceFileInfo {
      */
     vts::FileFlavor flavor;
 
-    /** Valid only when type == Type::support;
+    /** Valid only when type == Type::support
      */
     const vs::SupportFile *support;
 
-    /** Valid only when type == Type::registry;
+    /** Valid only when type == Type::registry
      */
     const vr::DataFile *registry;
+
+    /** Valid only when type == Type::service
+     */
+    unsigned int serviceFile;
 };
 
 /** Parsed surface file information.

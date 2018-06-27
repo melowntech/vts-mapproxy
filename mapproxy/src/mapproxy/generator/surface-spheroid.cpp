@@ -51,6 +51,7 @@
 #include "vts-libs/vts/math.hpp"
 #include "vts-libs/vts/mesh.hpp"
 #include "vts-libs/vts/opencv/navtile.hpp"
+#include "vts-libs/vts/service.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -276,10 +277,11 @@ void SurfaceSpheroid::prepare_impl(Arsenal&)
 
 vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root) const
 {
+    const auto path(prependRoot(fs::path(), resource(), root));
+
     auto mc(vts::mapConfig
             (properties_, resource().registry
-             , extraProperties(definition_)
-             , prependRoot(fs::path(), resource(), root)));
+             , extraProperties(definition_), path));
 
     if (!definition_.introspection.position) {
         // no introspection position, generate some
@@ -293,6 +295,9 @@ vts::MapConfig SurfaceSpheroid::mapConfig_impl(ResourceRoot root) const
 
         mc.position.verticalFov = config().defaultFov;
     }
+
+    // add local services
+    vts::service::addLocal(mc, path);
 
     return mc;
 }
