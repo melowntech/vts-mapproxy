@@ -309,6 +309,7 @@ bool SurfaceBase::updateProperties(const SurfaceDefinition &def)
     // update revision if changed
     if (resource().revision > properties_.revision) {
         properties_.revision = resource().revision;
+        changed = true;
     }
 
     return changed;
