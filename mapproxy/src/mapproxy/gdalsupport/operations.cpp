@@ -186,9 +186,17 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
     auto maxDst(geo::GeoDataset::deriveInMemory
                 (maxSrc, srs, size, extents, GDT_Float32, ForcedNodata));
 
-    auto wri(src.warpInto(dst, resampling));
-    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum);
-    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum);
+    geo::GeoDataset::WarpOptions warpOptions;
+#if GDAL_VERSION_NUM >= 2020000
+    // choose finer overview on GDAL>=2.2, since there is something rotten there
+    warpOptions.overviewBias = -1;
+#endif
+
+    auto wri(src.warpInto(dst, resampling, warpOptions));
+    minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum
+                    , warpOptions);
+    maxSrc.warpInto(maxDst, geo::GeoDataset::Resampling::maximum
+                    , warpOptions);
 
     // combine data
     auto *tile(allocateMat(mb, size, CV_64FC3));

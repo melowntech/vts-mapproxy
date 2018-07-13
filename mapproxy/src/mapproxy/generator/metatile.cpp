@@ -268,7 +268,14 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                    << ", size in tiles: " << vts::tileRangesSize(block.view)
                    << ".";
 
-        // warp value intentionally by average filter
+#if GDAL_VERSION_NUM >= 2020000
+        // force average since cubicspline is somewhat dubious on GDAL >= 2.2
+        const auto resampling(geo::GeoDataset::Resampling::average);
+#else
+        // use "dem" resampling (cubicspline or average)
+        const auto resampling(geo::GeoDataset::Resampling::dem);
+#endif
+
         auto dem(arsenal.warper.warp
                  (GdalWarper::RasterRequest
                   (GdalWarper::RasterRequest::Operation::valueMinMax
@@ -277,8 +284,7 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                    // add half pixel to warp in grid coordinates
                    , extentsPlusHalfPixel
                    (extents, { gridSize.width - 1, gridSize.height - 1 })
-                   , gridSize
-                   , geo::GeoDataset::Resampling::dem)
+                   , gridSize, resampling)
                   , sink));
 
         sink.checkAborted();
