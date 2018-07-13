@@ -1,3 +1,9 @@
+vts-mapproxy (1.35) stable; urgency=medium
+
+  * Surfaces: revision update fix.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Fri, 13 Jul 2018 14:57:52 +0200
+
 vts-mapproxy (1.34) stable; urgency=medium
 
   * Metatile generation: workarounds for gdal 2.2
