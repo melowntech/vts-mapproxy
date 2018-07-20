@@ -9,3 +9,4 @@ tmp
 *.pid
 gdalwmscache
 .gdb_history
+output
