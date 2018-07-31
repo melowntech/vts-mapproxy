@@ -66,10 +66,10 @@ UTILITY_GENERATE_ENUM_CI(DatasetType,
                          ((ophoto))
 )
 
-class AddResource : public service::Cmdline {
+class SetupResource : public service::Cmdline {
 public:
-    AddResource()
-        : service::Cmdline("addresource", BUILD_TARGET_VERSION)
+    SetupResource()
+        : service::Cmdline("mapproxy-setup-resource", BUILD_TARGET_VERSION)
     {}
 
 private:
@@ -94,7 +94,7 @@ private:
     boost::optional<DatasetType> datasetType_;
 };
 
-void AddResource::configuration(po::options_description &cmdline
+void SetupResource::configuration(po::options_description &cmdline
                                 , po::options_description &config
                                 , po::positional_options_description &pd)
 {
@@ -174,7 +174,7 @@ void AddResource::configuration(po::options_description &cmdline
     (void) pd;
 }
 
-void AddResource::configure(const po::variables_map &vars)
+void SetupResource::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
 
@@ -192,12 +192,12 @@ void AddResource::configure(const po::variables_map &vars)
         ;
 }
 
-bool AddResource::help(std::ostream &out, const std::string &what) const
+bool SetupResource::help(std::ostream &out, const std::string &what) const
 {
     if (what.empty()) {
         // program help
-        out << ("mapproxy addresource tool\n"
-                "    Preprocesses and adds new mapproxy resource to "
+        out << ("mapproxy resource setup tool\n"
+                "    Sets up and adds new mapproxy resource to "
                 "extisting mapproxy installation.\n"
                 "\n"
                 );
@@ -230,7 +230,7 @@ DatasetType detectType(const geo::GeoDataset::Descriptor &ds
     return DatasetType::dem;
 }
 
-int AddResource::run()
+int SetupResource::run()
 {
     // find reference frame
     auto rf(vr::system.referenceFrames(referenceFrame_));
@@ -250,5 +250,5 @@ int AddResource::run()
 int main(int argc, char *argv[])
 {
     gdal_drivers::registerAll();
-    return AddResource()(argc, argv);
+    return SetupResource()(argc, argv);
 }
