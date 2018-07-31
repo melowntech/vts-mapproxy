@@ -226,7 +226,7 @@ DatasetType detectType(const geo::GeoDataset::Descriptor &ds
         return DatasetType::ophoto;
     }
 
-    // anything else is DEM
+    // anything else is a DEM
     return DatasetType::dem;
 }
 
@@ -240,6 +240,9 @@ int AddResource::run()
 
     LOG(info3) << "Treating input dataset " << dataset_
                << " as " << datasetType << ".";
+
+    // first, measure dataset
+    
 
     return EXIT_SUCCESS;
 }
