@@ -63,6 +63,11 @@ namespace vts = vtslibs::vts;
 
 namespace vr = vtslibs::registry;
 
+UTILITY_GENERATE_ENUM_CI(ResourceType,
+                         ((tms)("TMS"))
+                         ((tin)("TIN"))
+                         )
+
 class SetupResource : public service::Cmdline {
 public:
     SetupResource()
@@ -88,7 +93,7 @@ private:
 
     fs::path dataset_;
 
-    calipers::Config calipersConfig_;
+    ResourceType resourceType_;
 };
 
 void SetupResource::configuration(po::options_description &cmdline
@@ -102,9 +107,8 @@ void SetupResource::configuration(po::options_description &cmdline
          , "Reference frame.")
         ("dataset", po::value(&dataset_)->required()
          , "Path to input raster dataset.")
-        ("datasetType", po::value<calipers::DatasetType>()
-         , "Dataset type (dem or ophoto). Mandatory only "
-         "if autodetect fails.")
+        ("resourceType", po::value<ResourceType>()
+         , "Resource type: TMS or TIN.")
         ;
 
     config.add_options()
@@ -127,9 +131,8 @@ void SetupResource::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
 
-    if (vars.count("datasetType")) {
-        calipersConfig_.datasetType
-            = vars["datasetType"].as<calipers::DatasetType>();
+    if (vars.count("resourceType")) {
+        resourceType_ = vars["resourceType"].as<ResourceType>();
     }
 
     LOG(info3, log_)
@@ -158,6 +161,17 @@ bool SetupResource::help(std::ostream &out, const std::string &what) const
     return false;
 }
 
+boost::optional<calipers::DatasetType>
+asDatasetType(const boost::optional<ResourceType> &type)
+{
+    if (!type) { return boost::none; }
+    switch (*type) {
+    case ResourceType::tms: return calipers::DatasetType::ophoto;
+    case ResourceType::tin: return calipers::DatasetType::dem;
+    }
+    return boost::none;
+}
+
 int SetupResource::run()
 {
     // find reference frame
@@ -166,7 +180,9 @@ int SetupResource::run()
     const auto ds(geo::GeoDataset::open(dataset_));
 
     // first, measure dataset
-    const auto m(calipers::measure(rf, ds.descriptor(), calipersConfig_));
+    calipers::Config calipersConfig;
+    calipersConfig.datasetType = asDatasetType(resourceType_);
+    const auto m(calipers::measure(rf, ds.descriptor(), calipersConfig));
 
     return EXIT_SUCCESS;
 }

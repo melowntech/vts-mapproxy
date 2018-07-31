@@ -208,12 +208,12 @@ int Calipers::run()
         return 1;
     }
 
-    std::cout << "gsd: " << gsd << "\n";
+    std::cout << "gsd: " << m.gsd << "\n";
 
     for (const auto &node : m.nodes) {
-        auto lr(node.lodRange());
+        auto lr(node.ranges.lodRange());
         std::cout << "range<" << node.srs << ">: " << lr << " "
-                  << lr.max << "/" << node.tileRange(lr.max)
+                  << lr.max << "/" << node.ranges.tileRange(lr.max)
                   << '\n';
     }
 

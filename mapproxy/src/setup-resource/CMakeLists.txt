@@ -1,6 +1,7 @@
 # test program
 define_module(BINARY setup-resource
-  DEPENDS mp-calipers vts-libs imgproc service gdal-drivers geometry
+  DEPENDS mp-calipers mapproxy-core
+  vts-libs imgproc service gdal-drivers geometry
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS
   Boost_REGEX)
