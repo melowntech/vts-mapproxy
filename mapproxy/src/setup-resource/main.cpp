@@ -54,17 +54,14 @@
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/tileindex.hpp"
 
+#include "calipers/calipers.hpp"
+
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;
 namespace vts = vtslibs::vts;
 
 namespace vr = vtslibs::registry;
-
-UTILITY_GENERATE_ENUM_CI(DatasetType,
-                         ((dem)("dem")("dsm"))
-                         ((ophoto))
-)
 
 class SetupResource : public service::Cmdline {
 public:
@@ -91,7 +88,7 @@ private:
 
     fs::path dataset_;
 
-    boost::optional<DatasetType> datasetType_;
+    calipers::Config calipersConfig_;
 };
 
 void SetupResource::configuration(po::options_description &cmdline
@@ -105,7 +102,7 @@ void SetupResource::configuration(po::options_description &cmdline
          , "Reference frame.")
         ("dataset", po::value(&dataset_)->required()
          , "Path to input raster dataset.")
-        ("datasetType", po::value<DatasetType>()
+        ("datasetType", po::value<calipers::DatasetType>()
          , "Dataset type (dem or ophoto). Mandatory only "
          "if autodetect fails.")
         ;
@@ -120,54 +117,6 @@ void SetupResource::configuration(po::options_description &cmdline
          , "Path to mapproxy control socket.")
         ;
 
-#if 0
-        ("dataset", po::value(&dataset_)->required()
-         , "Path to ORG dataset to proces.")
-        ("output", po::value(&output_)->required()
-         , "Path output mask file.")
-
-        ("lod", po::value(&lod_)->required()
-         , "Bottom level of detail.")
-        ("dilate"
-         , po::value(&dilate_)->required()->default_value(dilate_)
-         , "Dilation distance (in SDS SRS units).")
-        ("segments"
-         , po::value(&segments_)->required()->default_value(segments_)
-         , "The number of segments used to approximate a 90 degree "
-         "(quadrant) of curvature.")
-
-        ("tileSizeOrder"
-         , po::value(&tileSizeOrder_)->required()
-         ->default_value(tileSizeOrder_)
-         , "Raster tile size as a binary order. Tile size is "
-         "(1 << tileSizeOrder, 1 << tileSizeOrder).")
-
-        ("workBlock"
-         , po::value(&workBlock_)->required()->default_value(workBlock_)
-         , "Block of tiles to process at once. Specified in binary exponent. "
-         "Used blocks size is (1 << workBlock, 1 << workBlock)."
-         )
-
-        ("generateGdalDatasets"
-         , po::value(&generateGdalDatasets_)->required()
-         ->default_value(false)->implicit_value(true)
-         , "Generates gdal dataset per reference frame node."
-         )
-
-        ("layer"
-         , po::value(&layer_)->required()->default_value(layer_)
-         , "Layer selector. Not needed if there is just one layer "
-         "in the input."
-         )
-
-        ("featureFilter"
-         , po::value<std::string>()
-         , "Feature fileter (format: FIELD=REGEX): rasterize only geometries "
-         "from features that contain field named FIELD which value matches "
-         "given REGEX. All features are rasterized by default.")
-        ;
-
-#endif
     pd.add("dataset", 1)
         ;
 
@@ -179,7 +128,8 @@ void SetupResource::configure(const po::variables_map &vars)
     vr::registryConfigure(vars);
 
     if (vars.count("datasetType")) {
-        datasetType_ = vars["datasetType"].as<DatasetType>();
+        calipersConfig_.datasetType
+            = vars["datasetType"].as<calipers::DatasetType>();
     }
 
     LOG(info3, log_)
@@ -208,41 +158,15 @@ bool SetupResource::help(std::ostream &out, const std::string &what) const
     return false;
 }
 
-DatasetType detectType(const geo::GeoDataset::Descriptor &ds
-                       , const boost::optional<DatasetType> &forcedType)
-{
-    if (forcedType) { return *forcedType; }
-
-    if (ds.bands >= 3) { return DatasetType::ophoto; }
-
-    if (ds.bands != 1) {
-        LOGTHROW(err2, std::runtime_error)
-            << "Cannot autodetect dataset type, unsupported number of bands ("
-            << ds.bands << ").";
-    }
-
-    if (ds.dataType == GDT_Byte) {
-        // probably monochromatic orthophoto
-        return DatasetType::ophoto;
-    }
-
-    // anything else is a DEM
-    return DatasetType::dem;
-}
-
 int SetupResource::run()
 {
     // find reference frame
     auto rf(vr::system.referenceFrames(referenceFrame_));
 
-    const auto ds(geo::GeoDataset::open(dataset_).descriptor());
-    const auto datasetType(detectType(ds, datasetType_));
-
-    LOG(info3) << "Treating input dataset " << dataset_
-               << " as " << datasetType << ".";
+    const auto ds(geo::GeoDataset::open(dataset_));
 
     // first, measure dataset
-    
+    const auto m(calipers::measure(rf, ds.descriptor(), calipersConfig_));
 
     return EXIT_SUCCESS;
 }
