@@ -37,6 +37,10 @@
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 
+#include <unicode/translit.h>
+#include <unicode/unistr.h>
+#include <unicode/ucnv.h>
+
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
 #include "utility/buildsys.hpp"
@@ -44,6 +48,8 @@
 #include "utility/progress.hpp"
 #include "utility/path.hpp"
 #include "utility/enum-io.hpp"
+#include "utility/path.hpp"
+
 #include "service/cmdline.hpp"
 
 #include "geo/geodataset.hpp"
@@ -55,6 +61,7 @@
 #include "vts-libs/vts/tileindex.hpp"
 
 #include "calipers/calipers.hpp"
+#include "mapproxy/resource.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -85,15 +92,16 @@ private:
 
     int run();
 
-    std::string referenceFrame_;
-
     fs::path mapproxyDataRoot_;
     fs::path mapproxyDefinitionDir_;
     fs::path mapproxyCtrl_;
 
-    fs::path dataset_;
+    std::string dataset_; // do not use fs::path since it needs quotes in case
+                          // of spaces in filename
 
     ResourceType resourceType_;
+
+    Resource::Id resourceId_;
 };
 
 void SetupResource::configuration(po::options_description &cmdline
@@ -103,8 +111,12 @@ void SetupResource::configuration(po::options_description &cmdline
     vr::registryConfiguration(config, vr::defaultPath());
 
     cmdline.add_options()
-        ("referenceFrame", po::value(&referenceFrame_)->required()
+        ("referenceFrame", po::value(&resourceId_.referenceFrame)->required()
          , "Reference frame.")
+        ("id", po::value(&resourceId_.id)
+         , "Resource ID. Deduced from filename if not provided.")
+        ("group", po::value(&resourceId_.group)
+         , "Resource group ID. Deduced from filename if not provided.")
         ("dataset", po::value(&dataset_)->required()
          , "Path to input raster dataset.")
         ("resourceType", po::value<ResourceType>()
@@ -140,7 +152,7 @@ void SetupResource::configure(const po::variables_map &vars)
         << "\nmapproxy.dataRoot = " << mapproxyDataRoot_
         << "\nmapproxy.definitionDir = " << mapproxyDefinitionDir_
         << "\nmapproxy.ctrl = " << mapproxyCtrl_
-        << "\nreferenceFrame = " << referenceFrame_
+        << "\nreferenceFrame = " << resourceId_.referenceFrame
         << "\n"
         ;
 }
@@ -172,17 +184,58 @@ asDatasetType(const boost::optional<ResourceType> &type)
     return boost::none;
 }
 
+Resource::Id deduceResourceId(fs::path path, Resource::Id resourceId)
+{
+    // pass if already valid
+    if (!(resourceId.id.empty() || resourceId.group.empty())) {
+        return resourceId;
+    }
+
+    path = fs::absolute(path);
+    const auto dir(utility::sanitizePath(path.parent_path().filename())
+                   .string());
+    const auto stem(utility::sanitizePath(path.stem()).string());
+
+    if (resourceId.group.empty()) { resourceId.group = dir; }
+    if (resourceId.id.empty()) { resourceId.id = stem; }
+
+    return resourceId;
+}
+
 int SetupResource::run()
 {
     // find reference frame
-    auto rf(vr::system.referenceFrames(referenceFrame_));
+    const auto *rf(vr::system.referenceFrames
+                   (resourceId_.referenceFrame, std::nothrow));
+    if (!rf) {
+        LOG(fatal)
+            << "There is no reference frame with ID <"
+            << resourceId_.referenceFrame << ">.";
+        return EXIT_FAILURE;
+    }
 
+    // open dataset
     const auto ds(geo::GeoDataset::open(dataset_));
 
-    // first, measure dataset
+    // 1) deduce resource ID
+    const auto resourceId(deduceResourceId(dataset_, resourceId_));
+    LOG(info4) << "Using resource ID <" << resourceId << ">.";
+
+    // 2) check resource existence in mapproxy
+
+    // 3) measure dataset
     calipers::Config calipersConfig;
     calipersConfig.datasetType = asDatasetType(resourceType_);
-    const auto m(calipers::measure(rf, ds.descriptor(), calipersConfig));
+    const auto m(calipers::measure(*rf, ds.descriptor(), calipersConfig));
+
+    if (m.nodes.empty()) {
+        LOG(fatal)
+            << "Unable to set up a mapproxy resource <" << resourceId
+            << "> from " << dataset_ << ".";
+        return EXIT_FAILURE;
+    }
+
+    LOG(info4) << m.tileRange;
 
     return EXIT_SUCCESS;
 }
