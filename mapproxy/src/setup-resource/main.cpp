@@ -37,10 +37,6 @@
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 
-#include <unicode/translit.h>
-#include <unicode/unistr.h>
-#include <unicode/ucnv.h>
-
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
 #include "utility/buildsys.hpp"
@@ -51,6 +47,7 @@
 #include "utility/path.hpp"
 
 #include "service/cmdline.hpp"
+#include "service/ctrlclient.hpp"
 
 #include "geo/geodataset.hpp"
 #include "gdal-drivers/register.hpp"
