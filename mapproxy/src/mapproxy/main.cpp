@@ -39,6 +39,7 @@
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
 #include "utility/buildsys.hpp"
+#include "utility/format.hpp"
 #include "service/service.hpp"
 
 #include "gdal-drivers/register.hpp"
