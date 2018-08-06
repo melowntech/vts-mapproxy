@@ -45,6 +45,7 @@
 #include "utility/path.hpp"
 #include "utility/enum-io.hpp"
 #include "utility/path.hpp"
+#include "utility/filesystem.hpp"
 
 #include "service/cmdline.hpp"
 #include "service/ctrlclient.hpp"
@@ -58,6 +59,7 @@
 #include "vts-libs/vts/tileindex.hpp"
 
 #include "calipers/calipers.hpp"
+#include "generatevrtwo/generatevrtwo.hpp"
 #include "mapproxy/resource.hpp"
 
 namespace po = boost::program_options;
@@ -199,6 +201,47 @@ Resource::Id deduceResourceId(fs::path path, Resource::Id resourceId)
     return resourceId;
 }
 
+void createVrtWO(const fs::path &srcPath
+                 , const fs::path &dstPath
+                 , geo::GeoDataset::Resampling resampling)
+{
+    vrtwo::Config config;
+    config.resampling = resampling;
+    config.overwrite = true;
+
+    config.createOptions
+        ("TILED", true)
+        ("COMPRESS", "DEFLATE")
+        ("PREDICTOR", "")
+        ("ZLEVEL", 9)
+        ;
+
+    config.pathToOriginalDataset
+        = vrtwo::PathToOriginalDataset::relativeSymlink;
+    vrtwo::generate(fs::absolute(srcPath), dstPath, config);
+}
+
+void createVrtWO(const calipers::Measurement &cm
+                 , const fs::path &datasetPath
+                 , const fs::path &rootDir)
+{
+    switch (cm.datasetType) {
+    case calipers::DatasetType::dem:
+        createVrtWO(datasetPath, rootDir / "dem"
+                    , geo::GeoDataset::Resampling::dem);
+        createVrtWO(datasetPath, rootDir / "dem.min"
+                    , geo::GeoDataset::Resampling::minimum);
+        createVrtWO(datasetPath, rootDir / "dem.max"
+                    , geo::GeoDataset::Resampling::maximum);
+        break;
+
+    case calipers::DatasetType::ophoto:
+        createVrtWO(datasetPath, rootDir / "ophoto"
+                    , geo::GeoDataset::Resampling::texture);
+        break;
+    }
+}
+
 int SetupResource::run()
 {
     // find reference frame
@@ -223,16 +266,30 @@ int SetupResource::run()
     // 3) measure dataset
     calipers::Config calipersConfig;
     calipersConfig.datasetType = asDatasetType(resourceType_);
-    const auto m(calipers::measure(*rf, ds.descriptor(), calipersConfig));
+    const auto cm(calipers::measure(*rf, ds.descriptor(), calipersConfig));
 
-    if (m.nodes.empty()) {
+    if (cm.nodes.empty()) {
         LOG(fatal)
             << "Unable to set up a mapproxy resource <" << resourceId
             << "> from " << dataset_ << ".";
         return EXIT_FAILURE;
     }
 
-    LOG(info4) << m.tileRange;
+    LOG(info4) << "cm.tileRange: "<< cm.tileRange;
+
+    const auto rootDir(mapproxyDataRoot_ / resourceId.group / resourceId.id);
+    // TODO: check for existence
+    fs::create_directories(rootDir);
+
+    // 4) copy dataset; TODO: add symlink option
+    const auto datasetPath(rootDir / fs::path(dataset_).filename());
+
+    // copy (overwrite)
+    utility::copy_file(dataset_, datasetPath, true);
+
+
+    // 5) create vrtwo derived datasets
+    createVrtWO(cm, datasetPath, rootDir);
 
     return EXIT_SUCCESS;
 }
