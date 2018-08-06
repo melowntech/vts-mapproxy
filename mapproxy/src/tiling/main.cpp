@@ -53,6 +53,8 @@
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/tileindex.hpp"
 
+#include "./tiling.hpp"
+
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 namespace ba = boost::algorithm;

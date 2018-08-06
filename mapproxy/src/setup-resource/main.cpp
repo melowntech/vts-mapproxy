@@ -60,6 +60,7 @@
 
 #include "calipers/calipers.hpp"
 #include "generatevrtwo/generatevrtwo.hpp"
+#include "tiling/tiling.hpp"
 #include "mapproxy/resource.hpp"
 
 namespace po = boost::program_options;
