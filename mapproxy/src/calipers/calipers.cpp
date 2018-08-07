@@ -693,4 +693,13 @@ Measurement measure(const vtslibs::registry::ReferenceFrame &referenceFrame
     return m;
 }
 
+vts::LodTileRange::list Measurement::lodTileRanges() const
+{
+    vts::LodTileRange::list out;
+    for (const auto &node : nodes) {
+        out.emplace_back(node.ranges.lodRange().min, node.ranges.tileRange());
+    }
+    return out;
+}
+
 } // namespace calipers

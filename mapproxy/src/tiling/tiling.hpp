@@ -27,7 +27,30 @@
 #ifndef mapproxy_tiling_tiling_hpp_included_
 #define mapproxy_tiling_tiling_hpp_included_
 
+#include <boost/filesystem.hpp>
+
+#include "vts-libs/registry.hpp"
+#include "vts-libs/vts/tileindex.hpp"
+#include "vts-libs/vts/basetypes.hpp"
+
 namespace tiling {
+
+struct Config {
+    int tileSampling;
+    bool parallel;
+    bool forceWatertight;
+
+    Config()
+        : tileSampling(128), parallel(true), forceWatertight(false)
+    {}
+};
+
+vtslibs::vts::TileIndex
+generate(const boost::filesystem::path &dataset
+         , const vtslibs::registry::ReferenceFrame &referenceFrame
+         , const vtslibs::vts::LodRange &lodRange
+         , const vtslibs::vts::LodTileRange::list &tileRanges
+         , const Config &config);
 
 } // namespace tiling
 

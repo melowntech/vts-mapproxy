@@ -51,6 +51,7 @@
 #include "service/ctrlclient.hpp"
 
 #include "geo/geodataset.hpp"
+#include "geo/gdal.hpp"
 #include "gdal-drivers/register.hpp"
 
 #include "vts-libs/registry/po.hpp"
@@ -99,7 +100,7 @@ private:
     std::string dataset_; // do not use fs::path since it needs quotes in case
                           // of spaces in filename
 
-    ResourceType resourceType_;
+    boost::optional<ResourceType> resourceType_;
 
     Resource::Id resourceId_;
 };
@@ -173,6 +174,18 @@ bool SetupResource::help(std::ostream &out, const std::string &what) const
     return false;
 }
 
+struct LogLinePrefix {
+    LogLinePrefix(const std::string &prefix)
+        : old(dbglog::log_line_prefix())
+    {
+        dbglog::log_line_prefix(prefix);
+    }
+
+    ~LogLinePrefix() { dbglog::log_line_prefix(old); }
+
+    std::string old;
+};
+
 boost::optional<calipers::DatasetType>
 asDatasetType(const boost::optional<ResourceType> &type)
 {
@@ -203,7 +216,7 @@ Resource::Id deduceResourceId(fs::path path, Resource::Id resourceId)
 }
 
 void createVrtWO(const fs::path &srcPath
-                 , const fs::path &dstPath
+                 , const fs::path &root, const fs::path &name
                  , geo::GeoDataset::Resampling resampling)
 {
     vrtwo::Config config;
@@ -217,30 +230,61 @@ void createVrtWO(const fs::path &srcPath
         ("ZLEVEL", 9)
         ;
 
+    const auto ovrPathLocal("vttwo" / name);
+
     config.pathToOriginalDataset
         = vrtwo::PathToOriginalDataset::relativeSymlink;
-    vrtwo::generate(fs::absolute(srcPath), dstPath, config);
+    vrtwo::generate(fs::absolute(srcPath), root / ovrPathLocal, config);
+
+    // make a link to the vrtwo dataset
+    const auto datasetPath(root / name);
+    fs::remove(datasetPath);
+    fs::create_symlink(ovrPathLocal / "dataset", datasetPath);
 }
 
-void createVrtWO(const calipers::Measurement &cm
-                 , const fs::path &datasetPath
-                 , const fs::path &rootDir)
+fs::path createVrtWO(const calipers::Measurement &cm
+                     , const fs::path &datasetPath
+                     , const fs::path &rootDir)
 {
+    LOG(info4) << "Generating dataset overviews.";
+    LogLinePrefix linePrefix(" (ovr)");
+
     switch (cm.datasetType) {
     case calipers::DatasetType::dem:
-        createVrtWO(datasetPath, rootDir / "dem"
-                    , geo::GeoDataset::Resampling::dem);
-        createVrtWO(datasetPath, rootDir / "dem.min"
-                    , geo::GeoDataset::Resampling::minimum);
-        createVrtWO(datasetPath, rootDir / "dem.max"
-                    , geo::GeoDataset::Resampling::maximum);
-        break;
+        LOG(info4) << "Generating height overviews.";
+        {
+            LogLinePrefix linePrefix(" (dem)");
+            createVrtWO(datasetPath, rootDir, "dem"
+                        , geo::GeoDataset::Resampling::dem);
+        }
+
+        LOG(info4) << "Generating minimum height overviews.";
+        {
+            LogLinePrefix linePrefix(" (min)");
+            createVrtWO(datasetPath, rootDir, "dem.min"
+                        , geo::GeoDataset::Resampling::minimum);
+        }
+
+        LOG(info4) << "Generating maximum height overviews.";
+        {
+            LogLinePrefix linePrefix(" (max)");
+            createVrtWO(datasetPath, rootDir, "dem.max"
+                        , geo::GeoDataset::Resampling::maximum);
+        }
+        return (rootDir / "dem");
 
     case calipers::DatasetType::ophoto:
-        createVrtWO(datasetPath, rootDir / "ophoto"
-                    , geo::GeoDataset::Resampling::texture);
-        break;
+        {
+            LogLinePrefix linePrefix(" (ophoto)");
+            createVrtWO(datasetPath, rootDir, "ophoto"
+                        , geo::GeoDataset::Resampling::texture);
+        }
+        return (rootDir / "ophoto");
     }
+
+    LOGTHROW(err3, std::logic_error)
+        << "Unhandled dataset type <" << cm.datasetType << ">.";
+    throw;
 }
 
 int SetupResource::run()
@@ -262,12 +306,20 @@ int SetupResource::run()
     const auto resourceId(deduceResourceId(dataset_, resourceId_));
     LOG(info4) << "Using resource ID <" << resourceId << ">.";
 
+
     // 2) check resource existence in mapproxy
+    LOG(info4) << "Checking for resource existence.";
+    // TODO: implement me
 
     // 3) measure dataset
-    calipers::Config calipersConfig;
-    calipersConfig.datasetType = asDatasetType(resourceType_);
-    const auto cm(calipers::measure(*rf, ds.descriptor(), calipersConfig));
+    LOG(info4) << "Measuring dataset.";
+
+    auto cm([&]() {
+        LogLinePrefix linePrefix(" (calipers)");
+        calipers::Config calipersConfig;
+        calipersConfig.datasetType = asDatasetType(resourceType_);
+        return calipers::measure(*rf, ds.descriptor(), calipersConfig);
+    }());
 
     if (cm.nodes.empty()) {
         LOG(fatal)
@@ -280,23 +332,53 @@ int SetupResource::run()
 
     const auto rootDir(mapproxyDataRoot_ / resourceId.group / resourceId.id);
     // TODO: check for existence
-    fs::create_directories(rootDir);
 
     // 4) copy dataset; TODO: add symlink option
-    const auto datasetPath(rootDir / fs::path(dataset_).filename());
+    LOG(info4) << "Copying dataset to destination.";
+    const auto datasetPath(rootDir / "original-dataset"
+                           / fs::path(dataset_).filename());
+
+    fs::create_directories(datasetPath.parent_path());
 
     // copy (overwrite)
     utility::copy_file(dataset_, datasetPath, true);
-
+    ds.copyFiles(datasetPath);
 
     // 5) create vrtwo derived datasets
-    createVrtWO(cm, datasetPath, rootDir);
+    const auto mainDataset(createVrtWO(cm, datasetPath , rootDir));
+
+    // 6) generate tiling information
+    LOG(info4) << "Generating tiling information.";
+    {
+        LogLinePrefix linePrefix(" (tiling)");
+        tiling::Config tilingConfig;
+        auto ti(tiling::generate(mainDataset, *rf, cm.lodRange
+                                 , cm.lodTileRanges(), tilingConfig));
+
+        ti.save(rootDir / (resourceId_.referenceFrame + ".tiling"));
+    }
+
+    // 7) generate mapproxy resource configuration
+    // TODO: implement me
+
+    {
+        const auto resourceConfigPath
+            (mapproxyDefinitionDir_ / resourceId.group / resourceId.id);
+        LOG(info4) << "Generating mapproxy resource configuration at "
+                   << resourceConfigPath << ".";
+    }
+
+    // 8) notify mapproxy
+    LOG(info4) << "Notifying mapproxy.";
 
     return EXIT_SUCCESS;
 }
 
 int main(int argc, char *argv[])
 {
+    // force VRT not to share undelying datasets
+    geo::Gdal::setOption("VRT_SHARED_SOURCE", 0);
+    geo::Gdal::setOption("GDAL_TIFF_INTERNAL_MASK", "YES");
     gdal_drivers::registerAll();
     return SetupResource()(argc, argv);
 }

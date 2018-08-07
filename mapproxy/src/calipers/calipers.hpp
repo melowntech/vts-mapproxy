@@ -77,6 +77,7 @@ struct Measurement {
         , tileRange(math::InvalidExtents{})
     {}
 
+    vtslibs::vts::LodTileRange::list lodTileRanges() const;
 };
 
 Measurement measure(const vtslibs::registry::ReferenceFrame &referenceFrame
