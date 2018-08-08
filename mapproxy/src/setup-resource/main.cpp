@@ -35,7 +35,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
-#include <boost/format.hpp>
 
 #include "utility/streams.hpp"
 #include "utility/tcpendpoint-io.hpp"
@@ -46,6 +45,7 @@
 #include "utility/enum-io.hpp"
 #include "utility/path.hpp"
 #include "utility/filesystem.hpp"
+#include "utility/format.hpp"
 
 #include "service/cmdline.hpp"
 #include "service/ctrlclient.hpp"
@@ -63,6 +63,7 @@
 #include "generatevrtwo/generatevrtwo.hpp"
 #include "tiling/tiling.hpp"
 #include "mapproxy/resource.hpp"
+#include "mapproxy/definition.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -75,6 +76,18 @@ UTILITY_GENERATE_ENUM_CI(ResourceType,
                          ((tms)("TMS"))
                          ((tin)("TIN"))
                          )
+
+struct Config {
+    boost::optional<std::string> geoidGrid;
+    RasterFormat format;
+    boost::optional<geo::GeoDataset::Resampling> resampling;
+    bool transparent;
+
+    Config()
+        : format(RasterFormat::jpg)
+        , transparent(false)
+    {}
+};
 
 class SetupResource : public service::Cmdline {
 public:
@@ -103,6 +116,8 @@ private:
     boost::optional<ResourceType> resourceType_;
 
     Resource::Id resourceId_;
+
+    Config config_;
 };
 
 void SetupResource::configuration(po::options_description &cmdline
@@ -122,6 +137,19 @@ void SetupResource::configuration(po::options_description &cmdline
          , "Path to input raster dataset.")
         ("resourceType", po::value<ResourceType>()
          , "Resource type: TMS or TIN.")
+
+        ("tin.geoidGrid", po::value<std::string>()
+         , "TIN: Geoid grid to inject into dataset's SRS. Defaults to "
+         "reference frame's body default geoid grid if not specified.")
+
+        ("tms.format", po::value(&config_.format)
+         ->default_value(config_.format)->required()
+         , "TMS: image format to use when generating tiles (jpg or png).")
+        ("tms.resampling", po::value<geo::GeoDataset::Resampling>()
+         , "TMS: GDAL resampling used to generate tiles.")
+        ("tms.transparent", po::value(&config_.transparent)
+         ->default_value(config_.transparent)->required()
+         , "TMS: mark tiles as trasnparent.")
         ;
 
     config.add_options()
@@ -146,6 +174,15 @@ void SetupResource::configure(const po::variables_map &vars)
 
     if (vars.count("resourceType")) {
         resourceType_ = vars["resourceType"].as<ResourceType>();
+    }
+
+    if (vars.count("tin.geoidGrid")) {
+        config_.geoidGrid = vars["tin.geoidGrid"].as<std::string>();
+    }
+
+    if (vars.count("tms.resampling")) {
+        config_.resampling = vars["rms.resampling"]
+            .as<geo::GeoDataset::Resampling>();
     }
 
     LOG(info3, log_)
@@ -287,6 +324,48 @@ fs::path createVrtWO(const calipers::Measurement &cm
     throw;
 }
 
+
+void buildDefinition(resource::SurfaceDem &def, const fs::path &dataset
+                     , const Config &config)
+{
+    def.dem.dataset = dataset.string();
+    def.dem.geoidGrid = config.geoidGrid;
+}
+
+void buildDefinition(resource::TmsRaster &def, const fs::path &dataset
+                     , const Config &config)
+{
+    def.dataset = dataset.string();
+    def.format = config.format;
+    def.resampling = config.resampling;
+    def.transparent = config.transparent;
+}
+
+template <typename Definition>
+void buildDefinition(Resource &r, const fs::path &dataset
+                     , const Config &config)
+{
+    r.generator = Resource::Generator::from<Definition>();
+    auto definition(std::make_shared<Definition>());
+    r.definition(definition);
+    buildDefinition(*definition, dataset, config);
+}
+
+void buildDefinition(Resource &r, calipers::DatasetType datasetType
+                     , const fs::path &dataset
+                     , const Config &config)
+{
+    switch (datasetType) {
+    case calipers::DatasetType::dem:
+        buildDefinition<resource::SurfaceDem>(r, dataset, config);
+        break;
+
+    case calipers::DatasetType::ophoto:
+        buildDefinition<resource::TmsRaster>(r, dataset, config);
+        break;
+    }
+}
+
 int SetupResource::run()
 {
     // find reference frame
@@ -297,6 +376,13 @@ int SetupResource::run()
             << "There is no reference frame with ID <"
             << resourceId_.referenceFrame << ">.";
         return EXIT_FAILURE;
+    }
+
+    // copy config and update
+    auto config(config_);
+    if (!config.geoidGrid && rf->body) {
+        const auto &body(vr::system.bodies(*rf->body));
+        config.geoidGrid = body.defaultGeoidGrid;
     }
 
     // open dataset
@@ -328,9 +414,8 @@ int SetupResource::run()
         return EXIT_FAILURE;
     }
 
-    LOG(info4) << "cm.tileRange: "<< cm.tileRange;
-
-    const auto rootDir(mapproxyDataRoot_ / resourceId.group / resourceId.id);
+    const auto resourceDir(fs::path(resourceId.group) / resourceId.id);
+    const auto rootDir(mapproxyDataRoot_ / resourceDir);
     // TODO: check for existence
 
     // 4) copy dataset; TODO: add symlink option
@@ -363,9 +448,29 @@ int SetupResource::run()
 
     {
         const auto resourceConfigPath
-            (mapproxyDefinitionDir_ / resourceId.group / resourceId.id);
+            (mapproxyDefinitionDir_ / resourceId.group
+             / (resourceId.id + ".json"));
         LOG(info4) << "Generating mapproxy resource configuration at "
                    << resourceConfigPath << ".";
+
+        Resource r({});
+        r.id = resourceId;
+        r.comment = utility::format
+            ("Automatically generated from %s raster dataset."
+             , datasetPath.filename());
+
+        // TODO: credits
+        // r.credits = ???;
+
+        r.lodRange = cm.lodRange;
+        r.tileRange = cm.tileRange;
+
+        buildDefinition(r, cm.datasetType, resourceDir, config);
+
+        fs::create_directories(resourceConfigPath.parent_path());
+        save(resourceConfigPath, r);
+
+        // TODO: create group include if it is not there
     }
 
     // 8) notify mapproxy
