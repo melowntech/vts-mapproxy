@@ -399,6 +399,7 @@ int SetupResource::run()
     LOG(info4) << "Checking for resource existence.";
     // TODO: implement me
 
+
     // 3) measure dataset
     LOG(info4) << "Measuring dataset.";
 
@@ -420,6 +421,7 @@ int SetupResource::run()
     const auto rootDir(mapproxyDataRoot_ / resourceDir);
     // TODO: check for existence
 
+
     // 4) copy dataset; TODO: add symlink option
     LOG(info4) << "Copying dataset to destination.";
     const auto datasetPath(rootDir / "original-dataset"
@@ -431,8 +433,10 @@ int SetupResource::run()
     utility::copy_file(dataset_, datasetPath, true);
     ds.copyFiles(datasetPath);
 
+
     // 5) create vrtwo derived datasets
     const auto mainDataset(createVrtWO(cm, datasetPath , rootDir));
+
 
     // 6) generate tiling information
     LOG(info4) << "Generating tiling information.";
@@ -445,9 +449,8 @@ int SetupResource::run()
         ti.save(rootDir / ("tiling." + resourceId_.referenceFrame));
     }
 
-    // 7) generate mapproxy resource configuration
-    // TODO: implement me
 
+    // 7) generate mapproxy resource configuration
     {
         const auto resourceConfigPath
             (mapproxyDefinitionDir_ / resourceId.group
@@ -482,6 +485,7 @@ int SetupResource::run()
         }
     }
 
+    
     // 8) notify mapproxy
     LOG(info4) << "Notifying mapproxy.";
 
