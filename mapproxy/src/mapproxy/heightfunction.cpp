@@ -7,8 +7,8 @@
 
 #include "./heightfunction.hpp"
 
-#include "../error.hpp"
-#include "../support/python.hpp"
+#include "./error.hpp"
+#include "./support/python.hpp"
 
 SuperElevation::SuperElevation(const Config &config)
     : config_(config), s_()

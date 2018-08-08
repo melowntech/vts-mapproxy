@@ -84,63 +84,7 @@ utility::PreMain Factory::register_([]()
          , std::make_shared<Factory>());
 });
 
-void parseDefinition(TmsBing::Definition &def
-                     , const Json::Value &value)
-{
-    std::string s;
-
-    Json::get(def.metadataUrl, value, "metadataUrl");
-}
-
-void buildDefinition(Json::Value &value
-                     , const TmsBing::Definition &def)
-{
-    value["metadataUrl"] = def.metadataUrl;
-}
-
-void parseDefinition(TmsBing::Definition &def
-                     , const boost::python::dict &value)
-{
-    def.metadataUrl = py2utf8(value["metadataUrl"]);
-}
-
 } // namespace
-
-void TmsBing::Definition::from_impl(const boost::any &value)
-{
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsBing: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
-}
-
-void TmsBing::Definition::to_impl(boost::any &value) const
-{
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsBing:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
-}
-
-Changed TmsBing::Definition::changed_impl(const DefinitionBase &o) const
-{
-    const auto &other(o.as<Definition>());
-
-    // ignore metadata URL, we it has no effect on this resource
-    if (metadataUrl != other.metadataUrl) { return Changed::safely; }
-
-    return Changed::no;
-}
 
 TmsBing::TmsBing(const Params &params)
     : Generator(params)

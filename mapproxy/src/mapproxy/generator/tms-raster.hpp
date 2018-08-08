@@ -33,6 +33,7 @@
 #include "../support/mmapped/tileindex.hpp"
 
 #include "../generator.hpp"
+#include "../definition/tms.hpp"
 
 namespace generator {
 
@@ -40,21 +41,7 @@ class TmsRaster : public Generator {
 public:
     TmsRaster(const Params &params);
 
-    struct Definition : public DefinitionBase {
-        std::string dataset;
-        boost::optional<std::string> mask;
-        RasterFormat format;
-        bool transparent;
-        boost::optional<geo::GeoDataset::Resampling> resampling;
-
-        Definition(): format(RasterFormat::jpg), transparent(false) {}
-
-    protected:
-        virtual void from_impl(const boost::any &value);
-        virtual void to_impl(boost::any &value) const;
-        virtual Changed changed_impl(const DefinitionBase &other) const;
-        virtual bool frozenCredits_impl() const { return false; }
-    };
+    typedef resource::TmsRaster Definition;
 
 protected:
     const Definition &definition() const { return definition_; }

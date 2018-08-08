@@ -35,7 +35,7 @@
 
 #include "../generator.hpp"
 
-#include "./heightfunction.hpp"
+#include "../heightfunction.hpp"
 
 vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , Arsenal &arsenal

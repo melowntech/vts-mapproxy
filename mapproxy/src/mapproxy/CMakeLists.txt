@@ -18,6 +18,22 @@ set(mapproxy-core_SOURCES
   support/mmapped/qtree-rasterize.hpp
 
   support/mmapped/tilesetindex.hpp support/mmapped/tilesetindex.cpp
+  heightfunction.hpp heightfunction.cpp
+
+  # resource definitions
+  definition.hpp
+
+  definition/tms.hpp
+  definition/tms-raster-patchwork.cpp
+  definition/tms-raster.cpp
+  definition/tms-raster-remote.cpp
+  definition/tms-bing.cpp
+  definition/tms-windyty.cpp
+
+  definition/surface.hpp
+  definition/surface.cpp
+  definition/surface-spheroid.cpp
+  definition/surface-dem.cpp
   )
 
 # test program
@@ -61,7 +77,6 @@ set(mapproxy_SOURCES
   generator/generator.cpp
   generator/factory.hpp
   generator/metatile.hpp generator/metatile.cpp
-  generator/heightfunction.hpp generator/heightfunction.cpp
   generator/demregistry.hpp generator/demregistry.cpp
 
   # bound layers

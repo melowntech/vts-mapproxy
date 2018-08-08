@@ -29,6 +29,7 @@
 
 #include "../support/coverage.hpp"
 #include "../generator.hpp"
+#include "../definition.hpp"
 
 namespace generator {
 
@@ -36,18 +37,7 @@ class TmsRasterRemote : public Generator {
 public:
     TmsRasterRemote(const Params &params);
 
-    struct Definition : public DefinitionBase {
-        std::string remoteUrl;
-        boost::optional<boost::filesystem::path> mask;
-
-        Definition() {}
-
-    private:
-        virtual void from_impl(const boost::any &value);
-        virtual void to_impl(boost::any &value) const;
-        virtual Changed changed_impl(const DefinitionBase &other) const;
-        virtual bool frozenCredits_impl() const { return false; }
-    };
+    typedef resource::TmsRasterRemote Definition;
 
 private:
     virtual void prepare_impl(Arsenal &arsenal);

@@ -38,9 +38,6 @@
 #include "imgproc/rastermask/cvmat.hpp"
 #include "imgproc/png.hpp"
 
-#include "jsoncpp/json.hpp"
-#include "jsoncpp/as.hpp"
-
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
@@ -56,8 +53,6 @@
 #include "vts-libs/vts/debug.hpp"
 #include "vts-libs/vts/mapconfig.hpp"
 #include "vts-libs/vts/service.hpp"
-#include "vts-libs/registry/json.hpp"
-#include "vts-libs/registry/py.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -77,153 +72,6 @@ namespace vts = vtslibs::vts;
 
 namespace generator {
 
-bool SurfaceBase::Introspection::empty() const
-{
-    return (tms.empty() && geodata.empty()
-            && !position && browserOptions.empty());
-}
-
-bool SurfaceBase::Introspection::operator!=(const Introspection &other) const
-{
-    // introspection can safely change
-    if (tms != other.tms) { return true; }
-    if (geodata != other.geodata) { return true; }
-    if (position != other.position) { return true; }
-
-    if (browserOptions.empty() != other.browserOptions.empty()) {
-        return true;
-    }
-    if (!browserOptions.empty()
-        && (boost::any_cast<const Json::Value&>(browserOptions)
-            != boost::any_cast<const Json::Value&>(other.browserOptions)))
-    {
-        return true;
-    }
-
-    return false;
-}
-
-void SurfaceBase::SurfaceDefinition::parse(const Json::Value &value)
-{
-    if (value.isMember("nominalTexelSize")) {
-        nominalTexelSize = boost::in_place();
-        Json::get(*nominalTexelSize, value, "nominalTexelSize");
-    }
-
-    if (value.isMember("mergeBottomLod")) {
-        mergeBottomLod = boost::in_place();
-        Json::get(*mergeBottomLod, value, "mergeBottomLod");
-    }
-
-    heightFunction = HeightFunction::parse(value, "heightFunction");
-
-    if (value.isMember("introspection")) {
-        const auto &jintrospection(value["introspection"]);
-
-        introspection.tms
-            = introspectionListFrom(jintrospection, "tms");
-        introspection.geodata
-            = introspectionListFrom(jintrospection, "geodata");
-
-        if (jintrospection.isMember("position")) {
-            introspection.position
-                = vr::positionFromJson(jintrospection["position"]);
-        }
-
-        if (jintrospection.isMember("browserOptions")) {
-            introspection.browserOptions
-                = Json::check(jintrospection["browserOptions"]
-                              , Json::objectValue);
-        }
-    }
-}
-
-void SurfaceBase::SurfaceDefinition::build(Json::Value &value) const
-{
-    if (nominalTexelSize) {
-        value["nominalTexelSize"] = *nominalTexelSize;
-    }
-    if (mergeBottomLod) {
-        value["mergeBottomLod"] = *mergeBottomLod;
-    }
-
-    if (heightFunction) {
-        boost::any tmp(Json::Value(Json::objectValue));
-        heightFunction->build(tmp);
-        value["heightFunction"] = boost::any_cast<const Json::Value&>(tmp);
-    }
-
-    if (!introspection.empty()) {
-        auto &jintrospection(value["introspection"] = Json::objectValue);
-        introspectionListTo(jintrospection, "tms", introspection.tms) ;
-        introspectionListTo(jintrospection, "geodata", introspection.geodata);
-
-        if (introspection.position) {
-            jintrospection["position"] = vr::asJson(*introspection.position);
-        }
-
-        if (!introspection.browserOptions.empty()) {
-            jintrospection["browserOptions"]
-                = boost::any_cast<const Json::Value&>
-                (introspection.browserOptions);
-        }
-    }
-}
-
-void SurfaceBase::SurfaceDefinition::parse(const boost::python::dict &value)
-{
-    if (value.has_key("nominalTexelSize")) {
-        nominalTexelSize
-            = boost::python::extract<double>(value["nominalTexelSize"]);
-    }
-
-    if (value.has_key("mergeBottomLod")) {
-        mergeBottomLod = boost::python::extract
-            <vts::Lod>(value["mergeBottomLod"]);
-    }
-
-    heightFunction = HeightFunction::parse(value, "heightFunction");
-
-    if (value.has_key("introspection")) {
-        boost::python::dict pintrospection(value["introspection"]);
-        introspection.tms
-            = introspectionListFrom(pintrospection, "tms");
-        introspection.geodata
-            = introspectionListFrom(pintrospection, "geodata");
-
-        if (pintrospection.has_key("position")) {
-            introspection.position = boost::in_place();
-            vr::fromPython(*introspection.position
-                           , pintrospection["position"]);
-        }
-    }
-}
-
-Changed SurfaceBase::SurfaceDefinition::changed_impl(const DefinitionBase &o)
-    const
-{
-    const auto &other(o.as<SurfaceDefinition>());
-
-    // manually set data can be changed safely
-    if (nominalTexelSize != other.nominalTexelSize) {
-        return Changed::safely;
-    }
-
-    if (mergeBottomLod != other.mergeBottomLod) {
-        return Changed::safely;
-    }
-
-    if (introspection != other.introspection) {
-        return Changed::safely;
-    }
-
-    if (HeightFunction::changed(heightFunction, other.heightFunction)) {
-        return Changed::yes;
-    }
-
-    return Changed::no;
-}
-
 fs::path SurfaceBase::filePath(vts::File fileType) const
 {
     switch (fileType) {
@@ -241,7 +89,7 @@ SurfaceBase::SurfaceBase(const Params &params)
     : Generator(params)
 {}
 
-bool SurfaceBase::loadFiles(const SurfaceDefinition &definition)
+bool SurfaceBase::loadFiles(const Definition &definition)
 {
     if (changeEnforced()) {
         LOG(info1) << "Generator for <" << id() << "> not ready.";
@@ -287,7 +135,7 @@ bool SurfaceBase::loadFiles(const SurfaceDefinition &definition)
     return false;
 }
 
-bool SurfaceBase::updateProperties(const SurfaceDefinition &def)
+bool SurfaceBase::updateProperties(const Definition &def)
 {
     bool changed(false);
 
@@ -594,7 +442,7 @@ void SurfaceBase::generateDebugNode(const vts::TileId &tileId
 }
 
 vts::ExtraTileSetProperties
-SurfaceBase::extraProperties(const SurfaceDefinition &def) const
+SurfaceBase::extraProperties(const Definition &def) const
 {
     vts::ExtraTileSetProperties extra;
 

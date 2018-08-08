@@ -84,27 +84,6 @@ utility::PreMain Factory::register_([]()
 
 // definition manipulation
 
-void parseDefinition(TmsWindyty::Definition &def, const Json::Value &value)
-{
-    Json::getOpt(def.forecastOffset, value, "forecastOffset");
-}
-
-void buildDefinition(Json::Value &value, const TmsWindyty::Definition &def)
-{
-    if (def.forecastOffset) {
-        value["forecastOffset"] = def.forecastOffset;
-    }
-}
-
-void parseDefinition(TmsWindyty::Definition &def
-                     , const boost::python::dict &value)
-{
-    if (value.has_key("forecastOffset")) {
-        def.forecastOffset = boost::python::extract<int>
-            (value["forecastOffset"]);
-    }
-}
-
 // definition dataset config
 
 TmsWindyty::DatasetConfig loadConfig(const fs::path &path)
@@ -248,53 +227,6 @@ TmsWindyty::File writeWms(const fs::path &root
 }
 
 } // namespace
-
-void TmsWindyty::Definition::from_impl(const boost::any &value)
-{
-    // deserialize parent class first
-    TmsRaster::Definition::from_impl(value);
-
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsWindyty: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
-}
-
-void TmsWindyty::Definition::to_impl(boost::any &value) const
-{
-    // serialize parent class first
-    TmsRaster::Definition::to_impl(value);
-
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsWindyty:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
-}
-
-Changed TmsWindyty::Definition::changed_impl(const DefinitionBase &o) const
-{
-    // first check parent class for change
-    const auto changed(TmsRaster::Definition::changed_impl(o));
-    if (changed != Changed::no) { return changed; }
-
-    const auto &other(o.as<Definition>());
-
-    // forecast offset can change
-    if (forecastOffset != other.forecastOffset) { return Changed::safely; }
-
-    // not changed at alla
-    return Changed::no;
-}
 
 void TmsWindyty::File::remove()
 {

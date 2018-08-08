@@ -98,17 +98,7 @@ public:
         void remove();
     };
 
-    struct Definition : public TmsRaster::Definition {
-        int forecastOffset;
-
-        Definition() : forecastOffset() {}
-
-    private:
-        virtual void from_impl(const boost::any &value);
-        virtual void to_impl(boost::any &value) const;
-        virtual Changed changed_impl(const DefinitionBase &other) const;
-        virtual bool frozenCredits_impl() const { return false; }
-    };
+    typedef resource::TmsWindyty Definition;
 
 private:
     virtual DatasetDesc dataset_impl() const;

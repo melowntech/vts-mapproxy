@@ -30,6 +30,7 @@
 #include "vts-libs/vts/tileindex.hpp"
 
 #include "../generator.hpp"
+#include "../definition/tms.hpp"
 
 namespace generator {
 
@@ -37,18 +38,7 @@ class TmsRasterPatchwork : public Generator {
 public:
     TmsRasterPatchwork(const Params &params);
 
-    struct Definition : public DefinitionBase {
-        boost::optional<std::string> mask;
-        RasterFormat format;
-
-        Definition(): format(RasterFormat::jpg) {}
-
-    private:
-        virtual void from_impl(const boost::any &value);
-        virtual void to_impl(boost::any &value) const;
-        virtual Changed changed_impl(const DefinitionBase &other) const;
-        virtual bool frozenCredits_impl() const { return false; }
-    };
+    typedef resource::TmsRasterPatchwork Definition;
 
 private:
     virtual void prepare_impl(Arsenal &arsenal);

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2018 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,34 +24,20 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_tms_bing_hpp_included_
-#define mapproxy_generator_tms_bing_hpp_included_
+#ifndef mapproxy_definition_geodata_hpp_included_
+#define mapproxy_definition_geodata_hpp_included_
 
-#include <functional>
+#include <boost/optional.hpp>
+#include <boost/filesystem.hpp>
 
-#include "../generator.hpp"
-#include "../definition/tms.hpp"
+#include "geo/geodataset.hpp"
 
-namespace generator {
+#include "../resource.hpp"
 
-class TmsBing : public Generator {
-public:
-    TmsBing(const Params &params);
+namespace resource {
 
-    typedef resource::TmsBing Definition;
+// geodata vector formats
 
-private:
-    virtual void prepare_impl(Arsenal &arsenal);
-    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
+} // namespace resource
 
-    virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , Sink &sink) const;
-
-    vr::BoundLayer boundLayer(ResourceRoot root, const std::string &url) const;
-
-    const Definition &definition_;
-};
-
-} // namespace generator
-
-#endif // mapproxy_generator_tms_bing_hpp_included_
+#endif // mapproxy_definition_geodata_hpp_included_

@@ -80,76 +80,7 @@ utility::PreMain Factory::register_([]()
          , std::make_shared<Factory>());
 });
 
-void parseDefinition(TmsRasterRemote::Definition &def
-                     , const Json::Value &value)
-{
-    std::string s;
-
-    Json::get(def.remoteUrl, value, "remoteUrl");
-    if (value.isMember("mask")) {
-        std::string s;
-        Json::get(s, value, "mask");
-        def.mask = s;;
-    }
-}
-
-void buildDefinition(Json::Value &value
-                     , const TmsRasterRemote::Definition &def)
-{
-    value["remoteUrl"] = def.remoteUrl;
-    if (def.mask) {
-        value["mask"] = def.mask->string();
-    }
-}
-
-void parseDefinition(TmsRasterRemote::Definition &def
-                     , const boost::python::dict &value)
-{
-    def.remoteUrl = py2utf8(value["remoteUrl"]);
-
-    if (value.has_key("mask")) {
-        def.mask = py2utf8(value["mask"]);
-    }
-}
-
 } // namespace
-
-void TmsRasterRemote::Definition::from_impl(const boost::any &value)
-{
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsRasterRemote: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
-}
-
-void TmsRasterRemote::Definition::to_impl(boost::any &value) const
-{
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsRasterRemote:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
-}
-
-Changed TmsRasterRemote::Definition::changed_impl(const DefinitionBase &o)
-    const
-{
-    const auto &other(o.as<Definition>());
-
-    if (remoteUrl != other.remoteUrl) { return Changed::yes; }
-    if (mask != other.mask) { return Changed::yes; }
-
-    return Changed::no;
-}
 
 TmsRasterRemote::TmsRasterRemote(const Params &params)
     : Generator(params)

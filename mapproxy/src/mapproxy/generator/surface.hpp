@@ -32,14 +32,12 @@
 #include "vts-libs/vts/tileset/properties.hpp"
 #include "vts-libs/vts/mesh.hpp"
 
-#include "./heightfunction.hpp"
+#include "../heightfunction.hpp"
 #include "../support/mmapped/tilesetindex.hpp"
 #include "../generator.hpp"
+#include "../definition.hpp"
 
 namespace vts = vtslibs::vts;
-
-namespace json { class Value; }
-namespace boost { namespace python { class dict; } }
 
 namespace generator {
 
@@ -47,36 +45,14 @@ class SurfaceBase : public Generator {
 public:
     SurfaceBase(const Params &params);
 
-    struct Introspection {
-        Resource::Id::list tms;
-        Resource::Id::list geodata;
-        boost::optional<vr::Position> position;
-        boost::any browserOptions;
-
-        bool empty() const;
-        bool operator!=(const Introspection &other) const;
-    };
-
-    struct SurfaceDefinition : public DefinitionBase {
-        boost::optional<double> nominalTexelSize;
-        boost::optional<vts::Lod> mergeBottomLod;
-        HeightFunction::pointer heightFunction;
-        Introspection introspection;
-
-        void parse(const Json::Value &value);
-        void build(Json::Value &value) const;
-        void parse(const boost::python::dict &value);
-
-    protected:
-        virtual Changed changed_impl(const DefinitionBase &other) const;
-    };
+    typedef resource::Surface Definition;
 
 protected:
     boost::filesystem::path filePath(vts::File fileType) const;
-    bool updateProperties(const SurfaceDefinition &def);
-    bool loadFiles(const SurfaceDefinition &definition);
+    bool updateProperties(const Definition &def);
+    bool loadFiles(const Definition &definition);
 
-    vts::ExtraTileSetProperties extraProperties(const SurfaceDefinition &def)
+    vts::ExtraTileSetProperties extraProperties(const Definition &def)
         const;
 
 protected:

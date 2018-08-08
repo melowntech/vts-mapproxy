@@ -31,7 +31,7 @@
 
 #include "geo/heightcoding.hpp"
 
-#include "./heightfunction.hpp"
+#include "../heightfunction.hpp"
 #include "../generator.hpp"
 #include "../support/layerenancer.hpp"
 

@@ -40,17 +40,7 @@ class SurfaceSpheroid : public SurfaceBase {
 public:
     SurfaceSpheroid(const Params &params);
 
-    struct Definition : public SurfaceBase::SurfaceDefinition {
-        unsigned int textureLayerId;
-        boost::optional<std::string> geoidGrid;
-
-        Definition() : textureLayerId() {}
-
-    private:
-        virtual void from_impl(const boost::any &value);
-        virtual void to_impl(boost::any &value) const;
-        virtual Changed changed_impl(const DefinitionBase &other) const;
-    };
+    typedef resource::SurfaceSpheroid Definition;
 
 private:
     virtual void prepare_impl(Arsenal &arsenal);
