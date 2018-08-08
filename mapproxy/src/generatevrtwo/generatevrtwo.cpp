@@ -502,8 +502,6 @@ Setup buildDatasetBase(const Config &config
     }
 
     const auto outputDataset(output / "dataset");
-    LOG(info3) << "Creating dataset base in " << outputDataset
-               << " from " << input << ".";
 
     fs::path inputDataset("./original");
     {
@@ -515,6 +513,9 @@ Setup buildDatasetBase(const Config &config
     }
 
     fs::path inputDatasetSymlink(output / inputDataset);
+
+    LOG(info3) << "Creating dataset base in " << outputDataset
+               << " from " << inputDatasetSymlink << ".";
 
     // make a symlink, remove newpath beforehand
     auto symlink([](const fs::path &oldpath, const fs::path &newpath)
