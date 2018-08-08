@@ -325,15 +325,17 @@ fs::path createVrtWO(const calipers::Measurement &cm
 }
 
 
-void buildDefinition(resource::SurfaceDem &def, const fs::path &dataset
-                     , const Config &config)
+void buildDefinition(resource::SurfaceDem &def, const calipers::Measurement &cm
+                     , const fs::path &dataset, const Config &config)
 {
     def.dem.dataset = dataset.string();
     def.dem.geoidGrid = config.geoidGrid;
+
+    def.introspection.position = cm.position;
 }
 
-void buildDefinition(resource::TmsRaster &def, const fs::path &dataset
-                     , const Config &config)
+void buildDefinition(resource::TmsRaster &def, const calipers::Measurement&
+                     , const fs::path &dataset, const Config &config)
 {
     def.dataset = dataset.string();
     def.format = config.format;
@@ -342,26 +344,26 @@ void buildDefinition(resource::TmsRaster &def, const fs::path &dataset
 }
 
 template <typename Definition>
-void buildDefinition(Resource &r, const fs::path &dataset
+void buildDefinition(Resource &r, const calipers::Measurement &cm
+                     , const fs::path &dataset
                      , const Config &config)
 {
     r.generator = Resource::Generator::from<Definition>();
     auto definition(std::make_shared<Definition>());
     r.definition(definition);
-    buildDefinition(*definition, dataset, config);
+    buildDefinition(*definition, cm, dataset, config);
 }
 
-void buildDefinition(Resource &r, calipers::DatasetType datasetType
-                     , const fs::path &dataset
-                     , const Config &config)
+void buildDefinition(Resource &r, const calipers::Measurement &cm
+                     , const fs::path &dataset, const Config &config)
 {
-    switch (datasetType) {
+    switch (cm.datasetType) {
     case calipers::DatasetType::dem:
-        buildDefinition<resource::SurfaceDem>(r, dataset, config);
+        buildDefinition<resource::SurfaceDem>(r, cm, dataset, config);
         break;
 
     case calipers::DatasetType::ophoto:
-        buildDefinition<resource::TmsRaster>(r, dataset, config);
+        buildDefinition<resource::TmsRaster>(r, cm, dataset, config);
         break;
     }
 }
@@ -440,7 +442,7 @@ int SetupResource::run()
         auto ti(tiling::generate(mainDataset, *rf, cm.lodRange
                                  , cm.lodTileRanges(), tilingConfig));
 
-        ti.save(rootDir / (resourceId_.referenceFrame + ".tiling"));
+        ti.save(rootDir / ("tiling." + resourceId_.referenceFrame));
     }
 
     // 7) generate mapproxy resource configuration
@@ -465,12 +467,19 @@ int SetupResource::run()
         r.lodRange = cm.lodRange;
         r.tileRange = cm.tileRange;
 
-        buildDefinition(r, cm.datasetType, resourceDir, config);
+        buildDefinition(r, cm, resourceDir, config);
 
         fs::create_directories(resourceConfigPath.parent_path());
         save(resourceConfigPath, r);
 
-        // TODO: create group include if it is not there
+        // check whether there is a group include file
+        const auto groupConfigPath
+            (mapproxyDefinitionDir_ / (resourceId.group + ".json"));
+        if (!fs::exists(groupConfigPath)) {
+            // no -> create
+            const auto path(utility::format("%s/*.json", resourceId.group));
+            saveIncludeConfig(groupConfigPath, { path });
+        }
     }
 
     // 8) notify mapproxy

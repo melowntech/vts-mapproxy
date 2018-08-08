@@ -466,6 +466,35 @@ void save(const boost::filesystem::path &path, const Resource &resource)
     }
 
     detail::saveResource(f, resource);
+    f.close();
+}
+
+void saveIncludeConfig(const boost::filesystem::path &path
+                       , const std::vector<std::string> &includes)
+{
+    std::ofstream f;
+    f.exceptions(std::ios::badbit | std::ios::failbit);
+
+    try {
+        f.open(path.string(), std::ios_base::out | std::ios_base::trunc);
+    } catch (const std::exception &e) {
+        LOGTHROW(err1, IOError)
+            << "Unable to save resource file " << path
+            << ": <" << e.what() << ">.";
+    }
+
+    Json::Value value(Json::objectValue);
+    if (includes.size() == 1) {
+        value["include"] = includes.front();
+    } else {
+        auto &jincludes(value["include"] = Json::arrayValue);
+        for (const auto &include : includes) {
+            jincludes.append(include);
+        }
+    }
+
+    Json::write(f, value);
+    f.close();
 }
 
 Changed Resource::changed(const Resource &o) const

@@ -327,6 +327,11 @@ Resource::map loadResourcesFromPython(const boost::any &pylist
  */
 void save(const boost::filesystem::path &path, const Resource &resource);
 
+/** Writes helper config with include snippets, one per entry in include vector.
+ */
+void saveIncludeConfig(const boost::filesystem::path &path
+                       , const std::vector<std::string> &includes);
+
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource &resource
                                     , const ResourceRoot &root);
