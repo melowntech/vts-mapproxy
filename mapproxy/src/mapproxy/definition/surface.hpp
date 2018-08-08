@@ -38,7 +38,7 @@
 #include "../heightfunction.hpp"
 
 // fwd
-namespace json { class Value; }
+namespace Json { class Value; }
 namespace boost { namespace python { class dict; } }
 
 namespace resource {
@@ -66,6 +66,9 @@ public:
     void build(Json::Value &value) const;
     void parse(const boost::python::dict &value);
 
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::surface;
+
 protected:
     virtual Changed changed_impl(const DefinitionBase &other) const;
 };
@@ -75,6 +78,8 @@ struct SurfaceSpheroid : public Surface {
     boost::optional<std::string> geoidGrid;
 
     SurfaceSpheroid() : textureLayerId() {}
+
+    static constexpr char driverName[] = "surface-spheroid";
 
 private:
     virtual void from_impl(const boost::any &value);
@@ -89,6 +94,8 @@ struct SurfaceDem : public Surface {
     boost::optional<std::string> heightcodingAlias;
 
     SurfaceDem() : textureLayerId() {}
+
+    static constexpr char driverName[] = "surface-dem";
 
 private:
     virtual void from_impl(const boost::any &value);

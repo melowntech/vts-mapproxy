@@ -34,6 +34,7 @@
 #include "../heightfunction.hpp"
 #include "../generator.hpp"
 #include "../support/layerenancer.hpp"
+#include "../definition.hpp"
 
 namespace generator {
 
@@ -41,43 +42,7 @@ class GeodataVectorBase : public Generator {
 public:
     GeodataVectorBase(const Params &params, bool tiled);
 
-    struct Introspection {
-        boost::optional<Resource::Id> surface;
-        boost::any browserOptions;
-
-        bool empty() const;
-        bool operator!=(const Introspection &other) const;
-    };
-
-    struct Definition : public DefinitionBase {
-        /** Input dataset (can be remote url, interpreted as a template by tiled
-         *  version.
-         */
-        std::string dataset;
-        DemDataset dem;
-        boost::optional<geo::heightcoding::Config::LayerNames> layers;
-        boost::optional<geo::heightcoding::Config::LayerNames> clipLayers;
-        geo::VectorFormat format;
-        geo::vectorformat::Config formatConfig;
-        std::string styleUrl;
-        int displaySize;
-        geo::heightcoding::Mode mode;
-        LayerEnhancer::map layerEnhancers;
-        HeightFunction::pointer heightFunction;
-
-        Introspection introspection;
-
-        Definition()
-            : format(geo::VectorFormat::geodataJson) , displaySize(256)
-            , mode(geo::heightcoding::Mode::auto_)
-        {}
-
-        virtual void from_impl(const boost::any &value);
-        virtual void to_impl(boost::any &value) const;
-
-    protected:
-        virtual Changed changed_impl(const DefinitionBase &other) const;
-    };
+    typedef resource::GeodataVectorBase Definition;
 
 protected:
     /** Parses viewspec from HTTP query. Returns list of found datasets ending

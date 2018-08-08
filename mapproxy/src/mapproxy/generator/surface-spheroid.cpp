@@ -78,10 +78,6 @@ struct Factory : Generator::Factory {
         return std::make_shared<SurfaceSpheroid>(params);
     }
 
-    virtual DefinitionBase::pointer definition() {
-        return std::make_shared<SurfaceSpheroid::Definition>();
-    }
-
     virtual bool systemInstance() const { return true; }
 
 private:
@@ -90,10 +86,7 @@ private:
 
 utility::PreMain Factory::register_([]()
 {
-    Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::surface
-                             , "surface-spheroid")
-         , std::make_shared<Factory>());
+    Generator::registerType<SurfaceSpheroid>(std::make_shared<Factory>());
 });
 
 } // namespace

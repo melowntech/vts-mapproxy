@@ -64,20 +64,13 @@ struct Factory : Generator::Factory {
         return std::make_shared<TmsRasterRemote>(params);
     }
 
-    virtual DefinitionBase::pointer definition() {
-        return std::make_shared<TmsRasterRemote::Definition>();
-    }
-
 private:
     static utility::PreMain register_;
 };
 
 utility::PreMain Factory::register_([]()
 {
-    Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::tms
-                             , "tms-raster-remote")
-         , std::make_shared<Factory>());
+    Generator::registerType<TmsRasterRemote>(std::make_shared<Factory>());
 });
 
 } // namespace

@@ -27,16 +27,24 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/utility/in_place_factory.hpp>
 
+#include "utility/premain.hpp"
+
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
 #include "../support/python.hpp"
 
 #include "./tms.hpp"
+#include "./factory.hpp"
 
 namespace resource {
 
+constexpr Resource::Generator::Type TmsWindyty::type;
+constexpr char TmsWindyty::driverName[];
+
 namespace {
+
+utility::PreMain register_([]() { registerDefinition<TmsWindyty>(); });
 
 void parseDefinition(TmsWindyty &def, const Json::Value &value)
 {

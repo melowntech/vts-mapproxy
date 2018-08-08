@@ -40,6 +40,7 @@
 #include "./error.hpp"
 #include "./resource.hpp"
 #include "./generator.hpp"
+#include "./definition.hpp"
 
 namespace fs = boost::filesystem;
 
@@ -79,7 +80,7 @@ void parseCredits(Resource &r, const Json::Value &object
 
 void parseDefinition(Resource &r, const Json::Value &value, bool hasRanges)
 {
-    auto definition(Generator::definition(r.generator));
+    auto definition(resource::definition(r.generator));
     definition->from(value);
     if (definition->needsRanges()) {
         if (!hasRanges) {

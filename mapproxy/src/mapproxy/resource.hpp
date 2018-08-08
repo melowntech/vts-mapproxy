@@ -173,6 +173,10 @@ struct Resource {
             : type(type), driver(driver) {}
         bool operator<(const Generator &o) const;
         bool operator==(const Generator &o) const;
+
+        template <typename Definition> static Generator from() {
+            return { Definition::type, Definition::driverName };
+        }
     };
 
     Id id;

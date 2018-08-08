@@ -24,12 +24,34 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_definition_hpp_included_
-#define mapproxy_definition_hpp_included_
+#include <map>
 
-#include "definition/factory.hpp"
-#include "definition/tms.hpp"
-#include "definition/surface.hpp"
-#include "definition/geodata.hpp"
+#include "../error.hpp"
+#include "./factory.hpp"
 
-#endif // mapproxy_definition_hpp_included_
+namespace resource {
+
+namespace {
+typedef std::map<Resource::Generator
+                 , std::function<DefinitionBase::pointer()>> Registry;
+Registry registry;
+}
+
+DefinitionBase::pointer definition(const Resource::Generator &type)
+{
+    auto fregistry(registry.find(type));
+    if (fregistry == registry.end()) {
+        LOGTHROW(err1, UnknownGenerator)
+            << "Unknown generator type <" << type << ">.";
+    }
+    return fregistry->second();
+}
+
+void registerDefinition(const Resource::Generator &type
+                        , const std::function<DefinitionBase::pointer()>
+                        &factory)
+{
+    registry.insert(Registry::value_type(type, factory));
+}
+
+} // namespace resource

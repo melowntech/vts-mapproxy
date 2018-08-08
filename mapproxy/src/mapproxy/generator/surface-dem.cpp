@@ -87,20 +87,13 @@ struct Factory : Generator::Factory {
         return std::make_shared<SurfaceDem>(params);
     }
 
-    virtual DefinitionBase::pointer definition() {
-        return std::make_shared<SurfaceDem::Definition>();
-    }
-
 private:
     static utility::PreMain register_;
 };
 
 utility::PreMain Factory::register_([]()
 {
-    Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::surface
-                             , "surface-dem")
-         , std::make_shared<Factory>());
+    Generator::registerType<SurfaceDem>(std::make_shared<Factory>());
 });
 
 } // namespace

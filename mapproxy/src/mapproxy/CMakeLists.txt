@@ -22,6 +22,7 @@ set(mapproxy-core_SOURCES
 
   # resource definitions
   definition.hpp
+  definition/factory.hpp definition/factory.cpp
 
   definition/tms.hpp
   definition/tms-raster-patchwork.cpp
@@ -34,6 +35,11 @@ set(mapproxy-core_SOURCES
   definition/surface.cpp
   definition/surface-spheroid.cpp
   definition/surface-dem.cpp
+
+  definition/geodata.hpp
+  definition/geodatavectorbase.cpp
+  definition/geodata-vector.cpp
+  definition/geodata-vector-tiled.cpp
   )
 
 # test program

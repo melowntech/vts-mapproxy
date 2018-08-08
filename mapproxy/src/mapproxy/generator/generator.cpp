@@ -45,6 +45,7 @@
 
 #include "../error.hpp"
 #include "../generator.hpp"
+#include "../definition.hpp"
 #include "./factory.hpp"
 
 namespace fs = boost::filesystem;
@@ -79,7 +80,7 @@ void Generator::registerType(const Resource::Generator &type
 
 DefinitionBase::pointer Generator::definition(const Resource::Generator &type)
 {
-    return findFactory(type)->definition();
+    return resource::definition(type);
 }
 
 Generator::pointer Generator::create(const Params &params)
@@ -617,7 +618,7 @@ void Generators::Detail::registerSystemGenerators()
             resource.referenceFrame = &rf;
             resource.lodRange = vts::LodRange(0, 22);
             resource.tileRange = vts::TileRange(0, 0, 0, 0);
-            resource.definition(factory->definition());
+            resource.definition(resource::definition(resourceGenerator));
 
             // create generator params
             Generator::Params params(resource);

@@ -59,20 +59,13 @@ struct Factory : Generator::Factory {
         return std::make_shared<GeodataVector>(params);
     }
 
-    virtual DefinitionBase::pointer definition() {
-        return std::make_shared<GeodataVector::Definition>();
-    }
-
 private:
     static utility::PreMain register_;
 };
 
 utility::PreMain Factory::register_([]()
 {
-    Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::geodata
-                             , "geodata-vector")
-         , std::make_shared<Factory>());
+    Generator::registerType<GeodataVector>(std::make_shared<Factory>());
 });
 
 } // namespace

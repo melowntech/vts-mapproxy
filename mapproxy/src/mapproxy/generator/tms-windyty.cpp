@@ -67,19 +67,13 @@ struct Factory : Generator::Factory {
         return std::make_shared<TmsWindyty>(params);
     }
 
-    virtual DefinitionBase::pointer definition() {
-        return std::make_shared<TmsWindyty::Definition>();
-    }
-
 private:
     static utility::PreMain register_;
 };
 
 utility::PreMain Factory::register_([]()
 {
-    Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::tms, "tms-windyty")
-         , std::make_shared<Factory>());
+    Generator::registerType<TmsWindyty>(std::make_shared<Factory>());
 });
 
 // definition manipulation

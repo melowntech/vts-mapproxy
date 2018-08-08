@@ -32,67 +32,52 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
+#include "vts-libs/registry/json.hpp"
+#include "vts-libs/registry/py.hpp"
+
 #include "../support/python.hpp"
 
-#include "./surface.hpp"
+#include "./geodata.hpp"
 #include "./factory.hpp"
 
 namespace resource {
 
-constexpr char SurfaceSpheroid::driverName[];
+constexpr Resource::Generator::Type GeodataVectorTiled::type;
+constexpr char GeodataVectorTiled::driverName[];
 
 namespace {
 
-utility::PreMain register_([]() { registerDefinition<SurfaceSpheroid>(); });
+utility::PreMain register_([]() { registerDefinition<GeodataVectorTiled>(); });
 
-void parseDefinition(SurfaceSpheroid &def, const Json::Value &value)
+void parseDefinition(GeodataVectorTiled &def, const Json::Value &value)
 {
-    if (value.isMember("textureLayerId")) {
-        Json::get(def.textureLayerId, value, "textureLayerId");
+    if (value.isMember("maxSourceLod")) {
+        def.maxSourceLod = boost::in_place();
+        Json::get(*def.maxSourceLod, value, "maxSourceLod");
     }
-    if (value.isMember("geoidGrid")) {
-        std::string s;
-        Json::get(s, value, "geoidGrid");
-        def.geoidGrid = s;
-    } else {
-        def.geoidGrid = boost::none;
-    }
-
-    def.parse(value);
 }
 
-void buildDefinition(Json::Value &value, const SurfaceSpheroid &def)
+void parseDefinition(GeodataVectorTiled &def, const boost::python::dict &value)
 {
-    if (def.textureLayerId) {
-        value["textureLayerId"] = def.textureLayerId;
+    if (value.has_key("maxSourceLod")) {
+        def.maxSourceLod = boost::python::extract<int>(value["maxSourceLod"]);
     }
-    if (def.geoidGrid) {
-        value["geoidGrid"] = *def.geoidGrid;
-    }
-
-    def.build(value);
 }
 
-void parseDefinition(SurfaceSpheroid &def, const boost::python::dict &value)
+void buildDefinition(Json::Value &value, const GeodataVectorTiled &def)
 {
-    namespace python = boost::python;
-    if (value.has_key("textureLayerId")) {
-        def.textureLayerId = python::extract<int>(value["textureLayerId"]);
+    if (def.maxSourceLod) {
+        value["maxSourceLod"] = *def.maxSourceLod;
     }
-
-    if (value.has_key("geoidGrid")) {
-        def.geoidGrid = py2utf8(value["geoidGrid"]);
-    } else {
-        def.geoidGrid = boost::none;
-    }
-
-    def.parse(value);
 }
 
 } // namespace
 
-void SurfaceSpheroid::from_impl(const boost::any &value)
+void GeodataVectorTiled::from_impl(const boost::any &value)
 {
+    // deserialize parent class first
+    GeodataVectorBase::from_impl(value);
+
     if (const auto *json = boost::any_cast<Json::Value>(&value)) {
         parseDefinition(*this, *json);
     } else if (const auto *py
@@ -101,31 +86,41 @@ void SurfaceSpheroid::from_impl(const boost::any &value)
         parseDefinition(*this, *py);
     } else {
         LOGTHROW(err1, Error)
-            << "SurfaceSpheroid: Unsupported configuration from: <"
+            << "GeodataVectorTiled: Unsupported configuration from: <"
             << value.type().name() << ">.";
     }
 }
 
-void SurfaceSpheroid::to_impl(boost::any &value) const
+void GeodataVectorTiled::to_impl(boost::any &value) const
 {
+    // serialize parent class first
+    GeodataVectorBase::to_impl(value);
+
     if (auto *json = boost::any_cast<Json::Value>(&value)) {
         buildDefinition(*json, *this);
     } else {
         LOGTHROW(err1, Error)
-            << "SurfaceSpheroid:: Unsupported serialization into: <"
+            << "GeodataVectorTiled:: Unsupported serialization into: <"
             << value.type().name() << ">.";
     }
 }
 
-Changed SurfaceSpheroid::changed_impl(const DefinitionBase &o)
+Changed GeodataVectorTiled::changed_impl(const DefinitionBase &o)
     const
 {
-    const auto &other(o.as<SurfaceSpheroid>());
+    // first check parent class for change
+    const auto changed(GeodataVectorBase::changed_impl(o));
+    if (changed == Changed::yes) { return changed; }
 
-    if (textureLayerId != other.textureLayerId) { return Changed::yes; }
-    if (geoidGrid != other.geoidGrid) { return Changed::yes; }
+    const auto &other(o.as<GeodataVectorTiled>());
 
-    return Surface::changed_impl(o);
+    // max source lod leads to revision bump
+    if (maxSourceLod != other.maxSourceLod) {
+        return Changed::withRevisionBump;
+    }
+
+    // pass result from parent
+    return changed;
 }
 
 } // namespace resource

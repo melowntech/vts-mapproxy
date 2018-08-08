@@ -61,51 +61,19 @@ namespace generator {
 
 namespace {
 
-void parseDefinition(GeodataVectorTiled::Definition &def
-                     , const Json::Value &value)
-{
-    if (value.isMember("maxSourceLod")) {
-        def.maxSourceLod = boost::in_place();
-        Json::get(*def.maxSourceLod, value, "maxSourceLod");
-    }
-}
-
 struct Factory : Generator::Factory {
     virtual Generator::pointer create(const Generator::Params &params)
     {
         return std::make_shared<GeodataVectorTiled>(params);
     }
 
-    virtual DefinitionBase::pointer definition() {
-        return std::make_shared<GeodataVectorTiled::Definition>();
-    }
-
 private:
     static utility::PreMain register_;
 };
 
-void parseDefinition(GeodataVectorTiled::Definition &def
-                     , const boost::python::dict &value)
-{
-    if (value.has_key("maxSourceLod")) {
-        def.maxSourceLod = boost::python::extract<int>(value["maxSourceLod"]);
-    }
-}
-
-void buildDefinition(Json::Value &value
-                     , const GeodataVectorTiled::Definition &def)
-{
-    if (def.maxSourceLod) {
-        value["maxSourceLod"] = *def.maxSourceLod;
-    }
-}
-
 utility::PreMain Factory::register_([]()
 {
-    Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::geodata
-                             , "geodata-vector-tiled")
-         , std::make_shared<Factory>());
+    Generator::registerType<GeodataVectorTiled>(std::make_shared<Factory>());
 });
 
 /** NOTICE: increment each time some data-related bug is fixed.
@@ -113,56 +81,6 @@ utility::PreMain Factory::register_([]()
 int GeneratorRevision(0);
 
 } // namespace
-
-void GeodataVectorTiled::Definition::from_impl(const boost::any &value)
-{
-    // deserialize parent class first
-    GeodataVectorBase::Definition::from_impl(value);
-
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "GeodataVectorTiled: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
-}
-
-void GeodataVectorTiled::Definition::to_impl(boost::any &value) const
-{
-    // serialize parent class first
-    GeodataVectorBase::Definition::to_impl(value);
-
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "GeodataVectorTiled:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
-}
-
-Changed GeodataVectorTiled::Definition::changed_impl(const DefinitionBase &o)
-    const
-{
-    // first check parent class for change
-    const auto changed(GeodataVectorBase::Definition::changed_impl(o));
-    if (changed == Changed::yes) { return changed; }
-
-    const auto &other(o.as<Definition>());
-
-    // max source lod leads to revision bump
-    if (maxSourceLod != other.maxSourceLod) {
-        return Changed::withRevisionBump;
-    }
-
-    // pass result from parent
-    return changed;
-}
 
 GeodataVectorTiled::GeodataVectorTiled(const Params &params)
     : GeodataVectorBase(params, true)

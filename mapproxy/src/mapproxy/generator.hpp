@@ -132,6 +132,13 @@ public:
     static void registerType(const Resource::Generator &type
                              , const std::shared_ptr<Factory> &factory);
 
+    template <typename GeneratorType>
+    static void registerType(const std::shared_ptr<Factory> &factory) {
+        registerType({ GeneratorType::Definition::type
+                       , GeneratorType::Definition::driverName }
+                     , factory);
+    }
+
     /** Generator is ready when all data needed to serve are prepared.
      */
     bool ready() const { return ready_; }

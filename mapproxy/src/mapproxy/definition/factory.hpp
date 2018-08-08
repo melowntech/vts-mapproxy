@@ -24,12 +24,36 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_definition_hpp_included_
-#define mapproxy_definition_hpp_included_
+#ifndef mapproxy_definition_factory_hpp_included_
+#define mapproxy_definition_factory_hpp_included_
 
-#include "definition/factory.hpp"
-#include "definition/tms.hpp"
-#include "definition/surface.hpp"
-#include "definition/geodata.hpp"
+#include <functional>
 
-#endif // mapproxy_definition_hpp_included_
+#include "../resource.hpp"
+
+namespace resource {
+
+/** Create definition based on the generator type.
+ */
+DefinitionBase::pointer definition(const Resource::Generator &type);
+
+/** Register definition based on generator type.
+ */
+void registerDefinition(const Resource::Generator &type
+                        , const std::function<DefinitionBase::pointer()>
+                        &factory);
+
+template <typename Definition> void registerDefinition();
+
+// inlines
+
+template <typename Definition> void registerDefinition() {
+    registerDefinition({ Definition::type, Definition::driverName }
+                       , []() -> DefinitionBase::pointer {
+                           return std::make_shared<Definition>();
+                       });
+}
+
+} // namespace resource
+
+#endif // mapproxy_definition_factory_hpp_included_

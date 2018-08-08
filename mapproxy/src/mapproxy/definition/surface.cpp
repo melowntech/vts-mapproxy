@@ -42,6 +42,8 @@ namespace vr = vtslibs::registry;
 
 namespace resource {
 
+constexpr Resource::Generator::Type Surface::type;
+
 bool Surface::Introspection::empty() const
 {
     return (tms.empty() && geodata.empty()

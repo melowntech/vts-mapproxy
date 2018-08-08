@@ -37,14 +37,7 @@ class GeodataVector : public GeodataVectorBase {
 public:
     GeodataVector(const Params &params);
 
-    struct Definition : public GeodataVectorBase::Definition {
-    public:
-        Definition() : GeodataVectorBase::Definition() {}
-    private:
-        virtual bool frozenCredits_impl() const { return false; }
-
-        virtual bool needsRanges_impl() const { return false; }
-    };
+    typedef resource::GeodataVector Definition;
 
 private:
     virtual void prepare_impl(Arsenal &arsenal);

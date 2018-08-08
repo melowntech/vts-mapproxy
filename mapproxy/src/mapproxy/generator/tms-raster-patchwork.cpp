@@ -70,10 +70,6 @@ struct Factory : Generator::Factory {
         return std::make_shared<TmsRasterPatchwork>(params);
     }
 
-    virtual DefinitionBase::pointer definition() {
-        return std::make_shared<TmsRasterPatchwork::Definition>();
-    }
-
     virtual bool systemInstance() const { return true; }
 
 private:
@@ -82,10 +78,7 @@ private:
 
 utility::PreMain Factory::register_([]()
 {
-    Generator::registerType
-        (Resource::Generator(Resource::Generator::Type::tms
-                             , "tms-raster-patchwork")
-         , std::make_shared<Factory>());
+    Generator::registerType<TmsRasterPatchwork>(std::make_shared<Factory>());
 });
 
 } // namespace

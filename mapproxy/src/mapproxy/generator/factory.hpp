@@ -38,11 +38,6 @@ struct Generator::Factory {
     virtual ~Factory() {}
     virtual Generator::pointer create(const Params &params) = 0;
 
-    /** Parses configuration from any value (can be json or python object).
-     *  Throws in case of error.
-     */
-    virtual DefinitionBase::pointer definition() = 0;
-
     /** If true is returned a default system resource is generated for each
      *  reference frame.
      */

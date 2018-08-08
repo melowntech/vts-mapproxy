@@ -27,16 +27,23 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/utility/in_place_factory.hpp>
 
+#include "utility/premain.hpp"
+
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
 #include "../support/python.hpp"
 
 #include "./surface.hpp"
+#include "./factory.hpp"
 
 namespace resource {
 
+constexpr char SurfaceDem::driverName[];
+
 namespace {
+
+utility::PreMain register_([]() { registerDefinition<SurfaceDem>(); });
 
 void parseDefinition(SurfaceDem &def, const Json::Value &value)
 {

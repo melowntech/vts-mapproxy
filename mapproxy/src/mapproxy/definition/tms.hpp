@@ -44,6 +44,10 @@ struct TmsRasterPatchwork : public DefinitionBase {
 
     TmsRasterPatchwork(): format(RasterFormat::jpg) {}
 
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::tms;
+    static constexpr char driverName[] = "tms-raster-patchwork";
+
 private:
     virtual void from_impl(const boost::any &value);
     virtual void to_impl(boost::any &value) const;
@@ -60,6 +64,10 @@ struct TmsRaster : public DefinitionBase {
 
     TmsRaster(): format(RasterFormat::jpg), transparent(false) {}
 
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::tms;
+    static constexpr char driverName[] = "tms-raster";
+
 protected:
     virtual void from_impl(const boost::any &value);
     virtual void to_impl(boost::any &value) const;
@@ -73,6 +81,10 @@ struct TmsRasterRemote : public DefinitionBase {
 
     TmsRasterRemote() {}
 
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::tms;
+    static constexpr char driverName[] = "tms-raster-remote";
+
 private:
     virtual void from_impl(const boost::any &value);
     virtual void to_impl(boost::any &value) const;
@@ -85,6 +97,10 @@ struct TmsBing : public DefinitionBase {
 
     TmsBing() {}
 
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::tms;
+    static constexpr char driverName[] = "tms-bing";
+
 private:
     virtual void from_impl(const boost::any &value);
     virtual void to_impl(boost::any &value) const;
@@ -96,6 +112,10 @@ struct TmsWindyty : public TmsRaster {
     int forecastOffset;
 
     TmsWindyty() : forecastOffset() {}
+
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::tms;
+    static constexpr char driverName[] = "tms-windyty";
 
 private:
     virtual void from_impl(const boost::any &value);

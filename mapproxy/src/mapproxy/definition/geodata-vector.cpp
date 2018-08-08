@@ -24,12 +24,31 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_definition_hpp_included_
-#define mapproxy_definition_hpp_included_
+#include <boost/lexical_cast.hpp>
+#include <boost/utility/in_place_factory.hpp>
 
-#include "definition/factory.hpp"
-#include "definition/tms.hpp"
-#include "definition/surface.hpp"
-#include "definition/geodata.hpp"
+#include "utility/premain.hpp"
 
-#endif // mapproxy_definition_hpp_included_
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/as.hpp"
+
+#include "vts-libs/registry/json.hpp"
+#include "vts-libs/registry/py.hpp"
+
+#include "../support/python.hpp"
+
+#include "./geodata.hpp"
+#include "./factory.hpp"
+
+namespace resource {
+
+constexpr Resource::Generator::Type GeodataVector::type;
+constexpr char GeodataVector::driverName[];
+
+namespace {
+
+utility::PreMain register_([]() { registerDefinition<GeodataVector>(); });
+
+} // namespace
+
+} // namespace resource

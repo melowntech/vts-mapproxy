@@ -42,19 +42,7 @@ class GeodataVectorTiled : public GeodataVectorBase {
 public:
     GeodataVectorTiled(const Params &params);
 
-    struct Definition : GeodataVectorBase::Definition {
-        /** Maximum available LOD in the source data. Detailed LODs will be
-         *  generated from coarser tiles at maxSourceLod.
-         *  LOD is in local subtree.
-         */
-        boost::optional<vts::Lod> maxSourceLod;
-
-        virtual void from_impl(const boost::any &value);
-        virtual void to_impl(boost::any &value) const;
-
-    private:
-        virtual Changed changed_impl(const DefinitionBase &other) const;
-    };
+    typedef resource::GeodataVectorTiled Definition;
 
 private:
     virtual void prepare_impl(Arsenal &arsenal);
