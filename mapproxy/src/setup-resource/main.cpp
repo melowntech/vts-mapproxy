@@ -485,7 +485,7 @@ int SetupResource::run()
         }
     }
 
-    
+
     // 8) notify mapproxy
     LOG(info4) << "Notifying mapproxy.";
 
