@@ -368,6 +368,46 @@ void buildDefinition(Resource &r, const calipers::Measurement &cm
     }
 }
 
+class Mapproxy {
+public:
+    Mapproxy(const fs::path &ctrl)
+        : ctrl_(ctrl)
+    {}
+
+    bool has(const Resource::Id &resourceId);
+
+    void updateResources();
+
+private:
+    service::CtrlClient ctrl_;
+};
+
+bool Mapproxy::has(const Resource::Id &resourceId)
+{
+    const auto reply(ctrl_.command("has-resource", resourceId.referenceFrame
+                             , resourceId.group, resourceId.id));
+    if (reply.empty()) {
+        LOGTHROW(err3, std::runtime_error)
+            << "Invalid reply from mapproxy.";
+    }
+
+    if (reply.front() == "true") {
+        return true;
+    } else if (reply.front() == "false") {
+        return false;
+    }
+
+    LOGTHROW(err3, std::runtime_error)
+        << "Invalid reply from mapproxy: <" << reply.front() << ">.";
+    throw;
+}
+
+void Mapproxy::updateResources()
+{
+    auto reply(ctrl_.command("update-resources"));
+    LOG(info4) << "Reply: " << utility::join(reply, "---");
+}
+
 int SetupResource::run()
 {
     // find reference frame
@@ -399,6 +439,12 @@ int SetupResource::run()
     LOG(info4) << "Checking for resource existence.";
     // TODO: implement me
 
+    if (Mapproxy(mapproxyCtrl_).has(resourceId)) {
+        LOG(fatal)
+            << "Resource " << resourceId << " already exists in mapproxy "
+            << "configuration. Please, use another id and/or group.";
+        return EXIT_FAILURE;
+    }
 
     // 3) measure dataset
     LOG(info4) << "Measuring dataset.";
@@ -488,6 +534,10 @@ int SetupResource::run()
 
     // 8) notify mapproxy
     LOG(info4) << "Notifying mapproxy.";
+    {
+        Mapproxy mp(mapproxyCtrl_);
+        mp.updateResources();
+    }
 
     return EXIT_SUCCESS;
 }
