@@ -58,12 +58,17 @@ namespace {
 const std::string ResourceFile("resource.json");
 
 typedef std::map<Resource::Generator, Generator::Factory::pointer> Registry;
-Registry registry;
+
+Registry& registry() {
+    static Registry registry;
+    return registry;
+}
 
 Generator::Factory::pointer findFactory(const Resource::Generator &type)
 {
-    auto fregistry(registry.find(type));
-    if (fregistry == registry.end()) {
+    const auto &r(registry());
+    auto fregistry(r.find(type));
+    if (fregistry == r.end()) {
         LOGTHROW(err1, UnknownGenerator)
             << "Unknown generator type <" << type << ">.";
     }
@@ -75,7 +80,7 @@ Generator::Factory::pointer findFactory(const Resource::Generator &type)
 void Generator::registerType(const Resource::Generator &type
                              , const Factory::pointer &factory)
 {
-    registry.insert(Registry::value_type(type, factory));
+    registry().insert(Registry::value_type(type, factory));
 }
 
 DefinitionBase::pointer Generator::definition(const Resource::Generator &type)
@@ -373,6 +378,8 @@ public:
     void replace(const Generator::pointer &original
                  , const Generator::pointer &replacement);
 
+    bool has(const Resource::Id &resourceId) const;
+
 private:
     void registerSystemGenerators();
 
@@ -595,7 +602,7 @@ void Generators::Detail::prepare(const Generator::pointer &generator)
 
 void Generators::Detail::registerSystemGenerators()
 {
-    for (const auto &ritem : registry) {
+    for (const auto &ritem : registry()) {
         const auto &resourceGenerator(ritem.first);
         const auto &factory(ritem.second);
 
@@ -988,6 +995,11 @@ void Generators::update()
     detail().update();
 }
 
+bool Generators::has(const Resource::Id &resourceId) const
+{
+    return detail().has(resourceId);
+}
+
 void Generator::stat(std::ostream &os) const
 {
     os << "<" << id()
@@ -1010,6 +1022,14 @@ void Generators::Detail::stat(std::ostream &os) const
     for (const auto &generator : generators) {
         generator->stat(os);
     }
+}
+
+bool Generators::Detail::has(const Resource::Id &resourceId) const
+{
+    std::unique_lock<std::mutex> lock(lock_);
+    auto &idx(serving_.get<ResourceIdIdx>());
+    auto fserving(idx.find(resourceId));
+    return (fserving != idx.end());
 }
 
 void Generators::stat(std::ostream &os) const

@@ -34,13 +34,19 @@ namespace resource {
 namespace {
 typedef std::map<Resource::Generator
                  , std::function<DefinitionBase::pointer()>> Registry;
-Registry registry;
+
+Registry& registry() {
+    static Registry registry;
+    return registry;
 }
+
+} // namespace
 
 DefinitionBase::pointer definition(const Resource::Generator &type)
 {
-    auto fregistry(registry.find(type));
-    if (fregistry == registry.end()) {
+    const auto &r(registry());
+    auto fregistry(r.find(type));
+    if (fregistry == r.end()) {
         LOGTHROW(err1, UnknownGenerator)
             << "Unknown generator type <" << type << ">.";
     }
@@ -51,7 +57,7 @@ void registerDefinition(const Resource::Generator &type
                         , const std::function<DefinitionBase::pointer()>
                         &factory)
 {
-    registry.insert(Registry::value_type(type, factory));
+    registry().insert(Registry::value_type(type, factory));
 }
 
 } // namespace resource

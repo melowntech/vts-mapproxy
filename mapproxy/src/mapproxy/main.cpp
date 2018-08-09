@@ -416,9 +416,26 @@ bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
         generators_->update();
         os << "resource updater notified\n";
         return true;
+
+    } else if (cmd.cmd == "has-resource") {
+        if (cmd.args.size() != 3) {
+            os << "error: has-resource expects 3 arguments\n";
+            return true;
+        }
+        if (generators_->has
+            (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2])))
+        {
+            os << "true\n";
+        } else {
+            os << "false\n";
+        }
+        return true;
+
     } else if (cmd.cmd == "help") {
         os << "update-resources  schedule immediate resource update\n"
             ;
+        return true;
+
     }
     return false;
 }

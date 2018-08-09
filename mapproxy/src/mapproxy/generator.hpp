@@ -303,6 +303,8 @@ public:
      */
     void update();
 
+    bool has(const Resource::Id &resourceId) const;
+
     void stat(std::ostream &os) const;
 
     // internals
