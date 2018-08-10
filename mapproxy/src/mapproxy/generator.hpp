@@ -32,6 +32,7 @@
 #include <map>
 #include <iostream>
 #include <atomic>
+#include <cstdint>
 
 #include <boost/noncopyable.hpp>
 #include <boost/any.hpp>
@@ -189,6 +190,14 @@ public:
      */
     void commitEnforcedChange();
 
+    /** Build resource URL (path only).
+     */
+    std::string url() const;
+
+    /** Was the resource updated since given timestamp.
+     */
+    bool updatedSince(std::uint64_t timestamp) const;
+
 protected:
     Generator(const Params &params);
 
@@ -250,6 +259,7 @@ private:
     bool system_;
     bool changeEnforced_;
     std::atomic<bool> ready_;
+    std::atomic<std::uint64_t> readySince_;
     DemRegistry::pointer demRegistry_;
     Generator::pointer replace_;
 };
@@ -301,9 +311,19 @@ public:
 
     /** Force resources update.
      */
-    void update();
+    std::uint64_t update();
+
+    bool updatedSince(std::uint64_t timestamp) const;
+
+    bool updatedSince(const Resource::Id &resourceId
+                      , std::uint64_t timestamp, bool nothrow = false)
+        const;
 
     bool has(const Resource::Id &resourceId) const;
+
+    bool isReady(const Resource::Id &resourceId) const;
+
+    std::string url(const Resource::Id &resourceId) const;
 
     void stat(std::ostream &os) const;
 

@@ -31,16 +31,11 @@
 #include <boost/regex.hpp>
 
 #include <boost/optional.hpp>
-#include <boost/utility/in_place_factory.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/thread.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "utility/streams.hpp"
-#include "utility/tcpendpoint-io.hpp"
 #include "utility/buildsys.hpp"
-#include "utility/openmp.hpp"
-#include "utility/progress.hpp"
 #include "utility/path.hpp"
 #include "utility/enum-io.hpp"
 #include "utility/path.hpp"
@@ -59,15 +54,16 @@
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/tileindex.hpp"
 
+// mapproxy stuff
 #include "calipers/calipers.hpp"
 #include "generatevrtwo/generatevrtwo.hpp"
 #include "tiling/tiling.hpp"
 #include "mapproxy/resource.hpp"
 #include "mapproxy/definition.hpp"
+#include "mapproxy/mapproxy.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-namespace ba = boost::algorithm;
 namespace vts = vtslibs::vts;
 
 namespace vr = vtslibs::registry;
@@ -368,46 +364,6 @@ void buildDefinition(Resource &r, const calipers::Measurement &cm
     }
 }
 
-class Mapproxy {
-public:
-    Mapproxy(const fs::path &ctrl)
-        : ctrl_(ctrl)
-    {}
-
-    bool has(const Resource::Id &resourceId);
-
-    void updateResources();
-
-private:
-    service::CtrlClient ctrl_;
-};
-
-bool Mapproxy::has(const Resource::Id &resourceId)
-{
-    const auto reply(ctrl_.command("has-resource", resourceId.referenceFrame
-                             , resourceId.group, resourceId.id));
-    if (reply.empty()) {
-        LOGTHROW(err3, std::runtime_error)
-            << "Invalid reply from mapproxy.";
-    }
-
-    if (reply.front() == "true") {
-        return true;
-    } else if (reply.front() == "false") {
-        return false;
-    }
-
-    LOGTHROW(err3, std::runtime_error)
-        << "Invalid reply from mapproxy: <" << reply.front() << ">.";
-    throw;
-}
-
-void Mapproxy::updateResources()
-{
-    auto reply(ctrl_.command("update-resources"));
-    LOG(info4) << "Reply: " << utility::join(reply, "---");
-}
-
 int SetupResource::run()
 {
     // find reference frame
@@ -536,7 +492,51 @@ int SetupResource::run()
     LOG(info4) << "Notifying mapproxy.";
     {
         Mapproxy mp(mapproxyCtrl_);
-        mp.updateResources();
+
+        const auto timestamp(mp.updateResources());
+        LOG(info4)
+            << "Mapproxy notified. Waiting for update confirmation.";
+
+        const auto waitForUpdate([&](int tries) -> bool
+        {
+            for (; tries > 0; --tries) {
+                if (mp.updatedSince(timestamp)) { return true; }
+                usleep(500000);
+            }
+
+            return false;
+        });
+
+        const auto ready([&](int tries) -> bool
+        {
+            for (; tries > 0; --tries) {
+                if (mp.isReady(resourceId)) {
+                    return true;
+                }
+                usleep(500000);
+            }
+
+            return false;
+        });
+
+        if (!waitForUpdate(10)) {
+            LOG(err3) << "Mapproxy didn't update resources in time. "
+                "Check resource presence manually.";
+            return EXIT_FAILURE;
+        }
+        LOG(info3) << "Mapproxy updated resources.";
+
+        if (!ready(10)) {
+            LOG(err3) << "Resource has not been made ready in time. "
+                "Check resource presence manually.";
+            return EXIT_FAILURE;
+        }
+
+        const auto url(mp.url(resourceId));
+
+        LOG(info4)
+            << "Resource <" << resourceId << "> is ready to serve "
+            << "at local URL <" << url << ">.";
     }
 
     return EXIT_SUCCESS;

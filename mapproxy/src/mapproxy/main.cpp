@@ -410,11 +410,64 @@ void Daemon::monitor(std::ostream &os)
     (void) os;
 }
 
+inline void sendBoolean(std::ostream &os, bool value)
+{
+    os << (value ? "true\n" : "false\n");
+}
+
+inline bool parseBoolean(const std::string &value)
+{
+    if (value == "true") {
+        return true;
+    } else if (value == "false") {
+        return false;
+    }
+
+    LOGTHROW(err2, std::runtime_error)
+        << "Invalid boolean value: <" << value << ">.";
+    throw;
+}
+
 bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
 {
     if (cmd.cmd == "update-resources") {
-        generators_->update();
-        os << "resource updater notified\n";
+        auto token(generators_->update());
+        os << "resource updater notified\n"
+           << token << "\n"
+            ;
+        return true;
+
+    } else if (cmd.cmd == "updated-since") {
+        try {
+            switch (cmd.args.size()) {
+            case 1:
+                sendBoolean(os, generators_->updatedSince
+                            (boost::lexical_cast<std::uint64_t>(cmd.args[0])));
+                return true;
+
+            case 4:
+                sendBoolean
+                    (os, generators_->updatedSince
+                     (Resource::Id(cmd.args[1], cmd.args[2], cmd.args[3])
+                      , boost::lexical_cast<std::uint64_t>(cmd.args[0])));
+                return true;
+
+            case 5:
+                sendBoolean
+                    (os, generators_->updatedSince
+                     (Resource::Id(cmd.args[1], cmd.args[2], cmd.args[3])
+                      , boost::lexical_cast<std::uint64_t>(cmd.args[0])
+                      , parseBoolean(cmd.args[4])));
+                return true;
+
+            default:
+                os << "error: updated-since expects 1, 4 or 5 argument\n";
+                return true;
+            }
+
+        } catch (const boost::bad_lexical_cast&) {
+            os << "error: argument is not a number\n";
+        }
         return true;
 
     } else if (cmd.cmd == "has-resource") {
@@ -422,17 +475,50 @@ bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
             os << "error: has-resource expects 3 arguments\n";
             return true;
         }
-        if (generators_->has
-            (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2])))
-        {
-            os << "true\n";
-        } else {
-            os << "false\n";
+
+        sendBoolean(os, generators_->has
+                    (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2])));
+        return true;
+
+    } else if (cmd.cmd == "is-resource-ready") {
+        if (cmd.args.size() != 3) {
+            os << "error: is-resource-ready expects 3 arguments\n";
+            return true;
         }
+
+        sendBoolean(os, generators_->isReady
+                    (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2])));
+        return true;
+
+    } else if (cmd.cmd == "resource-url") {
+        if (cmd.args.size() != 3) {
+            os << "error: resource-url expects 3 arguments\n";
+            return true;
+        }
+
+        const auto url(generators_->url
+                       (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2])));
+        os << utility::format
+            ("http://%s%s\n"
+             , utility::TcpEndpointPrettyPrint(httpListen_), url);
         return true;
 
     } else if (cmd.cmd == "help") {
-        os << "update-resources  schedule immediate resource update\n"
+        os << "update-resources  schedule immediate update of resources;\n"
+           << "                  returns timestamp (usec from Epoch)\n"
+           << "                  that can be used to check for update \n"
+           << "                  completion\n"
+           << "updated-since timestamp\n"
+           << "                  check whether resources have been updated\n"
+           << "                  since given timestamp (usec since Epoch)\n"
+           << "has-resource referenceFrame group id\n"
+           << "                  returns boolean (true/false) indicating\n"
+           << "                  resource presence in the delivery table\n"
+           << "is-resource-ready referenceFrame group id\n"
+           << "                  returns boolean (true/false) indicating\n"
+           << "                  resource readiness\n"
+           << "resource-url referenceFrame group id\n"
+           << "                  returns local resource URL\n"
             ;
         return true;
 

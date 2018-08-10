@@ -42,6 +42,7 @@
 #include "dbglog/dbglog.hpp"
 #include "utility/path.hpp"
 #include "utility/gccversion.hpp"
+#include "utility/time.hpp"
 
 #include "../error.hpp"
 #include "../generator.hpp"
@@ -105,7 +106,7 @@ Generator::Generator(const Params &params)
     , resource_(params.resource), savedResource_(params.resource)
     , fresh_(false), system_(params.system)
     , changeEnforced_(false)
-    , ready_(false)
+    , ready_(false), readySince_(0)
     , demRegistry_(params.demRegistry)
     , replace_(params.replace)
 {
@@ -202,6 +203,7 @@ void Generator::makeReady()
     }
 
     ready_ = true;
+    readySince_ = utility::usecFromEpoch();
 
     LOG(info2) << "Ready to serve resource <" << id()
                << "> (type <" << resource().generator << ">).";
@@ -283,6 +285,18 @@ void Generator::checkReady() const
     throw Unavailable("Generator not ready.");
 }
 
+std::string Generator::url() const
+{
+    return ("/" / prependRoot(fs::path("/"), id(), type()
+                              , { ResourceRoot::referenceFrame }))
+        .string();
+}
+
+bool Generator::updatedSince(std::uint64_t timestamp) const
+{
+    return readySince_ > timestamp;
+}
+
 namespace {
 
 struct TypeKey {
@@ -343,7 +357,8 @@ public:
     Detail(const Generators::Config &config
            , const ResourceBackend::pointer &resourceBackend)
         : config_(config), resourceBackend_(resourceBackend)
-        , arsenal_(), running_(false), ready_(false), preparing_(0)
+        , arsenal_(), running_(false), updateRequest_(false), lastUpdate_(0)
+        , ready_(false), preparing_(0)
         , work_(ios_), demRegistry_(std::make_shared<DemRegistry>())
     {
         registerSystemGenerators();
@@ -371,7 +386,9 @@ public:
 
     inline const DemRegistry& demRegistry() const { return *demRegistry_; }
 
-    void update();
+    std::uint64_t update();
+
+    bool updatedSince(std::uint64_t timestamp) const;
 
     void stat(std::ostream &os) const;
 
@@ -379,6 +396,13 @@ public:
                  , const Generator::pointer &replacement);
 
     bool has(const Resource::Id &resourceId) const;
+
+    bool isReady(const Resource::Id &resourceId) const;
+
+    std::string url(const Resource::Id &resourceId) const;
+
+    bool updatedSince(const Resource::Id &resourceId
+                      , std::uint64_t timestamp, bool nothrow) const;
 
 private:
     void registerSystemGenerators();
@@ -401,6 +425,7 @@ private:
     std::thread updater_;
     std::atomic<bool> running_;
     std::atomic<bool> updateRequest_;
+    std::atomic<std::uint64_t> lastUpdate_;
     std::mutex updaterLock_;
     std::condition_variable updaterCond_;
 
@@ -516,6 +541,8 @@ void Generators::Detail::updater()
 
     // invalidate any update request
     updateRequest_ = false;
+    // never update
+    lastUpdate_ = 0;
 
     while (running_) {
         // default sleep time in seconds
@@ -523,6 +550,7 @@ void Generators::Detail::updater()
 
         try {
             update(resourceBackend_->load());
+            lastUpdate_ = utility::usecFromEpoch();
         } catch (Aborted) {
             // pass
         } catch (const std::exception &e) {
@@ -984,20 +1012,92 @@ const DemRegistry& Generators::demRegistry() const
     return detail().demRegistry();
 }
 
-void Generators::Detail::update()
+std::uint64_t Generators::Detail::update()
 {
+    const auto start(utility::usecFromEpoch());
     updateRequest_ = true;
     updaterCond_.notify_one();
+    return start;
 }
 
-void Generators::update()
+std::uint64_t Generators::update()
 {
-    detail().update();
+    return detail().update();
+}
+
+bool Generators::Detail::updatedSince(std::uint64_t timestamp) const
+{
+    return lastUpdate_ > timestamp;
+}
+
+bool Generators::updatedSince(std::uint64_t timestamp) const
+{
+    return detail().updatedSince(timestamp);
+}
+
+bool Generators::Detail::has(const Resource::Id &resourceId) const
+{
+    std::unique_lock<std::mutex> lock(lock_);
+    auto &idx(serving_.get<ResourceIdIdx>());
+    auto fserving(idx.find(resourceId));
+    return (fserving != idx.end());
 }
 
 bool Generators::has(const Resource::Id &resourceId) const
 {
     return detail().has(resourceId);
+}
+
+bool Generators::Detail::isReady(const Resource::Id &resourceId) const
+{
+    std::unique_lock<std::mutex> lock(lock_);
+    auto &idx(serving_.get<ResourceIdIdx>());
+    auto fserving(idx.find(resourceId));
+    if (fserving == idx.end()) { return false; }
+    return (*fserving)->ready();
+}
+
+bool Generators::isReady(const Resource::Id &resourceId) const
+{
+    return detail().isReady(resourceId);
+}
+
+std::string Generators::Detail::url(const Resource::Id &resourceId) const
+{
+    std::unique_lock<std::mutex> lock(lock_);
+    auto &idx(serving_.get<ResourceIdIdx>());
+    auto fserving(idx.find(resourceId));
+    if (fserving == idx.end()) {
+        LOGTHROW(err1, UnknownGenerator)
+            << "No such generator <" << resourceId << ">";
+    }
+    return (*fserving)->url();
+}
+
+std::string Generators::url(const Resource::Id &resourceId) const
+{
+    return detail().url(resourceId);
+}
+
+bool Generators::Detail::updatedSince(const Resource::Id &resourceId
+                                      , std::uint64_t timestamp
+                                      , bool nothrow) const
+{
+    std::unique_lock<std::mutex> lock(lock_);
+    auto &idx(serving_.get<ResourceIdIdx>());
+    auto fserving(idx.find(resourceId));
+    if (fserving == idx.end()) {
+        if (nothrow) { return false; }
+        LOGTHROW(err1, UnknownGenerator)
+            << "No such generator <" << resourceId << ">";
+    }
+    return (*fserving)->updatedSince(timestamp);
+}
+
+bool Generators::updatedSince(const Resource::Id &resourceId
+                              , std::uint64_t timestamp, bool nothrow) const
+{
+    return detail().updatedSince(resourceId, timestamp, nothrow);
 }
 
 void Generator::stat(std::ostream &os) const
@@ -1022,14 +1122,6 @@ void Generators::Detail::stat(std::ostream &os) const
     for (const auto &generator : generators) {
         generator->stat(os);
     }
-}
-
-bool Generators::Detail::has(const Resource::Id &resourceId) const
-{
-    std::unique_lock<std::mutex> lock(lock_);
-    auto &idx(serving_.get<ResourceIdIdx>());
-    auto fserving(idx.find(resourceId));
-    return (fserving != idx.end());
 }
 
 void Generators::stat(std::ostream &os) const

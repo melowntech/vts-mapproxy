@@ -40,6 +40,9 @@ set(mapproxy-core_SOURCES
   definition/geodatavectorbase.cpp
   definition/geodata-vector.cpp
   definition/geodata-vector-tiled.cpp
+
+  # control socket interface
+  mapproxy.hpp mapproxy.cpp
   )
 
 # test program
