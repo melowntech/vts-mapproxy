@@ -1,3 +1,9 @@
+vts-mapproxy (1.36) stable; urgency=medium
+
+  * Added mapproxy-setup-resource tool.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 09 Aug 2018 13:42:13 +0200
+
 vts-mapproxy (1.35) stable; urgency=medium
 
   * Surfaces: revision update fix.
