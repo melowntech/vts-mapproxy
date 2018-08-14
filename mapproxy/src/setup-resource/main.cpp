@@ -33,6 +33,7 @@
 #include <boost/optional.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/regex.hpp>
 
 #include "utility/streams.hpp"
 #include "utility/buildsys.hpp"
@@ -44,6 +45,7 @@
 
 #include "service/cmdline.hpp"
 #include "service/ctrlclient.hpp"
+#include "service/pidfile.hpp"
 
 #include "geo/geodataset.hpp"
 #include "geo/gdal.hpp"
@@ -64,8 +66,8 @@
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
-namespace vts = vtslibs::vts;
 
+namespace vts = vtslibs::vts;
 namespace vr = vtslibs::registry;
 
 UTILITY_GENERATE_ENUM_CI(ResourceType,
@@ -78,6 +80,11 @@ struct Config {
     RasterFormat format;
     boost::optional<geo::GeoDataset::Resampling> resampling;
     bool transparent;
+    std::vector<std::string> attributions;
+
+    fs::path mapproxyDataRoot;
+    fs::path mapproxyDefinitionDir;
+    fs::path mapproxyCtrl;
 
     Config()
         : format(RasterFormat::jpg)
@@ -101,10 +108,6 @@ private:
     bool help(std::ostream &out, const std::string &what) const;
 
     int run();
-
-    fs::path mapproxyDataRoot_;
-    fs::path mapproxyDefinitionDir_;
-    fs::path mapproxyCtrl_;
 
     std::string dataset_; // do not use fs::path since it needs quotes in case
                           // of spaces in filename
@@ -146,15 +149,19 @@ void SetupResource::configuration(po::options_description &cmdline
         ("tms.transparent", po::value(&config_.transparent)
          ->default_value(config_.transparent)->required()
          , "TMS: mark tiles as trasnparent.")
+
+        ("attribution", po::value(&config_.attributions)->required()
+         , "Atribution text, one per attribution. "
+         "At least one attribution is required.")
         ;
 
     config.add_options()
-        ("mapproxy.dataRoot", po::value(&mapproxyDataRoot_)->required()
+        ("mapproxy.dataRoot", po::value(&config_.mapproxyDataRoot)->required()
          , "Path to mapproxy resource data root directory.")
         ("mapproxy.definitionDir"
-         , po::value(&mapproxyDefinitionDir_)->required()
+         , po::value(&config_.mapproxyDefinitionDir)->required()
          , "Path to mapproxy resource definition directory.")
-        ("mapproxy.ctrl", po::value(&mapproxyCtrl_)->required()
+        ("mapproxy.ctrl", po::value(&config_.mapproxyCtrl)->required()
          , "Path to mapproxy control socket.")
         ;
 
@@ -183,9 +190,9 @@ void SetupResource::configure(const po::variables_map &vars)
 
     LOG(info3, log_)
         << "Config:"
-        << "\nmapproxy.dataRoot = " << mapproxyDataRoot_
-        << "\nmapproxy.definitionDir = " << mapproxyDefinitionDir_
-        << "\nmapproxy.ctrl = " << mapproxyCtrl_
+        << "\nmapproxy.dataRoot = " << config_.mapproxyDataRoot
+        << "\nmapproxy.definitionDir = " << config_.mapproxyDefinitionDir
+        << "\nmapproxy.ctrl = " << config_.mapproxyCtrl
         << "\nreferenceFrame = " << resourceId_.referenceFrame
         << "\n"
         ;
@@ -246,6 +253,183 @@ Resource::Id deduceResourceId(fs::path path, Resource::Id resourceId)
     if (resourceId.id.empty()) { resourceId.id = stem; }
 
     return resourceId;
+}
+
+std::string dropExpansion(const std::string &str)
+{
+    std::string out;
+
+    char match(0);
+    for (auto c : str) {
+        switch (c) {
+        case '{':
+            if (!match) {
+                match = '}';
+                continue;
+            }
+            break;
+
+        case '[':
+            if (!match) {
+                match = ']';
+                continue;
+            }
+            break;
+        }
+
+        // close if matching paren is hit
+        if (c == match) {
+            match = 0;
+            continue;
+        }
+
+        if (!match) { out.push_back(c); }
+    }
+
+    return out;
+}
+
+std::string contractAcronyms(const std::string &str)
+{
+    typedef boost::regex br;
+
+    boost::regex e("(^|[^[:alnum:]])(([a-z] ?[ .])+)", br::perl | br::icase);
+
+    const auto formatter([](const boost::smatch &what) -> std::string
+    {
+        std::string out(what.str(1));
+        for (auto c : what.str(2)) {
+            switch (c) {
+            case '.': case ' ': break;
+            default: out.push_back(c); break;
+            }
+        }
+        out.push_back(' ');
+        return out;
+    });
+
+    return boost::regex_replace(str, e, formatter);
+}
+
+std::string attribution2creditId(const std::string &attribution)
+{
+    const auto firstPass([](const std::string &str)
+    {
+        utility::SanitizerOptions so(true);
+        so.dashNonAlphanum = false;
+        so.singleSpace = true;
+        return utility::sanitizeId(str, so);
+    });
+
+    const auto secondPass([](const std::string &str)
+    {
+        utility::SanitizerOptions so;
+        so.latinize = false;
+        so.removeAccents = false;
+        return utility::sanitizeId(str, so);
+    });
+
+    return secondPass
+        ("auto-" + contractAcronyms
+         (firstPass(dropExpansion(attribution))));
+}
+
+vr::Credit buildCredit(const std::string &creditId
+                       , const std::string &attribution)
+{
+    vr::Credit credit;
+    credit.id = creditId;
+    // credit.numericId = allocateNumericId(counterPath);
+
+    credit.copyrighted = (attribution.find("{copy}") != std::string::npos);
+    credit.notice = attribution;
+
+    return credit;
+}
+
+typedef std::map<std::string, vr::Credit::dict> CreditFileMapping;
+typedef std::set<std::string> ChangedFiles;
+
+vr::Credit attribution2credit(const fs::path &creditHome
+                              , CreditFileMapping &cfm
+                              , ChangedFiles &cf
+                              , const std::string &attribution)
+{
+    (void) cfm;
+    (void) cf;
+    const auto creditId(attribution2creditId(attribution));
+    const auto creditConfigPath(creditHome / (creditId + ".json"));
+
+    if (fs::exists(creditConfigPath)) {
+        // found config for credit
+        LOG(info2)
+            << "Loading existing credit configuration "
+            << "from " << creditConfigPath << ".";
+
+        auto credits(vr::loadCredits(creditConfigPath));
+
+        // TODO: find credit via attribution or allocate new
+
+        return {};
+    }
+
+    // not existing
+
+    vr::Credit::dict credits;
+    auto credit(buildCredit(creditId, attribution));
+    credits.add(credit);
+    vr::saveCredits(creditConfigPath, credits);
+
+    return credit;
+}
+
+vr::Credit::dict attributions2credits(const Config &config)
+{
+    // auto generated credits home
+    const auto creditHome(config.mapproxyDataRoot / "auto-credits");
+    fs::create_directories(creditHome.parent_path());
+
+    const auto pidFilePath(creditHome / "lock.pid");
+
+    // lock credits databse using PID file
+    service::pidfile::ScopedPidFile(pidFilePath, 60);
+
+    // load credits
+    CreditFileMapping cfm;
+    for (fs::directory_iterator icreditHome(creditHome), ecreditHome;
+         icreditHome != ecreditHome; ++icreditHome)
+    {
+        if (!fs::is_regular_file(icreditHome->status())) { continue; }
+        const auto &path(icreditHome->path());
+        if (path.extension() != ".json") { continue; }
+
+        cfm.insert(CreditFileMapping::value_type
+                   (path.stem().string(), vr::loadCredits(path)));
+    }
+
+    // process
+    ChangedFiles cf;
+    vr::Credit::dict credits;
+    for (const auto &attribution : config.attributions) {
+        credits.add(attribution2credit(creditHome, cfm, cf, attribution));
+    }
+
+    // store changed credits
+    for (const auto &changedFile : cf) {
+        auto icfm(cfm.find(changedFile));
+        if (icfm == cfm.end()) {
+            LOG(warn4)
+                << "Unexpected filename in set of changed credit "
+                "config files: <" << changedFile << ">.";
+            continue;
+        }
+
+        // store credits
+        vr::saveCredits(creditHome / (changedFile + ".json")
+                        , icfm->second);
+    }
+
+    return credits;
 }
 
 void createVrtWO(const fs::path &srcPath
@@ -364,6 +548,14 @@ void buildDefinition(Resource &r, const calipers::Measurement &cm
     }
 }
 
+void addCredits(Resource &r, const vr::Credit::dict &credits)
+{
+    for (const auto &credit : credits) {
+        r.credits.insert(DualId(credit.id, credit.numericId));
+    }
+    r.registry.credits.update(credits);
+}
+
 int SetupResource::run()
 {
     // find reference frame
@@ -395,7 +587,7 @@ int SetupResource::run()
     LOG(info4) << "Checking for resource existence.";
     // TODO: implement me
 
-    if (Mapproxy(mapproxyCtrl_).has(resourceId)) {
+    if (Mapproxy(config_.mapproxyCtrl).has(resourceId)) {
         LOG(fatal)
             << "Resource " << resourceId << " already exists in mapproxy "
             << "configuration. Please, use another id and/or group.";
@@ -420,9 +612,8 @@ int SetupResource::run()
     }
 
     const auto resourceDir(fs::path(resourceId.group) / resourceId.id);
-    const auto rootDir(mapproxyDataRoot_ / resourceDir);
+    const auto rootDir(config_.mapproxyDataRoot / resourceDir);
     // TODO: check for existence
-
 
     // 4) copy dataset; TODO: add symlink option
     LOG(info4) << "Copying dataset to destination.";
@@ -435,12 +626,14 @@ int SetupResource::run()
     utility::copy_file(dataset_, datasetPath, true);
     ds.copyFiles(datasetPath);
 
+    // 5) allocate attributions
+    const auto credits(attributions2credits(config_));
 
-    // 5) create vrtwo derived datasets
+    // 6) create vrtwo derived datasets
     const auto mainDataset(createVrtWO(cm, datasetPath , rootDir));
 
 
-    // 6) generate tiling information
+    // 7) generate tiling information
     LOG(info4) << "Generating tiling information.";
     {
         LogLinePrefix linePrefix(" (tiling)");
@@ -451,11 +644,10 @@ int SetupResource::run()
         ti.save(rootDir / ("tiling." + resourceId_.referenceFrame));
     }
 
-
-    // 7) generate mapproxy resource configuration
+    // 8) generate mapproxy resource configuration
     {
         const auto resourceConfigPath
-            (mapproxyDefinitionDir_ / resourceId.group
+            (config_.mapproxyDefinitionDir / resourceId.group
              / (resourceId.id + ".json"));
         LOG(info4) << "Generating mapproxy resource configuration at "
                    << resourceConfigPath << ".";
@@ -466,8 +658,8 @@ int SetupResource::run()
             ("Automatically generated from %s raster dataset."
              , datasetPath.filename());
 
-        // TODO: credits
-        // r.credits = ???;
+        // add credits
+        addCredits(r, credits);
 
         r.lodRange = cm.lodRange;
         r.tileRange = cm.tileRange;
@@ -479,7 +671,7 @@ int SetupResource::run()
 
         // check whether there is a group include file
         const auto groupConfigPath
-            (mapproxyDefinitionDir_ / (resourceId.group + ".json"));
+            (config_.mapproxyDefinitionDir / (resourceId.group + ".json"));
         if (!fs::exists(groupConfigPath)) {
             // no -> create
             const auto path(utility::format("%s/*.json", resourceId.group));
@@ -487,11 +679,10 @@ int SetupResource::run()
         }
     }
 
-
-    // 8) notify mapproxy
+    // 9) notify mapproxy
     LOG(info4) << "Notifying mapproxy.";
     {
-        Mapproxy mp(mapproxyCtrl_);
+        Mapproxy mp(config_.mapproxyCtrl);
 
         const auto timestamp(mp.updateResources());
         LOG(info4)
