@@ -384,7 +384,7 @@ vr::Credit allocateCredit(const Config &config
     {
         auto newCreditId(creditId);
 
-        for (int i(0); i <= 100; ++i) {
+        for (int i(1); i <= 100; ++i) {
             if (cfm.find(newCreditId) == cfm.end()) { return newCreditId; }
             newCreditId = utility::format("%s.%d", creditId, i);
         }
