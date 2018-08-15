@@ -82,6 +82,8 @@ struct Config {
     bool transparent;
     std::vector<std::string> attributions;
 
+    int autoCreditId;
+
     fs::path mapproxyDataRoot;
     fs::path mapproxyDefinitionDir;
     fs::path mapproxyCtrl;
@@ -89,6 +91,7 @@ struct Config {
     Config()
         : format(RasterFormat::jpg)
         , transparent(false)
+        , autoCreditId(32768)
     {}
 };
 
@@ -150,6 +153,10 @@ void SetupResource::configuration(po::options_description &cmdline
          ->default_value(config_.transparent)->required()
          , "TMS: mark tiles as trasnparent.")
 
+        ("credits.firstNumericId", po::value(&config_.autoCreditId)
+         ->default_value(config_.autoCreditId)->required()
+         , "First numeric ID of the auto-generated credits.")
+
         ("attribution", po::value(&config_.attributions)->required()
          , "Atribution text, one per attribution. "
          "At least one attribution is required.")
@@ -194,6 +201,7 @@ void SetupResource::configure(const po::variables_map &vars)
         << "\nmapproxy.definitionDir = " << config_.mapproxyDefinitionDir
         << "\nmapproxy.ctrl = " << config_.mapproxyCtrl
         << "\nreferenceFrame = " << resourceId_.referenceFrame
+        << "\ncredits.firstNumericId = " << config_.autoCreditId
         << "\n"
         ;
 }
@@ -335,11 +343,12 @@ std::string attribution2creditId(const std::string &attribution)
 }
 
 vr::Credit buildCredit(const std::string &creditId
-                       , const std::string &attribution)
+                       , const std::string &attribution
+                       , vr::Credit::NumericId numericId)
 {
     vr::Credit credit;
     credit.id = creditId;
-    // credit.numericId = allocateNumericId(counterPath);
+    credit.numericId = numericId;
 
     credit.copyrighted = (attribution.find("{copy}") != std::string::npos);
     credit.notice = attribution;
@@ -350,36 +359,76 @@ vr::Credit buildCredit(const std::string &creditId
 typedef std::map<std::string, vr::Credit::dict> CreditFileMapping;
 typedef std::set<std::string> ChangedFiles;
 
-vr::Credit attribution2credit(const fs::path &creditHome
-                              , CreditFileMapping &cfm
+vr::Credit::NumericId allocateNumericId(const Config &config
+                                        , const CreditFileMapping &cfm)
+{
+    vr::Credit::NumericId maxId(0);
+    for (const auto &credits : cfm) {
+        for (const auto &credit : credits.second) {
+            maxId = std::max(maxId, credit.numericId);
+        }
+    }
+
+    if (maxId) { return maxId + 1; }
+    return config.autoCreditId;
+}
+
+vr::Credit allocateCredit(const Config &config
+                          , const CreditFileMapping &cfm
+                          , vr::Credit::dict &credits
+                          , const std::string &creditId
+                          , const std::string &attribution)
+{
+    // generate new credit ID (either creditId or another in case of collision)
+    auto newCreditId([&]()
+    {
+        auto newCreditId(creditId);
+
+        for (int i(0); i <= 100; ++i) {
+            if (cfm.find(newCreditId) == cfm.end()) { return newCreditId; }
+            newCreditId = utility::format("%s.%d", creditId, i);
+        }
+
+        LOGTHROW(err3, std::runtime_error)
+            << "Too much diferent versions of attribution with ID <"
+            << creditId << ">.";
+        throw;
+    }());
+
+    auto credit(buildCredit(newCreditId, attribution
+                            , allocateNumericId(config, cfm)));
+    credits.add(credit);
+    return credit;
+}
+
+vr::Credit attribution2credit(const Config &config, CreditFileMapping &cfm
                               , ChangedFiles &cf
                               , const std::string &attribution)
 {
-    (void) cfm;
-    (void) cf;
     const auto creditId(attribution2creditId(attribution));
-    const auto creditConfigPath(creditHome / (creditId + ".json"));
 
-    if (fs::exists(creditConfigPath)) {
-        // found config for credit
-        LOG(info2)
-            << "Loading existing credit configuration "
-            << "from " << creditConfigPath << ".";
+    auto fcfm(cfm.find(creditId));
+    if (fcfm != cfm.end()) {
+        // found a file with given credit id
+        auto &credits(fcfm->second);
 
-        auto credits(vr::loadCredits(creditConfigPath));
+        // try to find one with the same attributiin
+        for (const auto &credit : credits) {
+            if (credit.notice == attribution) { return credit; }
+        }
 
-        // TODO: find credit via attribution or allocate new
-
-        return {};
+        // none found, allocate new credit in this file
+        auto credit
+            (allocateCredit(config, cfm, credits, creditId, attribution));
+        cf.insert(creditId);
+        return credit;
     }
 
-    // not existing
-
+    // allocate new credit in completely new file
     vr::Credit::dict credits;
-    auto credit(buildCredit(creditId, attribution));
-    credits.add(credit);
-    vr::saveCredits(creditConfigPath, credits);
-
+    auto credit(allocateCredit(config, cfm, credits, creditId, attribution));
+    cfm.insert(CreditFileMapping::value_type(creditId, credits));
+    cf.insert(creditId);
     return credit;
 }
 
@@ -411,7 +460,7 @@ vr::Credit::dict attributions2credits(const Config &config)
     ChangedFiles cf;
     vr::Credit::dict credits;
     for (const auto &attribution : config.attributions) {
-        credits.add(attribution2credit(creditHome, cfm, cf, attribution));
+        credits.add(attribution2credit(config, cfm, cf, attribution));
     }
 
     // store changed credits
@@ -615,7 +664,10 @@ int SetupResource::run()
     const auto rootDir(config_.mapproxyDataRoot / resourceDir);
     // TODO: check for existence
 
-    // 4) copy dataset; TODO: add symlink option
+    // 4) allocate attributions
+    const auto credits(attributions2credits(config_));
+
+    // 5) copy dataset; TODO: add symlink option
     LOG(info4) << "Copying dataset to destination.";
     const auto datasetPath(rootDir / "original-dataset"
                            / fs::path(dataset_).filename());
@@ -626,12 +678,8 @@ int SetupResource::run()
     utility::copy_file(dataset_, datasetPath, true);
     ds.copyFiles(datasetPath);
 
-    // 5) allocate attributions
-    const auto credits(attributions2credits(config_));
-
     // 6) create vrtwo derived datasets
     const auto mainDataset(createVrtWO(cm, datasetPath , rootDir));
-
 
     // 7) generate tiling information
     LOG(info4) << "Generating tiling information.";
