@@ -575,6 +575,30 @@ math::Matrix4 makePlaneTrafo(const vr::ReferenceFrame &rf
     return math::matrixInvert(ec2wc);
 }
 
+boost::optional<int> xOverlap(const geo::GeoDataset::Descriptor &dataset)
+{
+    // geotransformation must have no rotation or shear
+    if (!dataset.geoTransform.isUpright()) { return boost::none; }
+
+    const auto periodic(geo::isPeriodic(dataset.srs));
+    if (!periodic || (periodic->type != geo::Periodicity::Type::x)) {
+        return boost::none;
+    }
+
+    // compute how much does dataset hang over in at both sides
+    const double left(periodic->min - dataset.extents.ll(0));
+    const double right(dataset.extents.ur(0) - periodic->max);
+
+    // total overlap
+    const auto overlap(left + right);
+
+    // is there any overlap?
+    if (overlap < 0.0) { return boost::none; }
+
+    // and convert to pixels and round to whole pixel
+    return int(std::round(overlap / dataset.resolution(0)));
+}
+
 } // namespace
 
 Measurement measure(const vtslibs::registry::ReferenceFrame &referenceFrame
@@ -582,6 +606,9 @@ Measurement measure(const vtslibs::registry::ReferenceFrame &referenceFrame
                     , const Config &config)
 {
     Measurement m;
+    m.datasetSrs = dataset.srs;
+    m.datasetExtents = dataset.extents;
+    m.xOverlap = xOverlap(dataset);
 
     m.datasetType = detectType(dataset, config.datasetType);
 

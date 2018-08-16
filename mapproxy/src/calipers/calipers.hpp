@@ -71,10 +71,33 @@ struct Measurement {
     Node::list nodes;
     vtslibs::registry::Position position;
 
+    /** Dataset's SRS.
+     */
+    geo::SrsDefinition datasetSrs;
+
+    /** Dataset's extents in its SRS.
+     */
+    math::Extents2 datasetExtents;
+
+    /** Says how many pixels does datasets's left side overlap with right
+     *  side. Rounded to whole pixels
+     *
+     *  This may happen only special case: SRS is cylindrical and both datasets
+     *  sides touch or pass longitude +-180 deg.
+     *
+     *  Note: latlon/eqc/mercator is considered only so far
+     *
+     *  unset -> not overlapping
+     *      0 ->  datasets sides make perfect seam on a cylinder
+     *      N ->  N pixels on left side overlap with N pixels on the right side
+     */
+    boost::optional<int> xOverlap;
+
     Measurement()
         : gsd()
         , lodRange(vtslibs::vts::LodRange::emptyRange())
         , tileRange(math::InvalidExtents{})
+        , datasetExtents(math::InvalidExtents{})
     {}
 
     vtslibs::vts::LodTileRange::list lodTileRanges() const;

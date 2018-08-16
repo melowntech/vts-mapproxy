@@ -165,6 +165,7 @@ bool Calipers::help(std::ostream &out, const std::string &what) const
                 "    Output format (stdout, machine readable):\n"
                 "\n"
                 "        gsd: GSD\n"
+                "        wrapx: overlap"
                 "        range<SRS1>: lodRange lod/tileRange\n"
                 "        range<SRS2>: lodRange lod/tileRange\n"
                 "        ...\n"
@@ -175,6 +176,8 @@ bool Calipers::help(std::ostream &out, const std::string &what) const
                 "    Where\n"
                 "        GSD       is computed ground sample distance\n"
                 "                  (resolution in meters per pixel)\n"
+                "        wrapx     dataset horizontal overlap in pixels\n"
+                "                  (only if datasets overlaps)\n"
                 "        SRS1-N    SRS in spatial division node 1-N\n"
                 "        lodRange  estimated LOD range\n"
                 "        lod/tileRange measured range at given LOD\n"
@@ -209,6 +212,9 @@ int Calipers::run()
     }
 
     std::cout << "gsd: " << m.gsd << "\n";
+    if (m.xOverlap) {
+        std::cout << "wrapx: " << *m.xOverlap << "\n";
+    }
 
     for (const auto &node : m.nodes) {
         auto lr(node.ranges.lodRange());

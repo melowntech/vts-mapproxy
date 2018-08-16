@@ -470,6 +470,11 @@ bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
         }
         return true;
 
+    } else if (cmd.cmd == "supports-reference-frame") {
+        sendBoolean(os, bool(vr::system.referenceFrames
+                             (cmd.args[0], std::nothrow)));
+        return true;
+
     } else if (cmd.cmd == "has-resource") {
         if (cmd.args.size() != 3) {
             os << "error: has-resource expects 3 arguments\n";

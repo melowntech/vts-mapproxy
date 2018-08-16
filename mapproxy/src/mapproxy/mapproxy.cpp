@@ -30,6 +30,18 @@
 
 namespace fs = boost::filesystem;
 
+bool Mapproxy::supportsReferenceFrame(const std::string &referenceFrame)
+{
+    const auto reply
+        (ctrl_.command("supports-reference-frame", referenceFrame));
+    if (reply.empty()) {
+        LOGTHROW(err2, std::runtime_error)
+            << "Invalid reply from mapproxy.";
+    }
+
+    return ctrl_.parseBoolean(reply.front());
+}
+
 bool Mapproxy::has(const Resource::Id &resourceId) const
 {
     const auto reply(ctrl_.command("has-resource", resourceId.referenceFrame

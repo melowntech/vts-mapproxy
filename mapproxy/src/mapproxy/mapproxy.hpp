@@ -44,6 +44,10 @@ public:
         : ctrl_(ctrl)
     {}
 
+    /** Is given reference frame supported?
+     */
+    bool supportsReferenceFrame(const std::string &referenceFrame);
+
     /** Is the given resource known by mapproxy.
      */
     bool has(const Resource::Id &resourceId) const;

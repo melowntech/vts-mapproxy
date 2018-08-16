@@ -481,13 +481,16 @@ vr::Credit::dict attributions2credits(const Config &config)
     return credits;
 }
 
+
 void createVrtWO(const fs::path &srcPath
                  , const fs::path &root, const fs::path &name
-                 , geo::GeoDataset::Resampling resampling)
+                 , geo::GeoDataset::Resampling resampling
+                 , const calipers::Measurement &cm)
 {
     vrtwo::Config config;
     config.resampling = resampling;
     config.overwrite = true;
+    config.wrapx = cm.xOverlap;
 
     config.createOptions
         ("TILED", true)
@@ -521,21 +524,21 @@ fs::path createVrtWO(const calipers::Measurement &cm
         {
             LogLinePrefix linePrefix(" (dem)");
             createVrtWO(datasetPath, rootDir, "dem"
-                        , geo::GeoDataset::Resampling::dem);
+                        , geo::GeoDataset::Resampling::dem, cm);
         }
 
         LOG(info4) << "Generating minimum height overviews.";
         {
             LogLinePrefix linePrefix(" (min)");
             createVrtWO(datasetPath, rootDir, "dem.min"
-                        , geo::GeoDataset::Resampling::minimum);
+                        , geo::GeoDataset::Resampling::minimum, cm);
         }
 
         LOG(info4) << "Generating maximum height overviews.";
         {
             LogLinePrefix linePrefix(" (max)");
             createVrtWO(datasetPath, rootDir, "dem.max"
-                        , geo::GeoDataset::Resampling::maximum);
+                        , geo::GeoDataset::Resampling::maximum, cm);
         }
         return (rootDir / "dem");
 
@@ -543,7 +546,7 @@ fs::path createVrtWO(const calipers::Measurement &cm
         {
             LogLinePrefix linePrefix(" (ophoto)");
             createVrtWO(datasetPath, rootDir, "ophoto"
-                        , geo::GeoDataset::Resampling::texture);
+                        , geo::GeoDataset::Resampling::texture, cm);
         }
         return (rootDir / "ophoto");
     }
@@ -634,13 +637,22 @@ int SetupResource::run()
 
     // 2) check resource existence in mapproxy
     LOG(info4) << "Checking for resource existence.";
-    // TODO: implement me
+    {
+        Mapproxy mp(config_.mapproxyCtrl);
+        if (!mp.supportsReferenceFrame(resourceId_.referenceFrame)) {
+            LOG(fatal)
+                << "Given reference frame is not supporte by mapproxy. "
+                "Please, check that mapproxy uses the same registry and "
+                "restart it.";
+            return EXIT_FAILURE;
+        }
 
-    if (Mapproxy(config_.mapproxyCtrl).has(resourceId)) {
-        LOG(fatal)
-            << "Resource " << resourceId << " already exists in mapproxy "
-            << "configuration. Please, use another id and/or group.";
-        return EXIT_FAILURE;
+        if (mp.has(resourceId)) {
+            LOG(fatal)
+                << "Resource " << resourceId << " already exists in mapproxy "
+                << "configuration. Please, use another id and/or group.";
+            return EXIT_FAILURE;
+        }
     }
 
     // 3) measure dataset
@@ -658,6 +670,12 @@ int SetupResource::run()
             << "Unable to set up a mapproxy resource <" << resourceId
             << "> from " << dataset_ << ".";
         return EXIT_FAILURE;
+    }
+
+    if (cm.xOverlap) {
+        LOG(info3)
+            << "Dataset covers whole globe horizontally with "
+            << "overlap of " << *cm.xOverlap << " pixels.";
     }
 
     const auto resourceDir(fs::path(resourceId.group) / resourceId.id);
