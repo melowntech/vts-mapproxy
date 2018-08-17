@@ -1,3 +1,9 @@
+vts-mapproxy (1.37) stable; urgency=medium
+
+  * mapproxy-setup-resource: attribution support, wrapx determination
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Fri, 17 Aug 2018 11:33:15 +0200
+
 vts-mapproxy (1.36) stable; urgency=medium
 
   * Added mapproxy-setup-resource tool.
