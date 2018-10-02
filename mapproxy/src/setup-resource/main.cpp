@@ -148,7 +148,10 @@ void SetupResource::configuration(po::options_description &cmdline
          ->default_value(config_.format)->required()
          , "TMS: image format to use when generating tiles (jpg or png).")
         ("tms.resampling", po::value<geo::GeoDataset::Resampling>()
-         , "TMS: GDAL resampling used to generate tiles.")
+         , utility::concat
+         ("TMS: GDAL resampling used to generate tiles. One of ["
+          , enumerationString(geo::GeoDataset::Resampling())
+          , "].").c_str())
         ("tms.transparent", po::value(&config_.transparent)
          ->default_value(config_.transparent)->required()
          , "TMS: mark tiles as trasnparent.")
@@ -191,7 +194,7 @@ void SetupResource::configure(const po::variables_map &vars)
     }
 
     if (vars.count("tms.resampling")) {
-        config_.resampling = vars["rms.resampling"]
+        config_.resampling = vars["tms.resampling"]
             .as<geo::GeoDataset::Resampling>();
     }
 
