@@ -269,6 +269,8 @@ Resource::Id deduceResourceId(fs::path path, Resource::Id resourceId)
 std::string dropExpansion(const std::string &str)
 {
     std::string out;
+    bool firstNonSpace(false);
+    bool dumpAnyway(false);
 
     char match(0);
     for (auto c : str) {
@@ -286,15 +288,27 @@ std::string dropExpansion(const std::string &str)
                 continue;
             }
             break;
+
+        default:
+            if (!firstNonSpace && !std::isspace(c)) {
+                firstNonSpace = true;
+            }
         }
 
         // close if matching paren is hit
         if (c == match) {
             match = 0;
+            firstNonSpace = false;
+            dumpAnyway = false;
             continue;
         }
 
-        if (!match) { out.push_back(c); }
+        if ((match == ']') && std::isspace(c) && firstNonSpace) {
+            // second token in []
+            dumpAnyway = true;
+        }
+
+        if (!match || dumpAnyway) { out.push_back(c); }
     }
 
     return out;
@@ -409,6 +423,8 @@ vr::Credit attribution2credit(const Config &config, CreditFileMapping &cfm
                               , const std::string &attribution)
 {
     const auto creditId(attribution2creditId(attribution));
+    LOG(info3) << "Using credit ID <" << creditId << "> for attribution \""
+               << attribution << "\".";
 
     auto fcfm(cfm.find(creditId));
     if (fcfm != cfm.end()) {
