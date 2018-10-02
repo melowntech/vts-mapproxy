@@ -1,3 +1,9 @@
+vts-mapproxy (1.38) stable; urgency=medium
+
+  * mapproxy-setup-resource: fixed typo in cmdline param.
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Tue, 02 Oct 2018 15:23:18 +0200
+
 vts-mapproxy (1.37) stable; urgency=medium
 
   * mapproxy-setup-resource: attribution support, wrapx determination
