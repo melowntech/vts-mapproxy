@@ -1,3 +1,9 @@
+vts-mapproxy (1.39) stable; urgency=medium
+
+  * mapproxy-setup-resource: better credit ID generation from attribution text
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Tue, 02 Oct 2018 18:50:26 +0200
+
 vts-mapproxy (1.38) stable; urgency=medium
 
   * mapproxy-setup-resource: fixed typo in cmdline param.
