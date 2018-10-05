@@ -16,4 +16,5 @@ m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 9.20160115ubuntu3), libboost1.
     , protobuf-compiler
     , libprocps4-dev (>= 3.3.10)
     , libmagic-dev (>= 5.25)
+    , libicu-dev (>= 55.1-7ubuntu0.4)
     , gawk}}})m4_dnl
