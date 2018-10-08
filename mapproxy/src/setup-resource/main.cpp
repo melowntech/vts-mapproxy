@@ -338,7 +338,7 @@ std::string contractAcronyms(const std::string &str)
 
 std::string attribution2creditId(const std::string &attribution)
 {
-    const auto firstPass([](const std::string &str)
+    const auto firstPass([](const std::string &str) -> std::string
     {
         utility::SanitizerOptions so(true);
         so.dashNonAlphanum = false;
@@ -346,7 +346,7 @@ std::string attribution2creditId(const std::string &attribution)
         return utility::sanitizeId(str, so);
     });
 
-    const auto secondPass([](const std::string &str)
+    const auto secondPass([](const std::string &str) -> std::string
     {
         utility::SanitizerOptions so;
         so.latinize = false;
@@ -397,7 +397,7 @@ vr::Credit allocateCredit(const Config &config
                           , const std::string &attribution)
 {
     // generate new credit ID (either creditId or another in case of collision)
-    auto newCreditId([&]()
+    auto newCreditId([&]() -> std::string
     {
         auto newCreditId(creditId);
 
@@ -677,7 +677,7 @@ int SetupResource::run()
     // 3) measure dataset
     LOG(info4) << "Measuring dataset.";
 
-    auto cm([&]() {
+    auto cm([&]() -> calipers::Measurement {
         LogLinePrefix linePrefix(" (calipers)");
         calipers::Config calipersConfig;
         calipersConfig.datasetType = asDatasetType(resourceType_);
