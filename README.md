@@ -106,7 +106,7 @@ again. The build will not work otherwise.
 For building VTS-Mapproxy, you just have to use ``make``
 
 ```
-cd mapproxy
+cd vts-mapproxy/mapproxy
 make -j4 # to compile in 4 threads
 ```
 
