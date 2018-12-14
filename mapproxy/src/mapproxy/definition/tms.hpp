@@ -34,19 +34,49 @@
 
 #include "../resource.hpp"
 
+// fwd
+namespace Json { class Value; }
+namespace boost { namespace python { class dict; } }
+
 namespace resource {
 
 // raster formats
 
-struct TmsRasterPatchwork : public DefinitionBase {
+struct TmsRasterSynthetic : public DefinitionBase {
     boost::optional<std::string> mask;
     RasterFormat format;
 
-    TmsRasterPatchwork(): format(RasterFormat::jpg) {}
+    TmsRasterSynthetic(): format(RasterFormat::jpg) {}
 
     static constexpr Resource::Generator::Type type
         = Resource::Generator::Type::tms;
+
+    void parse(const Json::Value &value);
+    void build(Json::Value &value) const;
+    void parse(const boost::python::dict &value);
+
+protected:
+    virtual Changed changed_impl(const DefinitionBase &other) const;
+};
+
+struct TmsRasterPatchwork : public TmsRasterSynthetic {
+    TmsRasterPatchwork() = default;
+
     static constexpr char driverName[] = "tms-raster-patchwork";
+
+private:
+    virtual void from_impl(const boost::any &value);
+    virtual void to_impl(boost::any &value) const;
+    virtual Changed changed_impl(const DefinitionBase &other) const;
+    virtual bool frozenCredits_impl() const { return false; }
+};
+
+struct TmsRasterSolid : public TmsRasterSynthetic {
+    cv::Vec3b color;
+
+    TmsRasterSolid() : color(0xff, 0xff, 0xff) {}
+
+    static constexpr char driverName[] = "tms-raster-solid";
 
 private:
     virtual void from_impl(const boost::any &value);

@@ -24,28 +24,51 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_tms_raster_patchwork_hpp_included_
-#define mapproxy_generator_tms_raster_patchwork_hpp_included_
+#ifndef mapproxy_generator_tms_raster_synthetic_hpp_included_
+#define mapproxy_generator_tms_raster_synthetic_hpp_included_
 
-#include "./tms-raster-synthetic.hpp"
+#include "vts-libs/vts/nodeinfo.hpp"
+
+#include "../generator.hpp"
+#include "../definition/tms.hpp"
 
 namespace generator {
 
-class TmsRasterPatchwork : public TmsRasterSynthetic {
+class TmsRasterSynthetic : public Generator {
 public:
-    TmsRasterPatchwork(const Params &params);
+    TmsRasterSynthetic(const Params &params);
 
-    typedef resource::TmsRasterPatchwork Definition;
+    typedef resource::TmsRasterSynthetic Definition;
 
 private:
+    virtual void prepare_impl(Arsenal &arsenal);
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
+
+    virtual Task generateFile_impl(const FileInfo &fileInfo
+                                   , Sink &sink) const;
+
     virtual void generateTileImage(const vts::TileId &tileId
                                    , const TmsFileInfo &fi
                                    , const vts::NodeInfo &nodeInfo
-                                   , Sink &sink, Arsenal &arsenal) const;
+                                   , Sink &sink, Arsenal &arsenal) const = 0;
+
+    void generateTileMask(const vts::TileId &tileId
+                          , const TmsFileInfo &fi
+                          , Sink &sink, Arsenal &arsenal) const;
+
+    void generateMetatile(const vts::TileId &tileId
+                          , const TmsFileInfo &fi
+                          , Sink &sink, Arsenal &arsenal) const;
+
+    vr::BoundLayer boundLayer(ResourceRoot root) const;
+
+    bool hasMask() const;
 
     const Definition &definition_;
+
+    bool hasMetatiles_;
 };
 
 } // namespace generator
 
-#endif // mapproxy_generator_tms_raster_patchwork_hpp_included_
+#endif // mapproxy_generator_tms_raster_synthetic_hpp_included_

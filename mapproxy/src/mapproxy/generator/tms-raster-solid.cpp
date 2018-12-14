@@ -49,7 +49,7 @@
 #include "../support/tileindex.hpp"
 #include "../support/revision.hpp"
 
-#include "./tms-raster-patchwork.hpp"
+#include "./tms-raster-solid.hpp"
 #include "./factory.hpp"
 #include "../support/python.hpp"
 
@@ -66,10 +66,8 @@ namespace {
 struct Factory : Generator::Factory {
     virtual Generator::pointer create(const Generator::Params &params)
     {
-        return std::make_shared<TmsRasterPatchwork>(params);
+        return std::make_shared<TmsRasterSolid>(params);
     }
-
-    virtual bool systemInstance() const { return true; }
 
 private:
     static utility::PreMain register_;
@@ -77,21 +75,27 @@ private:
 
 utility::PreMain Factory::register_([]()
 {
-    Generator::registerType<TmsRasterPatchwork>(std::make_shared<Factory>());
+    Generator::registerType<TmsRasterSolid>(std::make_shared<Factory>());
 });
+
+cv::Vec3b rgb2bgr(cv::Vec3b color)
+{
+    std::swap(color[0], color[2]);
+    return color;
+}
 
 } // namespace
 
-TmsRasterPatchwork::TmsRasterPatchwork(const Params &params)
+TmsRasterSolid::TmsRasterSolid(const Params &params)
     : TmsRasterSynthetic(params)
     , definition_(resource().definition<Definition>())
+    , burnColor_(rgb2bgr(definition_.color))
 {}
 
-void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
-                                           , const TmsFileInfo &fi
-                                           , const vts::NodeInfo&
-                                           , Sink &sink
-                                           , Arsenal&) const
+void TmsRasterSolid::generateTileImage(const vts::TileId &tileId
+                                       , const TmsFileInfo &fi
+                                       , const vts::NodeInfo&
+                                       , Sink &sink, Arsenal&) const
 {
     unsigned long long int colorIndex(tileId.y);
     colorIndex <<= tileId.lod;
@@ -100,17 +104,8 @@ void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
     colorIndex = 1 + (colorIndex % 254);
 
     cv::Mat_<cv::Vec3b> tile(vr::BoundLayer::tileHeight
-                             , vr::BoundLayer::tileWidth);
-
-    const cv::Vec3b color(vts::opencv::palette256vec[colorIndex]);
-    const cv::Vec3b darkColor(color[0] * 0.8, color[1] * 0.8, color[2] * 0.8);
-    cv::Vec3b colors[2] = { color, darkColor };
-
-    for (int j(0); j < vr::BoundLayer::tileHeight; ++j) {
-        for (int i(0); i < vr::BoundLayer::tileWidth; ++i) {
-            tile(j, i) = colors[((j >> 3) + (i >> 3)) & 1];
-        }
-    }
+                             , vr::BoundLayer::tileWidth
+                             , burnColor_);
 
     // serialize
     std::vector<unsigned char> buf;

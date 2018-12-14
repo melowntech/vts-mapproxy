@@ -24,18 +24,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_tms_raster_patchwork_hpp_included_
-#define mapproxy_generator_tms_raster_patchwork_hpp_included_
+#ifndef mapproxy_generator_tms_raster_solid_hpp_included_
+#define mapproxy_generator_tms_raster_solid_hpp_included_
 
 #include "./tms-raster-synthetic.hpp"
 
 namespace generator {
 
-class TmsRasterPatchwork : public TmsRasterSynthetic {
+class TmsRasterSolid : public TmsRasterSynthetic {
 public:
-    TmsRasterPatchwork(const Params &params);
+    TmsRasterSolid(const Params &params);
 
-    typedef resource::TmsRasterPatchwork Definition;
+    typedef resource::TmsRasterSolid Definition;
 
 private:
     virtual void generateTileImage(const vts::TileId &tileId
@@ -44,8 +44,10 @@ private:
                                    , Sink &sink, Arsenal &arsenal) const;
 
     const Definition &definition_;
+
+    const cv::Vec3b burnColor_;
 };
 
 } // namespace generator
 
-#endif // mapproxy_generator_tms_raster_patchwork_hpp_included_
+#endif // mapproxy_generator_tms_raster_solid_hpp_included_

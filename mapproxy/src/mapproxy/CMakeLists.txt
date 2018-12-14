@@ -25,7 +25,10 @@ set(mapproxy-core_SOURCES
   definition/factory.hpp definition/factory.cpp
 
   definition/tms.hpp
+  definition/tms-raster-synthetic.cpp
   definition/tms-raster-patchwork.cpp
+  definition/tms-raster-solid.cpp
+
   definition/tms-raster.cpp
   definition/tms-raster-remote.cpp
   definition/tms-bing.cpp
@@ -93,7 +96,9 @@ set(mapproxy_SOURCES
   generator/tms-raster-remote.hpp generator/tms-raster-remote.cpp
   generator/tms-bing.hpp generator/tms-bing.cpp
   generator/tms-windyty.hpp generator/tms-windyty.cpp
+  generator/tms-raster-synthetic.hpp generator/tms-raster-synthetic.cpp
   generator/tms-raster-patchwork.hpp generator/tms-raster-patchwork.cpp
+  generator/tms-raster-solid.hpp generator/tms-raster-solid.cpp
 
   # surfaces
   generator/surface.hpp generator/surface.cpp

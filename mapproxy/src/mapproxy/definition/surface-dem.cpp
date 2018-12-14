@@ -141,7 +141,7 @@ void SurfaceDem::to_impl(boost::any &value) const
         buildDefinition(*json, *this);
     } else {
         LOGTHROW(err1, Error)
-            << "SurfaceDem:: Unsupported serialization into: <"
+            << "SurfaceDem: Unsupported serialization into: <"
             << value.type().name() << ">.";
     }
 }

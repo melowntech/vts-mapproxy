@@ -37,42 +37,82 @@
 
 namespace resource {
 
-constexpr char TmsRasterPatchwork::driverName[];
+constexpr char TmsRasterSolid::driverName[];
 
 namespace {
 
-utility::PreMain register_([]() { registerDefinition<TmsRasterPatchwork>(); });
+utility::PreMain register_([]() { registerDefinition<TmsRasterSolid>(); });
+
+void parseDefinition(TmsRasterSolid &def, const Json::Value &value)
+{
+    const auto &color(Json::check(value["color"], Json::arrayValue));
+
+    Json::get(def.color[0], color, 0, "definition.color");
+    Json::get(def.color[1], color, 1, "definition.color");
+    Json::get(def.color[2], color, 2, "definition.color");
+
+    def.parse(value);
+}
+
+void buildDefinition(Json::Value &value, const TmsRasterSolid &def)
+{
+    auto &color(value["color"] = Json::arrayValue);
+
+    color.append(def.color[0]);
+    color.append(def.color[1]);
+    color.append(def.color[2]);
+
+    def.build(value);
+}
+
+void parseDefinition(TmsRasterSolid &def
+                     , const boost::python::dict &value)
+{
+    namespace python = boost::python;
+
+    boost::python::list color(value["color"]);
+
+    def.color[0] = boost::python::extract<int>(color[0]);
+    def.color[1] = boost::python::extract<int>(color[1]);
+    def.color[2] = boost::python::extract<int>(color[2]);
+
+    def.parse(value);
+}
 
 } // namespace
 
-void TmsRasterPatchwork::from_impl(const boost::any &value)
+void TmsRasterSolid::from_impl(const boost::any &value)
 {
     if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parse(*json);
+        parseDefinition(*this, *json);
     } else if (const auto *py
                = boost::any_cast<boost::python::dict>(&value))
     {
-        parse(*py);
+        parseDefinition(*this, *py);
     } else {
         LOGTHROW(err1, Error)
-            << "TmsRasterPatchwork: Unsupported configuration from: <"
+            << "TmsRasterSolid: Unsupported configuration from: <"
             << value.type().name() << ">.";
     }
 }
 
-void TmsRasterPatchwork::to_impl(boost::any &value) const
+void TmsRasterSolid::to_impl(boost::any &value) const
 {
     if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        build(*json);
+        buildDefinition(*json, *this);
     } else {
         LOGTHROW(err1, Error)
-            << "TmsRasterPatchwork: Unsupported serialization into: <"
+            << "TmsRasterSolid: Unsupported serialization into: <"
             << value.type().name() << ">.";
     }
 }
 
-Changed TmsRasterPatchwork::changed_impl(const DefinitionBase &other) const
+Changed TmsRasterSolid::changed_impl(const DefinitionBase &o) const
 {
+    const auto &other(o.as<TmsRasterSolid>());
+
+    if (color != other.color) { return Changed::yes; }
+
     return TmsRasterSynthetic::changed_impl(other);
 }
 
