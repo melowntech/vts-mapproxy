@@ -1,3 +1,9 @@
+vts-mapproxy (1.40) stable; urgency=medium
+
+  * Added tms-raster-solid driver.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Fri, 14 Dec 2018 17:54:02 +0100
+
 vts-mapproxy (1.39) stable; urgency=medium
 
   * mapproxy-setup-resource: better credit ID generation from attribution text
