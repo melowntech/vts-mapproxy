@@ -1,4 +1,4 @@
-vts-mapproxy (1.40) stable; urgency=medium
+vts-mapproxy (1.41) stable; urgency=medium
 
   * Added tms-raster-solid driver.
 
