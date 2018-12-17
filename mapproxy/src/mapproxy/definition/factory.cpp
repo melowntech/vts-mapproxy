@@ -57,7 +57,6 @@ void registerDefinition(const Resource::Generator &type
                         , const std::function<DefinitionBase::pointer()>
                         &factory)
 {
-    std::cout << "registering: " << type << std::endl;
     registry().insert(Registry::value_type(type, factory));
 }
 
