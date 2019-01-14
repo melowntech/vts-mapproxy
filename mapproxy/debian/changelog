@@ -1,3 +1,9 @@
+vts-mapproxy (1.42) stable; urgency=medium
+
+  * Geodata: Added #fid to layer enhancer: using ORG feature ID as a key
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 14 Jan 2019 15:17:30 +0100
+
 vts-mapproxy (1.41) stable; urgency=medium
 
   * Added tms-raster-solid driver.
