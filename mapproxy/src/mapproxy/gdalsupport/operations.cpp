@@ -430,6 +430,7 @@ private:
 };
 
 typedef geo::FeatureLayers::Features::Properties FeatureProperties;
+typedef geo::FeatureLayers::Features::Fid Fid;
 
 class EnhanceDatabase {
 public:
@@ -482,6 +483,11 @@ public:
         }
     }
 
+    template <typename T>
+    void enhance(FeatureProperties &properties, const T &id) {
+        return enhance(properties, boost::lexical_cast<std::string>(id));
+    }
+
 private:
     void check(int status, const char *what) const {
         if (status) {
@@ -503,9 +509,18 @@ void enhanceLayer(const LayerEnhancer &enhancer
 {
     EnhanceDatabase db(enhancer.databasePath, enhancer.table);
 
-    (void) db;
+    // special handling of feature ID
+    if (enhancer.key == "#fid") {
+        const auto manipulator([&](Fid fid, FeatureProperties &properties)
+        {
+            db.enhance(properties, fid);
+        });
+        layer.features.updateProperties(manipulator);
+        return;
+    }
 
-    const auto manipulator([&](FeatureProperties &properties)
+    // properties
+    const auto manipulator([&](Fid, FeatureProperties &properties)
     {
         const auto fkey(properties.find(enhancer.key));
         if (fkey == properties.end()) { return; }
