@@ -390,7 +390,7 @@ public:
 
     bool updatedSince(std::uint64_t timestamp) const;
 
-    void stat(std::ostream &os) const;
+    void listResources(std::ostream &os) const;
 
     void replace(const Generator::pointer &original
                  , const Generator::pointer &replacement);
@@ -1100,7 +1100,7 @@ bool Generators::updatedSince(const Resource::Id &resourceId
     return detail().updatedSince(resourceId, timestamp, nothrow);
 }
 
-void Generator::stat(std::ostream &os) const
+void Generator::status(std::ostream &os) const
 {
     os << "<" << id()
        << "> (type <" << resource().generator << ">)"
@@ -1108,7 +1108,7 @@ void Generator::stat(std::ostream &os) const
        << "\n";
 }
 
-void Generators::Detail::stat(std::ostream &os) const
+void Generators::Detail::listResources(std::ostream &os) const
 {
 
     Generator::list generators;
@@ -1120,11 +1120,11 @@ void Generators::Detail::stat(std::ostream &os) const
     }
 
     for (const auto &generator : generators) {
-        generator->stat(os);
+        generator->status(os);
     }
 }
 
-void Generators::stat(std::ostream &os) const
+void Generators::listResources(std::ostream &os) const
 {
-    detail().stat(os);
+    detail().listResources(os);
 }

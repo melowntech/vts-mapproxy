@@ -179,6 +179,8 @@ public:
      */
     void housekeeping();
 
+    void stat(std::ostream &os) const;
+
     struct Detail;
 
 private:

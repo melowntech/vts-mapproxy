@@ -402,7 +402,8 @@ void Daemon::cleanup()
 
 void Daemon::stat(std::ostream &os)
 {
-    generators_->stat(os);
+    http_->stat(os);
+    gdalWarper_->stat(os);
 }
 
 void Daemon::monitor(std::ostream &os)
@@ -430,7 +431,9 @@ inline bool parseBoolean(const std::string &value)
 
 bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
 {
-    if (cmd.cmd == "update-resources") {
+    if (cmd.cmd == "list-resources") {
+        generators_->listResources(os);
+    } else if (cmd.cmd == "update-resources") {
         auto token(generators_->update());
         os << "resource updater notified\n"
            << token << "\n"

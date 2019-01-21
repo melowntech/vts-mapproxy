@@ -177,7 +177,7 @@ public:
 
     Task generateFile(const FileInfo &fileInfo, Sink sink) const;
 
-    void stat(std::ostream &os) const;
+    void status(std::ostream &os) const;
 
     /** Pointer to original generator this one replaces.
      *  Used in runtime update.
@@ -319,13 +319,13 @@ public:
                       , std::uint64_t timestamp, bool nothrow = false)
         const;
 
+    void listResources(std::ostream &os) const;
+
     bool has(const Resource::Id &resourceId) const;
 
     bool isReady(const Resource::Id &resourceId) const;
 
     std::string url(const Resource::Id &resourceId) const;
-
-    void stat(std::ostream &os) const;
 
     // internals
     struct Detail;

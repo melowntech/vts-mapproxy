@@ -41,6 +41,7 @@
 
 #include "utility/errorcode.hpp"
 #include "utility/procstat.hpp"
+#include "utility/eventcounter.hpp"
 
 #include "geo/gdal.hpp"
 
@@ -181,8 +182,7 @@ private:
     std::error_code ec_;
 };
 
-void ShRequest::process(bi::interprocess_mutex &mutex
-                        , DatasetCache &cache)
+void ShRequest::process(bi::interprocess_mutex &mutex, DatasetCache &cache)
 {
     if (raster_) {
         raster_->response(mutex, ::warp(cache, sm_, *raster_));
@@ -446,6 +446,8 @@ public:
 
     void housekeeping();
 
+    void stat(std::ostream &os) const;
+
 private:
     void runManager(Process::Id parentId);
     void start();
@@ -462,6 +464,8 @@ private:
     inline bi::interprocess_mutex& mutex() { return *mutex_; }
     inline bi::interprocess_condition& cond() { return *cond_; }
 
+    void reportShm();
+
     Options options_;
     utility::Runnable &runnable_;
 
@@ -477,6 +481,11 @@ private:
     Process manager_;
 
     Worker::map workers_;
+
+    utility::EventCounter warpCounter_;
+    utility::EventCounter heightcodeCounter_;
+    utility::EventCounter shmCounter_;
+    utility::EventCounter queueCounter_;
 };
 
 GdalWarper::GdalWarper(const Options &options, utility::Runnable &runnable)
@@ -519,6 +528,10 @@ GdalWarper::Detail::Detail(const Options &options
              (bi::anonymous_instance)())
     , cond_(mb_.construct<bi::interprocess_condition>
             (bi::anonymous_instance)())
+    , warpCounter_(512)
+    , heightcodeCounter_(512)
+    , shmCounter_(512)
+    , queueCounter_(512)
 {
     start();
 }
@@ -727,6 +740,12 @@ void GdalWarper::Detail::cleanup(bool join)
 void GdalWarper::Detail::housekeeping()
 {
     try {
+        // measure memory
+        Lock lock(mutex());
+        reportShm();
+    } catch (...) {}
+
+    try {
         manager_.join(true);
         LOG(warn3) << "Manager process terminated. Bailing out.";
         cleanup(false);
@@ -828,12 +847,19 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
     LOG(info2) << "GDAL worker id:" << id << " finishing.";
 }
 
+void GdalWarper::Detail::reportShm()
+{
+    shmCounter_.eventMax(mb_.get_size() - mb_.get_free_memory());
+    queueCounter_.eventMax(queue_->size());
+}
+
 GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
-                                               , Aborter &aborter)
+                                            , Aborter &aborter)
 {
     Lock lock(mutex());
     ShRequest::pointer shReq(ShRequest::create(req, mb_));
     queue_->push_back(shReq);
+
     cond().notify_one();
 
     {
@@ -848,7 +874,12 @@ GdalWarper::Raster GdalWarper::Detail::warp(const RasterRequest &req
         });
     }
 
-    return shReq->getRaster(lock);
+    auto result(shReq->getRaster(lock));
+    lock.unlock();
+
+    warpCounter_.event();
+
+    return result;
 }
 
 GdalWarper::Heightcoded::pointer GdalWarper::Detail
@@ -879,5 +910,24 @@ GdalWarper::Heightcoded::pointer GdalWarper::Detail
         });
     }
 
-    return shReq->getHeightcoded(lock);
+    auto result(shReq->getHeightcoded(lock));
+    lock.unlock();
+
+    heightcodeCounter_.event();
+
+    return result;
+}
+
+void GdalWarper::Detail::stat(std::ostream &os) const
+{
+    warpCounter_.average(os, "gdal.warp.");
+    heightcodeCounter_.average(os, "gdal.heightcode.");
+    shmCounter_.max(os, "gdal.shm.used.");
+    os << "gdal.shm.total=" << mb_.get_size() << '\n';
+    queueCounter_.max(os, "gdal.shm.enqueued.");
+}
+
+void GdalWarper::stat(std::ostream &os) const
+{
+    detail().stat(os);
 }
