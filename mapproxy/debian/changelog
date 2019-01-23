@@ -1,3 +1,9 @@
+vts-mapproxy (1.43) stable; urgency=medium
+
+  * Added munin support.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Wed, 23 Jan 2019 18:42:55 +0100
+
 vts-mapproxy (1.42) stable; urgency=medium
 
   * Geodata: Added #fid to layer enhancer: using ORG feature ID as a key

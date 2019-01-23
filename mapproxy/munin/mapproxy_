@@ -11,70 +11,90 @@ fi
 
 CTRL="/var/run/${INSTANCE}.ctrl"
 
+NAME=$(echo $NAME | tr - _)
+
 function config() {
     cat <<EOF
 multigraph ${NAME}_http
 graph_title Mapproxy ${INSTANCE} HTTP traffic
-graph_category mapproxy
+graph_category vts
 graph_vlabel req/sec
-${NAME}-http_requests_max.label maximum number of HTTP req/sec
-${NAME}-http_requests_max.draw AREA
-${NAME}-http_requests_avg.label average number of HTTP req/sec
-${NAME}-http_requests_avg.draw LINE
+${NAME}_http_requests_max.label maximum number of HTTP req/sec
+${NAME}_http_requests_max.draw AREA
+${NAME}_http_requests_avg.label average number of HTTP req/sec
+${NAME}_http_requests_avg.draw LINE
 
 multigraph ${NAME}_gdal
 graph_title Mapproxy ${INSTANCE} GDAL operations
-graph_category mapproxy
+graph_category vts
 graph_vlabel op/sec
-${NAME}-gdal_warp_max.label maximum number of GDAL warp op/sec
-${NAME}-gdal_warp_max.draw AREA
-${NAME}-gdal_warp_avg.label average number of GDAL warp op/sec
-${NAME}-gdal_warp_avg.draw LINE
-${NAME}-gdal_heightcode_max.label maximum number of GDAL warp op/sec
-${NAME}-gdal_heightcode_max.draw AREASTACK
-${NAME}-gdal_heightcode_avg.label average number of GDAL warp op/sec
-${NAME}-gdal_heightcode_avg.draw LINESTACK
+${NAME}_gdal_warp_max.label maximum number of GDAL warp op/sec
+${NAME}_gdal_warp_max.draw AREA
+${NAME}_gdal_heightcode_max.label maximum number of GDAL heightcoding op/sec
+${NAME}_gdal_heightcode_max.draw STACK
+${NAME}_gdal_warp_avg.label average number of GDAL warp op/sec
+${NAME}_gdal_warp_avg.draw LINE
+${NAME}_gdal_heightcode_avg.label average number of GDAL heightcoding op/sec
+${NAME}_gdal_heightcode_avg.draw STACK
 
 multigraph ${NAME}_shm
 graph_args -l 0 --upper-limit 1
 graph_title Mapproxy ${INSTANCE} shared memory
-graph_category mapproxy
+graph_category vts
 graph_vlabel %
-${NAME}-shm_used.label % of used shared memory
-${NAME}-shm_used.draw AREA
-${NAME}-shm_used.colour COLOUR1
-${NAME}-shm_free.label % of used shared memory
-${NAME}-shm_free.draw AREASTACK
-${NAME}-shm_free.colour COLOUR0
+${NAME}_shm_used.label % of used shared memory
+${NAME}_shm_used.draw AREA
+${NAME}_shm_used.colour COLOUR1
+${NAME}_shm_free.label % of free shared memory
+${NAME}_shm_free.draw AREASTACK
+${NAME}_shm_free.colour COLOUR0
 EOF
 }
 
 function fetch() {
-    echo stat | socat -T2 - "UNIX-CONNECT:${CTRL}" | gawk -f <(cat <<EOF
+    # ! means close immediately after seding reply
+    echo -e '!stat' | socat -T2 - "UNIX-CONNECT:${CTRL}" | gawk -f <(cat <<EOF
 BEGIN { FS="="; }
 
-/http.requests.avg.300/ { printf("${NAME}-http_requests_avg.value %s\n", \$2); }
-/http.requests.max.300/ { printf("${NAME}-http_requests_max.value %s\n", \$2); }
-
-/gdal.warp.avg.300/ { printf("${NAME}-gdal_warp_avg.value %s\n", \$2); }
-/gdal.warp.max.300/ { printf("${NAME}-gdal_warp_max.value %s\n", \$2); }
-
-/gdal.heightcode.avg.300/ { printf("${NAME}-gdal_heightcode_avg.value %s\n", \$2); }
-/gdal.heightcode.max.300/ { printf("${NAME}-gdal_heightcode_max.value %s\n", \$2); }
-
 # grab values
+
+/http.requests.avg.300/ { http_avg = \$2; }
+/http.requests.max.300/ { http_max = \$2; }
+
+/gdal.warp.avg.300/ { warp_avg = \$2; }
+/gdal.warp.max.300/ { warp_max = \$2; }
+
+/gdal.heightcode.avg.300/ { hc_avg = \$2; }
+/gdal.heightcode.max.300/ { hc_max = \$2; }
+
 /gdal.shm.used.max.300/ { shmUsed=\$2; }
 /gdal.shm.total/ { shmTotal=\$2; }
 
+# print values in defined order
 END {
+    # sanity check
+    if (!NR) { exit 1; }
+
+    print("multigraph ${NAME}_http")
+    printf("${NAME}_http_requests_avg.value %s\n", http_avg);
+    printf("${NAME}_http_requests_max.value %s\n", http_max);
+
+    print("multigraph ${NAME}_gdal")
+    printf("${NAME}_gdal_warp_avg.value %s\n", warp_avg);
+    printf("${NAME}_gdal_warp_max.value %s\n", warp_max);
+
+    printf("${NAME}_gdal_heightcode_avg.value %s\n", hc_avg);
+    printf("${NAME}_gdal_heightcode_max.value %s\n", hc_max);
+
     # compute percentage of used and free memory
     used = (10000.0 * shmUsed) / shmTotal;
     frac = used - int(used);
     used = (frac >= 0.5) ? int(used) + 1 : int(used);
     free = 10000 - used;
 
-    printf("${NAME}-shm_used.value %d.%02d\n", int(used) / 100, int(used) % 100);
-    printf("${NAME}-shm_free.value %d.%02d\n", int(free) / 100, int(free) % 100);
+    print("multigraph ${NAME}_shm")
+    printf("${NAME}_shm_used.value %d.%02d\n", int(used) / 100, int(used) % 100);
+    printf("${NAME}_shm_free.value %d.%02d\n", int(free) / 100, int(free) % 100);
 }
 
 EOF
