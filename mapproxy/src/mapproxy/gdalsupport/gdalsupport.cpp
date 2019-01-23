@@ -920,8 +920,8 @@ GdalWarper::Heightcoded::pointer GdalWarper::Detail
 
 void GdalWarper::Detail::stat(std::ostream &os) const
 {
-    warpCounter_.average(os, "gdal.warp.");
-    heightcodeCounter_.average(os, "gdal.heightcode.");
+    warpCounter_.averageAndMax(os, "gdal.warp.");
+    heightcodeCounter_.averageAndMax(os, "gdal.heightcode.");
     shmCounter_.max(os, "gdal.shm.used.");
     os << "gdal.shm.total=" << mb_.get_size() << '\n';
     queueCounter_.max(os, "gdal.shm.enqueued.");

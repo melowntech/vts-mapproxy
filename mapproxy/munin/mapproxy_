@@ -1,0 +1,94 @@
+#!/bin/bash
+
+THIS="mapproxy_"
+NAME=$(basename "$0")
+INSTANCE="${NAME#${THIS}}"
+
+if [ "${INSTANCE}" = "" ]; then
+    echo "Make a symlink of format ${THIS}INSTANCE to this file to monitor mapproxy INSTANCE."  >/dev/stderr
+    exit 1
+fi
+
+CTRL="/var/run/${INSTANCE}.ctrl"
+
+function config() {
+    cat <<EOF
+multigraph ${NAME}_http
+graph_title Mapproxy ${INSTANCE} HTTP traffic
+graph_category mapproxy
+graph_vlabel req/sec
+${NAME}-http_requests_max.label maximum number of HTTP req/sec
+${NAME}-http_requests_max.draw AREA
+${NAME}-http_requests_avg.label average number of HTTP req/sec
+${NAME}-http_requests_avg.draw LINE
+
+multigraph ${NAME}_gdal
+graph_title Mapproxy ${INSTANCE} GDAL operations
+graph_category mapproxy
+graph_vlabel op/sec
+${NAME}-gdal_warp_max.label maximum number of GDAL warp op/sec
+${NAME}-gdal_warp_max.draw AREA
+${NAME}-gdal_warp_avg.label average number of GDAL warp op/sec
+${NAME}-gdal_warp_avg.draw LINE
+${NAME}-gdal_heightcode_max.label maximum number of GDAL warp op/sec
+${NAME}-gdal_heightcode_max.draw AREASTACK
+${NAME}-gdal_heightcode_avg.label average number of GDAL warp op/sec
+${NAME}-gdal_heightcode_avg.draw LINESTACK
+
+multigraph ${NAME}_shm
+graph_args -l 0 --upper-limit 1
+graph_title Mapproxy ${INSTANCE} shared memory
+graph_category mapproxy
+graph_vlabel %
+${NAME}-shm_used.label % of used shared memory
+${NAME}-shm_used.draw AREA
+${NAME}-shm_used.colour COLOUR1
+${NAME}-shm_free.label % of used shared memory
+${NAME}-shm_free.draw AREASTACK
+${NAME}-shm_free.colour COLOUR0
+EOF
+}
+
+function fetch() {
+    echo stat | socat -T2 - "UNIX-CONNECT:${CTRL}" | gawk -f <(cat <<EOF
+BEGIN { FS="="; }
+
+/http.requests.avg.300/ { printf("${NAME}-http_requests_avg.value %s\n", \$2); }
+/http.requests.max.300/ { printf("${NAME}-http_requests_max.value %s\n", \$2); }
+
+/gdal.warp.avg.300/ { printf("${NAME}-gdal_warp_avg.value %s\n", \$2); }
+/gdal.warp.max.300/ { printf("${NAME}-gdal_warp_max.value %s\n", \$2); }
+
+/gdal.heightcode.avg.300/ { printf("${NAME}-gdal_heightcode_avg.value %s\n", \$2); }
+/gdal.heightcode.max.300/ { printf("${NAME}-gdal_heightcode_max.value %s\n", \$2); }
+
+# grab values
+/gdal.shm.used.max.300/ { shmUsed=\$2; }
+/gdal.shm.total/ { shmTotal=\$2; }
+
+END {
+    # compute percentage of used and free memory
+    used = (10000.0 * shmUsed) / shmTotal;
+    frac = used - int(used);
+    used = (frac >= 0.5) ? int(used) + 1 : int(used);
+    free = 10000 - used;
+
+    printf("${NAME}-shm_used.value %d.%02d\n", int(used) / 100, int(used) % 100);
+    printf("${NAME}-shm_free.value %d.%02d\n", int(free) / 100, int(free) % 100);
+}
+
+EOF
+)
+
+}
+
+case $1 in
+    config)
+        config
+        if [ "$MUNIN_CAP_DIRTYCONFIG" = "1" ]; then
+            fetch
+        fi
+        exit 0;;
+esac
+
+fetch
