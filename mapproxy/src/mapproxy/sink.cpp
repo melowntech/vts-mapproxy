@@ -44,29 +44,44 @@ namespace vts = vtslibs::vts;
 
 namespace {
 
-boost::optional<long> maxAge(FileClass fileClass
-                             , const FileClassSettings *fileClassSettings
-                             , const boost::optional<long> &forcedMaxAge)
+http::SinkBase::CacheControl
+cacheControl(FileClass fileClass, const FileClassSettings *fileClassSettings
+             , const http::SinkBase::CacheControl &forcedCacheControl)
 {
-    if (forcedMaxAge) { return forcedMaxAge; }
-    if (!fileClassSettings) { return boost::none; }
-    return fileClassSettings->getMaxAge(fileClass);
+    if (forcedCacheControl) { return forcedCacheControl; }
+
+    http::SinkBase::CacheControl cc;
+    if (!fileClassSettings) { return cc; }
+
+    const auto &fc(*fileClassSettings);
+    cc.maxAge = fc.getMaxAge(fileClass);
+    if (*cc.maxAge > 0) {
+        cc.staleWhileRevalidate = fc.getStaleWhileRevalidate(fileClass);
+    }
+
+    return cc;
 }
 
 Sink::FileInfo update(const Sink::FileInfo &inStat
                       , const FileClassSettings *fileClassSettings)
 {
-    if (inStat.maxAge) { return inStat; }
+    if (inStat.cacheControl.maxAge) { return inStat; }
     auto stat(inStat);
+    auto &cc(stat.cacheControl);
 
     if (!fileClassSettings) {
         // no file class attached, no caching
-        stat.maxAge = -1;
+        cc.maxAge = -1;
         return stat;
     }
 
     // set max age based on fileClass settings
-    stat.maxAge = fileClassSettings->getMaxAge(stat.fileClass);
+    const auto &fc(*fileClassSettings);
+    cc.maxAge = fc.getMaxAge(stat.fileClass);
+    if (*cc.maxAge > 0) {
+        // we are caching, what about stale settings?
+        cc.staleWhileRevalidate = fc.getStaleWhileRevalidate(stat.fileClass);
+    }
 
     // done
     return stat;
@@ -100,12 +115,12 @@ public:
     IStreamDataSource(const vs::IStream::pointer &stream
                       , FileClass fileClass
                       , const FileClassSettings *fileClassSettings
-                      , const boost::optional<long> &forcedMaxAge
+                      , const http::SinkBase::CacheControl &forcedCacheControl
                       , bool gzipped)
         : stream_(stream), stat_(stream->stat())
         , fs_(Sink::FileInfo(stat_.contentType, stat_.lastModified
-                             , maxAge(fileClass, fileClassSettings
-                                      , forcedMaxAge)))
+                             , cacheControl(fileClass, fileClassSettings
+                                            , forcedCacheControl)))
     {
         // do not fail on eof
         stream->get().exceptions(std::ios::badbit);
@@ -143,10 +158,12 @@ private:
 } //namesapce
 
 void Sink::content(const vs::IStream::pointer &stream, FileClass fileClass
-                   , const boost::optional<long> &maxAge, bool gzipped)
+                   , const http::SinkBase::CacheControl &cacheControl
+                   , bool gzipped)
 {
     sink_->content(std::make_shared<IStreamDataSource>
-                   (stream, fileClass, fileClassSettings_, maxAge, gzipped));
+                   (stream, fileClass, fileClassSettings_, cacheControl
+                    , gzipped));
 }
 
 void Sink::error(const std::exception_ptr &exc)
@@ -188,7 +205,13 @@ Sink::FileInfo& Sink::FileInfo::setFileClass(FileClass fc)
 
 Sink::FileInfo& Sink::FileInfo::setMaxAge(const boost::optional<long> &ma)
 {
-    maxAge = ma;
+    cacheControl.maxAge = ma;
+    return *this;
+}
+
+Sink::FileInfo& Sink::FileInfo::setStaleWhileRevalidate(long stale)
+{
+    cacheControl.staleWhileRevalidate = stale;
     return *this;
 }
 

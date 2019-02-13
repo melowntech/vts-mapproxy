@@ -44,14 +44,27 @@ void FileClassSettings::configuration(po::options_description &od
                                       , const std::string &prefix)
 {
     auto ao(od.add_options());
-    for (auto fc : enumerationValues(FileClass())) {
-        if (fc == FileClass::unknown) { continue; }
-        auto name(boost::lexical_cast<std::string>(fc));
-        ao((prefix + name).c_str()
-           , po::value(&maxAges_[static_cast<int>(fc)])
-           ->required()->default_value(maxAges_[static_cast<int>(fc)])
-           , ("Max age of file class <" + name
-              + ">; >=0: Cache-Control: max-age, <0: Cache-Control=no-cache")
-           .c_str());
-    }
+
+    const auto registerTimes([&](Times &times, const std::string &prefix
+                                 , const std::string &what
+                                 , const std::string &help)
+    {
+        for (auto fc : enumerationValues(FileClass())) {
+            auto name(boost::lexical_cast<std::string>(fc));
+            ao((prefix + name).c_str()
+               , po::value(&times[static_cast<int>(fc)])
+               ->required()->default_value(times[static_cast<int>(fc)])
+               , (what + " of file class <" + name + ">; " + help).c_str());
+        }
+    });
+
+    registerTimes(maxAges_, prefix + "max-age."
+                  , "Max age"
+                  , ">=0: Cache-Control: max-age=???, "
+                  "<0: Cache-Control=no-cache.");
+
+    registerTimes(staleWhileRevalidate_, prefix + "stale-while-revalidate."
+                  , "Stale-while-revalidate value "
+                  , "if >0: adds stale-while-revalidate=??? after max-age.");
 }
+

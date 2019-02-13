@@ -41,7 +41,11 @@ enum class FileClass { config, support, registry, data, unknown };
 
 class FileClassSettings {
 public:
-    FileClassSettings() : maxAges_{{0}} {
+    static constexpr std::size_t storageSize =
+        static_cast<int>(FileClass::unknown) + 1;
+    typedef std::array<std::time_t, storageSize> Times;
+
+    FileClassSettings() : maxAges_{{0}}, staleWhileRevalidate_{{0}} {
         // unknown files are never cached -- for example directory listings
         setMaxAge(FileClass::unknown, -1);
     }
@@ -55,8 +59,12 @@ public:
     void setMaxAge(FileClass fc, long value);
     long getMaxAge(FileClass fc) const;
 
+    void setStaleWhileRevalidate(FileClass fc, std::time_t value);
+    std::time_t getStaleWhileRevalidate(FileClass fc) const;
+
 private:
-    std::array<long, static_cast<int>(FileClass::unknown) + 1> maxAges_;
+    Times maxAges_;
+    Times staleWhileRevalidate_;
 };
 
 UTILITY_GENERATE_ENUM_IO(FileClass,
@@ -77,6 +85,18 @@ inline void FileClassSettings::setMaxAge(FileClass fc, long value)
 inline long FileClassSettings::getMaxAge(FileClass fc) const
 {
     return maxAges_[static_cast<int>(fc)];
+}
+
+inline void
+FileClassSettings::setStaleWhileRevalidate(FileClass fc, std::time_t value)
+{
+    staleWhileRevalidate_[static_cast<int>(fc)] = value;
+}
+
+inline std::time_t FileClassSettings::getStaleWhileRevalidate(FileClass fc)
+    const
+{
+    return staleWhileRevalidate_[static_cast<int>(fc)];
 }
 
 #endif // mapproxy_support_fileclass_hpp_included_

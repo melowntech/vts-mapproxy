@@ -67,13 +67,21 @@ public:
     struct FileInfo : http::SinkBase::FileInfo {
         FileInfo(const std::string &contentType = "application/octet-stream"
                  , std::time_t lastModified = -1
-                 , const boost::optional<long> &maxAge = boost::none)
+                 , const http::SinkBase::CacheControl &cacheControl
+                 = http::SinkBase::CacheControl())
+            : http::SinkBase::FileInfo(contentType, lastModified
+                                       , cacheControl)
+        {}
+
+        FileInfo(const std::string &contentType
+                 , std::time_t lastModified, long maxAge)
             : http::SinkBase::FileInfo(contentType, lastModified, maxAge)
         {}
 
         FileInfo& setFileClass(FileClass fc);
 
         FileInfo& setMaxAge(const boost::optional<long> &maxAge);
+        FileInfo& setStaleWhileRevalidate(long stale);
 
         FileInfo& addHeader(const std::string &name
                             , const std::string &value);
@@ -110,11 +118,12 @@ public:
     /** Sends content to client.
      * \param stream stream to send
      * \param fileclass file class
-     * \param maxAge explicit max age
+     * \param cacheControl explicit cache-control
      * \param gzipped is content gzipped?
      */
     void content(const vs::IStream::pointer &stream, FileClass fileClass
-                 , const boost::optional<long> &maxAge = boost::none
+                 , const http::SinkBase::CacheControl &cacheContro
+                 = http::SinkBase::CacheControl()
                  , bool gzipped = false);
 
     /** Tell client to look somewhere else.

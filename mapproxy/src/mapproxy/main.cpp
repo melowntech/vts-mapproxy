@@ -235,8 +235,7 @@ void Daemon::configuration(po::options_description &cmdline
          , "Camera FOV used when no introspection position is provided.")
         ;
 
-        resourceBackendGenericConfig_.fileClassSettings
-            .configuration(config, "max-age.");
+        resourceBackendGenericConfig_.fileClassSettings.configuration(config);
 
     (void) cmdline;
     (void) pd;
