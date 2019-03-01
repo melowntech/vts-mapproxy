@@ -67,6 +67,8 @@ add_subdirectory(src/geo)
 add_subdirectory(src/half)
 add_subdirectory(src/gdal-drivers)
 add_subdirectory(src/http)
+add_subdirectory(src/miniball)
+add_subdirectory(src/qmf)
 
 # python stuff
 set(PYDBGLOG_STATIC TRUE)

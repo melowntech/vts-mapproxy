@@ -46,3 +46,9 @@
 [submodule "externals/libpysupport"]
 	path = externals/libpysupport
 	url = https://github.com/Melown/libpysupport.git
+[submodule "externals/libqmf"]
+	path = externals/libqmf
+	url = https://github.com/Melown/libqmf.git
+[submodule "externals/libminiball"]
+	path = externals/libminiball
+	url = https://github.com/Melown/libminiball.git
