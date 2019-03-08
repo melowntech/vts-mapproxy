@@ -61,7 +61,13 @@ namespace constants {
         const std::string Registry("tileset.registry");
     } // namespace tileset
 
+    const std::string LayerJson("layer.json");
+
     const std::string DisableBrowserHeader("X-Mapproxy-Disable-Browser");
+
+    const char *applicationJson("application/json; charset=utf-8");
+    const char *textHtml("text/html; charset=utf-8");
+    const char *quantizedMesh("application/vnd.quantized-mesh");
 } // namesapce constants
 
 namespace {
@@ -213,7 +219,7 @@ FileInfo::FileInfo(const http::Request &request, int f)
         if (components.size() != 6) {
             LOGTHROW(err1, NotFound)
                 << "URL <" << url << "> not found: invalid number "
-                "of path components.";
+                "of path components (" << components.size() << ").";
         }
     }
 
@@ -345,7 +351,7 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
         .setFileClass(FileClass::support);
 
     case Type::definition:
-        return Sink::FileInfo("application/json; charset=utf-8", lastModified)
+        return Sink::FileInfo(constants::applicationJson, lastModified)
             .setFileClass(FileClass::config);
 
     case Type::unknown:
@@ -437,6 +443,20 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
         flavor = vts::FileFlavor::debug;
         return;
     }
+
+    if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
+        const std::string ext(p);
+        if (ext == "terrain") {
+            type = Type::terrain;
+            return;
+        }
+    }
+
+    if (constants::LayerJson == fi.filename) {
+        type = Type::layerJson;
+        return;
+    }
+    return;
 }
 
 std::string contentType(vts::TileFile tileType, vts::FileFlavor flavor)
@@ -445,7 +465,7 @@ std::string contentType(vts::TileFile tileType, vts::FileFlavor flavor)
     case vts::TileFile::meta:
         if (flavor == vts::FileFlavor::debug) {
             // debug node
-            return "application/json; charset=utf-8";
+            return constants::applicationJson;
         }
         return vs::contentType(tileType);
 
@@ -478,8 +498,16 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
         return {};
 
     case Type::definition:
-        return Sink::FileInfo("application/json", lastModified)
+        return Sink::FileInfo(constants::applicationJson, lastModified)
             .setFileClass(FileClass::config);
+
+    case Type::layerJson:
+        return Sink::FileInfo(constants::applicationJson, lastModified)
+            .setFileClass(FileClass::config);
+
+    case Type::terrain:
+        return Sink::FileInfo(constants::quantizedMesh, lastModified)
+            .setFileClass(FileClass::data);
 
     case Type::unknown:
         return {};
@@ -493,6 +521,7 @@ GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled
     : fileInfo(fi), type(Type::unknown), support()
     , format(format)
 {
+    // TODO: use vts::parseTileIdPrefix function
     if (tiled && [&]() -> bool
     {
         const char *p(fi.filename.c_str());
@@ -591,11 +620,11 @@ Sink::FileInfo GeodataFileInfo::sinkFileInfo(std::time_t lastModified) const
             .setFileClass(FileClass::config);
 
     case Type::definition:
-        return Sink::FileInfo("application/json; charset=utf-8", lastModified)
+        return Sink::FileInfo(constants::applicationJson, lastModified)
             .setFileClass(FileClass::config);
 
     case Type::style:
-        return Sink::FileInfo("application/json; charset=utf-8", lastModified)
+        return Sink::FileInfo(constants::applicationJson, lastModified)
             .setFileClass(FileClass::config);
 
     case Type::unknown:

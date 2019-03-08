@@ -330,11 +330,10 @@ private:
 
 } // namespace
 
-vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , Sink &sink
-                                       , const SurfaceFileInfo&
-                                       , Arsenal &arsenal
-                                       , bool withMask) const
+AugmentedMesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
+                                           , Sink &sink
+                                           , const SurfaceFileInfo&
+                                           , Arsenal &arsenal) const
 {
     const int samplesPerSide(128);
     const TileFacesCalculator tileFacesCalculator;
@@ -363,35 +362,18 @@ vts::Mesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
     DemSampler ds(*dem, coverage, definition_.heightFunction);
 
     // generate mesh
-    auto meshInfo(meshFromNode(nodeInfo, size
+    auto mesh(meshFromNode(nodeInfo, size
                                , [&](int i, int j, double &h) -> bool
     {
         return ds(i, j, h);
     }));
-    auto &lm(std::get<0>(meshInfo));
+    mesh.textureLayerId = definition_.textureLayerId;
+    mesh.geoidGrid = dem_.geoidGrid;
 
     // simplify
-    simplifyMesh(lm, nodeInfo, tileFacesCalculator, dem_.geoidGrid);
+    simplifyMesh(mesh.mesh, nodeInfo, tileFacesCalculator, dem_.geoidGrid);
 
-    // and add skirt
-    addSkirt(lm, nodeInfo);
-
-    // generate VTS mesh
-    vts::Mesh mesh(false);
-    if (!lm.vertices.empty()) {
-        // local mesh is valid -> add as a submesh into output mesh
-        auto &sm(addSubMesh(mesh, lm, nodeInfo, dem_.geoidGrid));
-        if (definition_.textureLayerId) {
-            sm.textureLayer = definition_.textureLayerId;
-        }
-
-        if (withMask) {
-            // we are returning full mesh file -> generate coverage mask
-            meshCoverageMask
-                (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
-        }
-    }
-
+    // done for now
     return mesh;
 }
 

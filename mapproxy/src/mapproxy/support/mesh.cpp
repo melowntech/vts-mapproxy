@@ -37,12 +37,12 @@
 
 namespace vr = vtslibs::registry;
 
-std::tuple<geometry::Mesh, bool>
+AugmentedMesh
 meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
              , const HeightSampler &heights)
 {
-    std::tuple<geometry::Mesh, bool> res;
-    auto &fullyCovered(std::get<1>(res) = false);
+    AugmentedMesh res;
+    auto &fullyCovered(res.fullyCovered = false);
 
     const auto extents(nodeInfo.extents());
     const auto ts(math::size(extents));
@@ -64,7 +64,7 @@ meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
     fullyCovered = coverage.full();
 
     // fill grid and remember indices
-    auto &lm(std::get<0>(res));
+    auto &lm(res.mesh);
     for (int j(0), je(edges.height); j <= je; ++j) {
         auto y(extents.ur(1) - j * px.height);
         for (int i(0), ie(edges.width); i <= ie; ++i) {
@@ -461,4 +461,24 @@ int TileFacesCalculator::operator()(double meshArea, double meshProjectedArea)
 
     // apply factor to base number of faces
     return base_* factor;
+}
+
+qmf::Mesh qmfMesh(const geometry::Mesh &gmesh, const vts::NodeInfo &nodeInfo
+                  , const std::string &srs
+                  , const boost::optional<std::string> &geoidGrid)
+{
+    const auto extents(nodeInfo.extents());
+    const auto l2g(geo::local2geo(extents));
+    const auto conv(sds2srs(nodeInfo.srs(), srs, geoidGrid));
+
+    qmf::Mesh mesh;
+    mesh.extents = conv(extents);
+    mesh.mesh = gmesh;
+
+    // transform to output SRS
+    for (auto &v : mesh.mesh.vertices) { v = conv(transform(l2g, v)); }
+
+    qmf::calculateDerivedData(mesh, vr::system.srs(srs).srsDef);
+
+    return mesh;
 }

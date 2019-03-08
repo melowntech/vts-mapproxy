@@ -62,6 +62,7 @@
 #include "../support/python.hpp"
 #include "../support/serialization.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
+#include "../support/tilejson.hpp"
 
 #include "./surface.hpp"
 
@@ -87,6 +88,7 @@ fs::path SurfaceBase::filePath(vts::File fileType) const
 
 SurfaceBase::SurfaceBase(const Params &params)
     : Generator(params)
+    , tms_(params.resource.referenceFrame->findExtension<vre::Tms>())
 {}
 
 bool SurfaceBase::loadFiles(const Definition &definition)
@@ -209,8 +211,7 @@ Generator::Task SurfaceBase
                      (vts::meshTilesConfig
                       (properties_, vts::ExtraTileSetProperties()
                        , prependRoot(fs::path(), resource()
-                                     , ResourceRoot::none))
-                      , referenceFrameId()));
+                                     , ResourceRoot::none))));
                 vts::saveDebug(os, debug);
                 sink.content(os.str(), fi.sinkFileInfo());
                 break;
@@ -314,6 +315,15 @@ Generator::Task SurfaceBase
                      , FileClass::data);
         break;
 
+    case SurfaceFileInfo::Type::terrain:
+        return[=](Sink &sink, Arsenal &arsenal) {
+            generateTerrain(fi.tileId, sink, fi, arsenal);
+        };
+
+    case SurfaceFileInfo::Type::layerJson:
+        layerJson(sink, fi);
+        break;
+
     default:
         sink.error(utility::makeError<InternalError>
                     ("Not implemented yet."));
@@ -338,9 +348,29 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
             ("TileId outside of valid reference frame tree.");
     }
 
+    // generate the actual mesh
+    auto lm(generateMeshImpl(nodeInfo, sink, fi, arsenal));
+
+    // and add skirt
+    addSkirt(lm.mesh, nodeInfo);
+
     const auto raw(fi.flavor == vts::FileFlavor::raw);
 
-    auto mesh(generateMeshImpl(nodeInfo, sink, fi, arsenal, raw));
+    // generate VTS mesh
+    vts::Mesh mesh(false);
+    if (!lm.mesh.vertices.empty()) {
+        // local mesh is valid -> add as a submesh into output mesh
+        auto &sm(addSubMesh(mesh, lm.mesh, nodeInfo, lm.geoidGrid));
+        if (lm.textureLayerId) {
+            sm.textureLayer = lm.textureLayerId;
+        }
+
+        if (raw) {
+            // we are returning full mesh file -> generate coverage mask
+            meshCoverageMask
+                (mesh.coverageMask, lm.mesh, nodeInfo, lm.fullyCovered);
+        }
+    }
 
     // write mesh to stream
     std::stringstream os;
@@ -386,20 +416,22 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
     }
 
     // by default full watertight mesh
-    vts::Mesh mesh(true);
+    vts::MeshMask mask;
+    mask.createCoverage(true);
 
     if (!vts::TileIndex::Flag::isWatertight(flags)) {
-        mesh = generateMeshImpl
-            (nodeInfo, sink, fi, arsenal, true);
+        auto lm(generateMeshImpl(nodeInfo, sink, fi, arsenal));
+        meshCoverageMask
+            (mask.coverageMask, lm.mesh, nodeInfo, lm.fullyCovered);
     }
 
     if (debug) {
         sink.content(imgproc::png::serialize
-                     (vts::debugMask(mesh.coverageMask, { 1 }), 9)
+                     (vts::debugMask(mask.coverageMask, { 1 }), 9)
                      , fi.sinkFileInfo());
     } else {
         sink.content(imgproc::png::serialize
-                     (vts::mask2d(mesh.coverageMask, { 1 }), 9)
+                     (vts::mask2d(mask.coverageMask, { 1 }), 9)
                      , fi.sinkFileInfo());
     }
 }
@@ -504,6 +536,85 @@ SurfaceBase::extraProperties(const Definition &def) const
 
 
     return extra;
+}
+
+void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
+                                  , Sink &sink
+                                  , const SurfaceFileInfo &fi
+                                  , Arsenal &arsenal) const
+{
+    if (!tms_) {
+        utility::raise<NotFound>
+            ("Terrain provider interface disabled, no <tms> extension in "
+             "reference frame <%s>.", referenceFrameId());
+    }
+
+    // remap id from TMS to VTS
+    const auto tileId
+        (vts::global
+         (tms_->rootId
+          , (tms_->flipY) ? vts::verticalFlip(tmsTileId) : tmsTileId));
+
+    auto flags(index_->tileIndex.get(tileId));
+    if (!vts::TileIndex::Flag::isReal(flags)) {
+        utility::raise<NotFound>("No mesh for this tile.");
+    }
+
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.productive()) {
+        utility::raise<NotFound>
+            ("TileId outside of valid reference frame tree.");
+    }
+
+    // generate the actual mesh
+    auto lm(generateMeshImpl(nodeInfo, sink, fi, arsenal));
+
+    (void) lm;
+
+    // write mesh to stream
+
+    // TODO: gzip
+    std::stringstream os;
+    qmf::save(qmfMesh(lm.mesh, nodeInfo
+                      , (tms_->physicalSrs ? *tms_->physicalSrs
+                         : referenceFrame().model.physicalSrs)
+                      , lm.geoidGrid)
+              , os, fi.fileInfo.filename);
+
+    auto sfi(fi.sinkFileInfo());
+    sink.content(os.str(), sfi);
+}
+
+void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
+{
+    if (!tms_) {
+        utility::raise<NotFound>
+            ("Terrain provider interface disabled, no <tms> extension in "
+             "reference frame <%s>.", referenceFrameId());
+    }
+
+    LayerJson layer;
+
+    layer.name = id().fullId();
+    layer.description = resource().comment;
+
+    // use revision as major version (plus 1)
+    layer.version.maj = resource().revision + 1;
+    layer.format = "quantized-mesh-1.0";
+    layer.scheme = LayerJson::Scheme::tms;
+    layer.tiles.push_back("{z}-{y}-{x}.terrain");
+    layer.projection = tms_->projection;
+
+    // fixed LOD range
+    layer.zoom.min = resource().lodRange.min - tms_->rootId.lod;
+    layer.zoom.max = resource().lodRange.max - tms_->rootId.lod;
+
+    // TODO: bounds
+    // TODO: available
+
+    std::ostringstream os;
+    save(layer, os);
+    sink.content(os.str(), fi.sinkFileInfo());
 }
 
 } // namespace generator

@@ -29,15 +29,18 @@
 
 #include <boost/optional.hpp>
 
+#include "vts-libs/registry/extensions.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
 #include "vts-libs/vts/mesh.hpp"
 
 #include "../heightfunction.hpp"
+#include "../support/mesh.hpp"
 #include "../support/mmapped/tilesetindex.hpp"
 #include "../generator.hpp"
 #include "../definition.hpp"
 
 namespace vts = vtslibs::vts;
+namespace vre = vtslibs::registry::extensions;
 
 namespace generator {
 
@@ -98,13 +101,21 @@ private:
                            , const SurfaceFileInfo &fileInfo
                            , Arsenal &arsenal) const;
 
-    enum MeshRequest { full, mesh, mask };
+    virtual AugmentedMesh generateMeshImpl(const vts::NodeInfo &nodeInfo
+                                           , Sink &sink
+                                           , const SurfaceFileInfo &fileInfo
+                                           , Arsenal &arsenal) const = 0;
 
-    virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , Sink &sink
-                                       , const SurfaceFileInfo &fileInfo
-                                       , Arsenal &arsenal
-                                       , bool withMesh) const = 0;
+    /** Cesium terrain provider support. Generates non-VTS mesh.
+     */
+    void generateTerrain(const vts::TileId &tileId
+                         , Sink &sink
+                         , const SurfaceFileInfo &fileInfo
+                         , Arsenal &arsenal) const;
+
+    void layerJson(Sink &sink, const SurfaceFileInfo &fileInfo) const;
+
+    const vre::Tms *tms_;
 };
 
 } // namespace generator

@@ -139,6 +139,9 @@ struct SurfaceFileInfo {
 
     enum class Type {
         unknown, file, tile, definition, support, registry, service
+
+        // terrain provider support (if available)
+        , layerJson, terrain
     };
 
     /** File type.
@@ -153,7 +156,7 @@ struct SurfaceFileInfo {
      */
     vts::TileFile tileType;
 
-    /** Valid only when type in Type::tile
+    /** Valid only when type in Type::tile or Type::terrain
      */
     vts::TileId tileId;
 

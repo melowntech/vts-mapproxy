@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2017-2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,6 +33,8 @@
 
 #include "geometry/mesh.hpp"
 
+#include "qmf/qmf.hpp"
+
 #include "vts-libs/vts/nodeinfo.hpp"
 #include "vts-libs/vts/mesh.hpp"
 
@@ -59,7 +61,18 @@ private:
 
 typedef std::function<bool(int, int, double&)> HeightSampler;
 
-std::tuple<geometry::Mesh, bool>
+/** Local mesh (in node's local coordinates) augmented with more information.
+ */
+struct AugmentedMesh {
+    geometry::Mesh mesh;
+    bool fullyCovered;
+    boost::optional<std::string> geoidGrid;
+    unsigned int textureLayerId;
+
+    AugmentedMesh() : fullyCovered(false), textureLayerId() {}
+};
+
+AugmentedMesh
 meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
              , const HeightSampler &heights = HeightSampler());
 
@@ -75,6 +88,10 @@ void addSkirt(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo);
 vts::SubMesh& addSubMesh(vts::Mesh &mesh, const geometry::Mesh &gmesh
                          , const vts::NodeInfo &nodeInfo
                          , const boost::optional<std::string> &geoidGrid);
+
+qmf::Mesh qmfMesh(const geometry::Mesh &gmesh, const vts::NodeInfo &nodeInfo
+                  , const std::string &srs
+                  , const boost::optional<std::string> &geoidGrid);
 
 /** Calculates area of a quad.
  *

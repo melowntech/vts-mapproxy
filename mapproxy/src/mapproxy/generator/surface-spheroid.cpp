@@ -475,42 +475,27 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
     sink.content(os.str(), fi.sinkFileInfo());
 }
 
-vts::Mesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                            , Sink &sink
-                                            , const SurfaceFileInfo&
-                                            , Arsenal&
-                                            , bool withMask) const
+AugmentedMesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
+                                                , Sink &sink
+                                                , const SurfaceFileInfo&
+                                                , Arsenal&) const
 {
     // TODO: calculate tile sampling
     const int samplesPerSide(10);
-    //const TileFacesCalculator tileFacesCalculator;
+    // const TileFacesCalculator tileFacesCalculator;
 
     sink.checkAborted();
 
     // generate mesh
-    auto meshInfo
+    auto mesh
         (meshFromNode
          (nodeInfo, math::Size2(samplesPerSide, samplesPerSide)));
-    auto &lm(std::get<0>(meshInfo));
+    mesh.textureLayerId = definition_.textureLayerId;
+    mesh.geoidGrid = definition_.geoidGrid;
 
     // simplify
-    //simplifyMesh(lm, nodeInfo, tileFacesCalculator);
+    // simplifyMesh(lm, nodeInfo, tileFacesCalculator);
 
-    // and add skirt
-    addSkirt(lm, nodeInfo);
-
-    // generate VTS mesh
-    vts::Mesh mesh(false);
-    auto &sm(addSubMesh(mesh, lm, nodeInfo, definition_.geoidGrid));
-    if (definition_.textureLayerId) {
-        sm.textureLayer = definition_.textureLayerId;
-    }
-
-    if (withMask) {
-        // asked to generate coverage mask
-        meshCoverageMask
-            (mesh.coverageMask, lm, nodeInfo, std::get<1>(meshInfo));
-    }
     return mesh;
 }
 

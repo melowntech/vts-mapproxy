@@ -10,6 +10,7 @@ set(mapproxy-core_SOURCES
   support/fileclass.hpp support/fileclass.cpp
   support/serialization.hpp support/serialization.cpp
   support/glob.hpp support/glob.cpp
+  support/tilejson.hpp support/tilejson.cpp
 
   support/mmapped/tileindex.hpp support/mmapped/tileindex.cpp
   support/mmapped/qtree.hpp support/mmapped/qtree.cpp
@@ -51,6 +52,7 @@ set(mapproxy-core_SOURCES
 # test program
 define_module(LIBRARY mapproxy-core
   DEPENDS
+  qmf
   pysupport pydbglog
   vts-libs>=2.4 http>=1.0 geo>=1.28 gdal-drivers>=1.14 geometry>=1.7
   jsoncpp>=2.1

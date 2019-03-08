@@ -51,11 +51,10 @@ private:
                                   , const SurfaceFileInfo &fileInfo
                                   , Arsenal &arsenal) const;
 
-    virtual vts::Mesh generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                       , Sink &sink
-                                       , const SurfaceFileInfo &fileInfo
-                                       , Arsenal &arsenal
-                                       , bool withMask) const;
+    virtual AugmentedMesh generateMeshImpl(const vts::NodeInfo &nodeInfo
+                                           , Sink &sink
+                                           , const SurfaceFileInfo &fileInfo
+                                           , Arsenal &arsenal) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
                                  , Sink &sink
