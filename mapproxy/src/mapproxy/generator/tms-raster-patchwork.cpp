@@ -27,6 +27,7 @@
 #include <boost/filesystem.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 #include "utility/premain.hpp"
 #include "utility/raise.hpp"
@@ -87,6 +88,19 @@ TmsRasterPatchwork::TmsRasterPatchwork(const Params &params)
     , definition_(resource().definition<Definition>())
 {}
 
+namespace {
+
+double contrast(int i1, int i2)
+{
+    double l1(i1 / 255.);
+    double l2(i2 / 255.);
+    if (l2 > l1) { std::swap(l1, l2); }
+    // l1 is lighter
+    return (l1 + 0.05) / (l2 + 0.05);
+}
+
+} // namespace
+
 void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
                                            , const TmsFileInfo &fi
                                            , const vts::NodeInfo&
@@ -110,6 +124,33 @@ void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
         for (int i(0); i < vr::BoundLayer::tileWidth; ++i) {
             tile(j, i) = colors[((j >> 3) + (i >> 3)) & 1];
         }
+    }
+
+    {
+        const auto negative([&]() -> cv::Scalar
+        {
+            cv::Vec3b inColor(color);
+            std::uint8_t gray;
+            cv::Mat_<cv::Vec3b> in(1, 1, &inColor);
+            cv::Mat_<std::uint8_t> out(1, 1, &gray);
+            cv::cvtColor(in, out, cv::COLOR_RGB2GRAY);
+            if (contrast(gray, 0) > contrast(gray, 255)) {
+                return cv::Scalar(0, 0, 0);
+            }
+            return cv::Scalar(255, 255, 255);
+        }());
+
+        const auto label(boost::lexical_cast<std::string>(tileId));
+        const auto face(CV_FONT_HERSHEY_COMPLEX_SMALL);
+        const int thickness(1);
+        int baseline;
+        const auto size(cv::getTextSize(label, face, 1.0
+                                        , thickness, &baseline));
+
+        const cv::Point org((tile.cols - size.width) / 2
+                      , (tile.rows + size.height) / 2);
+
+        cv::putText(tile, label, org, face, 1.0, negative, 1.0, thickness);
     }
 
     // serialize

@@ -651,9 +651,22 @@ void Generators::Detail::registerSystemGenerators()
             resource.generator = resourceGenerator;
             resource.comment = "autoregistered resource";
             resource.referenceFrame = &rf;
-            resource.lodRange = vts::LodRange(0, 22);
-            resource.tileRange = vts::TileRange(0, 0, 0, 0);
             resource.definition(resource::definition(resourceGenerator));
+
+            // start at first valid lod
+            // lod 22 is arbitrarily deep
+            resource.lodRange
+                = vts::LodRange(rf.division.rootLodRange.min, 22);
+
+            // compose lod range from first valid lode
+            resource.tileRange = vts::TileRange(math::InvalidExtents{});
+            for (const auto &item : rf.division.nodes) {
+                const auto &node(item.second);
+                if (!node.real()) { continue; }
+                if (node.id.lod == rf.division.rootLodRange.min) {
+                    math::update(resource.tileRange, node.id.x, node.id.y);
+                }
+            }
 
             // create generator params
             Generator::Params params(resource);

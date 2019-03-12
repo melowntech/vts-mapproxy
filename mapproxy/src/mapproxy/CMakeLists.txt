@@ -144,10 +144,19 @@ file_to_cpp(mapproxy_FILES_SOURCES
   files::defaultstyle_json
   generator/files/defaultstyle.json)
 
+set(mapproxy_CESIUM_SOURCES
+  cesium.hpp cesium.cpp
+  )
+file_to_cpp(mapproxy_CESIUM_SOURCES
+  cesium::cesium_html
+  cesium/cesium.html)
+
 add_executable(mapproxy
   ${mapproxy_SOURCES}
   ${mapproxy_BROWSER_SOURCES}
-  ${mapproxy_FILES_SOURCES})
+  ${mapproxy_FILES_SOURCES}
+  ${mapproxy_CESIUM_SOURCES}
+  )
 target_link_libraries(mapproxy mapproxy-core ${MODULE_LIBRARIES})
 buildsys_target_compile_definitions(mapproxy ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy)

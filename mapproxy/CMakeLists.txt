@@ -94,3 +94,6 @@ add_subdirectory(src/rf-mask)
 add_subdirectory(src/generatevrtwo)
 add_subdirectory(src/calipers)
 add_subdirectory(src/setup-resource)
+
+# for testing
+add_subdirectory(src/utility/tools EXCLUDE_FROM_ALL)

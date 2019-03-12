@@ -95,6 +95,7 @@ SurfaceSpheroid::SurfaceSpheroid(const Params &params)
     : SurfaceBase(params)
     , definition_(resource().definition<Definition>())
 {
+    // TODO: do not load existing file if system and something changed
     loadFiles(definition_);
 }
 

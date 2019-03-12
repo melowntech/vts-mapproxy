@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <script src="https://cesiumjs.org/releases/1.51/Build/Cesium/Cesium.js"></script>
+  <style>
+    @import url(https://cesiumjs.org/releases/1.51/Build/Cesium/Widgets/widgets.css);
+    html, body, #cesiumContainer {
+        width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <script>
+
+// disable Cesium ion
+Cesium.Ion.defaultAccessToken = "";
+Cesium.Ion.defaultServer = "";
+
+// custom terrain provider
+var terrainProvider = new Cesium.CesiumTerrainProvider({
+    url: "."
+});
+
+// custom imagery provier: grid for no, introspection maybe layer
+var imageryProvider = new Cesium.GridImageryProvider({})
+
+// viewer: disable almost everything, use custom imagery and terrain providers
+var viewer = new Cesium.Viewer('cesiumContainer', {
+    geocoder: false
+    , baseLayerPicker: false
+    , sceneModePicker: false
+    , homeButton: false
+    , infoBox: false
+    , timeline: false
+    , animation: false
+    , scene3DOnly: true
+    , navigationInstructionsInitiallyVisible: false
+    , selectionIndicator: false
+    , imageryProvider: imageryProvider
+    , terrainProvider: terrainProvider
+});
+  </script>
+
+</body>
+</html>

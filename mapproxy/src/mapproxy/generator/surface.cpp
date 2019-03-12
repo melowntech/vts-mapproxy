@@ -63,6 +63,8 @@
 #include "../support/serialization.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
 #include "../support/tilejson.hpp"
+#include "../support/revision.hpp"
+#include "../support/tms.hpp"
 
 #include "./surface.hpp"
 
@@ -550,14 +552,11 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
     }
 
     // remap id from TMS to VTS
-    const auto tileId
-        (vts::global
-         (tms_->rootId
-          , (tms_->flipY) ? vts::verticalFlip(tmsTileId) : tmsTileId));
+    const auto tileId(tms2vts(tms_->rootId, tms_->flipY, tmsTileId));
 
     auto flags(index_->tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
-        utility::raise<NotFound>("No mesh for this tile.");
+        utility::raise<NotFound>("No terrain for this tile.");
     }
 
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
@@ -594,23 +593,40 @@ void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
     }
 
     LayerJson layer;
+    const auto &r(resource());
 
     layer.name = id().fullId();
-    layer.description = resource().comment;
+    layer.description = r.comment;
 
     // use revision as major version (plus 1)
-    layer.version.maj = resource().revision + 1;
+    layer.version.maj = r.revision + 1;
     layer.format = "quantized-mesh-1.0";
     layer.scheme = LayerJson::Scheme::tms;
-    layer.tiles.push_back("{z}-{y}-{x}.terrain");
+    layer.tiles.push_back
+        (utility::format("{z}-{x}-{y}.terrain%s"
+                         , RevisionWrapper(r.revision, "?")));
     layer.projection = tms_->projection;
 
     // fixed LOD range
-    layer.zoom.min = resource().lodRange.min - tms_->rootId.lod;
-    layer.zoom.max = resource().lodRange.max - tms_->rootId.lod;
+    layer.zoom.min = r.lodRange.min - tms_->rootId.lod;
+    layer.zoom.max = r.lodRange.max - tms_->rootId.lod;
 
-    // TODO: bounds
-    // TODO: available
+    /** TODO: compute bounds
+     *
+     * at each level, split tile range into individual subtrees and update
+     * bounds with extents converted to physical system (rf or tms)
+     */
+    // invalidate bounds
+    // layer.bounds = vts::Extents2(math::InvalidExtents{});
+
+    // TODO: use tileindex instead of single tile range; should be OK for now
+    for (const auto &range : vts::Ranges(r.lodRange, r.tileRange).ranges()) {
+        layer.available.emplace_back();
+        auto &current(layer.available.back());
+        const auto tmsRange(vts2tms(tms_->rootId, tms_->flipY, range));
+        current.push_back(tmsRange.range);
+        LOG(info4) << range << " -> " << tmsRange;
+    }
 
     std::ostringstream os;
     save(layer, os);

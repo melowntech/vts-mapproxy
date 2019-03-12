@@ -113,11 +113,11 @@ struct TmsFileInfo {
      */
     Type type;
 
-    /** Valid only when type in (Type::tile, Type::mask)
+    /** Valid only when type in (Type::image, Type::mask)
      */
     vts::TileId tileId;
 
-    /** Valid only when type == Type::tile;
+    /** Valid only when type == Type::image
      */
     RasterFormat format;
 

@@ -40,6 +40,7 @@
 #include "./error.hpp"
 #include "./fileinfo.hpp"
 #include "./browser2d.hpp"
+#include "./cesium.hpp"
 
 namespace ba = boost::algorithm;
 namespace vr = vtslibs::registry;
@@ -225,78 +226,24 @@ FileInfo::FileInfo(const http::Request &request, int f)
 
 }
 
-namespace {
-
-inline bool isDigit(char c) { return (c >= '0') && (c <= '9'); }
-
-inline char positive(char c) { return c - '0'; }
-
-template <unsigned int minWidth, char(*getter)(char), typename T>
-inline const char* parsePartImpl(const char *p, T &value)
-{
-    bool prefix = false;
-    char c(p[0]);
-    switch (c) {
-    case '-': case '+': return nullptr;
-    case '0': prefix = true;
-    }
-
-    value = 0;
-
-    const char *e(p);
-    while (isDigit(c)) {
-        value *= 10;
-        value += getter(c);
-        c = *++e;
-    }
-
-    auto dist(e - p);
-    if (dist < minWidth) { return nullptr; }
-    if (prefix && (dist > minWidth)) { return nullptr; }
-    return e;
-}
-
-template <unsigned int minWidth, typename T>
-inline const char* parsePart(const char *p, T &value)
-{
-    // only positive numbers are allowed
-    return parsePartImpl<minWidth, positive>(p, value);
-}
-
-} // namespace
-
 TmsFileInfo::TmsFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), support()
 {
-    if ([&]() -> bool
-    {
-        const char *p(fi.filename.c_str());
-
-        if (!(p = parsePart<1>(p, tileId.lod))) { return false; }
-        if (*p++ != '-') { return false; }
-
-        if (!(p = parsePart<1>(p, tileId.x))) { return false; }
-        if (*p++ != '-') { return false; }
-
-        if (!(p = parsePart<1>(p, tileId.y))) { return false; }
-        if (*p++ != '.') { return false; }
-
-        std::string ext(p);
+    if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
+        const std::string ext(p);
         if (ext == "mask") {
             // mask file
             type = Type::mask;
+            return;
         } else if (ext == "meta") {
             // mask file
             type = Type::metatile;
+            return;
         } else {
             // another file -> parse as format
             type = Type::image;
-            if (!asEnum<RasterFormat>(ext, format)) { return false; }
+            if (asEnum<RasterFormat>(ext, format)) { return; }
         }
-
-        return true;
-    }()) {
-        return;
     }
 
     if (constants::Config == fi.filename) {
@@ -412,11 +359,15 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
         if (constants::Self == path) { path = constants::Index; }
 
         // support files
-        auto fsupport(vts::supportFiles.find(path));
-        if (fsupport != vts::supportFiles.end()) {
-            type = Type::support;
-            support = &fsupport->second;
-            return;
+        for (const auto *supportFiles
+                 : { &vts::supportFiles, &cesium::supportFiles })
+        {
+            auto fsupport(supportFiles->find(path));
+            if (fsupport != supportFiles->end()) {
+                type = Type::support;
+                support = &fsupport->second;
+                return;
+            }
         }
     } else {
         LOG(debug) << "Browser disabled, skipping browser files.";
@@ -522,31 +473,17 @@ GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled
     , format(format)
 {
     // TODO: use vts::parseTileIdPrefix function
-    if (tiled && [&]() -> bool
-    {
-        const char *p(fi.filename.c_str());
-
-        if (!(p = parsePart<1>(p, tileId.lod))) { return false; }
-        if (*p++ != '-') { return false; }
-
-        if (!(p = parsePart<1>(p, tileId.x))) { return false; }
-        if (*p++ != '-') { return false; }
-
-        if (!(p = parsePart<1>(p, tileId.y))) { return false; }
-        if (*p++ != '.') { return false; }
-
+    if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
         std::string ext(p);
         if (ext == "geo") {
             // mask file
             type = Type::geo;
+            return;
         } else if (ext == "meta") {
             // mask file
             type = Type::metatile;
+            return;
         }
-
-        return true;
-    }()) {
-        return;
     }
 
     if (constants::Config == fi.filename) {
