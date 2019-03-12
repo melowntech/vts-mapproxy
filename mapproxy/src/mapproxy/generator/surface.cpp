@@ -30,6 +30,10 @@
 #include <boost/format.hpp>
 #include <boost/utility/in_place_factory.hpp>
 
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/restrict.hpp>
+
 #include <opencv2/highgui/highgui.hpp>
 
 #include "utility/raise.hpp"
@@ -69,6 +73,7 @@
 #include "./surface.hpp"
 
 namespace fs = boost::filesystem;
+namespace bio = boost::iostreams;
 namespace vr = vtslibs::registry;
 namespace vs = vtslibs::storage;
 namespace vts = vtslibs::vts;
@@ -568,19 +573,23 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
     // generate the actual mesh
     auto lm(generateMeshImpl(nodeInfo, sink, fi, arsenal));
 
-    (void) lm;
+    // write mesh to stream (gzipped)
+    std::ostringstream os;
+    {
+        bio::filtering_ostream gzipped;
+        gzipped.push(bio::gzip_compressor(bio::gzip_params(9), 1 << 16));
+        gzipped.push(os);
 
-    // write mesh to stream
-
-    // TODO: gzip
-    std::stringstream os;
-    qmf::save(qmfMesh(lm.mesh, nodeInfo
-                      , (tms_->physicalSrs ? *tms_->physicalSrs
-                         : referenceFrame().model.physicalSrs)
-                      , lm.geoidGrid)
-              , os, fi.fileInfo.filename);
+        qmf::save(qmfMesh(lm.mesh, nodeInfo
+                          , (tms_->physicalSrs ? *tms_->physicalSrs
+                             : referenceFrame().model.physicalSrs)
+                          , lm.geoidGrid)
+                  , gzipped, fi.fileInfo.filename);
+        gzipped.flush();
+    }
 
     auto sfi(fi.sinkFileInfo());
+    sfi.addHeader("Content-Encoding", "gzip");
     sink.content(os.str(), sfi);
 }
 
