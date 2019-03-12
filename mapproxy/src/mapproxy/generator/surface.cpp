@@ -611,13 +611,8 @@ void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
     layer.zoom.min = r.lodRange.min - tms_->rootId.lod;
     layer.zoom.max = r.lodRange.max - tms_->rootId.lod;
 
-    /** TODO: compute bounds
-     *
-     * at each level, split tile range into individual subtrees and update
-     * bounds with extents converted to physical system (rf or tms)
-     */
-    // invalidate bounds
-    // layer.bounds = vts::Extents2(math::InvalidExtents{});
+    // invalidate extents, updated in this per-lod loop
+    layer.bounds = math::Extents2(math::InvalidExtents{});
 
     // TODO: use tileindex instead of single tile range; should be OK for now
     for (const auto &range : vts::Ranges(r.lodRange, r.tileRange).ranges()) {
@@ -625,7 +620,17 @@ void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
         auto &current(layer.available.back());
         const auto tmsRange(vts2tms(tms_->rootId, tms_->flipY, range));
         current.push_back(tmsRange.range);
-        LOG(info4) << range << " -> " << tmsRange;
+
+        const auto physicalSrs(tms_->physicalSrs ? *tms_->physicalSrs
+                               : referenceFrame().model.physicalSrs);
+
+        // treat current LOD as one gigantic metatile
+        for (const auto &block : metatileBlocks(r, vts::TileId(range.lod, 0, 0)
+                                                , range.lod, false))
+        {
+            const vts::CsConvertor conv(block.srs, physicalSrs);
+            math::update(layer.bounds, conv(block.extents));
+        }
     }
 
     std::ostringstream os;
