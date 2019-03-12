@@ -30,14 +30,11 @@
 #include <boost/format.hpp>
 #include <boost/utility/in_place_factory.hpp>
 
-#include <boost/iostreams/filtering_stream.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/iostreams/restrict.hpp>
-
 #include <opencv2/highgui/highgui.hpp>
 
 #include "utility/raise.hpp"
 #include "utility/path.hpp"
+#include "utility/gzipper.hpp"
 
 #include "imgproc/rastermask/cvmat.hpp"
 #include "imgproc/png.hpp"
@@ -575,18 +572,11 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
 
     // write mesh to stream (gzipped)
     std::ostringstream os;
-    {
-        bio::filtering_ostream gzipped;
-        gzipped.push(bio::gzip_compressor(bio::gzip_params(9), 1 << 16));
-        gzipped.push(os);
-
-        qmf::save(qmfMesh(lm.mesh, nodeInfo
-                          , (tms_->physicalSrs ? *tms_->physicalSrs
-                             : referenceFrame().model.physicalSrs)
-                          , lm.geoidGrid)
-                  , gzipped, fi.fileInfo.filename);
-        gzipped.flush();
-    }
+    qmf::save(qmfMesh(lm.mesh, nodeInfo
+                      , (tms_->physicalSrs ? *tms_->physicalSrs
+                         : referenceFrame().model.physicalSrs)
+                      , lm.geoidGrid)
+              , utility::Gzipper(os), fi.fileInfo.filename);
 
     auto sfi(fi.sinkFileInfo());
     sfi.addHeader("Content-Encoding", "gzip");
