@@ -43,9 +43,6 @@ function resolveUrl(url, base) {
 }
 
 function processBoundLayer(config, bl) {
-    console.dir(config);
-    console.dir(bl);
-
     // resolve tile URL templace
     var tileUrl = resolveUrl(bl.url, config.boundLayer);
 
