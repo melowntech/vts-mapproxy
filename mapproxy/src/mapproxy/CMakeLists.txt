@@ -11,6 +11,7 @@ set(mapproxy-core_SOURCES
   support/serialization.hpp support/serialization.cpp
   support/glob.hpp support/glob.cpp
   support/tilejson.hpp support/tilejson.cpp
+  support/cesiumconf.hpp support/cesiumconf.cpp
 
   support/mmapped/tileindex.hpp support/mmapped/tileindex.cpp
   support/mmapped/qtree.hpp support/mmapped/qtree.cpp
@@ -150,6 +151,9 @@ set(mapproxy_CESIUM_SOURCES
 file_to_cpp(mapproxy_CESIUM_SOURCES
   cesium::cesium_html
   cesium/cesium.html)
+file_to_cpp(mapproxy_CESIUM_SOURCES
+  cesium::cesium_js
+  cesium/cesium.js)
 
 add_executable(mapproxy
   ${mapproxy_SOURCES}

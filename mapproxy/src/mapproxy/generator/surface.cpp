@@ -64,6 +64,7 @@
 #include "../support/serialization.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
 #include "../support/tilejson.hpp"
+#include "../support/cesiumconf.hpp"
 #include "../support/revision.hpp"
 #include "../support/tms.hpp"
 
@@ -92,6 +93,7 @@ fs::path SurfaceBase::filePath(vts::File fileType) const
 
 SurfaceBase::SurfaceBase(const Params &params)
     : Generator(params)
+    , definition_(resource().definition<Definition>())
     , tms_(params.resource.referenceFrame->findExtension<vre::Tms>())
 {}
 
@@ -328,6 +330,10 @@ Generator::Task SurfaceBase
         layerJson(sink, fi);
         break;
 
+    case SurfaceFileInfo::Type::cesiumConf:
+        cesiumConf(sink, fi);
+        break;
+
     default:
         sink.error(utility::makeError<InternalError>
                     ("Not implemented yet."));
@@ -542,10 +548,7 @@ SurfaceBase::extraProperties(const Definition &def) const
     return extra;
 }
 
-void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
-                                  , Sink &sink
-                                  , const SurfaceFileInfo &fi
-                                  , Arsenal &arsenal) const
+const vre::Tms& SurfaceBase::getTms() const
 {
     if (!tms_) {
         utility::raise<NotFound>
@@ -553,8 +556,18 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
              "reference frame <%s>.", referenceFrameId());
     }
 
+    return *tms_;
+}
+
+void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
+                                  , Sink &sink
+                                  , const SurfaceFileInfo &fi
+                                  , Arsenal &arsenal) const
+{
+    const auto &tms(getTms());
+
     // remap id from TMS to VTS
-    const auto tileId(tms2vts(tms_->rootId, tms_->flipY, tmsTileId));
+    const auto tileId(tms2vts(tms.rootId, tms.flipY, tmsTileId));
 
     auto flags(index_->tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
@@ -573,7 +586,7 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
     // write mesh to stream (gzipped)
     std::ostringstream os;
     qmf::save(qmfMesh(lm.mesh, nodeInfo
-                      , (tms_->physicalSrs ? *tms_->physicalSrs
+                      , (tms.physicalSrs ? *tms.physicalSrs
                          : referenceFrame().model.physicalSrs)
                       , lm.geoidGrid)
               , utility::Gzipper(os), fi.fileInfo.filename);
@@ -585,11 +598,7 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
 
 void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
 {
-    if (!tms_) {
-        utility::raise<NotFound>
-            ("Terrain provider interface disabled, no <tms> extension in "
-             "reference frame <%s>.", referenceFrameId());
-    }
+    const auto &tms(getTms());
 
     LayerJson layer;
     const auto &r(resource());
@@ -604,11 +613,11 @@ void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
     layer.tiles.push_back
         (utility::format("{z}-{x}-{y}.terrain%s"
                          , RevisionWrapper(r.revision, "?")));
-    layer.projection = tms_->projection;
+    layer.projection = tms.projection;
 
     // fixed LOD range
-    layer.zoom.min = r.lodRange.min - tms_->rootId.lod;
-    layer.zoom.max = r.lodRange.max - tms_->rootId.lod;
+    layer.zoom.min = r.lodRange.min - tms.rootId.lod;
+    layer.zoom.max = r.lodRange.max - tms.rootId.lod;
 
     // invalidate extents, updated in this per-lod loop
     layer.bounds = math::Extents2(math::InvalidExtents{});
@@ -617,10 +626,10 @@ void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
     for (const auto &range : vts::Ranges(r.lodRange, r.tileRange).ranges()) {
         layer.available.emplace_back();
         auto &current(layer.available.back());
-        const auto tmsRange(vts2tms(tms_->rootId, tms_->flipY, range));
+        const auto tmsRange(vts2tms(tms.rootId, tms.flipY, range));
         current.push_back(tmsRange.range);
 
-        const auto physicalSrs(tms_->physicalSrs ? *tms_->physicalSrs
+        const auto physicalSrs(tms.physicalSrs ? *tms.physicalSrs
                                : referenceFrame().model.physicalSrs);
 
         // treat current LOD as one gigantic metatile
@@ -634,6 +643,40 @@ void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
 
     std::ostringstream os;
     save(layer, os);
+    sink.content(os.str(), fi.sinkFileInfo());
+}
+
+void SurfaceBase::cesiumConf(Sink &sink, const SurfaceFileInfo &fi) const
+{
+    const auto &tms(getTms());
+    const auto &def(definition_);
+
+    const auto introId(def.introspection.tms.empty()
+                       ? Resource::Id(referenceFrameId(), systemGroup()
+                                      , "tms-raster-patchwork")
+                       : def.introspection.tms.front());
+
+    CesiumConf conf;
+    conf.tms = tms;
+
+    if (auto other = otherGenerator
+        (Resource::Generator::Type::tms
+         , addReferenceFrame(introId, referenceFrameId())))
+    {
+        // we have found matching tms resource, use it as an imagery provider
+        const auto otherId(introId.fullId());
+        const auto &otherResource(other->resource());
+        const auto resdiff(resolveRoot(resource(), otherResource));
+
+        // boundlayer path
+        const fs::path blPath
+            (prependRoot(fs::path(), otherResource, resdiff)
+             / "boundlayer.json");
+        conf.boundLayer = blPath.string();
+    };
+
+    std::ostringstream os;
+    save(conf, os);
     sink.content(os.str(), fi.sinkFileInfo());
 }
 

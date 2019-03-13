@@ -24,30 +24,33 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./cesium.hpp"
+#ifndef mapproxy_support_cesiumconf_hpp_included_
+#define mapproxy_support_cesiumconf_hpp_included_
 
-#include "cesium/cesium.html.hpp"
-#include "cesium/cesium.js.hpp"
+#include <iostream>
 
-namespace cesium {
+#include <boost/optional.hpp>
 
-const vtslibs::storage::SupportFile::Files supportFiles =
-{
-    { "cesium.html"
-      , {
-            cesium_html
-            , sizeof(cesium_html)
-            , cesium_html_attr_lastModified
-            , "text/html; charset=utf-8"
-        }
-    }, { "cesium.js"
-      , {
-            cesium_js
-            , sizeof(cesium_js)
-            , cesium_js_attr_lastModified
-            , "application/javascript; charset=utf-8"
-        }
-    }
+#include "utility/enum-io.hpp"
+
+#include "math/geometry_core.hpp"
+
+#include "vts-libs/vts/basetypes.hpp"
+#include "vts-libs/registry/extensions.hpp"
+
+namespace vts = vtslibs::vts;
+namespace vre = vtslibs::registry::extensions;
+
+/** Cesium browser configuiration.
+ */
+struct CesiumConf {
+    typedef boost::optional<std::string> OString;
+    vre::Tms tms;
+    OString boundLayer;
+
+    CesiumConf() {}
 };
 
-} // namespace cesium
+void save(const CesiumConf &conf, std::ostream &os);
+
+#endif // mapproxy_support_cesiumconf_hpp_included_

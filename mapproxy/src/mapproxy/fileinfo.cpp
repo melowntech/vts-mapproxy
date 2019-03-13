@@ -63,6 +63,7 @@ namespace constants {
     } // namespace tileset
 
     const std::string LayerJson("layer.json");
+    const std::string CesiumConf("cesium.conf");
 
     const std::string DisableBrowserHeader("X-Mapproxy-Disable-Browser");
 
@@ -407,6 +408,11 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
         type = Type::layerJson;
         return;
     }
+
+    if (constants::CesiumConf == fi.filename) {
+        type = Type::cesiumConf;
+        return;
+    }
     return;
 }
 
@@ -449,10 +455,8 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
         return {};
 
     case Type::definition:
-        return Sink::FileInfo(constants::applicationJson, lastModified)
-            .setFileClass(FileClass::config);
-
     case Type::layerJson:
+    case Type::cesiumConf:
         return Sink::FileInfo(constants::applicationJson, lastModified)
             .setFileClass(FileClass::config);
 

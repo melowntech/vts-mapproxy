@@ -24,30 +24,32 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./cesium.hpp"
+#include <boost/lexical_cast.hpp>
 
-#include "cesium/cesium.html.hpp"
-#include "cesium/cesium.js.hpp"
+#include "utility/format.hpp"
 
-namespace cesium {
+#include "jsoncpp/json.hpp"
+#include "jsoncpp/io.hpp"
 
-const vtslibs::storage::SupportFile::Files supportFiles =
+#include "vts-libs/registry/json.hpp"
+
+#include "cesiumconf.hpp"
+
+namespace {
+
+void build(Json::Value &content, const CesiumConf &conf)
 {
-    { "cesium.html"
-      , {
-            cesium_html
-            , sizeof(cesium_html)
-            , cesium_html_attr_lastModified
-            , "text/html; charset=utf-8"
-        }
-    }, { "cesium.js"
-      , {
-            cesium_js
-            , sizeof(cesium_js)
-            , cesium_js_attr_lastModified
-            , "application/javascript; charset=utf-8"
-        }
-    }
-};
+    content = Json::objectValue;
+    if (conf.boundLayer) { content["boundLayer"] = *conf.boundLayer; }
+    content["tms"] = vre::asJson(conf.tms);
+}
 
-} // namespace cesium
+} // namespace
+
+void save(const CesiumConf &conf, std::ostream &os)
+{
+    Json::Value content;
+    build(content, conf);
+    os.precision(15);
+    Json::write(os, content);
+}

@@ -141,7 +141,7 @@ struct SurfaceFileInfo {
         unknown, file, tile, definition, support, registry, service
 
         // terrain provider support (if available)
-        , layerJson, terrain
+        , layerJson, terrain, cesiumConf
     };
 
     /** File type.

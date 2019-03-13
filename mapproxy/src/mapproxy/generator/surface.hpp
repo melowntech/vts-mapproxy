@@ -59,6 +59,8 @@ protected:
         const;
 
 protected:
+    const vre::Tms& getTms() const;
+
     boost::optional<mmapped::Index> index_;
     vts::FullTileSetProperties properties_;
 
@@ -115,6 +117,9 @@ private:
 
     void layerJson(Sink &sink, const SurfaceFileInfo &fileInfo) const;
 
+    void cesiumConf(Sink &sink, const SurfaceFileInfo &fileInfo) const;
+
+    const Definition &definition_;
     const vre::Tms *tms_;
 };
 
