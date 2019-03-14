@@ -49,6 +49,114 @@ function resolveUrl(url, base) {
     return (new URL(url, base)).href;
 }
 
+function credit2html(credit) {
+    var notice = credit.notice;
+    var out = "";
+    var i = 0;
+
+    var escaped = function(c) {
+        switch (c) {
+        case '&': return '&amp;';
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '"': return '&quot;';
+        }
+        return c;
+    }
+
+    var escapedString = function(text) {
+        for (var i = 0; i < text.length; ++i) {
+            out += escaped(text[i]);
+        }
+    }
+
+    var replace = function(what) {
+        if (what == "{copy}") { out += "&copy;"; return; }
+        if (what == "{Y}") { out += new Date().getFullYear(); return; }
+    }
+
+    var beginA = function(url) {
+        return '<a href="' + escapedString(url) + '">';
+    }
+
+    var endA = function() {
+        return '</a>';
+    }
+
+    var parseTo = function(end) {
+        var out = "";
+        while (i < notice.length) {
+            var c = notice[i];
+            out += c;
+            if (c == end) { break; }
+            ++i;
+        }
+        return out;
+    }
+
+    var url = function(what) {
+        var url = ""
+        var text = ""
+        var split = false;
+
+        for (var i = 0; i < what.length; ++i) {
+            var c = what[i];
+            switch (c) {
+            case '[': case ']': continue;
+            case ' ':
+                if (!split) {
+                    split = true;
+                } else {
+                    text += c;
+                }
+                break;
+            default:
+                if (split) {
+                    text += c;
+                } else {
+                    url += c;
+                }
+                break;
+            }
+        }
+
+        out += beginA(url);
+        escapedString(text.length ? text : url);
+        out += endA();
+    }
+
+    var hasUrl = (typeof credit.url !== "undefined");
+    if (hasUrl) { out += beginA(credit.url); }
+
+    for (i = 0; i < notice.length; ++i) {
+        var c = credit.notice[i];
+
+        switch (c) {
+        case '{': replace(parseTo('}')); break;
+        case '[': url(parseTo(']')); break;
+        default: out += escaped(c); break;
+        }
+    }
+
+    if (hasUrl) { out += endA(); }
+
+    return out;
+}
+
+function credits2html(credits) {
+    var out = ""
+    var separator = "";
+    for (key in credits) {
+        if (!credits.hasOwnProperty(key)) continue;
+
+        var credit = credits[key];
+        out += separator;
+        out += credit2html(credit);
+        separator = "<br>";
+    }
+    return out;
+}
+
 function processBoundLayer(config, bl) {
     // resolve tile URL templace
     var tileUrl = resolveUrl(bl.url, config.boundLayer);
@@ -68,6 +176,7 @@ function processBoundLayer(config, bl) {
                 }
                 // TODO: apply rootId to x and y as well if needed
             }
+            , credit: credits2html(bl.credits)
         });
 
         // TODO: add "global-mercator" handling
