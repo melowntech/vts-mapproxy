@@ -76,11 +76,13 @@ function credit2html(credit) {
     }
 
     var beginA = function(url) {
-        return '<a href="' + escapedString(url) + '">';
+        out += '<a href="';
+        escapedString(url);
+        out += '">';
     }
 
     var endA = function() {
-        return '</a>';
+        out += '</a>';
     }
 
     var parseTo = function(end) {
@@ -120,13 +122,13 @@ function credit2html(credit) {
             }
         }
 
-        out += beginA(url);
+        beginA(url);
         escapedString(text.length ? text : url);
-        out += endA();
+        endA();
     }
 
     var hasUrl = (typeof credit.url !== "undefined");
-    if (hasUrl) { out += beginA(credit.url); }
+    if (hasUrl) { beginA(credit.url); }
 
     for (i = 0; i < notice.length; ++i) {
         var c = credit.notice[i];
@@ -138,7 +140,7 @@ function credit2html(credit) {
         }
     }
 
-    if (hasUrl) { out += endA(); }
+    if (hasUrl) { endA(); }
 
     return out;
 }
