@@ -33,9 +33,16 @@ function launchCesium(imageryProvider) {
         , scene3DOnly: true
         , navigationInstructionsInitiallyVisible: false
         , selectionIndicator: false
+        , requestRenderMode : true
         , imageryProvider: imageryProvider
         , terrainProvider: terrainProvider
     });
+
+    var melownCredit = new Cesium.Credit
+        ('<a href="https://www.melown.com/">'
+         + '<img src="melowntech.png" title="Melown Technologies SE" />'
+         + '</a>');
+    viewer.scene.frameState.creditDisplay.addDefaultCredit(melownCredit);
 }
 
 function resolveUrl(url, base) {

@@ -29,6 +29,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/utility/in_place_factory.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -39,6 +40,7 @@
 #include "imgproc/rastermask/cvmat.hpp"
 #include "imgproc/png.hpp"
 
+#include "vts-libs/registry/io.hpp"
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/vts/io.hpp"
 #include "vts-libs/vts/nodeinfo.hpp"
@@ -639,6 +641,12 @@ void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
             const vts::CsConvertor conv(block.srs, physicalSrs);
             math::update(layer.bounds, conv(block.extents));
         }
+    }
+
+    if (!r.credits.empty()) {
+        layer.attribution
+            = boost::lexical_cast<std::string>
+            (utility::join(html(asInlineCredits(r)), "<br/>"));
     }
 
     std::ostringstream os;

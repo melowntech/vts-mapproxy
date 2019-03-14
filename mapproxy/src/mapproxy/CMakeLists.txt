@@ -155,6 +155,10 @@ file_to_cpp(mapproxy_CESIUM_SOURCES
   cesium::cesium_js
   cesium/cesium.js)
 
+file_to_cpp(mapproxy_CESIUM_SOURCES
+  cesium::melowntech_png
+  cesium/melown-technologies-logo-transparent-28.png)
+
 add_executable(mapproxy
   ${mapproxy_SOURCES}
   ${mapproxy_BROWSER_SOURCES}

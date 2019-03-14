@@ -102,6 +102,7 @@ void build(Json::Value &content, const LayerJson &layer)
     build(content["available"], layer.available);
     content["minzoom"] = layer.zoom.min;
     content["maxzoom"] = layer.zoom.max;
+    build(content, "attribution", layer.attribution);
 }
 
 } // namespace

@@ -65,6 +65,7 @@ struct LayerJson {
     vts::LodRange zoom;
     Available available;
     std::vector<std::string> tiles;
+    OString attribution;
 
     LayerJson()
         : tilejson(2, 0, 0), version(1, 0, 0), scheme(Scheme::xyz)

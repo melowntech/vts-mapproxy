@@ -28,6 +28,7 @@
 
 #include "cesium/cesium.html.hpp"
 #include "cesium/cesium.js.hpp"
+#include "cesium/melown-technologies-logo-transparent-28.png.hpp"
 
 namespace cesium {
 
@@ -46,6 +47,13 @@ const vtslibs::storage::SupportFile::Files supportFiles =
             , sizeof(cesium_js)
             , cesium_js_attr_lastModified
             , "application/javascript; charset=utf-8"
+        }
+    }, { "melowntech.png"
+      , {
+            melowntech_png
+            , sizeof(melowntech_png)
+            , melowntech_png_attr_lastModified
+            , "image/png"
         }
     }
 };
