@@ -1,3 +1,9 @@
+vts-mapproxy (1.44) stable; urgency=medium
+
+  * Terrain provider support.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Wed, 13 Mar 2019 17:06:10 +0100
+
 vts-mapproxy (1.43) stable; urgency=medium
 
   * Added munin support.
