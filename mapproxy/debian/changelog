@@ -1,3 +1,9 @@
+vts-mapproxy (1.46) stable; urgency=medium
+
+  * Working introspection for terrain provider.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 14 Mar 2019 17:35:04 +0100
+
 vts-mapproxy (1.44) stable; urgency=medium
 
   * Terrain provider support.
