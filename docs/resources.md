@@ -224,9 +224,9 @@ In addition, if browsing is enabled these introspection URLs are handled
  * `cesium.js`: javascript support for (`cesium.html`)
  * `cesium.conf`: configuration for built-in introspection browser
  
-Nota bene: While it is possible to add the TMS extension to any reference frame please not that it makes only sense for the dedicated `tms-global-geodetic` reference frame. Any other reference frame would not work with 
+Nota bene: While it is possible to add the TMS extension to any reference frame please note that it was designed for the dedicated `tms-global-geodetic` reference frame. Any other reference frame would not work with Cesium's machinery that expect [TMS `global-geodetic` profile](http://wiki.osgeo.org/wiki/Tile_Map_Service_Specification#global-geodetic).
 
-Nota bene: Please, do not use the `tms-global-geodetic` reference frame for anything else than terrain provider support. This reference frame is absolutely inappropriate for the VTS system because the underlying [projection (eqc)](https://en.wikipedia.org/wiki/Equirectangular_projection) is neither equal area nor [conformal](https://en.wikipedia.org/wiki/Conformal_map_projection). 
+Nota bene: Please, do not use the `tms-global-geodetic` reference frame for anything else than terrain provider support. This reference frame is inappropriate for VTS-based clients because the underlying [projection (eqc)](https://en.wikipedia.org/wiki/Equirectangular_projection) is neither equal area nor [conformal](https://en.wikipedia.org/wiki/Conformal_map_projection).
 
 However, the only other use the `tms-global-geodetic` reference frame in VTS is the `tms` driver when generating data for [Cesium Imagery Provider](https://cesiumjs.org/Cesium/Build/Documentation/UrlTemplateImageryProvider.html); please, bear in mind that there is no extra imagery provider interface and the URL translation must be done manually in the javascript code. Introspection interface does it automatically, though.
 
