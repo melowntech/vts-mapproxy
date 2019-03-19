@@ -40,7 +40,8 @@ function launchCesium(imageryProvider) {
 
     var melownCredit = new Cesium.Credit
         ('<a href="https://www.melown.com/">'
-         + '<img src="melowntech.png" title="Melown Technologies SE" />'
+         + '<img src="melowntech.png" title="Melown Technologies SE" '
+         + 'style="display:inline-block;margin:0 10px;" />'
          + '</a>');
     viewer.scene.frameState.creditDisplay.addDefaultCredit(melownCredit);
 }
