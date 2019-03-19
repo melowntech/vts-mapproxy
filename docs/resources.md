@@ -268,7 +268,7 @@ heightFunction = {
 ```
 
 Superelevation maps height from `heightRange` to scale in `scaleRange` and outputs original height scaled by computed scale.
-The `heightRange[0]` must be lower than `heightRange[1]` and heights below `heightRange[0]` and above `heightRange[1]` are lipped.
+The `heightRange[0]` must be lower than `heightRange[1]` and heights below `heightRange[0]` and above `heightRange[1]` are clipped.
 
 ### Driver: surface-spheroid
 
