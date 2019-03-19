@@ -141,7 +141,13 @@ Available expansion strings. Only some make sense for templates used in mapproxy
 
 ## TMS drivers
 
-### tms-raster
+### Introspection
+
+If browsing is enabled mapproxy handles these URLs:
+ * `index.html`: [Leaflet](https://leafletjs.com/)-based boundlayer browser
+ * `index.js`: javascript support for (`index.html`)
+
+### Driver: tms-raster
 
 Raster-based bound layer generator. Uses any raster GDAL dataset as its data source. Supports optional data masking.
 
@@ -155,7 +161,7 @@ definition = {
 }
 ```
 
-### tms-raster-remote
+### Driver: tms-raster-remote
 
 Raster bound layer generator. Imagery is pointer to external resource via `remoteUrl` (a URL template). Supports optional data masking.
 
@@ -167,7 +173,7 @@ definition = {
 ```
 
 
-### tms-patchwork
+### Driver: tms-patchwork
 
 Simple raster bound layer generator. Generates color checkered tiles. Supports optional data masking.
 
@@ -178,7 +184,7 @@ definition = {
 }
 ```
 
-### tms-bing
+### Driver: tms-bing
 
 Bound layer generator for remote Bing data. Valid session is generated via metatada URL.
 
@@ -193,6 +199,37 @@ definition = {
 Surface drivers generate a meshed surface that can be used directly as a single surface or merged into VTS storage as
 a remote tileset.
 In addition, a `freelayer.json` file is provided allowing generated surface to act as a `mesh-tiles` free layer.
+
+### Introspection interface
+
+If browsing is enabled mapproxy handles URLs:
+ * `index.html`: built-in browser
+
+### Cesium terrain provider
+
+If resource's reference frame contains the TMS extension any surface driver will handle URLs for non-VTS [Cesium Terrain Provider](https://cesiumjs.org/Cesium/Build/Documentation/CesiumTerrainProvider.html):
+ * `{lod}-{x}-{y}.terrain`: terrain [quantized meshes](https://github.com/AnalyticalGraphicsInc/quantized-mesh)
+ * `layer.json`: terrain metadata
+ 
+Note: URL provided tile ID (`urlId`: lod-x-y) is mapped via TMS extension configuration to real tile ID (`tileId`: lod'-x'-y'). I.e. `urlId`'s y-component is optionally flipped (based on `tms.flipY` option, defaults to `true`) and then shifted under TMS root (`tms.rootId`, defaults to `0-0-0`).
+
+Generated mesh tiles are identical to VTS surface tiles, having these properties:
+ * different encoding [format](https://github.com/AnalyticalGraphicsInc/quantized-mesh)
+ * while there are no physical skirts border vertices are marked
+ * no texture coordinates
+ * no extensions (no normal vectors etc.)
+ 
+In addition, if browsing is enabled these introspection URLs are handled
+ * `cesium.html`: built-in terrain browser (available even without terrain support)
+ * `cesium.js`: javascript support for (`cesium.html`)
+ * `cesium.conf`: configuration for built-in introspection browser
+ 
+Nota bene: While it is possible to add the TMS extension to any reference frame please not that it makes only sense for the dedicated `tms-global-geodetic` reference frame. Any other reference frame would not work with 
+
+Nota bene: Please, do not use the `tms-global-geodetic` reference frame for anything else than terrain provider support. This reference frame is absolutely inappropriate for the VTS system because the underlying [projection (eqc)](https://en.wikipedia.org/wiki/Equirectangular_projection) is neither equal area nor [conformal](https://en.wikipedia.org/wiki/Conformal_map_projection). 
+
+However, the only other use the `tms-global-geodetic` reference frame in VTS is the `tms` driver when generating data for [Cesium Imagery Provider](https://cesiumjs.org/Cesium/Build/Documentation/UrlTemplateImageryProvider.html); please, bear in mind that there is no extra imagery provider interface and the URL translation must be done manually in the javascript code. Introspection interface does it automatically, though.
+
 
 ### Common surface driver configuration options
 
@@ -233,7 +270,7 @@ heightFunction = {
 Superelevation maps height from `heightRange` to scale in `scaleRange` and outputs original height scaled by computed scale.
 The `heightRange[0]` must be lower than `heightRange[1]` and heights below `heightRange[0]` and above `heightRange[1]` are clipped.
 
-### surface-spheroid
+### Driver: surface-spheroid
 
 This driver generates meshed surface for reference frame's spheroid. If geoid grid is provided the resulting body
 is in fact a geoid.
@@ -246,7 +283,7 @@ definition = {
 
 ☛ Since `superelevation` has no effect here (all heights are 0) the heightFunction is not implemented yet.
 
-### surface-dem
+### Driver: surface-dem
 
 This driver generates a meshed surface from the supplied GDAL raster DEM/DSM/DTM dataset.
 
@@ -278,7 +315,11 @@ definition = {
 
 Geodata drivers generate vector geographic data in the form of VTS free layer.
 
-### geodata-vector
+### Introspection interface
+
+The introspection interface (i.e. the built-in browser) is identical to surface drivers, sans the terrain provider-related stuff.
+
+### Driver: geodata-vector
 
 Generates monolithic free layer (`geodata` type) from an OGR-supported dataset (GeoJSON, shapefile, ...).
 Purely 2D data are converted to full 3D data using process called heithgcoding: each 2D coordinate is extented
@@ -372,7 +413,7 @@ introspection = {
 
 Browser options override any browser options from associated surface.
 
-### geodata-vector-tiled
+### Driver: geodata-vector-tiled
 
 Generates tiled geodata (`geodata-tiles` type) from pre-tiled data like MVT web service or `.mbtiles` archive. Input tiling must match reference frame's space division, at least in one of its nodes. For example, OSM tiles in pseudomerc projection can be used in `webmerc-projected` and `webmerc-unprojected` reference frames and in the `pseudomerc` subtree in in `melown2015` reference frame.
 
