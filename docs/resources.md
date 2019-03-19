@@ -211,7 +211,7 @@ If resource's reference frame contains the TMS extension any surface driver will
  * `{lod}-{x}-{y}.terrain`: terrain [quantized meshes](https://github.com/AnalyticalGraphicsInc/quantized-mesh)
  * `layer.json`: terrain metadata
  
-Note: URL provided tile ID (`url`: lod-x-y) is mapped via TMS extension configuration to real tile ID (`tileId`: lod'-x'-y'). I.e. `urlId`'s y-component is optionally flipped (based on `tms.flipY` option, defaults to `true`) and then shifted under TMS root (`tms.rootId`, defaults to `0-0-0`).
+Note: URL provided tile ID (`urlId`: lod-x-y) is mapped via TMS extension configuration to real tile ID (`tileId`: lod'-x'-y'). I.e. `urlId`'s y-component is optionally flipped (based on `tms.flipY` option, defaults to `true`) and then shifted under TMS root (`tms.rootId`, defaults to `0-0-0`).
 
 Generated mesh tiles are identical to VTS surface tiles, having these properties:
  * different encoding [format](https://github.com/AnalyticalGraphicsInc/quantized-mesh)
