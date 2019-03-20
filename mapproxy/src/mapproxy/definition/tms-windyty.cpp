@@ -116,7 +116,7 @@ Changed TmsWindyty::changed_impl(const DefinitionBase &o) const
     // forecast offset can change
     if (forecastOffset != other.forecastOffset) { return Changed::safely; }
 
-    return Changed::no;
+    return TmsCommon::changed_impl(o);
 }
 
 } // namespace resource
