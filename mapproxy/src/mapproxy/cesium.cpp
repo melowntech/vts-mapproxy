@@ -28,7 +28,7 @@
 
 #include "cesium/cesium.html.hpp"
 #include "cesium/cesium.js.hpp"
-#include "cesium/melown-technologies-logo-transparent-28.png.hpp"
+#include "cesium/melown-technologies-logo-28.png.hpp"
 
 namespace cesium {
 

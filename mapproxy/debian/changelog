@@ -1,3 +1,9 @@
+vts-mapproxy (1.47) stable; urgency=medium
+
+  * Fixed heightcoding of monolithic geodata. 
+
+ -- Ladislav Horky <ladislav.horky@citationtech.net>  Wed, 20 Mar 2019 13:07:05 +0000
+
 vts-mapproxy (1.46) stable; urgency=medium
 
   * Working introspection for terrain provider.
