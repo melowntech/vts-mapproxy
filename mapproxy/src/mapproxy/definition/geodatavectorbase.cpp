@@ -135,6 +135,8 @@ void parseDefinition(GeodataVectorBase &def
 
     def.heightFunction = HeightFunction::parse(value, "heightFunction");
 
+    if (value.isMember("options")) { def.options = value["options"]; }
+
     if (value.isMember("introspection")) {
         const auto &jintrospection(value["introspection"]);
 
@@ -211,6 +213,8 @@ void buildDefinition(Json::Value &value
         def.heightFunction->build(tmp);
         value["heightFunction"] = boost::any_cast<const Json::Value&>(tmp);
     }
+
+    value["options"] = boost::any_cast<Json::Value>(def.options);
 
     if (!def.introspection.empty()) {
         auto &jintrospection(value["introspection"] = Json::objectValue);
@@ -315,6 +319,12 @@ void parseDefinition(GeodataVectorBase &def
     }
 
     def.heightFunction = HeightFunction::parse(value, "heightFunction");
+
+    if (value.has_key("options")) {
+        LOG(warn2)
+            << "Generic options not supported in python geodata "
+            "configuration.";
+    }
 
     if (value.has_key("introspection")) {
         boost::python::dict pintrospection(value["introspection"]);
