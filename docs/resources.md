@@ -43,6 +43,7 @@ a JSON file on disk (for JSON resource backend) or a python data tree.
  * `Array<type>`: array of given type(s)
  * `Optional` given entry is optional
  * `Enum` string data type limited to enumerated values
+ * `Any` any data type
  * `?` no fixed name
  
 Complex datatypes:
@@ -146,6 +147,16 @@ Available expansion strings. Only some make sense for templates used in mapproxy
 If browsing is enabled mapproxy handles these URLs:
  * `index.html`: [Leaflet](https://leafletjs.com/)-based boundlayer browser
  * `index.js`: javascript support for (`index.html`)
+ 
+### Common TMS configuration
+
+```javascript
+definition = {
+    Optional Any options           // Boundlayer options
+}
+```
+
+Boundlayer options are passed as-is to the `boundlayer.conf`.
 
 ### Driver: tms-raster
 
@@ -224,11 +235,11 @@ In addition, if browsing is enabled these introspection URLs are handled
  * `cesium.js`: javascript support for (`cesium.html`)
  * `cesium.conf`: configuration for built-in introspection browser
  
-Nota bene: While it is possible to add the TMS extension to any reference frame please note that it was designed for the dedicated `tms-global-geodetic` reference frame. Any other reference frame would not work with Cesium's machinery that expect [TMS `global-geodetic` profile](http://wiki.osgeo.org/wiki/Tile_Map_Service_Specification#global-geodetic).
+☛ While it is possible to add the TMS extension to any reference frame please note that it was designed for the dedicated `tms-global-geodetic` reference frame. Any other reference frame would not work with Cesium's machinery that expect [TMS `global-geodetic` profile](http://wiki.osgeo.org/wiki/Tile_Map_Service_Specification#global-geodetic).
 
-Nota bene: Please, do not use the `tms-global-geodetic` reference frame for anything else than terrain provider support. This reference frame is inappropriate for VTS-based clients because the underlying [projection (eqc)](https://en.wikipedia.org/wiki/Equirectangular_projection) is neither equal area nor [conformal](https://en.wikipedia.org/wiki/Conformal_map_projection).
+☛ Please, do not use the `tms-global-geodetic` reference frame for anything else than terrain provider support. This reference frame is inappropriate for VTS-based clients because the underlying [projection (eqc)](https://en.wikipedia.org/wiki/Equirectangular_projection) is neither equal area nor [conformal](https://en.wikipedia.org/wiki/Conformal_map_projection).
 
-However, the only other use the `tms-global-geodetic` reference frame in VTS is the `tms` driver when generating data for [Cesium Imagery Provider](https://cesiumjs.org/Cesium/Build/Documentation/UrlTemplateImageryProvider.html); please, bear in mind that there is no extra imagery provider interface and the URL translation must be done manually in the javascript code. Introspection interface does it automatically, though.
+☛ However, the only other use the `tms-global-geodetic` reference frame in VTS is the `tms` driver when generating data for [Cesium Imagery Provider](https://cesiumjs.org/Cesium/Build/Documentation/UrlTemplateImageryProvider.html); please, bear in mind that there is no extra imagery provider interface and the URL translation must be done manually in the javascript code. Introspection interface does it automatically, though.
 
 
 ### Common surface driver configuration options
@@ -318,6 +329,16 @@ Geodata drivers generate vector geographic data in the form of VTS free layer.
 ### Introspection interface
 
 The introspection interface (i.e. the built-in browser) is identical to surface drivers, sans the terrain provider-related stuff.
+
+### Common TMS configuration
+
+```javascript
+definition = {
+    Optional Any options           // Freelayer options
+}
+```
+
+Freelayer options are passed as-is to the `freelayer.conf`.
 
 ### Driver: geodata-vector
 
