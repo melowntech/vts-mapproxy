@@ -214,7 +214,9 @@ void buildDefinition(Json::Value &value
         value["heightFunction"] = boost::any_cast<const Json::Value&>(tmp);
     }
 
-    value["options"] = boost::any_cast<Json::Value>(def.options);
+    if (!def.options.empty()) {
+        value["options"] = boost::any_cast<Json::Value>(def.options);
+    }
 
     if (!def.introspection.empty()) {
         auto &jintrospection(value["introspection"] = Json::objectValue);
