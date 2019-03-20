@@ -35,72 +35,58 @@
 #include "../support/python.hpp"
 
 #include "./tms.hpp"
-#include "./factory.hpp"
 
 namespace resource {
 
-constexpr char TmsBing::driverName[];
+constexpr Resource::Generator::Type TmsCommon::type;
+
+void TmsCommon::parse(const Json::Value &value)
+{
+    if (value.isMember("options")) { options = value["options"]; }
+}
+
+void TmsCommon::build(Json::Value &value) const
+{
+    if (!options.empty()) {
+        value["options"] = boost::any_cast<Json::Value>(options);
+    }
+}
+
+void TmsCommon::parse(const boost::python::dict &value)
+{
+    if (value.has_key("options")) {
+        LOG(warn2)
+            << "Generic options not supported in python TMS configuration.";
+    }
+}
 
 namespace {
 
-utility::PreMain register_([]() { registerDefinition<TmsBing>(); });
-
-void parseDefinition(TmsBing &def
-                     , const Json::Value &value)
+bool optionsChanged(const boost::any &l, const boost::any &r)
 {
-    std::string s;
+    const auto *lopt(boost::any_cast<Json::Value>(&l));
+    const auto *ropt(boost::any_cast<Json::Value>(&r));
 
-    Json::get(def.metadataUrl, value, "metadataUrl");
-}
+    // different availability -> changed
+    if (bool(lopt) != bool(ropt)) { return true; }
 
-void buildDefinition(Json::Value &value
-                     , const TmsBing &def)
-{
-    value["metadataUrl"] = def.metadataUrl;
-}
+    if (!lopt) { return false; }
 
-void parseDefinition(TmsBing &def
-                     , const boost::python::dict &value)
-{
-    def.metadataUrl = py2utf8(value["metadataUrl"]);
+    // compare value-wise
+    return *lopt != *ropt;
 }
 
 } // namespace
 
-void TmsBing::from_impl(const boost::any &value)
+Changed TmsCommon::changed_impl(const DefinitionBase &o) const
 {
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsBing: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
-}
+    const auto &other(o.as<TmsCommon>());
 
-void TmsBing::to_impl(boost::any &value) const
-{
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsBing:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
-}
+    // options can change
+    if (optionsChanged(options, other.options)) { return Changed::safely; }
 
-Changed TmsBing::changed_impl(const DefinitionBase &o) const
-{
-    const auto &other(o.as<TmsBing>());
-
-    // ignore metadata URL, we it has no effect on this resource
-    if (metadataUrl != other.metadataUrl) { return Changed::safely; }
-
-    return TmsCommon::changed_impl(o);
+    // not changed
+    return Changed::no;
 }
 
 } // namespace resource

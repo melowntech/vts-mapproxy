@@ -42,14 +42,25 @@ namespace resource {
 
 // raster formats
 
-struct TmsRasterSynthetic : public DefinitionBase {
+struct TmsCommon : public DefinitionBase {
+    boost::any options;
+
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::tms;
+
+    void parse(const Json::Value &value);
+    void build(Json::Value &value) const;
+    void parse(const boost::python::dict &value);
+
+protected:
+    virtual Changed changed_impl(const DefinitionBase &other) const;
+};
+
+struct TmsRasterSynthetic : public TmsCommon {
     boost::optional<std::string> mask;
     RasterFormat format;
 
     TmsRasterSynthetic(): format(RasterFormat::jpg) {}
-
-    static constexpr Resource::Generator::Type type
-        = Resource::Generator::Type::tms;
 
     void parse(const Json::Value &value);
     void build(Json::Value &value) const;
@@ -85,7 +96,7 @@ private:
     virtual bool frozenCredits_impl() const { return false; }
 };
 
-struct TmsRaster : public DefinitionBase {
+struct TmsRaster : public TmsCommon {
     std::string dataset;
     boost::optional<std::string> mask;
     RasterFormat format;
@@ -94,8 +105,6 @@ struct TmsRaster : public DefinitionBase {
 
     TmsRaster(): format(RasterFormat::jpg), transparent(false) {}
 
-    static constexpr Resource::Generator::Type type
-        = Resource::Generator::Type::tms;
     static constexpr char driverName[] = "tms-raster";
 
 protected:
@@ -105,14 +114,12 @@ protected:
     virtual bool frozenCredits_impl() const { return false; }
 };
 
-struct TmsRasterRemote : public DefinitionBase {
+struct TmsRasterRemote : public TmsCommon {
     std::string remoteUrl;
     boost::optional<boost::filesystem::path> mask;
 
     TmsRasterRemote() {}
 
-    static constexpr Resource::Generator::Type type
-        = Resource::Generator::Type::tms;
     static constexpr char driverName[] = "tms-raster-remote";
 
 private:
@@ -122,13 +129,11 @@ private:
     virtual bool frozenCredits_impl() const { return false; }
 };
 
-struct TmsBing : public DefinitionBase {
+struct TmsBing : public TmsCommon {
     std::string metadataUrl;
 
     TmsBing() {}
 
-    static constexpr Resource::Generator::Type type
-        = Resource::Generator::Type::tms;
     static constexpr char driverName[] = "tms-bing";
 
 private:
@@ -143,8 +148,6 @@ struct TmsWindyty : public TmsRaster {
 
     TmsWindyty() : forecastOffset() {}
 
-    static constexpr Resource::Generator::Type type
-        = Resource::Generator::Type::tms;
     static constexpr char driverName[] = "tms-windyty";
 
 private:

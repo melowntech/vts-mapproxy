@@ -27,6 +27,7 @@ set(mapproxy-core_SOURCES
   definition/factory.hpp definition/factory.cpp
 
   definition/tms.hpp
+  definition/tms-common.cpp
   definition/tms-raster-synthetic.cpp
   definition/tms-raster-patchwork.cpp
   definition/tms-raster-solid.cpp

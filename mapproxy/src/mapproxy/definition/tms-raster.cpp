@@ -39,7 +39,6 @@
 
 namespace resource {
 
-constexpr Resource::Generator::Type TmsRaster::type;
 constexpr char TmsRaster::driverName[];
 
 namespace {
@@ -71,6 +70,8 @@ void parseDefinition(TmsRaster &def, const Json::Value &value)
     }
 
     Json::get(def.resampling, value, "resampling");
+
+    def.parse(value);
 }
 
 void buildDefinition(Json::Value &value, const TmsRaster &def)
@@ -87,6 +88,8 @@ void buildDefinition(Json::Value &value, const TmsRaster &def)
         value["resampling"]
             = boost::lexical_cast<std::string>(*def.resampling);
     }
+
+    def.build(value);
 }
 
 void parseDefinition(TmsRaster &def, const boost::python::dict &value)
@@ -121,6 +124,8 @@ void parseDefinition(TmsRaster &def, const boost::python::dict &value)
                 ("Value stored in resampling is not a Resampling value");
         }
     }
+
+    def.parse(value);
 }
 
 } // namespace
@@ -168,8 +173,7 @@ Changed TmsRaster::changed_impl(const DefinitionBase &o) const
     // format can change
     if (resampling != other.resampling) { return Changed::safely; }
 
-    // not changed
-    return Changed::no;
+    return TmsCommon::changed_impl(o);
 }
 
 } // namespace resource

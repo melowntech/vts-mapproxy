@@ -38,8 +38,6 @@
 
 namespace resource {
 
-constexpr Resource::Generator::Type TmsRasterSynthetic::type;
-
 namespace {
 
 void parseDefinition(TmsRasterSynthetic &def, const Json::Value &value)
@@ -90,19 +88,21 @@ void parseDefinition(TmsRasterSynthetic &def
 
 } // namespace
 
-
 void TmsRasterSynthetic::parse(const Json::Value &value)
 {
+    TmsCommon::parse(value);
     parseDefinition(*this, value);
 }
 
 void TmsRasterSynthetic::build(Json::Value &value) const
 {
+    TmsCommon::build(value);
     buildDefinition(value, *this);
 }
 
 void TmsRasterSynthetic::parse(const boost::python::dict &value)
 {
+    TmsCommon::parse(value);
     parseDefinition(*this, value);
 }
 
@@ -116,8 +116,7 @@ Changed TmsRasterSynthetic::changed_impl(const DefinitionBase &o) const
     // format can change
     if (format != other.format) { return Changed::safely; }
 
-    // not changed
-    return Changed::no;
+    return TmsCommon::changed_impl(other);
 }
 
 } // namespace resource

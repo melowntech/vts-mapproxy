@@ -252,6 +252,8 @@ vr::BoundLayer TmsRaster::boundLayer(ResourceRoot root) const
     bl.credits = asInlineCredits(res);
     bl.isTransparent = transparent();
 
+    bl.options = definition_.options;
+
     // done
     return bl;
 }

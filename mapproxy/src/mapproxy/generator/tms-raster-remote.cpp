@@ -127,6 +127,8 @@ vr::BoundLayer TmsRasterRemote::boundLayer(ResourceRoot root) const
     bl.tileRange = res.tileRange;
     bl.credits = asInlineCredits(res);
 
+    bl.options = definition_.options;
+
     // done
     return bl;
 }

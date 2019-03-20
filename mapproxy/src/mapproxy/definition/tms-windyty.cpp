@@ -39,7 +39,6 @@
 
 namespace resource {
 
-constexpr Resource::Generator::Type TmsWindyty::type;
 constexpr char TmsWindyty::driverName[];
 
 namespace {
@@ -49,6 +48,8 @@ utility::PreMain register_([]() { registerDefinition<TmsWindyty>(); });
 void parseDefinition(TmsWindyty &def, const Json::Value &value)
 {
     Json::getOpt(def.forecastOffset, value, "forecastOffset");
+
+    def.parse(value);
 }
 
 void buildDefinition(Json::Value &value, const TmsWindyty &def)
@@ -56,6 +57,8 @@ void buildDefinition(Json::Value &value, const TmsWindyty &def)
     if (def.forecastOffset) {
         value["forecastOffset"] = def.forecastOffset;
     }
+
+    def.build(value);
 }
 
 void parseDefinition(TmsWindyty &def, const boost::python::dict &value)
@@ -64,6 +67,8 @@ void parseDefinition(TmsWindyty &def, const boost::python::dict &value)
         def.forecastOffset = boost::python::extract<int>
             (value["forecastOffset"]);
     }
+
+    def.parse(value);
 }
 
 } // namespace
@@ -111,7 +116,6 @@ Changed TmsWindyty::changed_impl(const DefinitionBase &o) const
     // forecast offset can change
     if (forecastOffset != other.forecastOffset) { return Changed::safely; }
 
-    // not changed at alla
     return Changed::no;
 }
 

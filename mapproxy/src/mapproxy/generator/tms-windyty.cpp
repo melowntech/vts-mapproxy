@@ -300,6 +300,8 @@ vr::BoundLayer TmsWindyty::boundLayer(ResourceRoot root) const
     if (bl.maskUrl) { addRevision(*bl.maskUrl); }
     if (bl.metaUrl) { addRevision(*bl.metaUrl); }
 
+    bl.options = definition_.options;
+
     return bl;
 }
 

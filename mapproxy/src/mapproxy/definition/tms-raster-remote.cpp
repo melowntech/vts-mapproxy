@@ -39,7 +39,6 @@
 
 namespace resource {
 
-constexpr Resource::Generator::Type TmsRasterRemote::type;
 constexpr char TmsRasterRemote::driverName[];
 
 namespace {
@@ -57,6 +56,8 @@ void parseDefinition(TmsRasterRemote &def
         Json::get(s, value, "mask");
         def.mask = s;;
     }
+
+    def.parse(value);
 }
 
 void buildDefinition(Json::Value &value
@@ -66,6 +67,8 @@ void buildDefinition(Json::Value &value
     if (def.mask) {
         value["mask"] = def.mask->string();
     }
+
+    def.build(value);
 }
 
 void parseDefinition(TmsRasterRemote &def
@@ -76,6 +79,8 @@ void parseDefinition(TmsRasterRemote &def
     if (value.has_key("mask")) {
         def.mask = py2utf8(value["mask"]);
     }
+
+    def.parse(value);
 }
 
 } // namespace
@@ -114,7 +119,7 @@ Changed TmsRasterRemote::changed_impl(const DefinitionBase &o)
     if (remoteUrl != other.remoteUrl) { return Changed::yes; }
     if (mask != other.mask) { return Changed::yes; }
 
-    return Changed::no;
+    return TmsCommon::changed_impl(o);
 }
 
 } // namespace resource

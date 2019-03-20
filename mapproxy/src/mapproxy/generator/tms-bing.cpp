@@ -187,6 +187,8 @@ vr::BoundLayer TmsBing::boundLayer(ResourceRoot, const std::string &url)
     bl.availability->type = vr::BoundLayer::Availability::Type::negativeType;
     bl.availability->mime = "image/png";
 
+    bl.options = definition_.options;
+
     // done
     return bl;
 }
