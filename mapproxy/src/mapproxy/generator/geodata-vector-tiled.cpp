@@ -228,6 +228,7 @@ vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
     def.lodRange = res.lodRange;
     def.tileRange = res.tileRange;
     fl.credits = asInlineCredits(res);
+    def.options = definition_.options;
 
     // done
     return fl;

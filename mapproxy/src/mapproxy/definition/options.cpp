@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,52 +24,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <boost/lexical_cast.hpp>
-#include <boost/utility/in_place_factory.hpp>
-
-#include "utility/premain.hpp"
-
 #include "jsoncpp/json.hpp"
-#include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
-#include "tms.hpp"
 #include "options.hpp"
 
 namespace resource {
 
-constexpr Resource::Generator::Type TmsCommon::type;
-
-void TmsCommon::parse(const Json::Value &value)
+bool optionsChanged(const boost::any &l, const boost::any &r)
 {
-    if (value.isMember("options")) { options = value["options"]; }
-}
+    const auto *lopt(boost::any_cast<Json::Value>(&l));
+    const auto *ropt(boost::any_cast<Json::Value>(&r));
 
-void TmsCommon::build(Json::Value &value) const
-{
-    if (!options.empty()) {
-        value["options"] = boost::any_cast<Json::Value>(options);
-    }
-}
+    // different availability -> changed
+    if (bool(lopt) != bool(ropt)) { return true; }
 
-void TmsCommon::parse(const boost::python::dict &value)
-{
-    if (value.has_key("options")) {
-        LOG(warn2)
-            << "Generic options not supported in python TMS configuration.";
-    }
-}
+    if (!lopt) { return false; }
 
-Changed TmsCommon::changed_impl(const DefinitionBase &o) const
-{
-    const auto &other(o.as<TmsCommon>());
-
-    // options can change
-    if (optionsChanged(*this, other)) { return Changed::safely; }
-
-    // not changed
-    return Changed::no;
+    // compare value-wise
+    return *lopt != *ropt;
 }
 
 } // namespace resource

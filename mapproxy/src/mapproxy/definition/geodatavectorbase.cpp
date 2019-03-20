@@ -36,7 +36,8 @@
 #include "../support/python.hpp"
 #include "../support/serialization.hpp"
 
-#include "./geodata.hpp"
+#include "geodata.hpp"
+#include "options.hpp"
 
 namespace vf = geo::vectorformat;
 
@@ -419,6 +420,9 @@ Changed GeodataVectorBase::changed_impl(const DefinitionBase &o) const
     if (displaySize != other.displaySize) { safe = true; }
     // styleUrl can change
     if (styleUrl != other.styleUrl) { safe = true; }
+
+    // options can be safely changed
+    if (optionsChanged(*this, other)) { safe = true; }
 
     // introspection can change
     if (introspection != other.introspection) { safe = true; }

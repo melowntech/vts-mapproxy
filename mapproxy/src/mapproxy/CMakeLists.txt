@@ -25,6 +25,7 @@ set(mapproxy-core_SOURCES
   # resource definitions
   definition.hpp
   definition/factory.hpp definition/factory.cpp
+  definition/options.hpp definition/options.cpp
 
   definition/tms.hpp
   definition/tms-common.cpp

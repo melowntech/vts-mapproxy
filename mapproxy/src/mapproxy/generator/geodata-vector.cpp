@@ -153,6 +153,7 @@ vr::FreeLayer GeodataVector::freeLayer_impl(ResourceRoot root) const
          , res, root);
     def.style = styleUrl();
     fl.credits = asInlineCredits(res);
+    def.options = definition_.options;
 
     // done
     return fl;

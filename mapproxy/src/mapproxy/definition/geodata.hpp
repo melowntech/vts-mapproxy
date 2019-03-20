@@ -66,6 +66,7 @@ struct GeodataVectorBase : public DefinitionBase {
     geo::heightcoding::Mode mode;
     LayerEnhancer::map layerEnhancers;
     HeightFunction::pointer heightFunction;
+    boost::any options;
 
     Introspection introspection;
 
