@@ -1,3 +1,10 @@
+vts-mapproxy (1.48) stable; urgency=medium
+
+  * Supporting boundlayer options in tms resource definition
+  * Supporting freelayer options in geodata resource definition
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 21 Mar 2019 10:12:25 +0100
+
 vts-mapproxy (1.47) stable; urgency=medium
 
   * Fixed heightcoding of monolithic geodata. 
