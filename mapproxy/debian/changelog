@@ -1,3 +1,9 @@
+vts-mapproxy (1.49) stable; urgency=medium
+
+  * Fixed control interface.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Tue, 02 Apr 2019 18:57:29 +0200
+
 vts-mapproxy (1.48) stable; urgency=medium
 
   * Supporting boundlayer options in tms resource definition
