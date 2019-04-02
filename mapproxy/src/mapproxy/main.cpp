@@ -432,6 +432,7 @@ bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
 {
     if (cmd.cmd == "list-resources") {
         generators_->listResources(os);
+        return true;
     } else if (cmd.cmd == "update-resources") {
         auto token(generators_->update());
         os << "resource updater notified\n"
