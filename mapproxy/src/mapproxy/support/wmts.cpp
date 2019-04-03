@@ -28,14 +28,116 @@
 
 #include "wmts.hpp"
 
+namespace {
+
+/** Stack-based XML element writer.
+ *
+ *  Can be used independently or combined with nested elements via push/pop
+ *  pair.
+ */
+class Element {
+public:
+    Element(tinyxml2::XMLPrinter &x, const char *name)
+        : x_(x), closed_(false), parent_()
+    {
+        x_.OpenElement(name);
+    }
+
+    ~Element() { close(); }
+
+    template <typename T>
+    Element& attribute(const char *name, T &&value) {
+        x_.PushAttribute(name, std::forward<T>(value));
+        return *this;
+    }
+
+    Element& attribute(const char *name, const std::string &value) {
+        x_.PushAttribute(name, value.c_str());
+        return *this;
+    }
+
+    template <typename T>
+    Element& text(T &&value) {
+        x_.PushText(std::forward<T>(value));
+        return *this;
+    }
+
+    Element& text(const std::string &value) { return text(value.c_str()); }
+
+    /** Push nested element. Must be pop()ed to work properly.
+     *  NB: Return by value!
+     */
+    Element push(const char *name) { return Element(this, name); }
+
+    /** Pop from nested element.
+     */
+    Element& pop() { close(); return *parent_; }
+
+private:
+    void close() { if (!closed_) { x_.CloseElement(); closed_ = true; } }
+
+    Element(Element *parent, const char *name)
+        : x_(parent->x_), closed_(false), parent_(parent)
+    {
+        x_.OpenElement(name);
+    }
+
+    tinyxml2::XMLPrinter &x_;
+    bool closed_;
+    Element *parent_;
+};
+
+/** TODO: make configurable
+ */
+void serviceIdentification(tinyxml2::XMLPrinter &x)
+{
+    Element(x, "ows:ServiceIdentification")
+        .push("ows:Title").text("VTS Mapproxy").pop()
+        .push("ows:ServiceType").text("OGC WMTS").pop()
+        .push("ows:ServiceTypeVersion").text("1.3.0").pop()
+        ;
+}
+
+/** TODO: make configurable
+ */
+void serviceProvider(tinyxml2::XMLPrinter &x)
+{
+    Element(x, "ows:ServiceProvider")
+        .push("ows:ProviderName").text("Mapproxy").pop()
+        .push("ows:ProviderSite").text("https://melown.com").pop()
+        .push("ows:ServiceContact").pop()
+        ;
+}
+
+} // namespace
+
 std::string wmtsCapabilities(const Resource &resources)
 {
     (void) resources;
 
-    tinyxml2::XMLPrinter xml;
+    tinyxml2::XMLPrinter x;
 
     // xml.PushHeader(false, false);
-    xml.PushDeclaration(R"(xml version="1.0" encoding="UTF-8")");
+    x.PushDeclaration(R"(xml version="1.0" encoding="UTF-8")");
 
-    return xml.CStr();
+    {
+        Element e(x, "Capabilities");
+        e.attribute("version", "1.3.0")
+            .attribute("xmlns", "http://www.opengis.net/wmts/1.0")
+            .attribute("xmlns:gml", "http://www.opengis.net/gml")
+            .attribute("xmlns:ows", "http://www.opengis.net/ows/1.1")
+            .attribute("xmlns:xlink", "http://www.w3.org/1999/xlink")
+            .attribute("xmlns:xsi"
+                       , "http://www.w3.org/2001/XMLSchema-instance")
+            .attribute("xsi:schemaLocation"
+                       , "http://www.opengis.net/wmts/1.0 "
+                       "http://schemas.opengis.net/wmts/1.0/"
+                       "wmtsGetCapabilities_response.xsd")
+            ;
+
+        serviceIdentification(x);
+        serviceProvider(x);
+    }
+
+    return x.CStr();
 }
