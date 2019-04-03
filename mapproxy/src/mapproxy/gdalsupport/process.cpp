@@ -34,7 +34,7 @@
 
 #include "utility/process.hpp"
 
-#include "./process.hpp"
+#include "process.hpp"
 
 Process::ExitCode Process::join(bool justTry)
 {

@@ -33,7 +33,7 @@
 
 #include "service/ctrlclient.hpp"
 
-#include "./resource.hpp"
+#include "resource.hpp"
 
 /** This is not mapproxy server but client to query running mapproxy.
  *  Mapproxy itself is in main.cpp.

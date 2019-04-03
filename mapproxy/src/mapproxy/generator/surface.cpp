@@ -70,7 +70,7 @@
 #include "../support/revision.hpp"
 #include "../support/tms.hpp"
 
-#include "./surface.hpp"
+#include "surface.hpp"
 
 namespace fs = boost::filesystem;
 namespace bio = boost::iostreams;
@@ -176,6 +176,18 @@ bool SurfaceBase::updateProperties(const Definition &def)
 Generator::Task SurfaceBase
 ::generateFile_impl(const FileInfo &fileInfo, Sink &sink) const
 {
+    // handle special case
+    switch (fileInfo.interface.interface) {
+    case GeneratorInterface::Interface::vts: break;
+    case GeneratorInterface::Interface::terrain:
+        return terrainInterface(fileInfo, sink);
+    default:
+        sink.error(utility::makeError<InternalError>
+                   ("Surface resource has no <%s> interface."
+                    , fileInfo.interface));
+        return {};
+    }
+
     SurfaceFileInfo fi(fileInfo);
 
     switch (fi.type) {
@@ -323,19 +335,6 @@ Generator::Task SurfaceBase
                      , FileClass::data);
         break;
 
-    case SurfaceFileInfo::Type::terrain:
-        return[=](Sink &sink, Arsenal &arsenal) {
-            generateTerrain(fi.tileId, sink, fi, arsenal);
-        };
-
-    case SurfaceFileInfo::Type::layerJson:
-        layerJson(sink, fi);
-        break;
-
-    case SurfaceFileInfo::Type::cesiumConf:
-        cesiumConf(sink, fi);
-        break;
-
     default:
         sink.error(utility::makeError<InternalError>
                     ("Not implemented yet."));
@@ -361,7 +360,7 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
     }
 
     // generate the actual mesh
-    auto lm(generateMeshImpl(nodeInfo, sink, fi, arsenal));
+    auto lm(generateMeshImpl(nodeInfo, sink, arsenal));
 
     // and add skirt
     addSkirt(lm.mesh, nodeInfo);
@@ -432,7 +431,7 @@ void SurfaceBase::generate2dMask(const vts::TileId &tileId
     mask.createCoverage(true);
 
     if (!vts::TileIndex::Flag::isWatertight(flags)) {
-        auto lm(generateMeshImpl(nodeInfo, sink, fi, arsenal));
+        auto lm(generateMeshImpl(nodeInfo, sink, arsenal));
         meshCoverageMask
             (mask.coverageMask, lm.mesh, nodeInfo, lm.fullyCovered);
     }
@@ -561,13 +560,49 @@ const vre::Tms& SurfaceBase::getTms() const
     return *tms_;
 }
 
-void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
-                                  , Sink &sink
-                                  , const SurfaceFileInfo &fi
-                                  , Arsenal &arsenal) const
+Generator::Task SurfaceBase
+::terrainInterface(const FileInfo &fileInfo, Sink &sink) const
 {
     const auto &tms(getTms());
 
+    TerrainFileInfo fi(fileInfo);
+
+    switch (fi.type) {
+    case TerrainFileInfo::Type::unknown:
+        sink.error(utility::makeError<NotFound>("Unrecognized filename."));
+        break;
+
+    case TerrainFileInfo::Type::tile:
+        return[=](Sink &sink, Arsenal &arsenal) {
+            generateTerrain(fi.tileId, sink, fi, arsenal, tms);
+        };
+
+    case TerrainFileInfo::Type::definition:
+        layerJson(sink, fi, tms);
+        break;
+
+    case TerrainFileInfo::Type::support:
+        supportFile(*fi.support, sink, fi.sinkFileInfo());
+        break;
+
+    case TerrainFileInfo::Type::cesiumConf:
+        cesiumConf(sink, fi, tms);
+        break;
+
+    default:
+        sink.error(utility::makeError<InternalError>
+                    ("Not implemented yet."));
+    }
+
+    return {};
+}
+
+void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
+                                  , Sink &sink
+                                  , const TerrainFileInfo &fi
+                                  , Arsenal &arsenal
+                                  , const vre::Tms &tms) const
+{
     // remap id from TMS to VTS
     const auto tileId(tms2vts(tms.rootId, tms.flipY, tmsTileId));
 
@@ -583,7 +618,7 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
     }
 
     // generate the actual mesh
-    auto lm(generateMeshImpl(nodeInfo, sink, fi, arsenal));
+    auto lm(generateMeshImpl(nodeInfo, sink, arsenal));
 
     // write mesh to stream (gzipped)
     std::ostringstream os;
@@ -598,10 +633,9 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
     sink.content(os.str(), sfi);
 }
 
-void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
+void SurfaceBase::layerJson(Sink &sink, const TerrainFileInfo &fi
+                            , const vre::Tms &tms) const
 {
-    const auto &tms(getTms());
-
     LayerJson layer;
     const auto &r(resource());
 
@@ -654,9 +688,9 @@ void SurfaceBase::layerJson(Sink &sink, const SurfaceFileInfo &fi) const
     sink.content(os.str(), fi.sinkFileInfo());
 }
 
-void SurfaceBase::cesiumConf(Sink &sink, const SurfaceFileInfo &fi) const
+void SurfaceBase::cesiumConf(Sink &sink, const TerrainFileInfo &fi
+                             , const vre::Tms &tms) const
 {
-    const auto &tms(getTms());
     const auto &def(definition_);
 
     const auto introId(def.introspection.tms.empty()

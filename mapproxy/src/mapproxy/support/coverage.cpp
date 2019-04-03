@@ -31,7 +31,7 @@
 
 #include "vts-libs/registry/referenceframe.hpp"
 
-#include "./coverage.hpp"
+#include "coverage.hpp"
 
 namespace vr = vtslibs::registry;
 

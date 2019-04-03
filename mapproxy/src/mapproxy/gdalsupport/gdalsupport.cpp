@@ -47,11 +47,11 @@
 
 #include "../error.hpp"
 #include "../gdalsupport.hpp"
-#include "./process.hpp"
-#include "./datasetcache.hpp"
-#include "./types.hpp"
-#include "./operations.hpp"
-#include "./requests.hpp"
+#include "process.hpp"
+#include "datasetcache.hpp"
+#include "types.hpp"
+#include "operations.hpp"
+#include "requests.hpp"
 
 namespace asio = boost::asio;
 namespace bs = boost::system;

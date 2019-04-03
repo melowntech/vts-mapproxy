@@ -27,7 +27,7 @@
 #ifndef mapproxy_support_mmapped_tilesetindex_hpp_included_
 #define mapproxy_support_mmapped_tilesetindex_hpp_included_
 
-#include "./tileindex.hpp"
+#include "tileindex.hpp"
 
 namespace mmapped {
 

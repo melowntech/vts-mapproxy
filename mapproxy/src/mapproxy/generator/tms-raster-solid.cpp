@@ -49,8 +49,8 @@
 #include "../support/tileindex.hpp"
 #include "../support/revision.hpp"
 
-#include "./tms-raster-solid.hpp"
-#include "./factory.hpp"
+#include "tms-raster-solid.hpp"
+#include "factory.hpp"
 #include "../support/python.hpp"
 
 #include "browser2d/index.html.hpp"

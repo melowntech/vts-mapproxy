@@ -33,7 +33,7 @@
 
 #include "../resource.hpp"
 
-#include "./coverage.hpp"
+#include "coverage.hpp"
 
 namespace vts = vtslibs::vts;
 namespace vr = vtslibs::registry;

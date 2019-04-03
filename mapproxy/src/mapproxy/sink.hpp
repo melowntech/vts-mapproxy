@@ -40,7 +40,7 @@
 
 #include "vts-libs/storage/streams.hpp"
 
-#include "./support/fileclass.hpp"
+#include "support/fileclass.hpp"
 
 namespace vs = vtslibs::storage;
 

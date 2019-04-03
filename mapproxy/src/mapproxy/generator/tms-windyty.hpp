@@ -33,7 +33,7 @@
 
 #include "utility/filedes.hpp"
 
-#include "./tms-raster.hpp"
+#include "tms-raster.hpp"
 
 namespace generator {
 

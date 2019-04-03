@@ -38,8 +38,8 @@
 #include "utility/binaryio.hpp"
 #include "utility/align.hpp"
 
-#include "./tileindex.hpp"
-#include "./memory-impl.hpp"
+#include "tileindex.hpp"
+#include "memory-impl.hpp"
 
 namespace mmapped {
 

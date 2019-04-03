@@ -24,7 +24,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./cesium.hpp"
+#include "cesium.hpp"
 
 #include "cesium/cesium.html.hpp"
 #include "cesium/cesium.js.hpp"
@@ -34,7 +34,7 @@ namespace cesium {
 
 const vtslibs::storage::SupportFile::Files supportFiles =
 {
-    { "cesium.html"
+    { "index.html"
       , {
             cesium_html
             , sizeof(cesium_html)

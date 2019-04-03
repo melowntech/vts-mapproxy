@@ -26,7 +26,7 @@
 
 #include "dbglog/dbglog.hpp"
 
-#include "./mapproxy.hpp"
+#include "mapproxy.hpp"
 
 namespace fs = boost::filesystem;
 

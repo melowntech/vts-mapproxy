@@ -33,7 +33,7 @@
 #include "vts-libs/vts/tileindex.hpp"
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 
-#include "./tileflags.hpp"
+#include "tileflags.hpp"
 
 // #define MMAPTI_DEBUG
 

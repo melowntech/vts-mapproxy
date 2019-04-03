@@ -34,8 +34,8 @@
 
 #include "../support/python.hpp"
 
-#include "./surface.hpp"
-#include "./factory.hpp"
+#include "surface.hpp"
+#include "factory.hpp"
 
 namespace resource {
 

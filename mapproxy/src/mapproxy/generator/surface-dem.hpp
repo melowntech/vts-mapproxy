@@ -30,7 +30,7 @@
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
 
-#include "./surface.hpp"
+#include "surface.hpp"
 
 #include "../support/coverage.hpp"
 
@@ -58,7 +58,6 @@ private:
 
     virtual AugmentedMesh generateMeshImpl(const vts::NodeInfo &nodeInfo
                                            , Sink &sink
-                                           , const SurfaceFileInfo &fileInfo
                                            , Arsenal &arsenal) const;
 
     virtual void generateNavtile(const vts::TileId &tileId

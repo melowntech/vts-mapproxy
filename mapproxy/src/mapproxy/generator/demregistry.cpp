@@ -27,7 +27,7 @@
 #include <map>
 #include <mutex>
 
-#include "./demregistry.hpp"
+#include "demregistry.hpp"
 
 class DemRegistry::Detail {
 public:

@@ -32,7 +32,7 @@
 #include "../support/srs.hpp"
 #include "../support/mesh.hpp"
 
-#include "./metatile.hpp"
+#include "metatile.hpp"
 
 namespace {
 

@@ -31,7 +31,7 @@
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 
 #include "../resource.hpp"
-#include "./coverage.hpp"
+#include "coverage.hpp"
 
 namespace vts = vtslibs::vts;
 

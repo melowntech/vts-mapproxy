@@ -50,8 +50,8 @@
 #include "../support/tileindex.hpp"
 #include "../support/revision.hpp"
 
-#include "./tms-raster-patchwork.hpp"
-#include "./factory.hpp"
+#include "tms-raster-patchwork.hpp"
+#include "factory.hpp"
 #include "../support/python.hpp"
 
 #include "browser2d/index.html.hpp"

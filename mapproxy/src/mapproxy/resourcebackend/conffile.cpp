@@ -30,8 +30,8 @@
 #include "service/program.hpp"
 
 #include "../error.hpp"
-#include "./conffile.hpp"
-#include "./factory.hpp"
+#include "conffile.hpp"
+#include "factory.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;

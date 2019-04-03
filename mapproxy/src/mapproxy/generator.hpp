@@ -43,13 +43,13 @@
 #include "vts-libs/storage/support.hpp"
 #include "vts-libs/vts/mapconfig.hpp"
 
-#include "./resource.hpp"
-#include "./resourcebackend.hpp"
-#include "./fileinfo.hpp"
-#include "./gdalsupport.hpp"
-#include "./sink.hpp"
+#include "resource.hpp"
+#include "resourcebackend.hpp"
+#include "fileinfo.hpp"
+#include "gdalsupport.hpp"
+#include "sink.hpp"
 
-#include "./generator/demregistry.hpp"
+#include "generator/demregistry.hpp"
 
 namespace vs = vtslibs::storage;
 namespace vts = vtslibs::vts;
@@ -362,7 +362,7 @@ inline Generator::Task Generator::generateFile(const FileInfo &fileInfo
 
 inline Generator::pointer Generators::generator(const FileInfo &fileInfo) const
 {
-    return generator(fileInfo.generatorType, fileInfo.resourceId);
+    return generator(fileInfo.interface, fileInfo.resourceId);
 }
 
 std::shared_ptr<Generator>

@@ -24,8 +24,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./python.hpp"
-#include "./serialization.hpp"
+#include "python.hpp"
+#include "serialization.hpp"
 
 Resource::Id::list introspectionListFrom(const Json::Value &introspection
                                          , const std::string &key)

@@ -32,8 +32,8 @@
 #include "vts-libs/vts/math.hpp"
 #include "vts-libs/vts/csconvertor.hpp"
 
-#include "./mesh.hpp"
-#include "./srs.hpp"
+#include "mesh.hpp"
+#include "srs.hpp"
 
 namespace vr = vtslibs::registry;
 

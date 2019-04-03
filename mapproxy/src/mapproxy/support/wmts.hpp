@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,23 +24,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_gdalsupport_operations_hpp_included_
-#define mapproxy_gdalsupport_operations_hpp_included_
+#ifndef mapproxy_support_wtms_hpp_included_
+#define mapproxy_support_wtms_hpp_included_
 
-#include "../gdalsupport.hpp"
-#include "types.hpp"
-#include "datasetcache.hpp"
+#include "../resource.hpp"
 
-cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
-              , const GdalWarper::RasterRequest &req);
+std::string wmtsCapabilities(const Resource &resources);
 
-GdalWarper::Heightcoded*
-heightcode(DatasetCache &cache, ManagedBuffer &mb
-           , const std::string &vectorDs
-           , const DemDataset::list &rasterDs
-           , geo::heightcoding::Config config
-           , const boost::optional<std::string> &vectorGeoidGrid
-           , const GdalWarper::OpenOptions &openOptions
-           , const LayerEnhancer::map &layerEnancers);
-
-#endif // mapproxy_gdalsupport_operations_hpp_included_
+#endif // mapproxy_support_wtms_hpp_included_

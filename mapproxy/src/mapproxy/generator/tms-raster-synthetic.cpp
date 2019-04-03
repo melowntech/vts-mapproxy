@@ -50,8 +50,8 @@
 #include "../support/tileindex.hpp"
 #include "../support/revision.hpp"
 
-#include "./tms-raster-synthetic.hpp"
-#include "./factory.hpp"
+#include "tms-raster-synthetic.hpp"
+#include "factory.hpp"
 #include "../support/python.hpp"
 
 #include "browser2d/index.html.hpp"
@@ -62,9 +62,14 @@ namespace vr = vtslibs::registry;
 
 namespace generator {
 
+detail::TmsRasterSyntheticMFB
+::TmsRasterSyntheticMFB(const Generator::Params &params)
+    : definition_(params.resource.definition<Definition>())
+{}
+
 TmsRasterSynthetic::TmsRasterSynthetic(const Params &params)
-    : Generator(params)
-    , definition_(resource().definition<Definition>())
+    : detail::TmsRasterSyntheticMFB(params)
+    , TmsRasterBase(params, definition_.format)
     , hasMetatiles_(false)
 {
     // not seen or index-less
@@ -141,8 +146,8 @@ vts::MapConfig TmsRasterSynthetic::mapConfig_impl(ResourceRoot root)
     return mapConfig;
 }
 
-Generator::Task TmsRasterSynthetic::generateFile_impl(const FileInfo &fileInfo
-                                                      , Sink &sink) const
+Generator::Task TmsRasterSynthetic
+::generateVtsFile_impl(const FileInfo &fileInfo, Sink &sink) const
 {
     TmsFileInfo fi(fileInfo);
 
@@ -238,9 +243,9 @@ Generator::Task TmsRasterSynthetic::generateFile_impl(const FileInfo &fileInfo
 }
 
 void TmsRasterSynthetic::generateTileMask(const vts::TileId &tileId
-                                 , const TmsFileInfo &fi
-                                 , Sink &sink
-                                 , Arsenal &arsenal) const
+                                          , const TmsFileInfo &fi
+                                          , Sink &sink
+                                          , Arsenal &arsenal) const
 {
     sink.checkAborted();
 

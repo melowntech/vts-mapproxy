@@ -27,7 +27,7 @@
 #ifndef mapproxy_generator_tms_raster_solid_hpp_included_
 #define mapproxy_generator_tms_raster_solid_hpp_included_
 
-#include "./tms-raster-synthetic.hpp"
+#include "tms-raster-synthetic.hpp"
 
 namespace generator {
 

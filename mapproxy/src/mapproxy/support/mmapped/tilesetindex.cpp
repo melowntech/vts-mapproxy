@@ -24,7 +24,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./tilesetindex.hpp"
+#include "tilesetindex.hpp"
 
 namespace mmapped {
 

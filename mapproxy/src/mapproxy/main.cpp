@@ -49,11 +49,11 @@
 
 #include "http/http.hpp"
 
-#include "./error.hpp"
-#include "./resourcebackend.hpp"
-#include "./generator.hpp"
-#include "./core.hpp"
-#include "./gdalsupport.hpp"
+#include "error.hpp"
+#include "resourcebackend.hpp"
+#include "generator.hpp"
+#include "core.hpp"
+#include "gdalsupport.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -432,6 +432,7 @@ bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
 {
     if (cmd.cmd == "list-resources") {
         generators_->listResources(os);
+        return true;
     } else if (cmd.cmd == "update-resources") {
         auto token(generators_->update());
         os << "resource updater notified\n"

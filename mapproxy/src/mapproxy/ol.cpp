@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,23 +24,30 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_gdalsupport_operations_hpp_included_
-#define mapproxy_gdalsupport_operations_hpp_included_
+#include "ol.hpp"
 
-#include "../gdalsupport.hpp"
-#include "types.hpp"
-#include "datasetcache.hpp"
+#include "ol/ol.html.hpp"
+#include "ol/ol.js.hpp"
 
-cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
-              , const GdalWarper::RasterRequest &req);
+namespace ol {
 
-GdalWarper::Heightcoded*
-heightcode(DatasetCache &cache, ManagedBuffer &mb
-           , const std::string &vectorDs
-           , const DemDataset::list &rasterDs
-           , geo::heightcoding::Config config
-           , const boost::optional<std::string> &vectorGeoidGrid
-           , const GdalWarper::OpenOptions &openOptions
-           , const LayerEnhancer::map &layerEnancers);
+const vtslibs::storage::SupportFile::Files supportFiles =
+{
+    { "index.html"
+      , {
+            ol_html
+            , sizeof(ol_html)
+            , ol_html_attr_lastModified
+            , "text/html; charset=utf-8"
+        }
+    }, { "ol.js"
+      , {
+            ol_js
+            , sizeof(ol_js)
+            , ol_js_attr_lastModified
+            , "application/javascript; charset=utf-8"
+        }
+    }
+};
 
-#endif // mapproxy_gdalsupport_operations_hpp_included_
+} // namespace ol

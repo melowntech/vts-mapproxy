@@ -45,7 +45,7 @@
 
 #include "../error.hpp"
 #include "../support/geo.hpp"
-#include "./operations.hpp"
+#include "operations.hpp"
 
 namespace bio = boost::iostreams;
 namespace vr = vtslibs::registry;

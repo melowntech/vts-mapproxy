@@ -36,7 +36,7 @@
 
 #include "utility/binaryio.hpp"
 
-#include "./memory.hpp"
+#include "memory.hpp"
 
 namespace mmapped {
 

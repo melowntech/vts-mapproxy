@@ -29,23 +29,42 @@
 
 #include "vts-libs/vts/nodeinfo.hpp"
 
-#include "../generator.hpp"
 #include "../definition/tms.hpp"
+
+#include "tms-raster-base.hpp"
+
+namespace vts = vtslibs::vts;
 
 namespace generator {
 
-class TmsRasterSynthetic : public Generator {
+namespace detail {
+
+/** Member from base idiom
+ */
+class TmsRasterSyntheticMFB {
+protected:
+    TmsRasterSyntheticMFB(const Generator::Params &params);
+    typedef resource::TmsRasterSynthetic Definition;
+    const Definition &definition_;
+};
+
+} // namespace detail
+
+class TmsRasterSynthetic
+    : private detail::TmsRasterSyntheticMFB
+    , public TmsRasterBase
+{
 public:
     TmsRasterSynthetic(const Params &params);
 
-    typedef resource::TmsRasterSynthetic Definition;
+    using TmsRasterSyntheticMFB::Definition;
 
 private:
     virtual void prepare_impl(Arsenal &arsenal);
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
-    virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , Sink &sink) const;
+    virtual Task generateVtsFile_impl(const FileInfo &fileInfo
+                                      , Sink &sink) const;
 
     virtual void generateTileImage(const vts::TileId &tileId
                                    , const TmsFileInfo &fi
@@ -63,8 +82,6 @@ private:
     vr::BoundLayer boundLayer(ResourceRoot root) const;
 
     bool hasMask() const;
-
-    const Definition &definition_;
 
     bool hasMetatiles_;
 };

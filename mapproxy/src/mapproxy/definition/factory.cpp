@@ -27,7 +27,7 @@
 #include <map>
 
 #include "../error.hpp"
-#include "./factory.hpp"
+#include "factory.hpp"
 
 namespace resource {
 

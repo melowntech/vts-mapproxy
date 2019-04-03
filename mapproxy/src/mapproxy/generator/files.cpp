@@ -24,7 +24,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./files.hpp"
+#include "files.hpp"
 
 #include "generator/files/defaultstyle.json.hpp"
 

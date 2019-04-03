@@ -51,9 +51,10 @@
 #include "../support/mmapped/qtree.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
 #include "../support/revision.hpp"
+#include "../support/wmts.hpp"
 
-#include "./tms-raster.hpp"
-#include "./factory.hpp"
+#include "tms-raster.hpp"
+#include "factory.hpp"
 #include "../support/python.hpp"
 
 #include "browser2d/index.html.hpp"
@@ -94,9 +95,15 @@ asPath(const boost::optional<std::string> &path)
 
 } // namespace
 
-TmsRaster::TmsRaster(const Params &params)
-    : Generator(params)
-    , definition_(resource().definition<Definition>())
+detail::TmsRasterMFB
+::TmsRasterMFB(const Generator::Params &params)
+    : definition_(params.resource.definition<Definition>())
+{}
+
+TmsRaster::TmsRaster(const Params &params
+                     , const boost::optional<RasterFormat> &format)
+    : detail::TmsRasterMFB(params)
+    , TmsRasterBase(params, format ? *format : definition_.format)
     , hasMetatiles_(false)
     , complexDataset_(false)
     , maskTree_(ignoreNonexistent(absoluteDatasetRf(asPath(definition_.mask))))
@@ -275,8 +282,8 @@ vts::MapConfig TmsRaster::mapConfig_impl(ResourceRoot root)
     return mapConfig;
 }
 
-Generator::Task TmsRaster::generateFile_impl(const FileInfo &fileInfo
-                                             , Sink &sink) const
+Generator::Task TmsRaster::generateVtsFile_impl(const FileInfo &fileInfo
+                                                , Sink &sink) const
 {
     TmsFileInfo fi(fileInfo);
 

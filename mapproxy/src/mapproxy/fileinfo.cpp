@@ -37,10 +37,11 @@
 #include "vts-libs/vts/mapconfig.hpp"
 #include "vts-libs/vts/service.hpp"
 
-#include "./error.hpp"
-#include "./fileinfo.hpp"
-#include "./browser2d.hpp"
-#include "./cesium.hpp"
+#include "error.hpp"
+#include "fileinfo.hpp"
+#include "browser2d.hpp"
+#include "cesium.hpp"
+#include "ol.hpp"
 
 namespace ba = boost::algorithm;
 namespace vr = vtslibs::registry;
@@ -65,10 +66,13 @@ namespace constants {
     const std::string LayerJson("layer.json");
     const std::string CesiumConf("cesium.conf");
 
+    const char *WmtsCapabilities("WMTSCapabilities.xml");
+
     const std::string DisableBrowserHeader("X-Mapproxy-Disable-Browser");
 
     const char *applicationJson("application/json; charset=utf-8");
     const char *textHtml("text/html; charset=utf-8");
+    const char *textXml("text/xml; charset=utf-8");
     const char *quantizedMesh("application/vnd.quantized-mesh");
 } // namesapce constants
 
@@ -167,8 +171,9 @@ FileInfo::FileInfo(const http::Request &request, int f)
     case 3:
         // only reference frame -> allow only map config
         resourceId.referenceFrame = checkReferenceFrame(components[1]);
-        asEnumChecked<Resource::Generator::Type, NotFound>
-            (components[2], generatorType, "Unknown generator type.");
+        // TODO: check if reference frame supports given interface
+        asEnumChecked<GeneratorInterface, NotFound>
+            (components[2], interface, "Unknown generator interface.");
         filename = components[3];
 
         if (filename == constants::Index) {
@@ -188,8 +193,9 @@ FileInfo::FileInfo(const http::Request &request, int f)
     case 4:
         // only reference frame -> allow only map config
         resourceId.referenceFrame = checkReferenceFrame(components[1]);
-        asEnumChecked<Resource::Generator::Type, NotFound>
-            (components[2], generatorType, "Unknown generator type.");
+        // TODO: check if reference frame supports given interface
+        asEnumChecked<GeneratorInterface, NotFound>
+            (components[2], interface, "Unknown generator interface.");
         resourceId.group = components[3];
         filename = components[4];
 
@@ -210,8 +216,9 @@ FileInfo::FileInfo(const http::Request &request, int f)
     case 5:
         // full resource file path
         resourceId.referenceFrame = checkReferenceFrame(components[1]);
-        asEnumChecked<Resource::Generator::Type, NotFound>
-            (components[2], generatorType, "Unknown generator type.");
+        // TODO: check if reference frame supports given interface
+        asEnumChecked<GeneratorInterface, NotFound>
+            (components[2], interface, "Unknown generator interface.");
         resourceId.group = components[3];
         resourceId.id = components[4];
         filename = components[5];
@@ -360,15 +367,11 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
         if (constants::Self == path) { path = constants::Index; }
 
         // support files
-        for (const auto *supportFiles
-                 : { &vts::supportFiles, &cesium::supportFiles })
-        {
-            auto fsupport(supportFiles->find(path));
-            if (fsupport != supportFiles->end()) {
-                type = Type::support;
-                support = &fsupport->second;
-                return;
-            }
+        auto fsupport(vts::supportFiles.find(path));
+        if (fsupport != vts::supportFiles.end()) {
+            type = Type::support;
+            support = &fsupport->second;
+            return;
         }
     } else {
         LOG(debug) << "Browser disabled, skipping browser files.";
@@ -396,23 +399,6 @@ SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
         return;
     }
 
-    if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
-        const std::string ext(p);
-        if (ext == "terrain") {
-            type = Type::terrain;
-            return;
-        }
-    }
-
-    if (constants::LayerJson == fi.filename) {
-        type = Type::layerJson;
-        return;
-    }
-
-    if (constants::CesiumConf == fi.filename) {
-        type = Type::cesiumConf;
-        return;
-    }
     return;
 }
 
@@ -455,14 +441,8 @@ Sink::FileInfo SurfaceFileInfo::sinkFileInfo(std::time_t lastModified) const
         return {};
 
     case Type::definition:
-    case Type::layerJson:
-    case Type::cesiumConf:
         return Sink::FileInfo(constants::applicationJson, lastModified)
             .setFileClass(FileClass::config);
-
-    case Type::terrain:
-        return Sink::FileInfo(constants::quantizedMesh, lastModified)
-            .setFileClass(FileClass::data);
 
     case Type::unknown:
         return {};
@@ -566,6 +546,115 @@ Sink::FileInfo GeodataFileInfo::sinkFileInfo(std::time_t lastModified) const
 
     case Type::style:
         return Sink::FileInfo(constants::applicationJson, lastModified)
+            .setFileClass(FileClass::config);
+
+    case Type::unknown:
+        return {};
+    }
+
+    return {};
+}
+
+TerrainFileInfo::TerrainFileInfo(const FileInfo &fi)
+    : fileInfo(fi), type(Type::unknown), support()
+{
+    if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
+        const std::string ext(p);
+        if (ext == "terrain") {
+            type = Type::tile;
+            return;
+        }
+    }
+
+    if (fi.flags & FileFlags::browserEnabled) {
+        LOG(debug) << "Browser enabled, checking browser files.";
+
+        auto path(fi.filename);
+        if (constants::Self == path) { path = constants::Index; }
+
+        // support files
+        auto fsupport(cesium::supportFiles.find(path));
+        if (fsupport != cesium::supportFiles.end()) {
+            type = Type::support;
+            support = &fsupport->second;
+            return;
+        }
+    } else {
+        LOG(debug) << "Browser disabled, skipping browser files.";
+    }
+
+    if (constants::LayerJson == fi.filename) {
+        type = Type::definition;
+        return;
+    }
+
+    if (constants::CesiumConf == fi.filename) {
+        type = Type::cesiumConf;
+        return;
+    }
+    return;
+}
+
+Sink::FileInfo TerrainFileInfo::sinkFileInfo(std::time_t lastModified) const
+{
+    switch (type) {
+    case Type::tile:
+        return Sink::FileInfo(constants::quantizedMesh, lastModified)
+            .setFileClass(FileClass::data);
+
+    case Type::support:
+        return Sink::FileInfo(support->contentType, support->lastModified)
+            .setFileClass(FileClass::support);
+
+    case Type::definition:
+    case Type::cesiumConf:
+        return Sink::FileInfo(constants::applicationJson, lastModified)
+            .setFileClass(FileClass::config);
+
+    case Type::unknown:
+        return {};
+    }
+
+    return {};
+}
+
+WmtsFileInfo::WmtsFileInfo(const FileInfo &fi)
+    : fileInfo(fi), type(Type::unknown), support()
+{
+    if (fi.flags & FileFlags::browserEnabled) {
+        LOG(debug) << "Browser enabled, checking browser files.";
+
+        auto path(fi.filename);
+        if (constants::Self == path) { path = constants::Index; }
+
+        // support files
+        auto fsupport(ol::supportFiles.find(path));
+        if (fsupport != ol::supportFiles.end()) {
+            type = Type::support;
+            support = &fsupport->second;
+            return;
+        }
+    } else {
+        LOG(debug) << "Browser disabled, skipping browser files.";
+    }
+
+    if (constants::WmtsCapabilities == fi.filename) {
+        type = Type::capabilities;
+        return;
+    }
+
+    return;
+}
+
+Sink::FileInfo WmtsFileInfo::sinkFileInfo(std::time_t lastModified) const
+{
+    switch (type) {
+    case Type::support:
+        return Sink::FileInfo(support->contentType, support->lastModified)
+            .setFileClass(FileClass::support);
+
+    case Type::capabilities:
+        return Sink::FileInfo(constants::textXml, lastModified)
             .setFileClass(FileClass::config);
 
     case Type::unknown:

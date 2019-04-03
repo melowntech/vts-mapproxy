@@ -28,7 +28,7 @@
 
 #include "geo/csconvertor.hpp"
 
-#include "./geo.hpp"
+#include "geo.hpp"
 
 double tileCircumference(const math::Extents2 &extents
                          , const geo::SrsDefinition &srs

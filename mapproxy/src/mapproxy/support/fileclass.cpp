@@ -24,7 +24,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./fileclass.hpp"
+#include "fileclass.hpp"
 
 namespace po = boost::program_options;
 

@@ -28,7 +28,7 @@
 #define mapproxy_gdalsupport_requests_hpp_included_
 
 #include "../gdalsupport.hpp"
-#include "./types.hpp"
+#include "types.hpp"
 
 
 class ShRequestBase {

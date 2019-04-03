@@ -35,15 +35,17 @@
 
 #include "vts-libs/vts/mapconfig.hpp"
 #include "vts-libs/registry.hpp"
+#include "vts-libs/registry/extensions.hpp"
 
-#include "./fileinfo.hpp"
-#include "./error.hpp"
-#include "./core.hpp"
-#include "./sink.hpp"
+#include "fileinfo.hpp"
+#include "error.hpp"
+#include "core.hpp"
+#include "sink.hpp"
 
 namespace asio = boost::asio;
 namespace vts = vtslibs::vts;
 namespace vr = vtslibs::registry;
+namespace vre = vtslibs::registry::extensions;
 
 class Core::Detail : boost::noncopyable {
 public:
@@ -192,6 +194,34 @@ std::string getName(const T &value)
     return boost::lexical_cast<std::string>(value);
 }
 
+template <typename F, typename Container>
+bool forEachEntry(const F &f, const Container &container)
+{
+    for (const auto &item : container) {
+        f(getName(item));
+    }
+    return container.empty();
+}
+
+struct RfGeneratorTypes { std::string id; };
+
+template <typename F>
+bool forEachEntry(const F &f, const RfGeneratorTypes &rfgt)
+{
+    for (auto type : enumerationValues(Resource::Generator::Type())) {
+        f(getName(type));
+    }
+
+    if (const vr::ReferenceFrame *rf
+        = vr::system.referenceFrames(rfgt.id, std::nothrow))
+    {
+        if (rf->findExtension<vre::Tms>()) { f("terrain"); }
+        if (rf->findExtension<vre::Wmts>()) { f("wmts"); }
+    };
+
+    return false;
+}
+
 template <bool allowEmpty, typename Container>
 inline Sink::Listing
 buildListing(const Container &container
@@ -199,11 +229,10 @@ buildListing(const Container &container
 {
     Sink::Listing out(bootstrap);
 
-    bool empty(true);
-    for (const auto &item : container) {
-        out.emplace_back(getName(item), Sink::ListingItem::Type::dir);
-        empty = false;
-    }
+    auto empty(forEachEntry([&](const std::string &name)
+    {
+        out.emplace_back(name, Sink::ListingItem::Type::dir);
+    }, container));
 
     if (!allowEmpty && empty) {
         throw NotFound("Empty listing");
@@ -344,21 +373,21 @@ void Core::Detail::generateListing(const FileInfo &fi, Sink &sink)
 
     case FileInfo::Type::typeListing:
         sink.listing
-            (buildListing(enumerationValues(Resource::Generator::Type())
+            (buildListing(RfGeneratorTypes{fi.resourceId.referenceFrame}
                           , rfDirectoryContent));
         return;
 
     case FileInfo::Type::groupListing:
         sink.listing(buildListing
                       (generators_.listGroups
-                       (fi.resourceId.referenceFrame, fi.generatorType)
+                       (fi.resourceId.referenceFrame, fi.interface.type)
                        , browsableDirectoryContent));
         return;
 
     case FileInfo::Type::idListing:
         sink.listing(buildListing<false>
                       (generators_.listIds
-                       (fi.resourceId.referenceFrame, fi.generatorType
+                       (fi.resourceId.referenceFrame, fi.interface.type
                         , fi.resourceId.group)
                        , browsableDirectoryContent));
         return;

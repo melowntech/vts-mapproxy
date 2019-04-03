@@ -33,8 +33,8 @@
 
 #include "dbglog/dbglog.hpp"
 
-#include "./tileflags.hpp"
-#include "./memory.hpp"
+#include "tileflags.hpp"
+#include "memory.hpp"
 
 #undef QTREE_DEBUG
 // uncomment for QTREE traversal debug

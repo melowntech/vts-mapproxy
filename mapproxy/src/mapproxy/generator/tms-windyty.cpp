@@ -50,8 +50,8 @@
 #include "../error.hpp"
 #include "../support/python.hpp"
 
-#include "./factory.hpp"
-#include "./tms-windyty.hpp"
+#include "factory.hpp"
+#include "tms-windyty.hpp"
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;

@@ -55,6 +55,9 @@ include_directories(${ICU_INCLUDE_DIRS})
 enable_python(2.7)
 include_directories(${PYTHONLIBS_INCLUDE_DIRS})
 
+find_package(TinyXML2 REQUIRED)
+include_directories(${TINYXML2_INCLUDE_DIR})
+
 # dependencies
 add_subdirectory(src/dbglog)
 add_subdirectory(src/utility)

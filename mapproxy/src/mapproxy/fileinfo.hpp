@@ -33,8 +33,8 @@
 #include "vts-libs/vts/basetypes.hpp"
 #include "vts-libs/vts/tileop.hpp"
 
-#include "./resource.hpp"
-#include "./sink.hpp"
+#include "resource.hpp"
+#include "sink.hpp"
 
 namespace vs = vtslibs::storage;
 namespace vts = vtslibs::vts;
@@ -80,12 +80,12 @@ struct FileInfo {
     Type type;
 
     /** Resource generator type.
-     *  Valid only if type == Type::resourceFile.
+     *  Valid only if type >= Type::groupListing.
      */
-    Resource::Generator::Type generatorType;
+    GeneratorInterface interface;
 
     /** Handling resource ID.
-     *  Valid only if type == Type::resourceFile.
+     *  Valid only if type >= Type::groupListing.
      */
     Resource::Id resourceId;
 
@@ -139,9 +139,6 @@ struct SurfaceFileInfo {
 
     enum class Type {
         unknown, file, tile, definition, support, registry, service
-
-        // terrain provider support (if available)
-        , layerJson, terrain, cesiumConf
     };
 
     /** File type.
@@ -216,6 +213,56 @@ struct GeodataFileInfo {
     /** File format. Passed in ctor.
      */
     geo::VectorFormat format;
+};
+
+/** Parsed terrain file information.
+ */
+struct TerrainFileInfo {
+    TerrainFileInfo(const FileInfo &fi);
+
+    Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
+
+    /** Parent information.
+     */
+    FileInfo fileInfo;
+
+    enum class Type {
+        unknown, tile, definition, support, cesiumConf
+    };
+
+    /** File type.
+     */
+    Type type;
+
+    /** Valid only when type == Type::terrain
+     */
+    vts::TileId tileId;
+
+    /** Valid only when type == Type::support
+     */
+    const vs::SupportFile *support;
+};
+
+/** Parsed TMS file information.
+ */
+struct WmtsFileInfo {
+    WmtsFileInfo(const FileInfo &fi);
+
+    Sink::FileInfo sinkFileInfo(std::time_t lastModified = -1) const;
+
+    /** Parent information.
+     */
+    FileInfo fileInfo;
+
+    enum class Type { unknown, capabilities, support };
+
+    /** File type.
+     */
+    Type type;
+
+    /** Valid only when type == Type::support;
+     */
+    const vs::SupportFile *support;
 };
 
 #endif // mapproxy_fileinfo_hpp_included_

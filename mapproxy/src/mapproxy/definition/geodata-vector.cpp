@@ -37,8 +37,8 @@
 
 #include "../support/python.hpp"
 
-#include "./geodata.hpp"
-#include "./factory.hpp"
+#include "geodata.hpp"
+#include "factory.hpp"
 
 namespace resource {
 

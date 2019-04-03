@@ -31,10 +31,10 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "./heightfunction.hpp"
+#include "heightfunction.hpp"
 
-#include "./error.hpp"
-#include "./support/python.hpp"
+#include "error.hpp"
+#include "support/python.hpp"
 
 SuperElevation::SuperElevation(const Config &config)
     : config_(config), s_()

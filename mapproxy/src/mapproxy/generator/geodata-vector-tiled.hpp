@@ -34,7 +34,7 @@
 #include "vts-libs/vts/urltemplate.hpp"
 
 #include "../support/mmapped/tilesetindex.hpp"
-#include "./geodatavectorbase.hpp"
+#include "geodatavectorbase.hpp"
 
 namespace generator {
 

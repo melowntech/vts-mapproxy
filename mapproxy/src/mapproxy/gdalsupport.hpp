@@ -44,9 +44,9 @@
 
 #include "vts-libs/vts/nodeinfo.hpp"
 
-#include "./support/geo.hpp"
-#include "./support/layerenancer.hpp"
-#include "./sink.hpp"
+#include "support/geo.hpp"
+#include "support/layerenancer.hpp"
+#include "sink.hpp"
 
 namespace vts = vtslibs::vts;
 

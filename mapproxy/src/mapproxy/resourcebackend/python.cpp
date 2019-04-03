@@ -35,8 +35,8 @@
 #include "pysupport/formatexception.hpp"
 
 #include "../error.hpp"
-#include "./python.hpp"
-#include "./factory.hpp"
+#include "python.hpp"
+#include "factory.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;

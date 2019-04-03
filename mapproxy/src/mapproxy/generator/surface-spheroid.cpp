@@ -60,8 +60,8 @@
 #include "../support/grid.hpp"
 #include "../support/python.hpp"
 
-#include "./surface-spheroid.hpp"
-#include "./factory.hpp"
+#include "surface-spheroid.hpp"
+#include "factory.hpp"
 
 namespace fs = boost::filesystem;
 namespace vr = vtslibs::registry;
@@ -478,7 +478,6 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
 AugmentedMesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
                                                 , Sink &sink
-                                                , const SurfaceFileInfo&
                                                 , Arsenal&) const
 {
     // TODO: calculate tile sampling

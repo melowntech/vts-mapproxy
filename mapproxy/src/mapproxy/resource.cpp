@@ -35,12 +35,12 @@
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/vts/tileop.hpp"
 
-#include "./support/glob.hpp"
+#include "support/glob.hpp"
 
-#include "./error.hpp"
-#include "./resource.hpp"
-#include "./generator.hpp"
-#include "./definition.hpp"
+#include "error.hpp"
+#include "resource.hpp"
+#include "generator.hpp"
+#include "definition.hpp"
 
 namespace fs = boost::filesystem;
 
@@ -648,3 +648,54 @@ vr::Credits asInlineCredits(const Resource &res)
     }
     return credits;
 }
+
+std::ostream& operator<<(std::ostream &os, const GeneratorInterface &gi)
+{
+    switch (gi.interface) {
+    case GeneratorInterface::Interface::vts:
+        return os << gi.type;
+
+    case GeneratorInterface::Interface::terrain:
+        if (gi.type != GeneratorInterface::Type::surface) {
+            LOG(warn1) << "Terrain interface is supported only for surfaces.";
+            os.setstate(std::ios::failbit);
+            return os;
+        }
+        return os << "terrain";
+
+    case GeneratorInterface::Interface::wmts:
+        if (gi.type != GeneratorInterface::Type::tms) {
+            LOG(warn1) << "WMTS interface is supported only for tms.";
+            os.setstate(std::ios::failbit);
+            return os;
+        }
+        return os << "wmts";
+    }
+
+    return os;
+}
+
+std::istream& operator>>(std::istream &is, GeneratorInterface &gi)
+{
+    std::string s;
+    is >> s;
+
+    if (s == "terrain") {
+        gi.type = GeneratorInterface::Type::surface;
+        gi.interface = GeneratorInterface::Interface::terrain;
+        return is;
+    }
+
+    if (s == "wmts") {
+        gi.type = GeneratorInterface::Type::tms;
+        gi.interface = GeneratorInterface::Interface::wmts;
+        return is;
+    }
+
+    gi.interface = GeneratorInterface::Interface::vts;
+    std::istringstream tmp(s);
+    if (!(tmp >> gi.type)) { is.setstate(std::ios::failbit); }
+
+    return is;
+}
+

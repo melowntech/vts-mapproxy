@@ -36,7 +36,7 @@
 #include "../support/python.hpp"
 #include "../support/serialization.hpp"
 
-#include "./surface.hpp"
+#include "surface.hpp"
 
 namespace vr = vtslibs::registry;
 

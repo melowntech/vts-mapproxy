@@ -103,21 +103,27 @@ private:
                            , const SurfaceFileInfo &fileInfo
                            , Arsenal &arsenal) const;
 
+    /** Generic mesh generation, used by both surface and terrain interface.
+     */
     virtual AugmentedMesh generateMeshImpl(const vts::NodeInfo &nodeInfo
                                            , Sink &sink
-                                           , const SurfaceFileInfo &fileInfo
                                            , Arsenal &arsenal) const = 0;
 
     /** Cesium terrain provider support. Generates non-VTS mesh.
      */
+
+    Task terrainInterface(const FileInfo &fileInfo, Sink &sink) const;
+
     void generateTerrain(const vts::TileId &tileId
                          , Sink &sink
-                         , const SurfaceFileInfo &fileInfo
-                         , Arsenal &arsenal) const;
+                         , const TerrainFileInfo &fileInfo
+                         , Arsenal &arsenal, const vre::Tms &tms) const;
 
-    void layerJson(Sink &sink, const SurfaceFileInfo &fileInfo) const;
+    void layerJson(Sink &sink, const TerrainFileInfo &fileInfo
+                   , const vre::Tms &tms) const;
 
-    void cesiumConf(Sink &sink, const SurfaceFileInfo &fileInfo) const;
+    void cesiumConf(Sink &sink, const TerrainFileInfo &fileInfo
+                    , const vre::Tms &tms) const;
 
     const Definition &definition_;
     const vre::Tms *tms_;

@@ -43,8 +43,8 @@
 #include "../support/srs.hpp"
 #include "../support/revision.hpp"
 
-#include "./geodata-vector.hpp"
-#include "./factory.hpp"
+#include "geodata-vector.hpp"
+#include "factory.hpp"
 
 namespace vr = vtslibs::registry;
 namespace fs = boost::filesystem;

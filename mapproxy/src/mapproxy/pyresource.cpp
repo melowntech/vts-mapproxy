@@ -36,10 +36,10 @@
 #include "vts-libs/vts/tileop.hpp"
 #include "vts-libs/registry/py.hpp"
 
-#include "./error.hpp"
-#include "./resource.hpp"
-#include "./generator.hpp"
-#include "./support/python.hpp"
+#include "error.hpp"
+#include "resource.hpp"
+#include "generator.hpp"
+#include "support/python.hpp"
 
 namespace fs = boost::filesystem;
 namespace python = boost::python;

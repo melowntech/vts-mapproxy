@@ -24,8 +24,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./metatile.hpp"
-#include "./tileindex.hpp"
+#include "metatile.hpp"
+#include "tileindex.hpp"
 
 typedef vts::TileIndex::Flag TiFlag;
 

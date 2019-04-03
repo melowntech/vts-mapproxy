@@ -68,9 +68,9 @@
 #include "../support/python.hpp"
 #include "../support/tileindex.hpp"
 
-#include "./surface-dem.hpp"
-#include "./factory.hpp"
-#include "./metatile.hpp"
+#include "surface-dem.hpp"
+#include "factory.hpp"
+#include "metatile.hpp"
 
 namespace fs = boost::filesystem;
 namespace vr = vtslibs::registry;
@@ -332,7 +332,6 @@ private:
 
 AugmentedMesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
                                            , Sink &sink
-                                           , const SurfaceFileInfo&
                                            , Arsenal &arsenal) const
 {
     const int samplesPerSide(128);

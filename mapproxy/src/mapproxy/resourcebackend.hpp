@@ -38,7 +38,7 @@
 
 #include "service/program.hpp"
 
-#include "./resource.hpp"
+#include "resource.hpp"
 
 class ResourceBackend : boost::noncopyable {
 public:

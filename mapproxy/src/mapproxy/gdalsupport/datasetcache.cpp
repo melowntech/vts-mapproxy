@@ -25,7 +25,7 @@
  */
 
 #include "../error.hpp"
-#include "./datasetcache.hpp"
+#include "datasetcache.hpp"
 
 geo::GeoDataset& DatasetCache::operator()(const std::string &path)
 {

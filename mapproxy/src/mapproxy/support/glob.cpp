@@ -30,7 +30,7 @@
 
 #include "dbglog/dbglog.hpp"
 
-#include "./glob.hpp"
+#include "glob.hpp"
 
 std::vector<boost::filesystem::path>
 globPath(const boost::filesystem::path &pattern)

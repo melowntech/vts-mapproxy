@@ -41,9 +41,9 @@
 #include "vts-libs/registry.hpp"
 #include "vts-libs/vts/basetypes.hpp"
 
-#include "./error.hpp"
+#include "error.hpp"
 
-#include "./support/fileclass.hpp"
+#include "support/fileclass.hpp"
 
 enum class Changed { yes, no, safely, withRevisionBump };
 
@@ -164,7 +164,7 @@ struct Resource {
     };
 
     struct Generator {
-        enum Type { tms, surface, geodata };
+        enum class Type { tms, surface, geodata };
         Type type;
         std::string driver;
 
@@ -226,6 +226,20 @@ private:
     DefinitionBase::pointer definition_;
 };
 
+struct GeneratorInterface {
+    typedef Resource::Generator::Type Type;
+    enum class Interface { vts, terrain, wmts };
+
+    Type type;
+    Interface interface;
+
+    GeneratorInterface(Type type = Type(), Interface interface = Interface())
+        : type(type), interface(interface)
+    {}
+
+    operator Type() const { return type; }
+};
+
 vr::Credits asInlineCredits(const Resource &res);
 
 UTILITY_GENERATE_ENUM_IO(Resource::Generator::Type,
@@ -238,6 +252,15 @@ UTILITY_GENERATE_ENUM(RasterFormat,
     ((jpg))
     ((png))
 )
+
+UTILITY_GENERATE_ENUM_IO(GeneratorInterface::Interface,
+    ((vts))
+    ((terrain))
+    ((wmts))
+)
+
+std::ostream& operator<<(std::ostream &os, const GeneratorInterface &gi);
+std::istream& operator>>(std::istream &is, GeneratorInterface &gi);
 
 constexpr RasterFormat MaskFormat = RasterFormat::png;
 constexpr RasterFormat RasterMetatileFormat = RasterFormat::png;

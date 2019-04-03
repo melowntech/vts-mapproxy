@@ -48,9 +48,9 @@
 #include "../support/srs.hpp"
 #include "../support/revision.hpp"
 
-#include "./geodata-vector-tiled.hpp"
-#include "./factory.hpp"
-#include "./metatile.hpp"
+#include "geodata-vector-tiled.hpp"
+#include "factory.hpp"
+#include "metatile.hpp"
 
 namespace ba = boost::algorithm;
 

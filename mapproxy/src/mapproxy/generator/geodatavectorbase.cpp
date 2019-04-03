@@ -43,8 +43,8 @@
 #include "../support/python.hpp"
 #include "../support/serialization.hpp"
 
-#include "./geodatavectorbase.hpp"
-#include "./files.hpp"
+#include "geodatavectorbase.hpp"
+#include "files.hpp"
 
 namespace ba = boost::algorithm;
 namespace vf = geo::vectorformat;

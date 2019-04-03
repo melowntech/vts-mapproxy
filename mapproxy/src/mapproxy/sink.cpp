@@ -37,8 +37,8 @@
 
 #include "vts-libs/vts/2d.hpp"
 
-#include "./sink.hpp"
-#include "./error.hpp"
+#include "sink.hpp"
+#include "error.hpp"
 
 namespace vts = vtslibs::vts;
 

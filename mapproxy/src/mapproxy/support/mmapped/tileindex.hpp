@@ -33,9 +33,9 @@
 #include "vts-libs/vts/tileindex.hpp"
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 
-#include "./memory.hpp"
-#include "./tileflags.hpp"
-#include "./qtree.hpp"
+#include "memory.hpp"
+#include "tileflags.hpp"
+#include "qtree.hpp"
 
 namespace vts = vtslibs::vts;
 

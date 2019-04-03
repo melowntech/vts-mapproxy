@@ -34,7 +34,7 @@
 
 #include "../support/python.hpp"
 
-#include "./tms.hpp"
+#include "tms.hpp"
 
 namespace resource {
 

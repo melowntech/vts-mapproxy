@@ -29,7 +29,7 @@
 
 #include "http/contentgenerator.hpp"
 
-#include "./generator.hpp"
+#include "generator.hpp"
 
 class Core : boost::noncopyable
            , public http::ContentGenerator

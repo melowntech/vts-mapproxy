@@ -29,7 +29,7 @@
 
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 
-#include "./geodatavectorbase.hpp"
+#include "geodatavectorbase.hpp"
 
 namespace generator {
 

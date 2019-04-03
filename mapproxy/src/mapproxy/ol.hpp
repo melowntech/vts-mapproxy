@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,23 +24,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_gdalsupport_operations_hpp_included_
-#define mapproxy_gdalsupport_operations_hpp_included_
+#ifndef mapproxy_ol_hpp_included_
+#define mapproxy_ol_hpp_included_
 
-#include "../gdalsupport.hpp"
-#include "types.hpp"
-#include "datasetcache.hpp"
+#include "vts-libs/storage/support.hpp"
 
-cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
-              , const GdalWarper::RasterRequest &req);
+namespace ol {
 
-GdalWarper::Heightcoded*
-heightcode(DatasetCache &cache, ManagedBuffer &mb
-           , const std::string &vectorDs
-           , const DemDataset::list &rasterDs
-           , geo::heightcoding::Config config
-           , const boost::optional<std::string> &vectorGeoidGrid
-           , const GdalWarper::OpenOptions &openOptions
-           , const LayerEnhancer::map &layerEnancers);
+extern const vtslibs::storage::SupportFile::Files supportFiles;
 
-#endif // mapproxy_gdalsupport_operations_hpp_included_
+} // namespace ol
+
+#endif // mapproxy_ol_hpp_included_

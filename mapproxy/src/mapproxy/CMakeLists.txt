@@ -12,6 +12,7 @@ set(mapproxy-core_SOURCES
   support/glob.hpp support/glob.cpp
   support/tilejson.hpp support/tilejson.cpp
   support/cesiumconf.hpp support/cesiumconf.cpp
+  support/wmts.hpp support/wmts.cpp
 
   support/mmapped/tileindex.hpp support/mmapped/tileindex.cpp
   support/mmapped/qtree.hpp support/mmapped/qtree.cpp
@@ -65,6 +66,7 @@ define_module(LIBRARY mapproxy-core
   Boost_PROGRAM_OPTIONS
   Boost_PYTHON
   Sqlite3
+  TINYXML2
   )
 
 add_library(mapproxy-core STATIC ${mapproxy-core_SOURCES})
@@ -97,6 +99,7 @@ set(mapproxy_SOURCES
   generator/demregistry.hpp generator/demregistry.cpp
 
   # bound layers
+  generator/tms-raster-base.hpp generator/tms-raster-base.cpp
   generator/tms-raster.hpp generator/tms-raster.cpp
   generator/tms-raster-remote.hpp generator/tms-raster-remote.cpp
   generator/tms-bing.hpp generator/tms-bing.cpp
@@ -156,16 +159,26 @@ file_to_cpp(mapproxy_CESIUM_SOURCES
 file_to_cpp(mapproxy_CESIUM_SOURCES
   cesium::cesium_js
   cesium/cesium.js)
-
 file_to_cpp(mapproxy_CESIUM_SOURCES
   cesium::melowntech_png
   cesium/melown-technologies-logo-28.png)
+
+set(mapproxy_OL_SOURCES
+  ol.hpp ol.cpp
+  )
+file_to_cpp(mapproxy_OL_SOURCES
+  ol::ol_html
+  ol/ol.html)
+file_to_cpp(mapproxy_OL_SOURCES
+  ol::ol_js
+  ol/ol.js)
 
 add_executable(mapproxy
   ${mapproxy_SOURCES}
   ${mapproxy_BROWSER_SOURCES}
   ${mapproxy_FILES_SOURCES}
   ${mapproxy_CESIUM_SOURCES}
+  ${mapproxy_OL_SOURCES}
   )
 target_link_libraries(mapproxy mapproxy-core ${MODULE_LIBRARIES})
 buildsys_target_compile_definitions(mapproxy ${MODULE_DEFINITIONS})

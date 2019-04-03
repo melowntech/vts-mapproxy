@@ -26,7 +26,7 @@
 
 #include <boost/utility/in_place_factory.hpp>
 
-#include "./requests.hpp"
+#include "requests.hpp"
 
 ShRaster::ShRaster(const GdalWarper::RasterRequest &other
                    , ManagedBuffer &sm, ShRequestBase *owner)

@@ -39,7 +39,7 @@
 #include "vts-libs/vts/tileop.hpp"
 
 #include "../error.hpp"
-#include "./metatile.hpp"
+#include "metatile.hpp"
 
 // Uncomment to get debug information for metatile block generation
 //#define DEBUG_META_BLOCKS 1

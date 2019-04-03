@@ -24,7 +24,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "./browser2d.hpp"
+#include "browser2d.hpp"
 
 #include "browser2d/index.html.hpp"
 #include "browser2d/index.js.hpp"

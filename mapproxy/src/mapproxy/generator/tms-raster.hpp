@@ -32,16 +32,34 @@
 #include "../support/coverage.hpp"
 #include "../support/mmapped/tileindex.hpp"
 
-#include "../generator.hpp"
 #include "../definition/tms.hpp"
+
+#include "tms-raster-base.hpp"
 
 namespace generator {
 
-class TmsRaster : public Generator {
-public:
-    TmsRaster(const Params &params);
+namespace detail {
 
+/** Member from base idiom
+ */
+class TmsRasterMFB {
+protected:
+    TmsRasterMFB(const Generator::Params &params);
     typedef resource::TmsRaster Definition;
+    const Definition &definition_;
+};
+
+} // namespace detail
+
+class TmsRaster
+    : private detail::TmsRasterMFB
+    , public TmsRasterBase
+{
+public:
+    TmsRaster(const Params &params
+              , const boost::optional<RasterFormat> &format = boost::none);
+
+    using detail::TmsRasterMFB::Definition;
 
 protected:
     const Definition &definition() const { return definition_; }
@@ -77,8 +95,8 @@ private:
     virtual void prepare_impl(Arsenal &arsenal);
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
 
-    virtual Task generateFile_impl(const FileInfo &fileInfo
-                                   , Sink &sink) const;
+    virtual Task generateVtsFile_impl(const FileInfo &fileInfo
+                                      , Sink &sink) const;
 
     void generateTileImage(const vts::TileId &tileId
                            , const TmsFileInfo &fi
@@ -125,8 +143,6 @@ private:
      *  no-op.
      */
     virtual void update_impl(vr::BoundLayer &bl) const;
-
-    const Definition &definition_;
 
     bool hasMetatiles_;
 
