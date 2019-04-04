@@ -15,10 +15,11 @@ function startBrowser() {
 
     var parser = new WMTSCapabilities();
 
-    fetch('./WMTSCapabilities.xml').then(function(response) {
+    fetch('./WMTSCapabilities.xml?is=1').then(function(response) {
         return response.text();
     }).then(function(text) {
         var capabilities = parser.read(text);
+        console.dir(capabilities);
 
         // TODO: use first layer from capabilities
 
@@ -26,6 +27,8 @@ function startBrowser() {
             layer: 'bmng',
             matrixSet: 'EPSG:3857'
         });
+
+        console.dir(options);
 
         map = new Map({
             layers: [

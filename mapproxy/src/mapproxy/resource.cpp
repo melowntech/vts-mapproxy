@@ -532,7 +532,7 @@ Changed Resource::changed(const Resource &o) const
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource::Id &resource
-                                    , Resource::Generator::Type generatorType
+                                    , GeneratorInterface generatorIface
                                     , const ResourceRoot &root)
 {
     boost::filesystem::path out;
@@ -545,8 +545,8 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
         out /= resource.referenceFrame;
         // fall through
 
-    case ResourceRoot::type:
-        out /= boost::lexical_cast<std::string>(generatorType);
+    case ResourceRoot::interface:
+        out /= boost::lexical_cast<std::string>(generatorIface);
         // fall through
 
     case ResourceRoot::group:
@@ -568,17 +568,17 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
 
 std::string prependRoot(const std::string &path
                         , const Resource::Id &resource
-                        , Resource::Generator::Type generatorType
+                        , const GeneratorInterface &generatorIface
                         , const ResourceRoot &root)
 {
     fs::path tmp(path);
-    return prependRoot(tmp, resource, generatorType, root).string();
+    return prependRoot(tmp, resource, generatorIface, root).string();
 }
 
 ResourceRoot resolveRoot(const Resource::Id &thisResource
-                         , Resource::Generator::Type thisGeneratorType
+                         , const GeneratorInterface &thisGeneratorIface
                          , const Resource::Id &thatResource
-                         , Resource::Generator::Type thatGeneratorType
+                         , const GeneratorInterface &thatGeneratorIface
                          , ResourceRoot::Depth thisDepth)
 {
     // compute difference between two resources
@@ -588,8 +588,8 @@ ResourceRoot resolveRoot(const Resource::Id &thisResource
             return { ResourceRoot::referenceFrame, 4 };
         }
 
-        if (thisGeneratorType != thatGeneratorType) {
-            return { ResourceRoot::type, 3 };
+        if (thisGeneratorIface != thatGeneratorIface) {
+            return { ResourceRoot::interface, 3 };
         }
 
         if (thisResource.group != thatResource.group) {

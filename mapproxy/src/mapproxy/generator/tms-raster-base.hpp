@@ -31,6 +31,7 @@
 
 #include "vts-libs/registry/extensions.hpp"
 
+#include "../support/wmts.hpp"
 #include "../generator.hpp"
 
 namespace vre = vtslibs::registry::extensions;
@@ -51,6 +52,8 @@ private:
                                       , Sink &sink) const = 0;
 
     Task wmtsInterface(const FileInfo &fileInfo, Sink &sink) const;
+
+    WmtsLayer wmtsLayer(bool introspection) const;
 
     const vre::Wmts& getWmts() const;
 

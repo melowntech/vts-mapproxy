@@ -29,6 +29,18 @@
 
 #include "../resource.hpp"
 
-std::string wmtsCapabilities(const Resource &resources);
+struct WmtsLayer {
+    const Resource &resource;
+    std::string rootPath;
+    RasterFormat format;
+
+    typedef std::vector<WmtsLayer> list;
+
+    WmtsLayer(const Resource &resource)
+        : resource(resource), format(RasterFormat::jpg)
+    {}
+};
+
+std::string wmtsCapabilities(const WmtsLayer::list &layers);
 
 #endif // mapproxy_support_wtms_hpp_included_

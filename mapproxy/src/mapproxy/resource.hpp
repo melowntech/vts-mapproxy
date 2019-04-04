@@ -233,11 +233,15 @@ struct GeneratorInterface {
     Type type;
     Interface interface;
 
-    GeneratorInterface(Type type = Type(), Interface interface = Interface())
+    GeneratorInterface(Type type = Type()
+                       , Interface interface = Interface::vts)
         : type(type), interface(interface)
     {}
 
     operator Type() const { return type; }
+
+    bool operator==(const GeneratorInterface &o) const;
+    bool operator!=(const GeneratorInterface &o) const;
 };
 
 vr::Credits asInlineCredits(const Resource &res);
@@ -274,7 +278,7 @@ struct ResourceRoot {
      * the code.
      */
     enum Depth : int {
-        referenceFrame = 0, type = 1, group = 2, id = 3, none = 4
+        referenceFrame = 0, interface = 1, group = 2, id = 3, none = 4
     };
 
     /** Root location.
@@ -300,9 +304,9 @@ struct ResourceRoot {
 /** Computes path from this resource to that resource.
  */
 ResourceRoot resolveRoot(const Resource::Id &thisResource
-                         , Resource::Generator::Type thisGeneratorType
+                         , const GeneratorInterface &thisGeneratorIface
                          , const Resource::Id &thatResource
-                         , Resource::Generator::Type thatGeneratorType
+                         , const GeneratorInterface &thatGeneratorIface
                          , ResourceRoot::Depth thisDepth = ResourceRoot::none);
 
 /** Computes path from this resource to that resource.
@@ -315,7 +319,7 @@ ResourceRoot resolveRoot(const Resource &thisResource
  */
 UTILITY_GENERATE_ENUM_IO(ResourceRoot::Depth,
     ((referenceFrame))
-    ((type))
+    ((interface))
     ((group))
     ((id))
     ((none))
@@ -364,11 +368,11 @@ std::string prependRoot(const std::string &path, const Resource &resource
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource::Id &resource
-                                    , Resource::Generator::Type generatorType
+                                    , GeneratorInterface generatorInterface
                                     , const ResourceRoot &root);
 
 std::string prependRoot(const std::string &path, const Resource::Id &resource
-                        , Resource::Generator::Type generatorType
+                        , const GeneratorInterface &generatorIface
                         , const ResourceRoot &root);
 
 std::string contentType(RasterFormat format);
@@ -447,6 +451,22 @@ inline std::string prependRoot(const std::string &path
     return prependRoot(path, resource.id, resource.generator.type, root);
 }
 
+inline boost::filesystem::path prependRoot(const boost::filesystem::path &path
+                                           , const Resource &resource
+                                           , const GeneratorInterface &iface
+                                           , const ResourceRoot &root)
+{
+    return prependRoot(path, resource.id, iface, root);
+}
+
+inline std::string prependRoot(const std::string &path
+                               , const Resource &resource
+                               , const GeneratorInterface &iface
+                               , const ResourceRoot &root)
+{
+    return prependRoot(path, resource.id, iface, root);
+}
+
 inline ResourceRoot resolveRoot(const Resource &thisResource
                                 , const Resource &thatResource
                                 , ResourceRoot::Depth thisDepth)
@@ -454,6 +474,14 @@ inline ResourceRoot resolveRoot(const Resource &thisResource
     return resolveRoot(thisResource.id, thisResource.generator.type
                        , thatResource.id, thatResource.generator.type
                        , thisDepth);
+}
+
+inline bool GeneratorInterface::operator==(const GeneratorInterface &o) const {
+    return (type == o.type) && (interface != o.interface);
+}
+
+inline bool GeneratorInterface::operator!=(const GeneratorInterface &o) const {
+    return !(*this == o);
 }
 
 #endif // mapproxy_resource_hpp_included_

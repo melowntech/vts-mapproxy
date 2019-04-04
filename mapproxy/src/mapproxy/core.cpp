@@ -323,7 +323,7 @@ void Core::Detail::generateReferenceFrameDems(const FileInfo &fi, Sink &sink)
         auto link(prependRoot(boost::filesystem::path()
                               , record.resourceId
                               , Resource::Generator::Type::surface
-                              , ResourceRoot::Depth::type));
+                              , ResourceRoot::Depth::interface));
 
         os << "<a href=\"" << link.string() << "\">"
                    << record.id.id << "</a>\n";

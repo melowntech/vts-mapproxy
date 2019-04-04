@@ -25,10 +25,13 @@
  */
 
 #include "utility/raise.hpp"
+#include "utility/httpquery.hpp"
 
 #include "../support/wmts.hpp"
 
 #include "tms-raster-base.hpp"
+
+namespace uq = utility::query;
 
 namespace generator {
 
@@ -72,6 +75,33 @@ const vre::Wmts& TmsRasterBase::getWmts() const
     return *wmts_;
 }
 
+namespace {
+
+bool hasIntrospection(const std::string &query)
+{
+    return !uq::empty(uq::find(uq::splitQuery(query), "is"));
+}
+
+} // namespace
+
+WmtsLayer TmsRasterBase::wmtsLayer(bool introspection) const
+{
+    WmtsLayer layer(resource());
+
+    // build root path
+    if (introspection) {
+        // this is URL used in introspection -> local
+        layer.rootPath = "./";
+        layer.format = format_;
+    } else {
+        LOG(warn4) << "TODO: Use external path; must be configured.";
+        layer.rootPath = "./";
+        layer.format = format_;
+    }
+
+    return layer;
+}
+
 Generator::Task TmsRasterBase
 ::wmtsInterface(const FileInfo &fileInfo, Sink &sink) const
 {
@@ -85,7 +115,9 @@ Generator::Task TmsRasterBase
         break;
 
     case WmtsFileInfo::Type::capabilities:
-        sink.content(wmtsCapabilities({resource()}), fi.sinkFileInfo());
+        sink.content
+            (wmtsCapabilities({wmtsLayer(hasIntrospection(fileInfo.query))})
+             , fi.sinkFileInfo());
         return {};
 
     case WmtsFileInfo::Type::support:
