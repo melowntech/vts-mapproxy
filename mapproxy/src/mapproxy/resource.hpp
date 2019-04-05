@@ -240,6 +240,8 @@ struct GeneratorInterface {
 
     operator Type() const { return type; }
 
+    GeneratorInterface as(Interface other) const { return { type, other }; }
+
     bool operator==(const GeneratorInterface &o) const;
     bool operator!=(const GeneratorInterface &o) const;
 };
@@ -477,7 +479,7 @@ inline ResourceRoot resolveRoot(const Resource &thisResource
 }
 
 inline bool GeneratorInterface::operator==(const GeneratorInterface &o) const {
-    return (type == o.type) && (interface != o.interface);
+    return (type == o.type) && (interface == o.interface);
 }
 
 inline bool GeneratorInterface::operator!=(const GeneratorInterface &o) const {

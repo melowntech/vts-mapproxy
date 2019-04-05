@@ -24,7 +24,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <set>
+#include <map>
 
 #include <boost/optional.hpp>
 #include <boost/lexical_cast.hpp>
@@ -37,8 +37,10 @@
 
 #include "vts-libs/registry/extensions.hpp"
 #include "vts-libs/vts/csconvertor.hpp"
+#include "vts-libs/vts/tileop.hpp"
 
 #include "../error.hpp"
+#include "../support/metatile.hpp"
 
 #include "wmts.hpp"
 
@@ -47,6 +49,8 @@ namespace vre = vtslibs::registry::extensions;
 namespace vts = vtslibs::vts;
 
 namespace {
+
+constexpr double wmtsResolution(0.28e-3);
 
 typedef tinyxml2::XMLPrinter XML;
 
@@ -117,6 +121,19 @@ void text(XML &x, const char *element, T &&value) {
     Element(x, element).text(std::forward<T>(value));
 }
 
+std::string makeTemplate(const WmtsLayer &layer)
+{
+    std::ostringstream os;
+    os << layer.rootPath;
+    if (!layer.rootPath.empty() && layer.rootPath.back() != '/') {
+        os << '/';
+    }
+
+    os << "{TileMatrix}-{TileCol}-{TileRow}." << layer.format;
+
+    return os.str();
+}
+
 /** TODO: make configurable
  */
 void serviceIdentification(XML &x)
@@ -135,11 +152,14 @@ void serviceProvider(XML &x)
     Element(x, "ows:ServiceProvider")
         .text("ows:ProviderName", "Mapproxy")
         .text("ows:ProviderSite", "https://melown.com")
-        .text("ows:ServiceContact")
+        .push("ows:ServiceContact").pop()
         ;
 }
 
-typedef std::set<const vr::ReferenceFrame*> RfSet;
+void point(Element &e, const char *name, const math::Point2 &p)
+{
+    e.text(name, utility::format("%.9f %.9f", p(0), p(1)));
+}
 
 void boundingBox(XML &x, const math::Extents2 &extents
                  , const boost::optional<std::string> &crs
@@ -148,38 +168,212 @@ void boundingBox(XML &x, const math::Extents2 &extents
     Element bb(x, crs ? "ows:BoundingBox" : "ows:WGS84BoundingBox");
     bb.attribute("crs", crs ? crs->c_str() : "urn:ogc:def:crs:OGC:2:84");
 
-    // TODO: use custom format
-    bb.text("ows:LowerCorner"
-            , utility::format("%.9f %.9f", extents.ll(0), extents.ll(1)));
-    bb.text("ows:UpperCorner"
-            , utility::format("%.9f %.9f", extents.ur(0), extents.ur(1)));
+    point(bb, "ows:LowerCorner", extents.ll);
+    point(bb, "ows:UpperCorner", extents.ur);
 }
 
-RfSet content(XML &x, const WmtsLayer::list &layers)
+template <typename T>
+void widthAndHeight(Element &e, const char *widthName, const char *heightName
+                    , const math::Size2_<T> &size)
 {
-    RfSet rfs;
+    e.text(widthName, size.width);
+    e.text(heightName, size.height);
+}
+
+struct TileMatrixSet {
+    std::string id;
+    std::string description;
+
+    math::Extents2 extents;
+    std::string srs;
+    std::string extentsSrs;
+    vts::LodRange lodRange;
+    vts::TileRange tileRange;
+    vre::Wmts wmts;
+    double metersPerUnit;
+    geo::SrsDefinition geographic;
+
+    TileMatrixSet(const vr::ReferenceFrame &rf);
+
+    math::Extents2 computeExtents(const Resource &r) const;
+};
+
+TileMatrixSet::TileMatrixSet(const vr::ReferenceFrame &rf)
+    : id(rf.id), description(rf.description)
+    , lodRange(vts::LodRange::emptyRange())
+    , tileRange(math::InvalidExtents{})
+    , metersPerUnit(1.0)
+{
+    if (const auto *ext = rf.findExtension<vre::Wmts>()) {
+        wmts = *ext;
+    } else {
+        LOGTHROW(err1, Error)
+            << "Reference frame <" << id << "> has no WMTS extension.";
+    }
+
+    if (wmts.content) {
+        srs = *wmts.content;
+
+        // this ... is here to silence compiler's "may-be-uninitialized"
+        auto lod([]()->boost::optional<vts::Lod> { return boost::none; }());
+
+        // find subtree-roots that provide data in "content" SRS
+        for (const auto &item : rf.division.nodes) {
+            const auto &node(item.second);
+            if (node.srs != srs) { continue; }
+
+            if (!lod) {
+                lod = node.id.lod;
+            } else if (*lod != node.id.lod) {
+                LOGTHROW(err1, Error)
+                    << "Malformed WMTS extension in reference frame <"
+                    << id << ">: not all content root nodes are"
+                    "at the same LOD.";
+            }
+
+            math::update(extents, node.extents);
+            math::update(tileRange, node.id.x, node.id.y);
+        }
+
+        if (!lod) {
+            LOGTHROW(err1, Error)
+                << "Malformed WMTS extension in reference frame <"
+                << id << ">: No root node found for wmts.content <"
+                << srs << "> in the reference frame.";
+        }
+        lodRange = vts::LodRange(*lod);
+    } else {
+        if (rf.division.nodes.size() != 1) {
+            LOGTHROW(err1, Error)
+                << "Malformed WMTS extension in reference frame <"
+                << id << ">: No wmts.content and the reference frame"
+                "is not single-rooted.";
+        }
+        const auto &node(rf.division.nodes.begin()->second);
+        extents = node.extents;
+        srs = node.srs;
+        lodRange = vts::LodRange(node.id.lod);
+        tileRange = vts::tileRange(node.id);
+    }
+
+    extentsSrs = wmts.extentsSrs ? *wmts.extentsSrs : srs;
+    extents = vts::CsConvertor(srs, extentsSrs)(extents);
+
+    {
+        const auto srsDef(vr::system.srs(extentsSrs).srsDef);
+        geographic = srsDef.geographic();
+
+        // get linear unit of given SRS (force computation for angluar systems)
+        metersPerUnit = geo::linearUnit(srsDef, true);
+    }
+}
+
+math::Extents2 TileMatrixSet::computeExtents(const Resource &r) const
+{
+    const vts::CsConvertor conv(srs, extentsSrs);
+
+    math::Extents2 e(math::InvalidExtents{});
+
+    // treat min lod as one gigantic metatile
+    for (const auto &block : metatileBlocks
+             (r, vts::TileId(r.lodRange.min, 0, 0), r.lodRange.min, false))
+    {
+        if (block.srs == srs) {
+            math::update(e, conv(block.extents));
+        }
+    }
+
+    return e;
+}
+
+void tileMatrix(XML &x, vts::Lod lod, const vts::TileRange &tr
+                , const math::Extents2 &extents
+                , const double metersPerUnit)
+{
+    Element e(x, "TileMatrix");
+
+    const auto ts(vr::BoundLayer::tileSize());
+    const auto trs(vts::tileRangesSize(tr));
+    const auto es(math::size(extents));
+
+    e.text("ows:Identifier", lod);
+
+    // scale denominator:
+    const auto pixelSize(es.width / (trs.width * ts.width));
+    const auto scaleDenominator(pixelSize * metersPerUnit / wmtsResolution);
+    e.text("ScaleDenominator", scaleDenominator);
+
+    point(e, "TopLeftCorner", math::ul(extents));
+    widthAndHeight(e, "TileWidth", "TileHeight", ts);
+    widthAndHeight(e, "MatrixWidth", "MatrixHeight", trs);
+}
+
+/** Describe reference frame as tile matrix set
+ */
+void tileMatrixSet(XML &x, const TileMatrixSet &tms)
+{
+    Element e(x, "TileMatrixSet");
+
+    e.text("ows:Identifier", tms.id);
+    e.text("ows:Title", "VTS reference frame <" + tms.id + ">");
+    e.text("ows:Abstract", tms.description);
+
+    boundingBox(x, tms.extents, tms.wmts.projection);
+    e.text("ows:SupportedCRS", tms.wmts.projection);
+    if (tms.wmts.wellKnownScaleSet) {
+        e.text("ows:WellKnownScaleSet", *tms.wmts.wellKnownScaleSet);
+    }
+
+    auto tr(tms.tileRange);
+    for (const auto lod : tms.lodRange) {
+        tileMatrix(x, lod, tr, tms.extents, tms.metersPerUnit);
+        tr = vts::childRange(tr);
+    }
+}
+
+void layerExtents(XML &x, const TileMatrixSet &tms, const Resource &r)
+{
+    const auto extents(tms.computeExtents(r));
+
+    boundingBox(x, extents, tms.wmts.projection);
+    boundingBox(x, vts::CsConvertor(tms.extentsSrs, tms.geographic)(extents));
+}
+
+void content(XML &x, const WmtsLayer::list &layers)
+{
+    typedef std::map<const vr::ReferenceFrame*, TileMatrixSet> map;
+    map tmss;
 
     Element c(x, "Contents");
     for (const auto &layer : layers) {
         const auto &r(layer.resource);
 
+        // remember reference frame
+        auto ftmss(tmss.find(r.referenceFrame));
+        if (ftmss == tmss.end()) {
+            ftmss = tmss.insert
+                (map::value_type
+                 (r.referenceFrame, TileMatrixSet(*r.referenceFrame))).first;
+        }
+        auto &tms(ftmss->second);
+
+        // update tile-matrix-set lod range
+        update(tms.lodRange, r.lodRange.max);
+
         Element l(x, "Layer");
         l.text("ows:Title", "VTS Mapproxy resource <" + r.id.id + ">");
         l.text("ows:Abstract", r.comment);
-        Element(x, "ows::Keywords");
         l.text("ows:Identifier", r.id.fullId());
 
-        l.text("Format", contentType(layer.format));
+        layerExtents(x, tms, r);
 
-        // TODO: extents from reference frame
-        //  <ows:WGS84BoundingBox>
-        //  <ows:BoundingBox>
-#if 0
-        const auto wgs84Extents
-            (vts::CsConvertor(contentSrs, vr::system.srs
-                              (contentSrs).srsDef.geographic())(rfExtents));
-        boundingBox(x, wgs84Extents);
-#endif
+        const auto ct(contentType(layer.format));
+        l.text("Format", ct);
+        Element(x, "ResourceURL")
+            .attribute("format", ct)
+            .attribute("resourceType", "tile")
+            .attribute("template", makeTemplate(layer))
+            ;
 
         {
             Element s(x, "Style");
@@ -191,79 +385,31 @@ RfSet content(XML &x, const WmtsLayer::list &layers)
             // TileMatrixSet -> reference frame
             Element tmsl(x, "TileMatrixSetLink");
             tmsl.text("TileMatrixSet", r.id.referenceFrame);
-
-            // TODO: TileMatrixSetLimits from resource (tile/lod range)
         }
-
-        // remember reference frame
-        rfs.insert(r.referenceFrame);
     }
 
-    return rfs;
+    for (const auto &tms : tmss) { tileMatrixSet(x, tms.second); }
 }
 
-void tileMatrixSet(XML &x, const vr::ReferenceFrame &rf)
+void operationsMetadata(XML &x, const WmtsResources &resources)
 {
-    const auto *wmts(rf.findExtension<vre::Wmts>());
+    Element om(x, "ows:OperationsMetadata");
+    Element op(x, "ows:Operation");
+    op.attribute("name", "GetCapabilities");
 
-    Element e(x, "TileMatrixSet");
+    Element dcp(x, "ows:DCP");
+    Element http(x, "ows:HTTP");
+    Element get(x, "ows:Get");
+    get.attribute("xlink:href", resources.capabilitiesUrl);
 
-    e.text("ows:Title", "VTS reference frame <" + rf.id + ">");
-    e.text("ows:Abstract", rf.description);
-
-    const auto &physicalSrs(wmts->physicalSrs ? *wmts->physicalSrs
-                            : rf.model.physicalSrs);
-
-    // compute extents in reference frame SRS
-    math::Extents2 rfExtents(math::InvalidExtents{});
-
-    std::string contentSrs;
-
-    if (wmts->content) {
-        // find subtree-roots that provide data in "content" SRS
-        for (const auto &item : rf.division.nodes) {
-            const auto &node(item.second);
-            if (node.srs != wmts->content) { continue; }
-
-            math::update(rfExtents, node.extents);
-        }
-        if (!math::valid(rfExtents)) {
-            LOGTHROW(err1, Error)
-                << "Malformed WMTS extension in reference frame <"
-                << rf.id << ">: No root node found for wmts.content <"
-                << *wmts->content << "> in the reference frame.";
-        }
-        contentSrs = *wmts->content;
-    } else {
-        if (rf.division.nodes.size() != 1) {
-            LOGTHROW(err1, Error)
-                << "Malformed WMTS extension in reference frame <"
-                << rf.id << ">: No wmts.content and the reference frame"
-                "is not single-rooted.";
-        }
-        const auto &node(rf.division.nodes.begin()->second);
-        rfExtents = node.extents;
-        contentSrs = node.srs;
-    }
-
-    const auto extents
-        (vts::CsConvertor(contentSrs, physicalSrs)(rfExtents));
-
-    boundingBox(x, extents, wmts->projection);
-    e.text("ows:SupportedCRS", wmts->projection);
-    if (wmts->wellKnownScaleSet) {
-        e.text("ows:WellKnownScaleSet", *wmts->wellKnownScaleSet);
-    }
-}
-
-void matrixSets(XML &x, const RfSet &rfs)
-{
-    for (const auto *rf : rfs) { tileMatrixSet(x, *rf); }
+    Element c(x, "ows:Constraint");
+    Element aw(x, "ows:AllowedValues");
+    aw.text("ows:Value", "REST");
 }
 
 } // namespace
 
-std::string wmtsCapabilities(const WmtsLayer::list &layers)
+std::string wmtsCapabilities(const WmtsResources &resources)
 {
     XML x;
 
@@ -287,8 +433,9 @@ std::string wmtsCapabilities(const WmtsLayer::list &layers)
 
         serviceIdentification(x);
         serviceProvider(x);
+        operationsMetadata(x, resources);
 
-        matrixSets(x, content(x, layers));
+        content(x, resources.layers);
     }
 
     return x.CStr();

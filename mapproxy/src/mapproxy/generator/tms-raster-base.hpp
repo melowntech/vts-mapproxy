@@ -53,7 +53,7 @@ private:
 
     Task wmtsInterface(const FileInfo &fileInfo, Sink &sink) const;
 
-    WmtsLayer wmtsLayer(bool introspection) const;
+    WmtsResources wmtsResources(const WmtsFileInfo &fileInfo) const;
 
     const vre::Wmts& getWmts() const;
 

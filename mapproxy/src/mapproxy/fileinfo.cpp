@@ -66,7 +66,7 @@ namespace constants {
     const std::string LayerJson("layer.json");
     const std::string CesiumConf("cesium.conf");
 
-    const char *WmtsCapabilities("WMTSCapabilities.xml");
+    const std::string WmtsCapabilities("WMTSCapabilities.xml");
 
     const std::string DisableBrowserHeader("X-Mapproxy-Disable-Browser");
 
@@ -662,4 +662,9 @@ Sink::FileInfo WmtsFileInfo::sinkFileInfo(std::time_t lastModified) const
     }
 
     return {};
+}
+
+const std::string& WmtsFileInfo::capabilitesName()
+{
+    return constants::WmtsCapabilities;
 }

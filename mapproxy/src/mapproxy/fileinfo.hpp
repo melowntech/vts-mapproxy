@@ -263,6 +263,8 @@ struct WmtsFileInfo {
     /** Valid only when type == Type::support;
      */
     const vs::SupportFile *support;
+
+    static const std::string& capabilitesName();
 };
 
 #endif // mapproxy_fileinfo_hpp_included_

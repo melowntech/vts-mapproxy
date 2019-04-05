@@ -75,31 +75,39 @@ const vre::Wmts& TmsRasterBase::getWmts() const
     return *wmts_;
 }
 
-namespace {
-
-bool hasIntrospection(const std::string &query)
+WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo) const
 {
-    return !uq::empty(uq::find(uq::splitQuery(query), "is"));
-}
+    const auto &fi(fileInfo.fileInfo);
+    const bool introspection
+        (!uq::empty(uq::find(uq::splitQuery(fi.query), "is")));
 
-} // namespace
+    WmtsResources resources;
 
-WmtsLayer TmsRasterBase::wmtsLayer(bool introspection) const
-{
-    WmtsLayer layer(resource());
+    resources.layers.emplace_back(resource());
+    auto &layer(resources.layers.back());
+
+    layer.format = format_;
 
     // build root path
     if (introspection) {
-        // this is URL used in introspection -> local
-        layer.rootPath = "./";
-        layer.format = format_;
+        // used in introspection -> local, can be relative from wmts interface
+        // to vts interface
+        const auto resdiff
+            (resolveRoot
+             (id(), fi.interface
+              , id(), fi.interface.as(GeneratorInterface::Interface::vts)));
+
+        layer.rootPath =
+            prependRoot(std::string(), resource(), resdiff);
+
+        resources.capabilitiesUrl = "./" + fileInfo.capabilitesName();
     } else {
         LOG(warn4) << "TODO: Use external path; must be configured.";
         layer.rootPath = "./";
-        layer.format = format_;
+        resources.capabilitiesUrl = "./" + fileInfo.capabilitesName();
     }
 
-    return layer;
+    return resources;
 }
 
 Generator::Task TmsRasterBase
@@ -115,9 +123,7 @@ Generator::Task TmsRasterBase
         break;
 
     case WmtsFileInfo::Type::capabilities:
-        sink.content
-            (wmtsCapabilities({wmtsLayer(hasIntrospection(fileInfo.query))})
-             , fi.sinkFileInfo());
+        sink.content(wmtsCapabilities(wmtsResources(fi)), fi.sinkFileInfo());
         return {};
 
     case WmtsFileInfo::Type::support:

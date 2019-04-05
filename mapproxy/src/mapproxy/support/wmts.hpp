@@ -41,6 +41,11 @@ struct WmtsLayer {
     {}
 };
 
-std::string wmtsCapabilities(const WmtsLayer::list &layers);
+struct WmtsResources {
+    std::string capabilitiesUrl;
+    WmtsLayer::list layers;
+};
+
+std::string wmtsCapabilities(const WmtsResources &resources);
 
 #endif // mapproxy_support_wtms_hpp_included_
