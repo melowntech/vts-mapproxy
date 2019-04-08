@@ -347,6 +347,19 @@ GroupKey extractGroupKey(const Generator &generator)
     return { r.id.referenceFrame, r.generator.type, r.id.group };
 }
 
+Generators::Config fixUp(Generators::Config config)
+{
+    if (config.externalUrl) {
+        // sanity check
+        if (config.externalUrl->empty()) {
+            config.externalUrl = boost::none;
+        } else if (config.externalUrl->back() != '/') {
+            config.externalUrl->push_back('/');
+        }
+    }
+    return config;
+}
+
 } // namespace
 
 class Generators::Detail
@@ -356,7 +369,7 @@ class Generators::Detail
 public:
     Detail(const Generators::Config &config
            , const ResourceBackend::pointer &resourceBackend)
-        : config_(config), resourceBackend_(resourceBackend)
+        : config_(fixUp(config)), resourceBackend_(resourceBackend)
         , arsenal_(), running_(false), updateRequest_(false), lastUpdate_(0)
         , ready_(false), preparing_(0)
         , work_(ios_), demRegistry_(std::make_shared<DemRegistry>())

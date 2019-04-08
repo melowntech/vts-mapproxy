@@ -29,23 +29,31 @@
 
 #include "../resource.hpp"
 
-struct WmtsLayer {
+namespace wmts {
+
+struct Layer {
     const Resource &resource;
     std::string rootPath;
     RasterFormat format;
 
-    typedef std::vector<WmtsLayer> list;
+    typedef std::vector<Layer> list;
 
-    WmtsLayer(const Resource &resource)
+    Layer(const Resource &resource)
         : resource(resource), format(RasterFormat::jpg)
     {}
 };
 
 struct WmtsResources {
     std::string capabilitiesUrl;
-    WmtsLayer::list layers;
+    Layer::list layers;
 };
 
 std::string wmtsCapabilities(const WmtsResources &resources);
+
+/** Prepares WMTS support.
+ */
+void prepareTileMatrixSets();
+
+} // namespace wmts
 
 #endif // mapproxy_support_wtms_hpp_included_

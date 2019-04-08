@@ -99,6 +99,7 @@ public:
         const vs::SupportFile::Vars *defaults;
         double defaultFov;
         std::set<Resource::Generator::Type> freezeResourceTypes;
+        boost::optional<std::string> externalUrl;
 
         Config()
             : fileFlags(), variables(), defaults()

@@ -49,6 +49,8 @@
 
 #include "http/http.hpp"
 
+#include "support/wmts.hpp"
+
 #include "error.hpp"
 #include "resourcebackend.hpp"
 #include "generator.hpp"
@@ -177,6 +179,10 @@ void Daemon::configuration(po::options_description &cmdline
          ->default_value(httpEnableBrowser_)->required()
          , "Enables resource browsering functionaly if set to true.")
 
+        ("http.externalUrl", po::value<std::string>()
+         , "External URL of root of this mapproxy instance. Used only "
+         "by services that cannot cope with relive paths (WMTS).")
+
         ("core.threadCount", po::value(&coreThreadCount_)
          ->default_value(coreThreadCount_)->required()
          , "Number of processing threads.")
@@ -294,6 +300,11 @@ void Daemon::configure(const po::variables_map &vars)
         }
     }
 
+    if (vars.count("http.externalUrl")) {
+        generatorsConfig_.externalUrl
+            = vars["http.externalUrl"].as<std::string>();
+    }
+
     LOG(info3, log_)
         << "Config:"
         << "\n\tstore.path = " << generatorsConfig_.root
@@ -311,6 +322,11 @@ void Daemon::configure(const po::variables_map &vars)
         << "\n\tresource-backend.freeze = ["
         << utility::join(generatorsConfig_.freezeResourceTypes, ",")
         << "]\n"
+        << utility::LManip([&](std::ostream &os) {
+                if (!generatorsConfig_.externalUrl) { return; }
+                os << "\thttp.externalUrl = " << *generatorsConfig_.externalUrl
+                   << '\n';
+            })
         << utility::LManip([&](std::ostream &os) {
                 ResourceBackend::printConfig(os, "\t" + RBPrefixDotted
                                              , resourceBackendConfig_);
@@ -360,6 +376,9 @@ bool Daemon::prePersonaSwitch()
 
 service::Service::Cleanup Daemon::start()
 {
+    // wmts support
+    wmts::prepareTileMatrixSets();
+
     auto guard(std::make_shared<Stopper>(*this));
 
     // warper must be first since it uses processes

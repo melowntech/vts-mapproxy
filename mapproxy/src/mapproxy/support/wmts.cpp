@@ -38,6 +38,7 @@
 #include "vts-libs/registry/extensions.hpp"
 #include "vts-libs/vts/csconvertor.hpp"
 #include "vts-libs/vts/tileop.hpp"
+#include "vts-libs/vts/io.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -48,7 +49,142 @@ namespace vr = vtslibs::registry;
 namespace vre = vtslibs::registry::extensions;
 namespace vts = vtslibs::vts;
 
+namespace wmts {
+
 namespace {
+
+typedef std::vector<vts::LodTileRange> LodTileRanges;
+
+struct TileMatrixSet {
+public:
+    std::string id;
+    std::string description;
+    vre::Wmts wmts;
+
+    math::Extents2 extents;
+    std::string srs;
+    std::string extentsSrs;
+    vts::Lod rootLod;
+    vts::TileRange tileRange;
+    double metersPerUnit;
+    geo::SrsDefinition geographic;
+
+    math::Extents2 computeExtents(const Resource &r) const;
+
+    static void prepare();
+    static const TileMatrixSet& get(const std::string &rf);
+
+private:
+    TileMatrixSet(const vr::ReferenceFrame &rf, const vre::Wmts &wmts);
+    typedef std::map<std::string, TileMatrixSet> map;
+    static TileMatrixSet::map rfSets_;
+};
+
+TileMatrixSet::map TileMatrixSet::rfSets_;
+
+void TileMatrixSet::prepare()
+{
+    for (const auto &item : vr::system.referenceFrames) {
+        const auto &rf(item.second);
+        if (const auto *ext = rf.findExtension<vre::Wmts>()) {
+            rfSets_.insert(TileMatrixSet::map::value_type
+                           (item.first, TileMatrixSet(rf, *ext)));
+        }
+    }
+}
+
+const TileMatrixSet& TileMatrixSet::get(const std::string &rf)
+{
+    const auto frfSets(rfSets_.find(rf));
+    if (frfSets == rfSets_.end()) {
+        LOGTHROW(err1, Error)
+            << "Reference frame <" << rf << "> has no WMTS extension.";
+    }
+    return frfSets->second;
+}
+
+TileMatrixSet::TileMatrixSet(const vr::ReferenceFrame &rf
+                             , const vre::Wmts &wmts)
+    : id(rf.id), description(rf.description), wmts(wmts)
+    , tileRange(math::InvalidExtents{})
+    , metersPerUnit(1.0)
+{
+    if (wmts.content) {
+        srs = *wmts.content;
+
+        // this ... is here to silence compiler's "may-be-uninitialized"
+        auto lod([]()->boost::optional<vts::Lod> { return boost::none; }());
+
+        // find subtree-roots that provide data in "content" SRS
+        for (const auto &item : rf.division.nodes) {
+            const auto &node(item.second);
+            if (node.srs != srs) { continue; }
+
+            if (!lod) {
+                lod = node.id.lod;
+            } else if (*lod != node.id.lod) {
+                LOGTHROW(err1, Error)
+                    << "Malformed WMTS extension in reference frame <"
+                    << id << ">: not all content root nodes are"
+                    "at the same LOD.";
+            }
+
+            math::update(extents, node.extents);
+            math::update(tileRange, node.id.x, node.id.y);
+        }
+
+        if (!lod) {
+            LOGTHROW(err1, Error)
+                << "Malformed WMTS extension in reference frame <"
+                << id << ">: No root node found for wmts.content <"
+                << srs << "> in the reference frame.";
+        }
+        rootLod = *lod;
+    } else {
+        if (rf.division.nodes.size() != 1) {
+            LOGTHROW(err1, Error)
+                << "Malformed WMTS extension in reference frame <"
+                << id << ">: No wmts.content and the reference frame"
+                "is not single-rooted.";
+        }
+        const auto &node(rf.division.nodes.begin()->second);
+        extents = node.extents;
+        srs = node.srs;
+        rootLod = node.id.lod;
+        tileRange = vts::tileRange(node.id);
+    }
+
+    extentsSrs = wmts.extentsSrs ? *wmts.extentsSrs : srs;
+    extents = vts::CsConvertor(srs, extentsSrs)(extents);
+
+    {
+        const auto srsDef(vr::system.srs(extentsSrs).srsDef);
+        geographic = srsDef.geographic();
+
+        // get linear unit of given SRS (force computation for angluar systems)
+        metersPerUnit = geo::linearUnit(srsDef, true);
+    }
+}
+
+math::Extents2 TileMatrixSet::computeExtents(const Resource &r) const
+{
+    const vts::CsConvertor conv(srs, extentsSrs);
+
+    math::Extents2 e(math::InvalidExtents{});
+
+    const auto lod(std::max(r.lodRange.min, rootLod));
+
+    // treat min lod as one gigantic metatile
+    for (const auto &block : metatileBlocks
+             (r, vts::TileId(lod, 0, 0), lod, false))
+    {
+        if (block.srs == srs) {
+            math::update(e, conv(block.extents));
+        }
+    }
+
+    return e;
+}
 
 constexpr double wmtsResolution(0.28e-3);
 
@@ -121,7 +257,7 @@ void text(XML &x, const char *element, T &&value) {
     Element(x, element).text(std::forward<T>(value));
 }
 
-std::string makeTemplate(const WmtsLayer &layer)
+std::string makeTemplate(const Layer &layer)
 {
     std::ostringstream os;
     os << layer.rootPath;
@@ -130,6 +266,9 @@ std::string makeTemplate(const WmtsLayer &layer)
     }
 
     os << "{TileMatrix}-{TileCol}-{TileRow}." << layer.format;
+    if (layer.resource.revision) {
+        os << "?r=" << layer.resource.revision;
+    }
 
     return os.str();
 }
@@ -180,112 +319,6 @@ void widthAndHeight(Element &e, const char *widthName, const char *heightName
     e.text(heightName, size.height);
 }
 
-struct TileMatrixSet {
-    std::string id;
-    std::string description;
-
-    math::Extents2 extents;
-    std::string srs;
-    std::string extentsSrs;
-    vts::LodRange lodRange;
-    vts::TileRange tileRange;
-    vre::Wmts wmts;
-    double metersPerUnit;
-    geo::SrsDefinition geographic;
-
-    TileMatrixSet(const vr::ReferenceFrame &rf);
-
-    math::Extents2 computeExtents(const Resource &r) const;
-};
-
-TileMatrixSet::TileMatrixSet(const vr::ReferenceFrame &rf)
-    : id(rf.id), description(rf.description)
-    , lodRange(vts::LodRange::emptyRange())
-    , tileRange(math::InvalidExtents{})
-    , metersPerUnit(1.0)
-{
-    if (const auto *ext = rf.findExtension<vre::Wmts>()) {
-        wmts = *ext;
-    } else {
-        LOGTHROW(err1, Error)
-            << "Reference frame <" << id << "> has no WMTS extension.";
-    }
-
-    if (wmts.content) {
-        srs = *wmts.content;
-
-        // this ... is here to silence compiler's "may-be-uninitialized"
-        auto lod([]()->boost::optional<vts::Lod> { return boost::none; }());
-
-        // find subtree-roots that provide data in "content" SRS
-        for (const auto &item : rf.division.nodes) {
-            const auto &node(item.second);
-            if (node.srs != srs) { continue; }
-
-            if (!lod) {
-                lod = node.id.lod;
-            } else if (*lod != node.id.lod) {
-                LOGTHROW(err1, Error)
-                    << "Malformed WMTS extension in reference frame <"
-                    << id << ">: not all content root nodes are"
-                    "at the same LOD.";
-            }
-
-            math::update(extents, node.extents);
-            math::update(tileRange, node.id.x, node.id.y);
-        }
-
-        if (!lod) {
-            LOGTHROW(err1, Error)
-                << "Malformed WMTS extension in reference frame <"
-                << id << ">: No root node found for wmts.content <"
-                << srs << "> in the reference frame.";
-        }
-        lodRange = vts::LodRange(*lod);
-    } else {
-        if (rf.division.nodes.size() != 1) {
-            LOGTHROW(err1, Error)
-                << "Malformed WMTS extension in reference frame <"
-                << id << ">: No wmts.content and the reference frame"
-                "is not single-rooted.";
-        }
-        const auto &node(rf.division.nodes.begin()->second);
-        extents = node.extents;
-        srs = node.srs;
-        lodRange = vts::LodRange(node.id.lod);
-        tileRange = vts::tileRange(node.id);
-    }
-
-    extentsSrs = wmts.extentsSrs ? *wmts.extentsSrs : srs;
-    extents = vts::CsConvertor(srs, extentsSrs)(extents);
-
-    {
-        const auto srsDef(vr::system.srs(extentsSrs).srsDef);
-        geographic = srsDef.geographic();
-
-        // get linear unit of given SRS (force computation for angluar systems)
-        metersPerUnit = geo::linearUnit(srsDef, true);
-    }
-}
-
-math::Extents2 TileMatrixSet::computeExtents(const Resource &r) const
-{
-    const vts::CsConvertor conv(srs, extentsSrs);
-
-    math::Extents2 e(math::InvalidExtents{});
-
-    // treat min lod as one gigantic metatile
-    for (const auto &block : metatileBlocks
-             (r, vts::TileId(r.lodRange.min, 0, 0), r.lodRange.min, false))
-    {
-        if (block.srs == srs) {
-            math::update(e, conv(block.extents));
-        }
-    }
-
-    return e;
-}
-
 void tileMatrix(XML &x, vts::Lod lod, const vts::TileRange &tr
                 , const math::Extents2 &extents
                 , const double metersPerUnit)
@@ -310,12 +343,17 @@ void tileMatrix(XML &x, vts::Lod lod, const vts::TileRange &tr
 
 /** Describe reference frame as tile matrix set
  */
-void tileMatrixSet(XML &x, const TileMatrixSet &tms)
+void tileMatrixSet(XML &x, const std::string &identifier
+                   , const TileMatrixSet &tms
+                   , const LodTileRanges &ranges)
 {
     Element e(x, "TileMatrixSet");
 
-    e.text("ows:Identifier", tms.id);
-    e.text("ows:Title", "VTS reference frame <" + tms.id + ">");
+    e.text("ows:Identifier", identifier);
+    e.text("ows:Title"
+           , utility::format("VTS reference frame <%s> in LOD range [%s, %s]"
+                             , tms.id, ranges.front().lod
+                             , ranges.back().lod));
     e.text("ows:Abstract", tms.description);
 
     boundingBox(x, tms.extents, tms.wmts.projection);
@@ -324,10 +362,38 @@ void tileMatrixSet(XML &x, const TileMatrixSet &tms)
         e.text("ows:WellKnownScaleSet", *tms.wmts.wellKnownScaleSet);
     }
 
-    auto tr(tms.tileRange);
-    for (const auto lod : tms.lodRange) {
-        tileMatrix(x, lod, tr, tms.extents, tms.metersPerUnit);
-        tr = vts::childRange(tr);
+    for (const auto &range : ranges) {
+        tileMatrix(x, range.lod, range.range, tms.extents, tms.metersPerUnit);
+    }
+}
+
+void tileMatrixLimits(XML &x, const vts::Lod lod, const vts::TileRange &range)
+{
+    Element t(x, "TileMatrixLimits");
+    t.text("TileMatrix", lod);
+    t.text("MinTileCol", range.ll(0));
+    t.text("MaxTileCol", range.ur(0));
+    t.text("MinTileRow", range.ll(1));
+    t.text("MaxTileRow", range.ur(1));
+}
+
+void tileMatrixSetLimits(XML &x, const LodTileRanges &tmsRanges
+                         , const LodTileRanges &resRanges)
+
+{
+    if (tmsRanges.front().range == resRanges.front().range) { return; }
+
+    Element e(x, "TileMatrixSetLimits");
+    auto iresRanges(resRanges.begin());
+    for (const auto &tmsRange : tmsRanges) {
+        const auto resRange(*iresRanges++);
+
+        // and intersect with resource tile range
+        const auto tr(vts::tileRangesIntersect
+                      (resRange.range, tmsRange.range, std::nothrow));
+        if (!math::valid(tr)) { continue; }
+
+        tileMatrixLimits(x, resRange.lod, tr);
     }
 }
 
@@ -339,33 +405,91 @@ void layerExtents(XML &x, const TileMatrixSet &tms, const Resource &r)
     boundingBox(x, vts::CsConvertor(tms.extentsSrs, tms.geographic)(extents));
 }
 
-void content(XML &x, const WmtsLayer::list &layers)
+LodTileRanges makeRanges(const TileMatrixSet &tms
+                         , const vts::LodRange &lodRange)
 {
-    typedef std::map<const vr::ReferenceFrame*, TileMatrixSet> map;
-    map tmss;
+    const auto lodDiff(lodRange.min - tms.rootLod);
+    const auto tr(vts::childRange(tms.tileRange, lodDiff));
+    return vts::Ranges(lodRange, tr).ranges();
+}
+
+struct TmsEntry {
+    std::string id;
+    const TileMatrixSet &tms;
+    LodTileRanges ranges;
+
+    TmsEntry(const std::string &id, const TileMatrixSet &tms
+             , const vts::LodRange &lodRange)
+        : id(id), tms(tms), ranges(makeRanges(tms, lodRange))
+    {}
+};
+
+class TmsCache {
+public:
+    TmsCache() {}
+
+    const TmsEntry& get(const Resource &r) {
+        const auto &tms(TileMatrixSet::get(r.referenceFrame->id));
+        vts::LodRange lr(std::max(tms.rootLod, r.lodRange.min)
+                         , std::max(tms.rootLod, r.lodRange.max));
+
+        Key key(r.referenceFrame->id, lr);
+        auto fcache(cache_.find(key));
+        if (fcache != cache_.end()) { return fcache->second; }
+
+        const auto id(utility::format("%s:%s-%s", tms.id, lr.min, lr.max));
+
+        return cache_.insert(Cache::value_type(key, TmsEntry(id, tms, lr)))
+            .first->second;
+    }
+
+    void output(XML &x) {
+        for (const auto &tms : cache_) {
+            tileMatrixSet(x, tms.second.id, tms.second.tms, tms.second.ranges);
+        }
+    }
+
+
+private:
+    struct Key {
+        std::string id;
+        vts::LodRange lodRange;
+
+        Key(const std::string &id, const vts::LodRange &lodRange)
+            : id(id), lodRange(lodRange)
+        {}
+
+        bool operator<(const Key &other) const {
+            if (id < other.id) { return true; }
+            if (id > other.id) { return false; }
+
+            if (lodRange.min < other.lodRange.min) { return true; }
+            if (other.lodRange.min < lodRange.min) { return false; }
+
+            return lodRange.max < other.lodRange.max;
+        }
+    };
+
+    typedef std::map<Key, TmsEntry> Cache;
+    Cache cache_;
+};
+
+void content(XML &x, const Layer::list &layers)
+{
+    TmsCache cache;
 
     Element c(x, "Contents");
     for (const auto &layer : layers) {
         const auto &r(layer.resource);
 
-        // remember reference frame
-        auto ftmss(tmss.find(r.referenceFrame));
-        if (ftmss == tmss.end()) {
-            ftmss = tmss.insert
-                (map::value_type
-                 (r.referenceFrame, TileMatrixSet(*r.referenceFrame))).first;
-        }
-        auto &tms(ftmss->second);
-
-        // update tile-matrix-set lod range
-        update(tms.lodRange, r.lodRange.max);
+        const TmsEntry &tms(cache.get(r));
 
         Element l(x, "Layer");
         l.text("ows:Title", "VTS Mapproxy resource <" + r.id.id + ">");
         l.text("ows:Abstract", r.comment);
         l.text("ows:Identifier", r.id.fullId());
 
-        layerExtents(x, tms, r);
+        layerExtents(x, tms.tms, r);
 
         const auto ct(contentType(layer.format));
         l.text("Format", ct);
@@ -384,11 +508,13 @@ void content(XML &x, const WmtsLayer::list &layers)
         {
             // TileMatrixSet -> reference frame
             Element tmsl(x, "TileMatrixSetLink");
-            tmsl.text("TileMatrixSet", r.id.referenceFrame);
+            tmsl.text("TileMatrixSet", tms.id);
+            tileMatrixSetLimits
+                (x, tms.ranges, vts::Ranges(r.lodRange, r.tileRange).ranges());
         }
     }
 
-    for (const auto &tms : tmss) { tileMatrixSet(x, tms.second); }
+    cache.output(x);
 }
 
 void operationsMetadata(XML &x, const WmtsResources &resources)
@@ -408,6 +534,8 @@ void operationsMetadata(XML &x, const WmtsResources &resources)
 }
 
 } // namespace
+
+void prepareTileMatrixSets() { TileMatrixSet::prepare(); }
 
 std::string wmtsCapabilities(const WmtsResources &resources)
 {
@@ -440,3 +568,5 @@ std::string wmtsCapabilities(const WmtsResources &resources)
 
     return x.CStr();
 }
+
+} // namespace wmts

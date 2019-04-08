@@ -35,6 +35,17 @@ function startBrowser() {
                                , getProjection("CRS:84")
                                ,  options.projection);
 
+        // calculate allowed resolutions for tile-matrix-set
+        var tms = capabilities.Contents.TileMatrixSet.find(
+            x => x.Identifier === layer.TileMatrixSetLink[0].TileMatrixSet
+        );
+        var projection = getProjection(options.projection);
+        var matrix = tms.TileMatrix[0];
+        const width = getWidth(projection.getExtent());
+        var resolutions = tms.TileMatrix.map(
+            m => width / m.TileWidth / m.MatrixWidth
+        );
+
         map = new Map({
             layers: [
                 new TileLayer({
@@ -45,7 +56,9 @@ function startBrowser() {
             target: 'map',
             view: new View({
                 center: center
-                , zoom: 0
+                , projection: options.projection
+                , resolutions: resolutions
+                , resolution: resolutions[0]
             })
         });
     });

@@ -75,18 +75,27 @@ const vre::Wmts& TmsRasterBase::getWmts() const
     return *wmts_;
 }
 
-WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo) const
+wmts::WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo)
+    const
 {
     const auto &fi(fileInfo.fileInfo);
-    const bool introspection
+    bool introspection
         (!uq::empty(uq::find(uq::splitQuery(fi.query), "is")));
 
-    WmtsResources resources;
+    wmts::WmtsResources resources;
 
     resources.layers.emplace_back(resource());
     auto &layer(resources.layers.back());
 
     layer.format = format_;
+
+    if (!introspection && !config().externalUrl) {
+        LOG(warn2)
+            << "External URL unset in configuration, cannot generate "
+            "proper URL template in WMTSCapabilities; please, set "
+            "external URL. Switching to introspection mode.";
+        introspection = true;
+    }
 
     // build root path
     if (introspection) {
@@ -102,9 +111,11 @@ WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo) const
 
         resources.capabilitiesUrl = "./" + fileInfo.capabilitesName();
     } else {
-        LOG(warn4) << "TODO: Use external path; must be configured.";
-        layer.rootPath = "./";
-        resources.capabilitiesUrl = "./" + fileInfo.capabilitesName();
+        layer.rootPath = *config().externalUrl
+            + prependRoot(std::string(), resource()
+                          , ResourceRoot::Depth::referenceFrame);
+        resources.capabilitiesUrl =
+            layer.rootPath + "/" + fileInfo.capabilitesName();
     }
 
     return resources;
