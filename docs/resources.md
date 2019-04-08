@@ -397,9 +397,9 @@ definition = {
  
 Available format configurations:
 
-* `geodataJson`:
+* For `geodataJson`:
 ```javascript
-{
+formatConfig = {
     Int resolution // number of samples the bounding box is divided to, defaults to 4096
 }
 ```
