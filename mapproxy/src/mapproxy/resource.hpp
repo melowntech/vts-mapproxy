@@ -228,7 +228,7 @@ private:
 
 struct GeneratorInterface {
     typedef Resource::Generator::Type Type;
-    enum class Interface { vts, terrain, wmts };
+    enum class Interface : std::uint8_t { vts = 1, terrain = 2, wmts = 3 };
 
     Type type;
     Interface interface;
@@ -484,6 +484,27 @@ inline bool GeneratorInterface::operator==(const GeneratorInterface &o) const {
 
 inline bool GeneratorInterface::operator!=(const GeneratorInterface &o) const {
     return !(*this == o);
+}
+
+inline GeneratorInterface::Interface
+operator|(GeneratorInterface::Interface l, GeneratorInterface::Interface r)
+{
+    return static_cast<GeneratorInterface::Interface>
+        (static_cast<std::uint8_t>(l) | static_cast<std::uint8_t>(r));
+}
+
+inline GeneratorInterface::Interface&
+operator|=(GeneratorInterface::Interface &l, GeneratorInterface::Interface r)
+{
+    return (l = l | r);
+}
+
+inline GeneratorInterface::Interface
+operator&(GeneratorInterface::Interface l, GeneratorInterface::Interface r)
+{
+    return static_cast<GeneratorInterface::Interface>
+        (static_cast<std::uint8_t>(l)
+         & static_cast<std::uint8_t>(r));
 }
 
 #endif // mapproxy_resource_hpp_included_

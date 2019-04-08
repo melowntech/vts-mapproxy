@@ -126,6 +126,23 @@ public:
             : resource(resource), system(false) {}
     };
 
+    struct Properties {
+        GeneratorInterface::Interface supportedInterfaces;
+
+        Properties(GeneratorInterface::Interface iface
+                       = GeneratorInterface::Interface::vts)
+            : supportedInterfaces(iface)
+        {}
+
+        Properties& support(GeneratorInterface::Interface iface) {
+            supportedInterfaces |= iface; return *this;
+        }
+
+        bool isSupported(GeneratorInterface::Interface iface) const {
+            return (supportedInterfaces & iface) == iface;
+        }
+    };
+
     static Generator::pointer create(const Params &params);
 
     static DefinitionBase::pointer definition(const Resource::Generator &type);
@@ -171,6 +188,7 @@ public:
     const boost::filesystem::path& resourceRoot() const {
         return config_.resourceRoot;
     }
+    const Properties& properties() const { return properties_; }
 
     Changed changed(const Resource &resource) const;
 
@@ -200,7 +218,7 @@ public:
     bool updatedSince(std::uint64_t timestamp) const;
 
 protected:
-    Generator(const Params &params);
+    Generator(const Params &params, const Properties &props = Properties());
 
     void makeReady();
     bool fresh() const { return fresh_; }
@@ -254,6 +272,7 @@ private:
 
     const GeneratorFinder *generatorFinder_;
     Config config_;
+    Properties properties_;
     Resource resource_;
     Resource savedResource_;
     bool fresh_;
@@ -352,13 +371,6 @@ inline void Generator::prepare(Arsenal &arsenal)
 inline vts::MapConfig Generator::mapConfig(ResourceRoot root) const
 {
     return mapConfig_impl(root);
-}
-
-inline Generator::Task Generator::generateFile(const FileInfo &fileInfo
-                                               , Sink sink)
-    const
-{
-    return generateFile_impl(fileInfo, sink);
 }
 
 inline Generator::pointer Generators::generator(const FileInfo &fileInfo) const

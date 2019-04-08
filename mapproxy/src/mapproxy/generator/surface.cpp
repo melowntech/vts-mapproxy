@@ -80,6 +80,20 @@ namespace vts = vtslibs::vts;
 
 namespace generator {
 
+namespace {
+
+Generator::Properties
+terrainSupport(const Generator::Params &params)
+{
+    Generator::Properties props;
+    if (!params.resource.referenceFrame->findExtension<vre::Tms>()) {
+        return props;
+    }
+    return props.support(GeneratorInterface::Interface::terrain);
+}
+
+} // namespace
+
 fs::path SurfaceBase::filePath(vts::File fileType) const
 {
     switch (fileType) {
@@ -94,7 +108,7 @@ fs::path SurfaceBase::filePath(vts::File fileType) const
 }
 
 SurfaceBase::SurfaceBase(const Params &params)
-    : Generator(params)
+    : Generator(params, terrainSupport(params))
     , definition_(resource().definition<Definition>())
     , tms_(params.resource.referenceFrame->findExtension<vre::Tms>())
 {}

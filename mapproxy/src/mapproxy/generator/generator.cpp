@@ -43,6 +43,7 @@
 #include "utility/path.hpp"
 #include "utility/gccversion.hpp"
 #include "utility/time.hpp"
+#include "utility/raise.hpp"
 
 #include "../error.hpp"
 #include "../generator.hpp"
@@ -101,8 +102,9 @@ Generator::pointer Generator::create(const Params &params)
     throw;
 }
 
-Generator::Generator(const Params &params)
+Generator::Generator(const Params &params, const Properties &properties)
     : generatorFinder_(params.generatorFinder), config_(params.config)
+    , properties_(properties)
     , resource_(params.resource), savedResource_(params.resource)
     , fresh_(false), system_(params.system)
     , changeEnforced_(false)
@@ -1153,4 +1155,17 @@ void Generators::Detail::listResources(std::ostream &os) const
 void Generators::listResources(std::ostream &os) const
 {
     detail().listResources(os);
+}
+
+Generator::Task Generator::generateFile(const FileInfo &fileInfo, Sink sink)
+    const
+{
+    if (!properties_.isSupported(fileInfo.interface.interface)) {
+        utility::raise<NotFound>
+            ("WMTS interface disabled, no <wmts> extension in "
+             "reference frame <%s> or not supported by <%s> driver."
+             , referenceFrameId(), resource().generator);
+    }
+
+    return generateFile_impl(fileInfo, sink);
 }

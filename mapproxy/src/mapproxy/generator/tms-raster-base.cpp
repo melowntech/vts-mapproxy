@@ -35,11 +35,27 @@ namespace uq = utility::query;
 
 namespace generator {
 
+namespace {
+Generator::Properties
+wmtsSupport(const Generator::Params &params
+            , const boost::optional<RasterFormat> &format)
+{
+    Generator::Properties props;
+    if (!format) { return props; }
+    if (!params.resource.referenceFrame->findExtension<vre::Wmts>()) {
+        return props;
+    }
+    return props.support(GeneratorInterface::Interface::wmts);
+}
+
+} // namespace
+
 TmsRasterBase
 ::TmsRasterBase(const Params &params
                 , const boost::optional<RasterFormat> &format)
-    : Generator(params), format_(format ? *format : RasterFormat())
-    , wmts_(format
+    : Generator(params, wmtsSupport(params, format))
+    , format_(format ? *format : RasterFormat())
+    , wmts_(properties().isSupported(GeneratorInterface::Interface::wmts)
             ? params.resource.referenceFrame->findExtension<vre::Wmts>()
             : nullptr)
 {}

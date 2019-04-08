@@ -152,7 +152,7 @@ vts::MapConfig TmsRasterRemote::mapConfig_impl(ResourceRoot root)
 }
 
 Generator::Task TmsRasterRemote::generateFile_impl(const FileInfo &fileInfo
-                                             , Sink &sink) const
+                                                   , Sink &sink) const
 {
     TmsFileInfo fi(fileInfo);
 
