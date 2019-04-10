@@ -620,8 +620,47 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
     // remap id from TMS to VTS
     const auto tileId(tms2vts(tms.rootId, tms.flipY, tmsTileId));
 
+    const auto &zerotile([&]() -> bool
+    {
+        // level 0 is always generated
+        if (tmsTileId.lod > 0) {
+            // other non-defined levels are base on tile's presence above
+            // existing tiles (computed in VTS system!)
+            const auto &r(resource());
+            // shift resource's tile range to this lod
+            const auto range
+                (vts::shiftRange(r.lodRange.min, r.tileRange, tileId.lod));
+            // and check for tile's incidence
+            if (!math::inside(range, tileId.x, tileId.y)) { return false; }
+        }
+
+        vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+        if (!nodeInfo.productive()) {
+            utility::raise<NotFound>
+                ("TileId outside of valid reference frame tree.");
+        }
+
+        // some toplevel tile -> zero tile
+        auto lm(meshFromNode(nodeInfo, math::Size2(10, 10)));
+
+        // write mesh to stream (gzipped)
+        std::ostringstream os;
+        qmf::save(qmfMesh(lm.mesh, nodeInfo
+                          , (tms.physicalSrs ? *tms.physicalSrs
+                             : referenceFrame().model.physicalSrs)
+                          , boost::none)
+                  , utility::Gzipper(os), fi.fileInfo.filename);
+
+        auto sfi(fi.sinkFileInfo());
+        sfi.addHeader("Content-Encoding", "gzip");
+        sink.content(os.str(), sfi);
+
+        return true;
+    });
+
     auto flags(index_->tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
+        if (zerotile()) { return; }
         utility::raise<NotFound>("No terrain for this tile.");
     }
 
@@ -631,8 +670,8 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
             ("TileId outside of valid reference frame tree.");
     }
 
-    // generate the actual mesh
-    auto lm(generateMeshImpl(nodeInfo, sink, arsenal));
+    // generate the actual mesh; replace all no-data values with zero
+    auto lm(generateMeshImpl(nodeInfo, sink, arsenal, 0.0));
 
     // write mesh to stream (gzipped)
     std::ostringstream os;
@@ -646,6 +685,61 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
     sfi.addHeader("Content-Encoding", "gzip");
     sink.content(os.str(), sfi);
 }
+
+namespace {
+
+struct TerrainBound {
+    LayerJson::Available available;
+    math::Extents2 bounds;
+
+    TerrainBound() : bounds(math::InvalidExtents{}) {}
+};
+
+TerrainBound terrainBounds(const Resource &r, const vre::Tms &tms)
+{
+    TerrainBound tb;
+
+    // ensure we have top-level tiles "available"
+    if (tms.rootId.lod < r.lodRange.min) {
+        tb.available.emplace_back();
+        auto &current(tb.available.back());
+
+        const auto lod(tms.rootId.lod);
+        for (const auto &block : metatileBlocks
+                 (*r.referenceFrame, vts::TileId(lod, 0, 0), lod, false))
+        {
+            const auto tmsRange(vts2tms(tms.rootId, tms.flipY
+                                        , vts::LodTileRange(lod, block.view)));
+            current.push_back(tmsRange.range);
+        }
+    }
+
+    // all other lods between top-level and first data lod are empty
+    for (auto lod(tms.rootId.lod + 1); lod < r.lodRange.min; ++lod) {
+        tb.available.emplace_back();
+    }
+
+    const auto physicalSrs(tms.physicalSrs ? *tms.physicalSrs
+                           : r.referenceFrame->model.physicalSrs);
+    for (const auto &range : vts::Ranges(r.lodRange, r.tileRange).ranges()) {
+        tb.available.emplace_back();
+        auto &current(tb.available.back());
+        const auto tmsRange(vts2tms(tms.rootId, tms.flipY, range));
+        current.push_back(tmsRange.range);
+
+        // treat current LOD as one gigantic metatile
+        for (const auto &block : metatileBlocks(r, vts::TileId(range.lod, 0, 0)
+                                                , range.lod, false))
+        {
+            const vts::CsConvertor conv(block.srs, physicalSrs);
+            math::update(tb.bounds, conv(block.extents));
+        }
+    }
+
+    return tb;
+}
+
+} // namespace
 
 void SurfaceBase::layerJson(Sink &sink, const TerrainFileInfo &fi
                             , const vre::Tms &tms) const
@@ -666,30 +760,12 @@ void SurfaceBase::layerJson(Sink &sink, const TerrainFileInfo &fi
     layer.projection = tms.projection;
 
     // fixed LOD range
-    layer.zoom.min = r.lodRange.min - tms.rootId.lod;
+    layer.zoom.min = 0; // r.lodRange.min - tms.rootId.lod;
     layer.zoom.max = r.lodRange.max - tms.rootId.lod;
 
-    // invalidate extents, updated in this per-lod loop
-    layer.bounds = math::Extents2(math::InvalidExtents{});
-
-    // TODO: use tileindex instead of single tile range; should be OK for now
-    for (const auto &range : vts::Ranges(r.lodRange, r.tileRange).ranges()) {
-        layer.available.emplace_back();
-        auto &current(layer.available.back());
-        const auto tmsRange(vts2tms(tms.rootId, tms.flipY, range));
-        current.push_back(tmsRange.range);
-
-        const auto physicalSrs(tms.physicalSrs ? *tms.physicalSrs
-                               : referenceFrame().model.physicalSrs);
-
-        // treat current LOD as one gigantic metatile
-        for (const auto &block : metatileBlocks(r, vts::TileId(range.lod, 0, 0)
-                                                , range.lod, false))
-        {
-            const vts::CsConvertor conv(block.srs, physicalSrs);
-            math::update(layer.bounds, conv(block.extents));
-        }
-    }
+    auto tb(terrainBounds(r, tms));
+    layer.available = std::move(tb.available);
+    layer.bounds = std::move(tb.bounds);
 
     if (!r.credits.empty()) {
         layer.attribution
@@ -730,6 +806,9 @@ void SurfaceBase::cesiumConf(Sink &sink, const TerrainFileInfo &fi
              / "boundlayer.json");
         conf.boundLayer = blPath.string();
     };
+
+    const auto tb(terrainBounds(resource(), tms));
+    conf.defaultView = tb.bounds;
 
     std::ostringstream os;
     save(conf, os);

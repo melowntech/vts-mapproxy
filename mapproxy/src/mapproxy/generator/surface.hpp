@@ -105,9 +105,10 @@ private:
 
     /** Generic mesh generation, used by both surface and terrain interface.
      */
-    virtual AugmentedMesh generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                           , Sink &sink
-                                           , Arsenal &arsenal) const = 0;
+    virtual AugmentedMesh
+    generateMeshImpl(const vts::NodeInfo &nodeInfo
+                     , Sink &sink, Arsenal &arsenal
+                     , const OptHeight &defaultHeight = boost::none) const = 0;
 
     /** Cesium terrain provider support. Generates non-VTS mesh.
      */

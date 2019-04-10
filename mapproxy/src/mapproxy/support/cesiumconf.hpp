@@ -47,6 +47,7 @@ struct CesiumConf {
     typedef boost::optional<std::string> OString;
     vre::Tms tms;
     OString boundLayer;
+    boost::optional<math::Extents2> defaultView;
 
     CesiumConf() {}
 };

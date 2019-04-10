@@ -63,11 +63,22 @@ struct MetatileBlock {
 
 /** Generate metatile blocks for given metatile id in given reference frame
  *
- *  \param referenceFrame reference frame
+ *  \param resource resource to get reference frame and tile range bounds
  *  \param tileId metatile id
  *  \param metaBinaryOrder metatile binary order override if nonzero
  */
 MetatileBlock::list metatileBlocks(const Resource &resource
+                                   , const vts::TileId &tileId
+                                   , unsigned int metaBinaryOrder = 0
+                                   , bool includeInvalid = false);
+
+/** Generate metatile blocks for given metatile id in given reference frame
+ *
+ *  \param referenceFrame reference frame
+ *  \param tileId metatile id
+ *  \param metaBinaryOrder metatile binary order override if nonzero
+ */
+MetatileBlock::list metatileBlocks(const vr::ReferenceFrame &referenceFrame
                                    , const vts::TileId &tileId
                                    , unsigned int metaBinaryOrder = 0
                                    , bool includeInvalid = false);

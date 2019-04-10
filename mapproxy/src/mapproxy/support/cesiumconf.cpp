@@ -41,6 +41,13 @@ void build(Json::Value &content, const CesiumConf &conf)
 {
     content = Json::objectValue;
     if (conf.boundLayer) { content["boundLayer"] = *conf.boundLayer; }
+    if (conf.defaultView) {
+        auto &dv(content["defaultView"] = Json::arrayValue);
+        dv.append(conf.defaultView->ll(0));
+        dv.append(conf.defaultView->ll(1));
+        dv.append(conf.defaultView->ur(0));
+        dv.append(conf.defaultView->ur(1));
+    }
     content["tms"] = vre::asJson(conf.tms);
 }
 

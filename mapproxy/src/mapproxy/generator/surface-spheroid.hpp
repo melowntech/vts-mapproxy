@@ -53,7 +53,8 @@ private:
 
     virtual AugmentedMesh generateMeshImpl(const vts::NodeInfo &nodeInfo
                                            , Sink &sink
-                                           , Arsenal &arsenal) const;
+                                           , Arsenal &arsenal
+                                           , const OptHeight&) const;
 
     virtual void generateNavtile(const vts::TileId &tileId
                                  , Sink &sink

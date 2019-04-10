@@ -211,6 +211,16 @@ MetatileBlock::list metatileBlocks(const Resource &resource
          (resource.lodRange.min, resource.tileRange, tileId.lod));
 }
 
+MetatileBlock::list metatileBlocks(const vr::ReferenceFrame &referenceFrame
+                                   , const vts::TileId &tileId
+                                   , unsigned int metaBinaryOrder
+                                   , bool includeInvalid)
+{
+    return metatileBlocksImpl
+        (referenceFrame, tileId, metaBinaryOrder, includeInvalid
+         , vts::childRange(vts::TileRange(0, 0, 0, 0), tileId.lod));
+}
+
 cv::Mat boundlayerMetatileFromMaskTree(const vts::TileId &tileId
                                        , const MaskTree &maskTree
                                        , const MetatileBlock::list &blocks)

@@ -72,6 +72,8 @@ struct AugmentedMesh {
     AugmentedMesh() : fullyCovered(false), textureLayerId() {}
 };
 
+typedef boost::optional<double> OptHeight;
+
 AugmentedMesh
 meshFromNode(const vts::NodeInfo &nodeInfo, const math::Size2 &edges
              , const HeightSampler &heights = HeightSampler());

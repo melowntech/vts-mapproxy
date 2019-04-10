@@ -67,6 +67,7 @@ private:
     math::Size2 size_;
     geo::GeoDataset::Resampling resampling_;
     String mask_;
+    boost::optional<double> nodata_;
 
     // response matrix
     cv::Mat *response_;

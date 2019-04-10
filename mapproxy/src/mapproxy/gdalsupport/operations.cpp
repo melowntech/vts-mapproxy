@@ -71,6 +71,13 @@ cv::Mat* allocateMat(ManagedBuffer &mb
                              , raw + sizeof(cv::Mat));
 }
 
+inline geo::OptionalNodataValue
+asOptNodata(const geo::NodataValue &nodata
+            , const geo::NodataValue &dflt = boost::none)
+{
+    return nodata ? nodata : dflt;
+}
+
 cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
                    , const std::string &dataset
                    , const geo::SrsDefinition &srs
@@ -78,10 +85,12 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
                    , const math::Size2 &size
                    , geo::GeoDataset::Resampling resampling
                    , const boost::optional<std::string> &maskDataset
-                   , bool optimize)
+                   , bool optimize
+                   , const geo::NodataValue &nodata)
 {
     auto &src(cache(dataset));
-    auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
+    auto dst(geo::GeoDataset::deriveInMemory
+             (src, srs, size, extents, boost::none, asOptNodata(nodata)));
     src.warpInto(dst, resampling);
 
     if (optimize && dst.cmask().empty()) {
@@ -116,10 +125,12 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
                   , const math::Extents2 &extents
                   , const math::Size2 &size
                   , geo::GeoDataset::Resampling resampling
-                  , bool optimize)
+                  , bool optimize
+                  , const geo::NodataValue &nodata)
 {
     auto &src(cache(dataset));
-    auto dst(geo::GeoDataset::deriveInMemory(src, srs, size, extents));
+    auto dst(geo::GeoDataset::deriveInMemory
+             (src, srs, size, extents, boost::none, asOptNodata(nodata)));
     src.warpInto(dst, resampling);
 
     // fetch mask from dataset (optimized, all valid -> invalid matrix)
@@ -176,19 +187,22 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
                          , const geo::SrsDefinition &srs
                          , const math::Extents2 &extents
                          , const math::Size2 &size
-                         , geo::GeoDataset::Resampling resampling)
+                         , geo::GeoDataset::Resampling resampling
+                         , const geo::NodataValue &nodata)
 {
     // combined result of warped dataset and result of warpMinMax
     auto &src(cache(dataset));
     auto &minSrc(cache(dataset + ".min"));
     auto &maxSrc(cache(dataset + ".max"));
 
+    const auto nd(asOptNodata(nodata, ForcedNodata));
+
     auto dst(geo::GeoDataset::deriveInMemory
-             (src, srs, size, extents, GDT_Float32, ForcedNodata));
+             (src, srs, size, extents, GDT_Float32, nd));
     auto minDst(geo::GeoDataset::deriveInMemory
-                (minSrc, srs, size, extents, GDT_Float32, ForcedNodata));
+                (minSrc, srs, size, extents, GDT_Float32, nd));
     auto maxDst(geo::GeoDataset::deriveInMemory
-                (maxSrc, srs, size, extents, GDT_Float32, ForcedNodata));
+                (maxSrc, srs, size, extents, GDT_Float32, nd));
 
     geo::GeoDataset::WarpOptions warpOptions;
 #if GDAL_VERSION_NUM >= 2020000
@@ -253,7 +267,8 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
                  , const geo::SrsDefinition &srs
                  , const math::Extents2 &extents
                  , const math::Size2 &requestedSize
-                 , bool optimize)
+                 , bool optimize
+                 , const geo::NodataValue &nodata)
 {
     auto &src(cache(dataset));
 
@@ -279,7 +294,7 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
     // warp in floats
     auto dst(geo::GeoDataset::deriveInMemory
              (src, srs, gridSize, gridExtents, ::GDT_Float32
-              , ForcedNodata));
+              , asOptNodata(nodata, ForcedNodata)));
 
     auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem));
     LOG(info1) << "Warp result: scale=" << wri.scale
@@ -305,13 +320,14 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
         return warpImage
             (cache, mb, req.dataset, req.srs, req.extents, req.size
              , req.resampling, req.mask
-             , (req.operation == Operation::image));
+             , (req.operation == Operation::image), req.nodata);
 
     case Operation::mask:
     case Operation::maskNoOpt:
         return warpMask
             (cache, mb, req.dataset, req.srs, req.extents, req.size
-             , req.resampling, (req.operation == Operation::mask));
+             , req.resampling, (req.operation == Operation::mask)
+             , req.nodata);
 
     case Operation::detailMask:
         return warpDetailMask
@@ -321,12 +337,13 @@ cv::Mat* warp(DatasetCache &cache, ManagedBuffer &mb
     case Operation::demOptimal:
         return warpDem
             (cache, mb, req.dataset, req.srs, req.extents, req.size
-             , (req.operation == Operation::demOptimal));
+             , (req.operation == Operation::demOptimal)
+             , req.nodata);
 
     case Operation::valueMinMax:
         return warpValueMinMax
             (cache, mb, req.dataset, req.srs, req.extents, req.size
-             , req.resampling);
+             , req.resampling, req.nodata);
     }
     throw;
 }

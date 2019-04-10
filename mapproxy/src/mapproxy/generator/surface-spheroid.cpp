@@ -476,9 +476,9 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
     sink.content(os.str(), fi.sinkFileInfo());
 }
 
-AugmentedMesh SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                                , Sink &sink
-                                                , Arsenal&) const
+AugmentedMesh
+SurfaceSpheroid::generateMeshImpl(const vts::NodeInfo &nodeInfo, Sink &sink
+                                  , Arsenal&, const OptHeight&) const
 {
     // TODO: calculate tile sampling
     const int samplesPerSide(10);

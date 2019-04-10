@@ -191,6 +191,16 @@ function processBoundLayer(config, bl) {
 }
 
 function processConfig(config) {
+    if (typeof(config.defaultView !== "undefined")) {
+        // set default rectangle from config
+        Cesium.Camera.DEFAULT_VIEW_FACTOR = 0.0;
+        Cesium.Camera.DEFAULT_VIEW_RECTANGLE
+            = Cesium.Rectangle.fromDegrees(config.defaultView[0]
+                                           , config.defaultView[1]
+                                           , config.defaultView[2]
+                                           , config.defaultView[3]);
+    }
+
     if (config.boundLayer) {
         config.boundLayer = resolveUrl(config.boundLayer, document.URL);
         return loadJson(config.boundLayer, "application/json"

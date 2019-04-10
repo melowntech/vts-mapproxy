@@ -330,9 +330,9 @@ private:
 
 } // namespace
 
-AugmentedMesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
-                                           , Sink &sink
-                                           , Arsenal &arsenal) const
+AugmentedMesh SurfaceDem
+::generateMeshImpl(const vts::NodeInfo &nodeInfo, Sink &sink
+                   , Arsenal &arsenal, const OptHeight &defaultHeight) const
 {
     const int samplesPerSide(128);
     const TileFacesCalculator tileFacesCalculator;
@@ -347,6 +347,7 @@ AugmentedMesh SurfaceDem::generateMeshImpl(const vts::NodeInfo &nodeInfo
                , dem_.dataset
                , nodeInfo.srsDef(), nodeInfo.extents()
                , math::Size2(samplesPerSide, samplesPerSide))
+              .setNodata(defaultHeight)
               , sink));
 
     sink.checkAborted();

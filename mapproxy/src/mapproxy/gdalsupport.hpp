@@ -121,6 +121,7 @@ public:
         math::Size2 size;
         geo::GeoDataset::Resampling resampling;
         boost::optional<std::string> mask;
+        boost::optional<double> nodata;
 
         RasterRequest(Operation operation
                       , const std::string &dataset
@@ -135,6 +136,10 @@ public:
             , srs(srs), extents(extents), size(size), resampling(resampling)
             , mask(mask)
         {}
+
+        RasterRequest& setNodata(const boost::optional<double> &value) {
+            nodata = value; return *this;
+        }
     };
 
     Raster warp(const RasterRequest &request, Aborter &sink);

@@ -43,6 +43,7 @@ ShRaster::ShRaster(const GdalWarper::RasterRequest &other
     , size_(other.size)
     , resampling_(other.resampling)
     , mask_(sm.get_allocator<char>())
+    , nodata_(other.nodata)
     , response_()
 {
     if (other.mask) {
@@ -60,7 +61,7 @@ ShRaster::operator GdalWarper::RasterRequest() const {
          , std::string(dataset_.data(), dataset_.size())
          , geo::SrsDefinition(asString(srs_), srsType_)
          , extents_, size_, resampling_
-         , asOptional(mask_));
+         , asOptional(mask_)).setNodata(nodata_);
 }
 
 cv::Mat* ShRaster::response() {
