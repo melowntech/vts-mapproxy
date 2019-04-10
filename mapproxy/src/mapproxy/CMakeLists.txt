@@ -1,3 +1,4 @@
+# ------------------------------------------------------------------------
 # core mapproxy library
 set(mapproxy-core_SOURCES
   error.hpp
@@ -9,6 +10,7 @@ set(mapproxy-core_SOURCES
   support/tileindex.hpp support/tileindex.cpp
   support/fileclass.hpp support/fileclass.cpp
   support/serialization.hpp support/serialization.cpp
+  support/aborter.hpp
   support/glob.hpp support/glob.cpp
   support/tilejson.hpp support/tilejson.cpp
   support/cesiumconf.hpp support/cesiumconf.cpp
@@ -53,12 +55,11 @@ set(mapproxy-core_SOURCES
   mapproxy.hpp mapproxy.cpp
   )
 
-# test program
 define_module(LIBRARY mapproxy-core
   DEPENDS
   qmf
   pysupport pydbglog
-  vts-libs>=2.4 http>=1.0 geo>=1.28 gdal-drivers>=1.14 geometry>=1.7
+  vts-libs>=2.4 http>=1.0 geo>=1.28 geometry>=1.7
   jsoncpp>=2.1
 
   Boost_SERIALIZATION
@@ -74,10 +75,32 @@ buildsys_library(mapproxy-core)
 target_link_libraries(mapproxy-core ${MODULE_LIBRARIES})
 buildsys_target_compile_definitions(mapproxy-core ${MODULE_DEFINITIONS})
 
-# test program
+# ------------------------------------------------------------------------
+# GDAL machinery
+set(mapproxy-gdal_SOURCES
+  gdalsupport.hpp gdalsupport/gdalsupport.cpp
+  gdalsupport/types.hpp
+  gdalsupport/requests.hpp gdalsupport/requests.cpp
+  gdalsupport/process.hpp gdalsupport/process.cpp
+  gdalsupport/datasetcache.hpp gdalsupport/datasetcache.cpp
+  gdalsupport/operations.hpp gdalsupport/operations.cpp
+  )
+
+define_module(LIBRARY mapproxy-gdal
+  DEPENDS mapproxy-core
+  gdal-drivers>=1.14
+  )
+
+add_library(mapproxy-gdal STATIC ${mapproxy-gdal_SOURCES})
+buildsys_library(mapproxy-gdal)
+target_link_libraries(mapproxy-gdal ${MODULE_LIBRARIES})
+buildsys_target_compile_definitions(mapproxy-gdal ${MODULE_DEFINITIONS})
+
+# ------------------------------------------------------------------------
+# Main mapproxy binary
 define_module(BINARY mapproxy
   DEPENDS
-  mapproxy-core service>=1.6
+  mapproxy-gdal mapproxy-core service>=1.6
 
   Boost_SERIALIZATION
   Boost_FILESYSTEM
@@ -122,13 +145,6 @@ set(mapproxy_SOURCES
 
   fileinfo.hpp fileinfo.cpp
   core.hpp core.cpp
-
-  gdalsupport.hpp gdalsupport/gdalsupport.cpp
-  gdalsupport/types.hpp
-  gdalsupport/requests.hpp gdalsupport/requests.cpp
-  gdalsupport/process.hpp gdalsupport/process.cpp
-  gdalsupport/datasetcache.hpp gdalsupport/datasetcache.cpp
-  gdalsupport/operations.hpp gdalsupport/operations.cpp
 
   main.cpp
   )

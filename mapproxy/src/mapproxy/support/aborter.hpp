@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2019 Melown Technologies SE
+ * Copyright (c) 2017 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,36 +24,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_support_wtms_hpp_included_
-#define mapproxy_support_wtms_hpp_included_
+#ifndef mapproxy_support_aborter_hpp_included_
+#define mapproxy_support_aborter_hpp_included_
 
-#include "../resource.hpp"
+#include <functional>
 
-namespace wmts {
-
-struct Layer {
-    const Resource *resource;
-    std::string rootPath;
-    RasterFormat format;
-
-    typedef std::vector<Layer> list;
-
-    Layer(const Resource &resource)
-        : resource(&resource), format(RasterFormat::jpg)
-    {}
-};
-
-struct WmtsResources {
-    std::string capabilitiesUrl;
-    Layer::list layers;
-};
-
-std::string wmtsCapabilities(const WmtsResources &resources);
-
-/** Prepares WMTS support.
+/** Aborter helper.
  */
-void prepareTileMatrixSets();
+struct Aborter {
+    typedef std::function<void()> AbortedCallback;
 
-} // namespace wmts
+    virtual ~Aborter() {}
 
-#endif // mapproxy_support_wtms_hpp_included_
+    /** Defaults to dummy aborter
+     */
+    virtual void setAborter(const AbortedCallback&) {};
+};
+
+#endif // mapproxy_support_aborter_hpp_included_
+

@@ -266,8 +266,8 @@ std::string makeTemplate(const Layer &layer)
     }
 
     os << "{TileMatrix}-{TileCol}-{TileRow}." << layer.format;
-    if (layer.resource.revision) {
-        os << "?r=" << layer.resource.revision;
+    if (layer.resource->revision) {
+        os << "?r=" << layer.resource->revision;
     }
 
     return os.str();
@@ -480,7 +480,7 @@ void content(XML &x, const Layer::list &layers)
 
     Element c(x, "Contents");
     for (const auto &layer : layers) {
-        const auto &r(layer.resource);
+        const auto &r(*layer.resource);
 
         const TmsEntry &tms(cache.get(r));
 

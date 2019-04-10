@@ -27,6 +27,7 @@
 #include <new>
 #include <algorithm>
 #include <cstring>
+#include <type_traits>
 
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -36,6 +37,8 @@
 #include <sqlite3.h>
 
 #include <ogrsf_frmts.h>
+
+#include "utility/gccversion.hpp"
 
 #include "imgproc/rastermask/cvmat.hpp"
 
@@ -60,7 +63,8 @@ cv::Mat* allocateMat(ManagedBuffer &mb
     const auto matSize(sizeof(cv::Mat) + dataSize);
 
     // create raw memory to hold matrix and data
-    char *raw(static_cast<char*>(mb.allocate(matSize)));
+    char *raw(static_cast<char*>
+              (mb.allocate_aligned(matSize, alignof(cv::Mat))));
 
     // allocate matrix in raw data block
     return new (raw) cv::Mat(size.height, size.width, type
@@ -401,7 +405,9 @@ allocateHc(ManagedBuffer &mb
 {
     // create raw memory to hold block and data
     char *raw(static_cast<char*>
-              (mb.allocate(sizeof(GdalWarper::Heightcoded) + data.size())));
+              (mb.allocate_aligned
+               (sizeof(GdalWarper::Heightcoded) + data.size()
+                , alignof(GdalWarper::Heightcoded))));
 
     // poiter to output data
     auto *dataPtr(raw + sizeof(GdalWarper::Heightcoded));

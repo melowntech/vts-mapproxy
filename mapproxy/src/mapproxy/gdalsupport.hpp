@@ -42,18 +42,12 @@
 #include "geo/vectorformat.hpp"
 #include "geo/heightcoding.hpp"
 
-#include "vts-libs/vts/nodeinfo.hpp"
-
 #include "support/geo.hpp"
 #include "support/layerenancer.hpp"
-#include "sink.hpp"
-
-namespace vts = vtslibs::vts;
+#include "support/aborter.hpp"
 
 class GdalWarper {
 public:
-    typedef std::shared_ptr<GdalWarper> pointer;
-
     struct Options {
         unsigned int processCount;
         boost::filesystem::path tmpRoot;

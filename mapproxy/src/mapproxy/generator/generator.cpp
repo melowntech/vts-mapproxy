@@ -227,12 +227,18 @@ bool isRemote(const std::string &path)
              || ba::istarts_with(path, "ftp:")));
 }
 
+bool isMvt(const std::string &path)
+{
+    return ba::starts_with(path, "mvt:");
+}
+
 } // namespace
 
 std::string Generator::absoluteDataset(const std::string &path)
     const
 {
     // handle non-path resources (i.e. URL's)
+    if (isMvt(path)) { return "mvt:" + absoluteDataset(path.substr(4)); }
     if (isRemote(path)) { return path; }
     return absolute(path, config_.resourceRoot).string();
 }
@@ -241,7 +247,9 @@ boost::filesystem::path
 Generator::absoluteDataset(const boost::filesystem::path &path)
     const
 {
+    const auto &spath(path.string());
     // handle non-path resources (i.e. URL's)
+    if (isMvt(spath)) { return "mvt:" + absoluteDataset(spath.substr(4)); }
     if (isRemote(path.string())) { return path; }
     return absolute(path, config_.resourceRoot);
 }

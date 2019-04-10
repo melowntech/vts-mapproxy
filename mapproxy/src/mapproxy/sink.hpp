@@ -41,20 +41,9 @@
 #include "vts-libs/storage/streams.hpp"
 
 #include "support/fileclass.hpp"
+#include "support/aborter.hpp"
 
 namespace vs = vtslibs::storage;
-
-/** Aborter helper.
- */
-struct Aborter {
-    typedef http::ServerSink::AbortedCallback AbortedCallback;
-
-    virtual ~Aborter() {}
-
-    /** Defaults to dummy aborter
-     */
-    virtual void setAborter(const AbortedCallback&) {};
-};
 
 /** Wraps libhttp's sink.
  */

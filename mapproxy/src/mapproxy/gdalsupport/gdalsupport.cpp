@@ -716,6 +716,8 @@ void GdalWarper::Detail::cleanup(bool join)
         cond().notify_all();
     }
 
+    // TODO: kill unresponsive processes
+
     // cleanup
     while (!workers_.empty()) {
         auto head(workers_.begin());
