@@ -125,13 +125,13 @@ wmts::WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo)
         layer.rootPath =
             prependRoot(std::string(), resource(), resdiff);
 
-        resources.capabilitiesUrl = "./" + fileInfo.capabilitesName();
+        resources.capabilitiesUrl = "./" + fileInfo.capabilitesName;
     } else {
         layer.rootPath = *config().externalUrl
             + prependRoot(std::string(), resource()
                           , ResourceRoot::Depth::referenceFrame);
         resources.capabilitiesUrl =
-            layer.rootPath + "/" + fileInfo.capabilitesName();
+            layer.rootPath + "/" + fileInfo.capabilitesName;
     }
 
     return resources;
@@ -140,8 +140,6 @@ wmts::WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo)
 Generator::Task TmsRasterBase
 ::wmtsInterface(const FileInfo &fileInfo, Sink &sink) const
 {
-    const auto &wmts(getWmts());
-
     WmtsFileInfo fi(fileInfo);
 
     switch (fi.type) {
@@ -157,14 +155,16 @@ Generator::Task TmsRasterBase
         supportFile(*fi.support, sink, fi.sinkFileInfo());
         break;
 
+    case WmtsFileInfo::Type::listing:
+        sink.listing(fi.listing);
+        break;
+
     default:
         sink.error(utility::makeError<InternalError>
                     ("Not implemented yet."));
     }
 
     return {};
-
-    (void) wmts;
 }
 
 } // namespace generator

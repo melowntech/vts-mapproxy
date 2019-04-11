@@ -53,6 +53,8 @@ namespace constants {
     const std::string DebugConfig("debug.json");
     const std::string Self("");
     const std::string Index("index.html");
+    const std::string Browser("browser.html");
+    const std::string README("README");
     const std::string Dems("dems.html");
     const std::string Geo("geo");
     const std::string Style("style.json");
@@ -570,7 +572,10 @@ TerrainFileInfo::TerrainFileInfo(const FileInfo &fi)
         LOG(debug) << "Browser enabled, checking browser files.";
 
         auto path(fi.filename);
-        if (constants::Self == path) { path = constants::Index; }
+        if ((constants::Self == path) || (constants::Index == path)) {
+            type = Type::listing;
+            return;
+        }
 
         // support files
         auto fsupport(cesium::supportFiles.find(path));
@@ -611,12 +616,19 @@ Sink::FileInfo TerrainFileInfo::sinkFileInfo(std::time_t lastModified) const
         return Sink::FileInfo(constants::applicationJson, lastModified)
             .setFileClass(FileClass::config);
 
+    case Type::listing:
     case Type::unknown:
         return {};
     }
 
     return {};
 }
+
+const Sink::Listing TerrainFileInfo::listing {
+    { constants::Browser }
+    , { constants::LayerJson }
+    , { constants::README }
+};
 
 WmtsFileInfo::WmtsFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), support()
@@ -625,7 +637,10 @@ WmtsFileInfo::WmtsFileInfo(const FileInfo &fi)
         LOG(debug) << "Browser enabled, checking browser files.";
 
         auto path(fi.filename);
-        if (constants::Self == path) { path = constants::Index; }
+        if ((constants::Self == path) || (constants::Index == path)) {
+            type = Type::listing;
+            return;
+        }
 
         // support files
         auto fsupport(ol::supportFiles.find(path));
@@ -657,6 +672,7 @@ Sink::FileInfo WmtsFileInfo::sinkFileInfo(std::time_t lastModified) const
         return Sink::FileInfo(constants::textXml, lastModified)
             .setFileClass(FileClass::config);
 
+    case Type::listing:
     case Type::unknown:
         return {};
     }
@@ -664,7 +680,10 @@ Sink::FileInfo WmtsFileInfo::sinkFileInfo(std::time_t lastModified) const
     return {};
 }
 
-const std::string& WmtsFileInfo::capabilitesName()
-{
-    return constants::WmtsCapabilities;
-}
+const std::string WmtsFileInfo::capabilitesName = constants::WmtsCapabilities;
+
+const Sink::Listing WmtsFileInfo::listing {
+    { constants::Browser }
+    , { constants::WmtsCapabilities }
+    , { constants::README }
+};

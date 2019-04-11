@@ -28,12 +28,13 @@
 
 #include "ol/ol.html.hpp"
 #include "ol/ol.js.hpp"
+#include "ol/README.md.html.hpp"
 
 namespace ol {
 
 const vtslibs::storage::SupportFile::Files supportFiles =
 {
-    { "index.html"
+    { "browser.html"
       , {
             ol_html
             , sizeof(ol_html)
@@ -46,6 +47,13 @@ const vtslibs::storage::SupportFile::Files supportFiles =
             , sizeof(ol_js)
             , ol_js_attr_lastModified
             , "application/javascript; charset=utf-8"
+        }
+    }, { "README"
+      , {
+            README_md
+            , sizeof(README_md)
+            , README_md_attr_lastModified
+            , "text/html; charset=utf-8"
         }
     }
 };

@@ -580,6 +580,10 @@ Generator::Task SurfaceBase
         cesiumConf(sink, fi, tms);
         break;
 
+    case TerrainFileInfo::Type::listing:
+        sink.listing(fi.listing);
+        break;
+
     default:
         sink.error(utility::makeError<InternalError>
                     ("Not implemented yet."));

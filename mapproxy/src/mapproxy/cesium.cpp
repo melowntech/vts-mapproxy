@@ -29,12 +29,13 @@
 #include "cesium/cesium.html.hpp"
 #include "cesium/cesium.js.hpp"
 #include "cesium/melown-technologies-logo-28.png.hpp"
+#include "cesium/README.md.html.hpp"
 
 namespace cesium {
 
 const vtslibs::storage::SupportFile::Files supportFiles =
 {
-    { "index.html"
+    { "browser.html"
       , {
             cesium_html
             , sizeof(cesium_html)
@@ -54,6 +55,13 @@ const vtslibs::storage::SupportFile::Files supportFiles =
             , sizeof(melowntech_png)
             , melowntech_png_attr_lastModified
             , "image/png"
+        }
+    }, { "README"
+      , {
+            README_md
+            , sizeof(README_md)
+            , README_md_attr_lastModified
+            , "text/html; charset=utf-8"
         }
     }
 };

@@ -227,7 +227,7 @@ struct TerrainFileInfo {
     FileInfo fileInfo;
 
     enum class Type {
-        unknown, tile, definition, support, cesiumConf
+        unknown, tile, definition, support, cesiumConf, listing
     };
 
     /** File type.
@@ -241,6 +241,8 @@ struct TerrainFileInfo {
     /** Valid only when type == Type::support
      */
     const vs::SupportFile *support;
+
+    static const Sink::Listing listing;
 };
 
 /** Parsed TMS file information.
@@ -254,7 +256,7 @@ struct WmtsFileInfo {
      */
     FileInfo fileInfo;
 
-    enum class Type { unknown, capabilities, support };
+    enum class Type { unknown, capabilities, support, listing };
 
     /** File type.
      */
@@ -264,7 +266,9 @@ struct WmtsFileInfo {
      */
     const vs::SupportFile *support;
 
-    static const std::string& capabilitesName();
+    static const std::string capabilitesName;
+
+    static const Sink::Listing listing;
 };
 
 #endif // mapproxy_fileinfo_hpp_included_
