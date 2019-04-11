@@ -1,3 +1,9 @@
+vts-mapproxy (1.51) stable; urgency=medium
+
+  * WMTS support
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 11 Apr 2019 18:20:58 +0000
+
 vts-mapproxy (1.50) stable; urgency=medium
 
   * Fixed conrol interface (again).

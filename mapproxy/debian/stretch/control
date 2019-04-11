@@ -16,4 +16,5 @@ m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 9.20150101+deb8u2), libboost1.
     , protobuf-compiler
     , libprocps-dev (>= 3.3.9)
     , libmagic-dev (>= 5.25)
+    , libtinyxml-dev
     , gawk, pandoc}}})m4_dnl
