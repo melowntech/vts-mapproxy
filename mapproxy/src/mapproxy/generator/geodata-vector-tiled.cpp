@@ -39,7 +39,6 @@
 #include "jsoncpp/as.hpp"
 
 #include "../support/python.hpp"
-#include "../support/serialization.hpp"
 
 #include "vts-libs/vts/opencv/navtile.hpp"
 

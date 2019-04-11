@@ -24,75 +24,122 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "python.hpp"
-#include "serialization.hpp"
+#include "jsoncpp/as.hpp"
 
-Resource::Id::list introspectionListFrom(const Json::Value &introspection
-                                         , const std::string &key)
+#include "python.hpp"
+#include "introspection.hpp"
+
+namespace introspection {
+
+Layers layersFrom(const Json::Value &introspection, const std::string &key)
 {
     if (!introspection.isMember(key)) { return {}; }
 
     const auto &value(introspection[key]);
-    auto getRid([](const Json::Value &item) -> Resource::Id
+
+    const auto &local([](const Json::Value &item) -> LocalLayer
     {
-        Resource::Id rid;
-        Json::get(rid.group, item, "group");
-        Json::get(rid.id, item, "id");
-        return rid;
+        LocalLayer l;
+        Json::get(l.group, item, "group");
+        Json::get(l.id, item, "id");
+        return l;
     });
 
-    Resource::Id::list out;
+    const auto &remote([](const Json::Value &item) -> RemoteLayer
+    {
+        RemoteLayer l;
+        Json::get(l.id, item, "id");
+        Json::get(l.url, item, "url");
+        return l;
+    });
+
+    Layers out;
+
+    const auto &add([&](const Json::Value &item)
+    {
+        if (item.isMember("url")) {
+            out.push_back(remote(item));
+        } else {
+            out.push_back(local(item));
+        }
+    });
 
     if (value.isArray()) {
         for (const auto &item : value) {
-            out.push_back(getRid(item));
+            add(item);
         }
     } else {
-        out.push_back(getRid(value));
+        add(value);
     }
 
     return out;
 }
 
-void introspectionListTo(Json::Value &introspection
-                           , const std::string &key
-                           , const Resource::Id::list &resources)
+void layersTo(Json::Value &introspection, const std::string &key
+              , const Layers &layers)
 {
-    if (resources.empty()) { return; }
+    if (layers.empty()) { return; }
 
-    auto &list(introspection[key] = Json::arrayValue);
-    for (const auto &rid : resources) {
-        auto &item(list.append(Json::objectValue));
-        item["group"] = rid.group;
-        item["id"] = rid.id;
-    }
+    struct Visitor : boost::static_visitor<void> {
+        Json::Value &list;
+        Visitor(Json::Value &list) : list(list) {}
+
+        void operator()(const LocalLayer &l) {
+            auto &item(list.append(Json::objectValue));
+            item["group"] = l.group;
+            item["id"] = l.id;
+        }
+
+        void operator()(const RemoteLayer &l) {
+            auto &item(list.append(Json::objectValue));
+            item["id"] = l.id;
+            item["url"] = l.url;
+        }
+    } visitor(introspection[key] = Json::arrayValue);
+
+    for (const auto &l : layers) { boost::apply_visitor(visitor, l); }
 }
 
-Resource::Id::list
-introspectionListFrom(const boost::python::dict &introspection
-                      , const std::string &key)
+Layers layersFrom(const boost::python::dict &introspection
+                  , const std::string &key)
 {
     if (!introspection.has_key(key)) { return {}; }
 
-    auto getRid([](const boost::python::dict &item) -> Resource::Id
+    const auto &local([](const boost::python::dict &item) -> LocalLayer
     {
-        Resource::Id rid;
-        rid.group = py2utf8(item["group"]);
-        rid.id = py2utf8(item["id"]);
-        return rid;
+        LocalLayer l;
+        l.group = py2utf8(item["group"]);
+        l.id = py2utf8(item["id"]);
+        return l;
     });
 
-    Resource::Id::list out;
+    const auto &remote([](const boost::python::dict &item) -> RemoteLayer
+    {
+        RemoteLayer l;
+        l.id = py2utf8(item["id"]);
+        l.url = py2utf8(item["url"]);
+        return l;
+    });
+
+    Layers out;
+
+    const auto &add([&](const boost::python::dict &item)
+    {
+        if (item.has_key("url")) {
+            out.push_back(remote(item));
+        } else {
+            out.push_back(local(item));
+        }
+    });
 
     // TODO: support list
     boost::python::dict value(introspection[key]);
-    out.push_back(getRid(value));
-
+    add(value);
     return out;
 }
 
-boost::optional<Resource::Id>
-introspectionIdFrom(const Json::Value &introspection, const std::string &key)
+Resource::OptId idFrom(const Json::Value &introspection
+                       , const std::string &key)
 {
     if (!introspection.isMember(key)) { return {}; }
 
@@ -108,9 +155,8 @@ introspectionIdFrom(const Json::Value &introspection, const std::string &key)
     return getRid(value);
 }
 
-void introspectionIdTo(Json::Value &introspection
-                       , const std::string &key
-                       , const boost::optional<Resource::Id> &resource)
+void idTo(Json::Value &introspection, const std::string &key
+          , const Resource::OptId &resource)
 {
     if (!resource) { return; }
 
@@ -119,9 +165,8 @@ void introspectionIdTo(Json::Value &introspection
     item["id"] = resource->id;
 }
 
-boost::optional<Resource::Id>
-introspectionIdFrom(const boost::python::dict &introspection
-                    , const std::string &key)
+Resource::OptId idFrom(const boost::python::dict &introspection
+                       , const std::string &key)
 {
     if (!introspection.has_key(key)) { return {}; }
 
@@ -136,3 +181,5 @@ introspectionIdFrom(const boost::python::dict &introspection
     boost::python::dict value(introspection[key]);
     return getRid(value);
 }
+
+} // namespace introspection

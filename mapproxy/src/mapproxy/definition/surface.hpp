@@ -37,6 +37,8 @@
 
 #include "../heightfunction.hpp"
 
+#include "../support/introspection.hpp"
+
 // fwd
 namespace Json { class Value; }
 namespace boost { namespace python { class dict; } }
@@ -48,8 +50,8 @@ namespace resource {
 class Surface : public DefinitionBase {
 public:
     struct Introspection {
-        Resource::Id::list tms;
-        Resource::Id::list geodata;
+        introspection::Layers tms;
+        introspection::Layers geodata;
         boost::optional<vr::Position> position;
         boost::any browserOptions;
 
@@ -65,6 +67,8 @@ public:
     void parse(const Json::Value &value);
     void build(Json::Value &value) const;
     void parse(const boost::python::dict &value);
+
+    virtual boost::optional<std::string> getGeoidGrid() const = 0;
 
     static constexpr Resource::Generator::Type type
         = Resource::Generator::Type::surface;
@@ -85,6 +89,9 @@ private:
     virtual void from_impl(const boost::any &value);
     virtual void to_impl(boost::any &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
+    virtual boost::optional<std::string> getGeoidGrid() const {
+        return geoidGrid;
+    }
 };
 
 struct SurfaceDem : public Surface {
@@ -101,6 +108,9 @@ private:
     virtual void from_impl(const boost::any &value);
     virtual void to_impl(boost::any &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
+    virtual boost::optional<std::string> getGeoidGrid() const {
+        return dem.geoidGrid;
+    }
 };
 
 } // namespace resource

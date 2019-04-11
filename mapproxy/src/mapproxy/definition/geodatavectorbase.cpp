@@ -34,7 +34,7 @@
 #include "vts-libs/registry/py.hpp"
 
 #include "../support/python.hpp"
-#include "../support/serialization.hpp"
+#include "../support/introspection.hpp"
 
 #include "geodata.hpp"
 #include "options.hpp"
@@ -141,7 +141,7 @@ void parseDefinition(GeodataVectorBase &def
         const auto &jintrospection(value["introspection"]);
 
         def.introspection.surface
-            = introspectionIdFrom(jintrospection, "surface");
+            = introspection::idFrom(jintrospection, "surface");
 
         if (jintrospection.isMember("browserOptions")) {
             def.introspection.browserOptions
@@ -220,8 +220,8 @@ void buildDefinition(Json::Value &value
 
     if (!def.introspection.empty()) {
         auto &jintrospection(value["introspection"] = Json::objectValue);
-        introspectionIdTo(jintrospection, "surface"
-                          , def.introspection.surface);
+        introspection::idTo(jintrospection, "surface"
+                            , def.introspection.surface);
 
         if (!def.introspection.browserOptions.empty()) {
             jintrospection["browserOptions"]
@@ -331,7 +331,7 @@ void parseDefinition(GeodataVectorBase &def
     if (value.has_key("introspection")) {
         boost::python::dict pintrospection(value["introspection"]);
         def.introspection.surface
-            = introspectionIdFrom(pintrospection, "surface");
+            = introspection::idFrom(pintrospection, "surface");
     }
 }
 

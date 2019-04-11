@@ -63,12 +63,12 @@
 #include "../support/srs.hpp"
 #include "../support/grid.hpp"
 #include "../support/python.hpp"
-#include "../support/serialization.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
 #include "../support/tilejson.hpp"
 #include "../support/cesiumconf.hpp"
 #include "../support/revision.hpp"
 #include "../support/tms.hpp"
+#include "../support/introspection.hpp"
 
 #include "surface.hpp"
 
@@ -503,54 +503,32 @@ SurfaceBase::extraProperties(const Definition &def) const
 {
     vts::ExtraTileSetProperties extra;
 
-    Resource::Id::list introspectionTmsList(def.introspection.tms);
-    if (introspectionTmsList.empty()) {
-        // defaults to patchwork
-        introspectionTmsList.emplace_back(referenceFrameId()
-                                          , systemGroup()
-                                          , "tms-raster-patchwork");
-    }
-
-    for (const auto &tms : introspectionTmsList) {
+    const auto &findResource([this](Resource::Generator::Type type
+                                    , const Resource::Id &id)
+                             -> const Resource*
+    {
         if (auto other = otherGenerator
-            (Resource::Generator::Type::tms
-             , addReferenceFrame(tms, referenceFrameId())))
+            (type, addReferenceFrame(id, referenceFrameId())))
         {
-            // we have found tms resource, use it as a boundlayer
-            const auto otherId(tms.fullId());
-            const auto &otherResource(other->resource());
-            const auto resdiff(resolveRoot(resource(), otherResource));
+            return &other->resource();
+        }
+        return nullptr;
+    });
 
-            const fs::path blPath
-                (prependRoot(fs::path(), otherResource, resdiff)
-                 / "boundlayer.json");
+    const auto &r(resource());
 
-            extra.boundLayers.add(vr::BoundLayer(otherId, blPath.string()));
-
-            extra.view.surfaces[id().fullId()]
-                .push_back(vr::View::BoundLayerParams(otherId));
-        };
+    if (def.introspection.tms.empty()) {
+        introspection::add
+            (extra, Resource::Generator::Type::tms, introspection::LocalLayer
+             ({}, systemGroup(), "tms-raster-patchwork")
+             , r, findResource);
+    } else {
+        introspection::add(extra, Resource::Generator::Type::tms
+                           , def.introspection.tms, r, findResource);
     }
 
-    for (const auto &geodata : def.introspection.geodata) {
-        if (auto other = otherGenerator
-            (Resource::Generator::Type::geodata
-             , addReferenceFrame(geodata, referenceFrameId())))
-        {
-            // we have found geodata resource, use it as a boundlayer
-            const auto otherId(geodata.fullId());
-            const auto &otherResource(other->resource());
-            const auto resdiff(resolveRoot(resource(), otherResource));
-
-            const fs::path flPath
-                (prependRoot(fs::path(), otherResource, resdiff)
-                 / "freelayer.json");
-
-            extra.freeLayers.add(vr::FreeLayer(otherId, flPath.string()));
-
-            extra.view.freeLayers[otherId];
-        };
-    }
+    introspection::add(extra, Resource::Generator::Type::geodata
+                       , def.introspection.geodata, r, findResource);
 
     if (def.introspection.position) {
         extra.position = *def.introspection.position;
@@ -558,7 +536,6 @@ SurfaceBase::extraProperties(const Definition &def) const
 
     // browser options (must be Json::Value!)
     extra.browserOptions = def.introspection.browserOptions;
-
 
     return extra;
 }
@@ -648,7 +625,7 @@ void SurfaceBase::generateTerrain(const vts::TileId &tmsTileId
         qmf::save(qmfMesh(lm.mesh, nodeInfo
                           , (tms.physicalSrs ? *tms.physicalSrs
                              : referenceFrame().model.physicalSrs)
-                          , boost::none)
+                          , definition_.getGeoidGrid())
                   , utility::Gzipper(os), fi.fileInfo.filename);
 
         auto sfi(fi.sinkFileInfo());
@@ -781,31 +758,36 @@ void SurfaceBase::layerJson(Sink &sink, const TerrainFileInfo &fi
 void SurfaceBase::cesiumConf(Sink &sink, const TerrainFileInfo &fi
                              , const vre::Tms &tms) const
 {
-    const auto &def(definition_);
-
-    const auto introId(def.introspection.tms.empty()
-                       ? Resource::Id(referenceFrameId(), systemGroup()
-                                      , "tms-raster-patchwork")
-                       : def.introspection.tms.front());
+    const auto &findResource([this](Resource::Generator::Type type
+                                    , const Resource::Id &id)
+                             -> const Resource*
+    {
+        if (auto other = otherGenerator
+            (type, addReferenceFrame(id, referenceFrameId())))
+        {
+            return &other->resource();
+        }
+        return nullptr;
+    });
 
     CesiumConf conf;
     conf.tms = tms;
 
-    if (auto other = otherGenerator
-        (Resource::Generator::Type::tms
-         , addReferenceFrame(introId, referenceFrameId())))
+    if (definition_.introspection.tms.empty()) {
+        if (const auto intro = introspection::remote
+            (Resource::Generator::Type::tms
+             , Resource::Id({}, systemGroup(), "tms-raster-patchwork")
+             , resource(), findResource))
+        {
+            conf.boundLayer = intro->url;
+        }
+    } else if (const auto intro = introspection::remote
+               (Resource::Generator::Type::tms
+                , definition_.introspection.tms.front()
+                , resource(), findResource))
     {
-        // we have found matching tms resource, use it as an imagery provider
-        const auto otherId(introId.fullId());
-        const auto &otherResource(other->resource());
-        const auto resdiff(resolveRoot(resource(), otherResource));
-
-        // boundlayer path
-        const fs::path blPath
-            (prependRoot(fs::path(), otherResource, resdiff)
-             / "boundlayer.json");
-        conf.boundLayer = blPath.string();
-    };
+        conf.boundLayer = intro->url;
+    }
 
     const auto tb(terrainBounds(resource(), tms));
     conf.defaultView = tb.bounds;

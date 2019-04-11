@@ -9,7 +9,8 @@ set(mapproxy-core_SOURCES
   support/coverage.hpp support/coverage.cpp
   support/tileindex.hpp support/tileindex.cpp
   support/fileclass.hpp support/fileclass.cpp
-  support/serialization.hpp support/serialization.cpp
+  support/introspection.hpp support/introspection.cpp
+  support/serialization.cpp
   support/aborter.hpp
   support/glob.hpp support/glob.cpp
   support/tilejson.hpp support/tilejson.cpp

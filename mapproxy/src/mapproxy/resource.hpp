@@ -163,6 +163,9 @@ struct Resource {
         typedef std::vector<Id> list;
     };
 
+    typedef boost::optional<Id> OptId;
+    typedef std::vector<OptId> OptIds;
+
     struct Generator {
         enum class Type { tms, surface, geodata };
         Type type;

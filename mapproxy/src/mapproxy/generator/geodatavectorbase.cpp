@@ -41,7 +41,6 @@
 #include "vts-libs/storage/fstreams.hpp"
 
 #include "../support/python.hpp"
-#include "../support/serialization.hpp"
 
 #include "geodatavectorbase.hpp"
 #include "files.hpp"

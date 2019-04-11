@@ -34,7 +34,6 @@
 #include "vts-libs/registry/py.hpp"
 
 #include "../support/python.hpp"
-#include "../support/serialization.hpp"
 
 #include "surface.hpp"
 
@@ -88,9 +87,9 @@ void Surface::parse(const Json::Value &value)
         const auto &jintrospection(value["introspection"]);
 
         introspection.tms
-            = introspectionListFrom(jintrospection, "tms");
+            = introspection::layersFrom(jintrospection, "tms");
         introspection.geodata
-            = introspectionListFrom(jintrospection, "geodata");
+            = introspection::layersFrom(jintrospection, "geodata");
 
         if (jintrospection.isMember("position")) {
             introspection.position
@@ -122,8 +121,9 @@ void Surface::build(Json::Value &value) const
 
     if (!introspection.empty()) {
         auto &jintrospection(value["introspection"] = Json::objectValue);
-        introspectionListTo(jintrospection, "tms", introspection.tms) ;
-        introspectionListTo(jintrospection, "geodata", introspection.geodata);
+        introspection::layersTo(jintrospection, "tms", introspection.tms) ;
+        introspection::layersTo
+            (jintrospection, "geodata", introspection.geodata);
 
         if (introspection.position) {
             jintrospection["position"] = vr::asJson(*introspection.position);
@@ -154,9 +154,9 @@ void Surface::parse(const boost::python::dict &value)
     if (value.has_key("introspection")) {
         boost::python::dict pintrospection(value["introspection"]);
         introspection.tms
-            = introspectionListFrom(pintrospection, "tms");
+            = introspection::layersFrom(pintrospection, "tms");
         introspection.geodata
-            = introspectionListFrom(pintrospection, "geodata");
+            = introspection::layersFrom(pintrospection, "geodata");
 
         if (pintrospection.has_key("position")) {
             introspection.position = boost::in_place();
