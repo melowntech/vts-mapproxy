@@ -2,19 +2,6 @@
 Cesium.Ion.defaultAccessToken = "";
 Cesium.Ion.defaultServer = "";
 
-function loadJson(url, type, callback) {
-    var x = new XMLHttpRequest();
-    x.overrideMimeType(type);
-    x.open("GET", url, true);
-    x.onreadystatechange = function () {
-        if ((x.readyState) == 4 && ((x.status == 200) || (x.status == 0)))
-        {
-            callback(JSON.parse(x.responseText));
-        }
-    };
-    x.send(null);
-}
-
 function launchCesium(imageryProvider) {
     // custom terrain provider
     var terrainProvider = new Cesium.CesiumTerrainProvider({
@@ -203,12 +190,19 @@ function processConfig(config) {
 
     if (config.boundLayer) {
         config.boundLayer = resolveUrl(config.boundLayer, document.URL);
-        return loadJson(config.boundLayer, "application/json"
-                        , processBoundLayer.bind(processBoundLayer, config));
+
+        fetch(config.boundLayer)
+            .then((response) => response.json())
+            .then((bl) => processBoundLayer(config, bl))
+        ;
+        return;
     }
     launchCesium(new Cesium.GridImageryProvider({}));
 }
 
 function startBrowser() {
-    loadJson("cesium.conf", "application/json", processConfig);
+    fetch('./cesium.conf')
+        .then((response) => response.json())
+        .then(processConfig)
+    ;
 }
