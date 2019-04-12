@@ -130,6 +130,7 @@ Available expansion strings. Only some make sense for templates used in mapproxy
  * `{locy}`   local tile Y index
  * `{sub}`    sub-tile identifier (e.g. submesh index in atlas image)
  * `{srs}`    symbolic name of SRS in the current reference frame subtree
+ * `{rf}`     reference frame identifier
  * `{alt(1,2,3,4)}` exands to one of given strings
  * `{ppx}`    tile's old PP space X index (makes sense only in ppspace)
  * `{ppy}`    tile's old PP space Y index (makes sense only in ppspace)
@@ -252,7 +253,7 @@ All surface drivers support these (optional) options:
     Optional Int mergeBottomLod         // Reported in generated tileset.conf, speeds up merge
                                         // with other surfaces
     Optional Object heightFunction      // Height manipulation function. See below.
-    Optional Object/Array introspection // Introspection info used when using mapConfig.json served
+    Optional Object introspection       // Introspection info used when using mapConfig.json served
                                         // by mapproxy. See below.
 ```
 
@@ -261,11 +262,31 @@ Introspection is extended configuration for mapproxy served `mapConfig.json` (on
 ```javascript
 introspection = {
     Optional Array position;                       // VTS position in JSON/python format
-    Optional ResourceId/Array<ResourceId> tms      // bound layer(s) mapped on the surface, see below 
-    Optional ResourceId/Array<ResourceId> geodata  // free layer(s) (geodata) mapped on the surface, see below
+    Optional Layer/Array<Layer> tms                // bound layer(s) mapped on the surface, see below 
+    Optional Layer/Array<Layer> geodata            // free layer(s) (geodata) mapped on the surface, see below
     Optional Object browserOptions                 // browser options passed to mapConfig.json
 }
 ```
+
+The `Layer` type in the `introspection` above (`tms`/`geodata`) is a (bound/free) layer reference.
+It can be either a `ResourceId`:
+```javascript
+Layer = ResourceId: {
+    String group        // group this resource belongs to
+    String id           // resource identifier (withing group)
+}
+```
+
+or a URL of bound/free layer definition:
+```javascript
+Layer = {
+    String id                           // Bound/free layer identifier
+    String url                          // URL template of layer definition (boundlayer.json or freeelayer.json)
+}
+```
+
+NB: in the above template only `{rf}` (reference frame identifier) is expected to work. It can be used to use in terse
+resource definition in multiple reference frames.
 
 Height function is a function that takes the original height value and modifies it. Currently, the only supported
 height function is `superelevation`.
