@@ -295,11 +295,18 @@ void Generator::checkReady() const
     throw Unavailable("Generator not ready.");
 }
 
-std::string Generator::url() const
+std::string Generator::url(const std::string &fallbackRoot) const
 {
-    return ("/" / prependRoot(fs::path("/"), id(), type()
-                              , { ResourceRoot::referenceFrame }))
-        .string();
+    const auto trailer(prependRoot(fs::path("/"), id(), type()
+                                   , { ResourceRoot::referenceFrame })
+                       .string());
+
+    const auto &prefix(config().externalUrl
+                       ? *config().externalUrl : fallbackRoot);
+
+    if (prefix.empty()) { return trailer; }
+    if (prefix.back() != '/') { return prefix + "/" + trailer; }
+    return prefix + trailer;
 }
 
 bool Generator::updatedSince(std::uint64_t timestamp) const
@@ -422,7 +429,8 @@ public:
 
     bool isReady(const Resource::Id &resourceId) const;
 
-    std::string url(const Resource::Id &resourceId) const;
+    std::string url(const Resource::Id &resourceId
+                    , const std::string &fallbackRoot) const;
 
     bool updatedSince(const Resource::Id &resourceId
                       , std::uint64_t timestamp, bool nothrow) const;
@@ -1098,7 +1106,8 @@ bool Generators::isReady(const Resource::Id &resourceId) const
     return detail().isReady(resourceId);
 }
 
-std::string Generators::Detail::url(const Resource::Id &resourceId) const
+std::string Generators::Detail::url(const Resource::Id &resourceId
+                                    , const std::string &fallbackRoot) const
 {
     std::unique_lock<std::mutex> lock(lock_);
     auto &idx(serving_.get<ResourceIdIdx>());
@@ -1107,12 +1116,13 @@ std::string Generators::Detail::url(const Resource::Id &resourceId) const
         LOGTHROW(err1, UnknownGenerator)
             << "No such generator <" << resourceId << ">";
     }
-    return (*fserving)->url();
+    return (*fserving)->url(fallbackRoot);
 }
 
-std::string Generators::url(const Resource::Id &resourceId) const
+std::string Generators::url(const Resource::Id &resourceId
+                            , const std::string &fallbackRoot) const
 {
-    return detail().url(resourceId);
+    return detail().url(resourceId, fallbackRoot);
 }
 
 bool Generators::Detail::updatedSince(const Resource::Id &resourceId

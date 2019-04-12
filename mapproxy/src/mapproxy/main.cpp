@@ -301,8 +301,14 @@ void Daemon::configure(const po::variables_map &vars)
     }
 
     if (vars.count("http.externalUrl")) {
-        generatorsConfig_.externalUrl
-            = vars["http.externalUrl"].as<std::string>();
+        auto eurl(vars["http.externalUrl"].as<std::string>());
+        if (eurl.empty()) {
+            throw po::validation_error
+                (po::validation_error::invalid_option_value
+                 , "http.externalUrl");
+        }
+        if (eurl.back() != '/') { eurl.push_back('/'); }
+        generatorsConfig_.externalUrl = eurl;
     }
 
     LOG(info3, log_)
@@ -523,11 +529,11 @@ bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
             return true;
         }
 
-        const auto url(generators_->url
-                       (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2])));
-        os << utility::format
-            ("http://%s%s\n"
-             , utility::TcpEndpointPrettyPrint(httpListen_), url);
+        os << generators_->url
+            (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2])
+             , boost::lexical_cast<std::string>
+             (utility::TcpEndpointPrettyPrint(httpListen_)))
+           << '\n';
         return true;
 
     } else if (cmd.cmd == "help") {

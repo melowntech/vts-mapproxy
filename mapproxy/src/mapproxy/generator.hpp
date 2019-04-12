@@ -209,9 +209,9 @@ public:
      */
     void commitEnforcedChange();
 
-    /** Build resource URL (path only).
+    /** Build resource URL under config.externalUrl (or root as a fallback root)
      */
-    std::string url() const;
+    std::string url(const std::string &fallbackRoot) const;
 
     /** Was the resource updated since given timestamp.
      */
@@ -345,7 +345,8 @@ public:
 
     bool isReady(const Resource::Id &resourceId) const;
 
-    std::string url(const Resource::Id &resourceId) const;
+    std::string url(const Resource::Id &resourceId
+                    , const std::string &fallbackRoot) const;
 
     // internals
     struct Detail;
