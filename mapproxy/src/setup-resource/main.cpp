@@ -874,7 +874,7 @@ int SetupResource::run()
 
 int main(int argc, char *argv[])
 {
-    // force VRT not to share undelying datasets
+    // force VRT not to share underlying datasets
     geo::Gdal::setOption("VRT_SHARED_SOURCE", 0);
     geo::Gdal::setOption("GDAL_TIFF_INTERNAL_MASK", "YES");
     gdal_drivers::registerAll();
