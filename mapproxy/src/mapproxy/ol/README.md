@@ -12,7 +12,7 @@ this particular resource.
 There's an [interactive browser](browser.html) provided by mapproxy for testing
 and evaluation.
 
-You can the use the [URL of this directory[(.)in tools like
+You can the use the [URL of this directory](.) in tools like
 [GDAL](https://www.gdal.org/) or [QGIS](https://qgis.org/en/site/).
 
 ## Examples
