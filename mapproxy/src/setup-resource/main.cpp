@@ -34,6 +34,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
+#include <boost/algorithm/string/trim.hpp>
 
 #include "utility/streams.hpp"
 #include "utility/buildsys.hpp"
@@ -42,6 +43,7 @@
 #include "utility/path.hpp"
 #include "utility/filesystem.hpp"
 #include "utility/format.hpp"
+#include "utility/md5.hpp"
 
 #include "service/cmdline.hpp"
 #include "service/ctrlclient.hpp"
@@ -66,6 +68,7 @@
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
+namespace ba = boost::algorithm;
 
 namespace vts = vtslibs::vts;
 namespace vr = vtslibs::registry;
@@ -530,6 +533,21 @@ void createVrtWO(const fs::path &srcPath
     fs::create_symlink(ovrPathLocal / "dataset", datasetPath);
 }
 
+fs::path vrtWOPath(const calipers::Measurement &cm, const fs::path &rootDir)
+{
+    switch (cm.datasetType) {
+    case calipers::DatasetType::dem:
+        return rootDir / "dem";
+
+    case calipers::DatasetType::ophoto:
+        return rootDir / "ophoto";
+    }
+
+    LOGTHROW(err3, std::logic_error)
+        << "Unhandled dataset type <" << cm.datasetType << ">.";
+    throw;
+}
+
 fs::path createVrtWO(const calipers::Measurement &cm
                      , const fs::path &datasetPath
                      , const fs::path &rootDir)
@@ -559,7 +577,7 @@ fs::path createVrtWO(const calipers::Measurement &cm
             createVrtWO(datasetPath, rootDir, "dem.max"
                         , geo::GeoDataset::Resampling::maximum, cm);
         }
-        return (rootDir / "dem");
+        break;
 
     case calipers::DatasetType::ophoto:
         {
@@ -567,14 +585,16 @@ fs::path createVrtWO(const calipers::Measurement &cm
             createVrtWO(datasetPath, rootDir, "ophoto"
                         , geo::GeoDataset::Resampling::texture, cm);
         }
-        return (rootDir / "ophoto");
+        break;
+
+    default:
+        LOGTHROW(err3, std::logic_error)
+            << "Unhandled dataset type <" << cm.datasetType << ">.";
     }
 
-    LOGTHROW(err3, std::logic_error)
-        << "Unhandled dataset type <" << cm.datasetType << ">.";
-    throw;
+    // fails if dataset type is not handled
+    return vrtWOPath(cm, rootDir);
 }
-
 
 void buildDefinition(resource::SurfaceDem &def, const calipers::Measurement &cm
                      , const fs::path &dataset, const Config &config)
@@ -625,6 +645,21 @@ void addCredits(Resource &r, const vr::Credit::dict &credits)
         r.credits.insert(DualId(credit.id, credit.numericId));
     }
     r.registry.credits.update(credits);
+}
+
+std::string md5sum(const fs::path &path)
+{
+    utility::ifstreambuf f(path.string());
+    f.exceptions(std::ios::badbit);
+
+    utility::md5::Md5Sum md5;
+    char buf[1<<16];
+    std::size_t total(0);
+    while (f.readsome(buf, sizeof(buf))) {
+        md5.append(buf, f.gcount());
+        total += f.gcount();
+    }
+    return md5.hash();
 }
 
 int SetupResource::run()
@@ -697,26 +732,45 @@ int SetupResource::run()
             << "overlap of " << *cm.xOverlap << " pixels.";
     }
 
-    const auto resourceDir(fs::path(resourceId.group) / resourceId.id);
-    const auto rootDir(config_.mapproxyDataRoot / resourceDir);
-    // TODO: check for existence
-
     // 4) allocate attributions
     const auto credits(attributions2credits(config_));
 
     // 5) copy dataset; TODO: add symlink option
-    LOG(info4) << "Copying dataset to destination.";
-    const auto datasetPath(rootDir / "original-dataset"
-                           / fs::path(dataset_).filename());
+    const auto datasetFileName(fs::path(dataset_).filename());
 
-    fs::create_directories(datasetPath.parent_path());
+    const auto datasetHome
+        (utility::addExtension(datasetFileName
+                               , "." + md5sum(dataset_)));
 
-    // copy (overwrite)
-    utility::copy_file(dataset_, datasetPath, true);
-    ds.copyFiles(datasetPath);
+    const auto rootDir(config_.mapproxyDataRoot / datasetHome);
+    const auto baseDatasetPath("original-dataset" / datasetFileName);
+    const auto datasetPath(rootDir / baseDatasetPath);
 
-    // 6) create vrtwo derived datasets
-    const auto mainDataset(createVrtWO(cm, datasetPath , rootDir));
+    const auto mainDataset([&]()
+    {
+        if (!fs::exists(rootDir)) {
+            LOG(info4) << "Copying dataset to destination.";
+
+            const auto tmpRootDir(utility::addExtension(rootDir, ".tmp"));
+
+            const auto tmpDatasetPath(tmpRootDir / baseDatasetPath);
+
+            fs::create_directories(tmpDatasetPath.parent_path());
+
+            // copy (overwrite)
+            utility::copy_file(dataset_, tmpDatasetPath, true);
+            ds.copyFiles(datasetPath);
+
+            // 6) create vrtwo derived datasets
+            createVrtWO(cm, tmpDatasetPath , tmpRootDir);
+
+            // commit
+            fs::rename(tmpRootDir, rootDir);
+        } else {
+            LOG(info4) << "Reusing existing dataset.";
+        }
+        return vrtWOPath(cm, rootDir);
+    }());
 
     // 7) generate tiling information
     LOG(info4) << "Generating tiling information.";
@@ -733,7 +787,7 @@ int SetupResource::run()
     {
         const auto resourceConfigPath
             (config_.mapproxyDefinitionDir / resourceId.group
-             / (resourceId.id + ".json"));
+             / (resourceId.id + "." + resourceId_.referenceFrame + ".json"));
         LOG(info4) << "Generating mapproxy resource configuration at "
                    << resourceConfigPath << ".";
 
@@ -749,7 +803,7 @@ int SetupResource::run()
         r.lodRange = cm.lodRange;
         r.tileRange = cm.tileRange;
 
-        buildDefinition(r, cm, resourceDir, config);
+        buildDefinition(r, cm, datasetHome, config);
 
         fs::create_directories(resourceConfigPath.parent_path());
         save(resourceConfigPath, r);
