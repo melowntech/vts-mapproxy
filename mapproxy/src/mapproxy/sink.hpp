@@ -60,6 +60,7 @@ public:
                  = http::SinkBase::CacheControl())
             : http::SinkBase::FileInfo(contentType, lastModified
                                        , cacheControl)
+            , fileClass()
         {}
 
         FileInfo(const std::string &contentType
@@ -111,7 +112,7 @@ public:
      * \param gzipped is content gzipped?
      */
     void content(const vs::IStream::pointer &stream, FileClass fileClass
-                 , const http::SinkBase::CacheControl &cacheContro
+                 , const http::SinkBase::CacheControl &cacheControl
                  = http::SinkBase::CacheControl()
                  , bool gzipped = false);
 
@@ -126,6 +127,10 @@ public:
     void listing(const Listing &list) {
         sink_->listing(list);
     }
+
+    /** Formats markdown as a HTML and sends it to the client.
+     */
+    void markdown(const std::string &content);
 
     /** Sends current exception to the client.
      */

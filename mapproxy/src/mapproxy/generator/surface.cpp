@@ -70,6 +70,7 @@
 #include "../support/tms.hpp"
 #include "../support/introspection.hpp"
 
+#include "files.hpp"
 #include "surface.hpp"
 
 namespace fs = boost::filesystem;
@@ -584,6 +585,10 @@ Generator::Task SurfaceBase
         sink.listing(fi.listing);
         break;
 
+    case TerrainFileInfo::Type::readme:
+        sink.markdown(cesiumReadme());
+        break;
+
     default:
         sink.error(utility::makeError<InternalError>
                     ("Not implemented yet."));
@@ -799,6 +804,15 @@ void SurfaceBase::cesiumConf(Sink &sink, const TerrainFileInfo &fi
     std::ostringstream os;
     save(conf, os);
     sink.content(os.str(), fi.sinkFileInfo());
+}
+
+std::string SurfaceBase::cesiumReadme() const
+{
+    vs::SupportFile::Vars vars;
+    vars["externalUrl"] = config().externalUrl;
+    vars["url"] = url(GeneratorInterface::Interface::terrain);
+
+    return files::cesiumReadme.expand(&vars, nullptr);
 }
 
 } // namespace generator

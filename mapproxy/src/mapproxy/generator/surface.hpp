@@ -126,6 +126,8 @@ private:
     void cesiumConf(Sink &sink, const TerrainFileInfo &fileInfo
                     , const vre::Tms &tms) const;
 
+    std::string cesiumReadme() const;
+
     const Definition &definition_;
     const vre::Tms *tms_;
 };

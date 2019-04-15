@@ -17,5 +17,6 @@ m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 11), libboost1.65-all-dev
     , libprocps-dev (>= 3.3.12)
     , libmagic-dev (>= 5.32)
     , libicu-dev (>= 60.2-3ubuntu3)
-    , libtinyxml-dev
+    , libtinyxml2-dev
+    , libmarkdown2-dev
     , gawk, pandoc}}})m4_dnl

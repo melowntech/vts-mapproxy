@@ -107,6 +107,7 @@ define_module(BINARY mapproxy
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS
   Boost_PYTHON
+  Markdown
   )
 
 set(mapproxy_SOURCES
@@ -166,6 +167,12 @@ set(mapproxy_FILES_SOURCES
 file_to_cpp(mapproxy_FILES_SOURCES
   files::defaultstyle_json
   generator/files/defaultstyle.json)
+file_to_cpp(mapproxy_FILES_SOURCES
+  files::wmtsreadme_md
+  generator/files//wmtsreadme.md)
+file_to_cpp(mapproxy_FILES_SOURCES
+  files::cesiumreadme_md
+  generator/files//cesiumreadme.md)
 
 set(mapproxy_CESIUM_SOURCES
   cesium.hpp cesium.cpp
@@ -179,9 +186,6 @@ file_to_cpp(mapproxy_CESIUM_SOURCES
 file_to_cpp(mapproxy_CESIUM_SOURCES
   cesium::melowntech_png
   cesium/melown-technologies-logo-28.png)
-pandoc_to_cpp(mapproxy_CESIUM_SOURCES
-  cesium::README_md
-  cesium/README.md)
 
 set(mapproxy_OL_SOURCES
   ol.hpp ol.cpp
@@ -192,9 +196,6 @@ file_to_cpp(mapproxy_OL_SOURCES
 file_to_cpp(mapproxy_OL_SOURCES
   ol::ol_js
   ol/ol.js)
-pandoc_to_cpp(mapproxy_OL_SOURCES
-  ol::README_md
-  ol/README.md)
 
 add_executable(mapproxy
   ${mapproxy_SOURCES}

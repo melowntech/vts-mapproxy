@@ -35,6 +35,10 @@ namespace files {
 
 extern const vtslibs::storage::SupportFile defaultStyle;
 
+extern const vtslibs::storage::SupportFile wmtsReadme;
+
+extern const vtslibs::storage::SupportFile cesiumReadme;
+
 } // namespace files
 
 #endif // mapproxy_generator_files_hpp_included_

@@ -11,5 +11,6 @@ m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 7.0.50~), libboost-all-dev (>=
     , libblas-dev (>= 1.2.20110419-5), libcrypto++-dev (>= 5.6)
     , libgdal-dev (>= 2.0), libproj-dev (>= 4.9)
     , libmysql++-dev (>= 3.0.9-1+b1), libopenmesh-dev (>= 2.3.1-2)
-    , libtinyxml-dev
+    , libtinyxml2-dev
+    , libmarkdown2-dev
     , libgeographiclib-dev (>= 1.21-1), pandoc}}})m4_dnl

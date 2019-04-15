@@ -371,10 +371,11 @@ boost::filesystem::path prependRoot(const boost::filesystem::path &path
 std::string prependRoot(const std::string &path, const Resource &resource
                         , const ResourceRoot &root);
 
-boost::filesystem::path prependRoot(const boost::filesystem::path &path
-                                    , const Resource::Id &resource
-                                    , GeneratorInterface generatorInterface
-                                    , const ResourceRoot &root);
+boost::filesystem::path
+prependRoot(const boost::filesystem::path &path
+            , const Resource::Id &resource
+            , const GeneratorInterface &generatorInterface
+            , const ResourceRoot &root);
 
 std::string prependRoot(const std::string &path, const Resource::Id &resource
                         , const GeneratorInterface &generatorIface

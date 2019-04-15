@@ -27,6 +27,8 @@
 #include "files.hpp"
 
 #include "generator/files/defaultstyle.json.hpp"
+#include "generator/files/wmtsreadme.md.hpp"
+#include "generator/files/cesiumreadme.md.hpp"
 
 namespace files {
 
@@ -35,6 +37,20 @@ const vtslibs::storage::SupportFile defaultStyle = {
     , sizeof(defaultstyle_json)
     , defaultstyle_json_attr_lastModified
     , "application/json; charset=utf-8"
+};
+
+const vtslibs::storage::SupportFile wmtsReadme = {
+    wmtsreadme_md
+    , sizeof(wmtsreadme_md)
+    , wmtsreadme_md_attr_lastModified
+    , "text/markdown; charset=utf-8"
+};
+
+const vtslibs::storage::SupportFile cesiumReadme = {
+    cesiumreadme_md
+    , sizeof(cesiumreadme_md)
+    , cesiumreadme_md_attr_lastModified
+    , "text/markdown; charset=utf-8"
 };
 
 } // namespace files

@@ -227,7 +227,7 @@ struct TerrainFileInfo {
     FileInfo fileInfo;
 
     enum class Type {
-        unknown, tile, definition, support, cesiumConf, listing
+        unknown, tile, definition, support, cesiumConf, listing, readme
     };
 
     /** File type.
@@ -256,7 +256,7 @@ struct WmtsFileInfo {
      */
     FileInfo fileInfo;
 
-    enum class Type { unknown, capabilities, support, listing };
+    enum class Type { unknown, capabilities, support, listing, readme };
 
     /** File type.
      */

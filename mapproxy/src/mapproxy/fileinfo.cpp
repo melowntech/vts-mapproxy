@@ -577,6 +577,12 @@ TerrainFileInfo::TerrainFileInfo(const FileInfo &fi)
             return;
         }
 
+
+        if (constants::README == fi.filename) {
+            type = Type::readme;
+            return;
+        }
+
         // support files
         auto fsupport(cesium::supportFiles.find(path));
         if (fsupport != cesium::supportFiles.end()) {
@@ -617,6 +623,7 @@ Sink::FileInfo TerrainFileInfo::sinkFileInfo(std::time_t lastModified) const
             .setFileClass(FileClass::config);
 
     case Type::listing:
+    case Type::readme:
     case Type::unknown:
         return {};
     }
@@ -639,6 +646,11 @@ WmtsFileInfo::WmtsFileInfo(const FileInfo &fi)
         auto path(fi.filename);
         if ((constants::Self == path) || (constants::Index == path)) {
             type = Type::listing;
+            return;
+        }
+
+        if (constants::README == fi.filename) {
+            type = Type::readme;
             return;
         }
 
@@ -673,6 +685,7 @@ Sink::FileInfo WmtsFileInfo::sinkFileInfo(std::time_t lastModified) const
             .setFileClass(FileClass::config);
 
     case Type::listing:
+    case Type::readme:
     case Type::unknown:
         return {};
     }

@@ -29,6 +29,10 @@
 
 #include <opencv2/highgui/highgui.hpp>
 
+extern "C" {
+#include <mkdio.h>
+} // extern "C"
+
 #include "dbglog/dbglog.hpp"
 
 #include "imgproc/png.hpp"
@@ -225,4 +229,32 @@ Sink::FileInfo& Sink::FileInfo::addHeader(const std::string &name
 Sink::FileInfo Sink::update(const FileInfo &stat) const
 {
     return ::update(stat, fileClassSettings_);
+}
+
+void Sink::markdown(const std::string &source)
+{
+    struct Holder {
+        MMIOT *md;
+        ~Holder() { if (md) { ::mkd_cleanup(md); } }
+    } md{::mkd_string(source.data(), source.size(), 0)};
+
+    if (!md.md) {
+        LOGTHROW(err1, InternalError)
+            << "Markdown format error.";
+    }
+
+    if (!::mkd_compile(md.md, 0)) {
+        LOGTHROW(err1, InternalError)
+            << "Markdown compile error.";
+    }
+
+    char *text;
+    const auto size(::mkd_document(md.md, &text));
+    if (size < 0) {
+        LOGTHROW(err1, InternalError)
+            << "Markdown document output failed.";
+    }
+
+    FileInfo stat("text/html; charset=utf-8");
+    content(text, size, stat, true);
 }

@@ -532,7 +532,7 @@ Changed Resource::changed(const Resource &o) const
 
 boost::filesystem::path prependRoot(const boost::filesystem::path &path
                                     , const Resource::Id &resource
-                                    , GeneratorInterface generatorIface
+                                    , const GeneratorInterface &generatorIface
                                     , const ResourceRoot &root)
 {
     boost::filesystem::path out;

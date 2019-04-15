@@ -179,7 +179,7 @@ void Daemon::configuration(po::options_description &cmdline
          ->default_value(httpEnableBrowser_)->required()
          , "Enables resource browsering functionaly if set to true.")
 
-        ("http.externalUrl", po::value<std::string>()
+        ("http.externalUrl", po::value(&generatorsConfig_.externalUrl)
          , "External URL of root of this mapproxy instance. Used only "
          "by services that cannot cope with relive paths (WMTS).")
 
@@ -300,15 +300,10 @@ void Daemon::configure(const po::variables_map &vars)
         }
     }
 
-    if (vars.count("http.externalUrl")) {
-        auto eurl(vars["http.externalUrl"].as<std::string>());
-        if (eurl.empty()) {
-            throw po::validation_error
-                (po::validation_error::invalid_option_value
-                 , "http.externalUrl");
-        }
-        if (eurl.back() != '/') { eurl.push_back('/'); }
-        generatorsConfig_.externalUrl = eurl;
+    if (!vars.count("http.externalUrl")) {
+        generatorsConfig_.externalUrl
+            = utility::format("http://%s/"
+                              , utility::TcpEndpointPrettyPrint(httpListen_));
     }
 
     LOG(info3, log_)
@@ -328,11 +323,7 @@ void Daemon::configure(const po::variables_map &vars)
         << "\n\tresource-backend.freeze = ["
         << utility::join(generatorsConfig_.freezeResourceTypes, ",")
         << "]\n"
-        << utility::LManip([&](std::ostream &os) {
-                if (!generatorsConfig_.externalUrl) { return; }
-                os << "\thttp.externalUrl = " << *generatorsConfig_.externalUrl
-                   << '\n';
-            })
+        << "\thttp.externalUrl = " << generatorsConfig_.externalUrl << '\n'
         << utility::LManip([&](std::ostream &os) {
                 ResourceBackend::printConfig(os, "\t" + RBPrefixDotted
                                              , resourceBackendConfig_);
@@ -530,9 +521,7 @@ bool Daemon::ctrl(const CtrlCommand &cmd, std::ostream &os)
         }
 
         os << generators_->url
-            (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2])
-             , boost::lexical_cast<std::string>
-             (utility::TcpEndpointPrettyPrint(httpListen_)))
+            (Resource::Id(cmd.args[0], cmd.args[1], cmd.args[2]))
            << '\n';
         return true;
 

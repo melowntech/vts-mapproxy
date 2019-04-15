@@ -29,6 +29,8 @@
 
 #include "../support/wmts.hpp"
 
+#include "files.hpp"
+
 #include "tms-raster-base.hpp"
 
 namespace uq = utility::query;
@@ -105,14 +107,6 @@ wmts::WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo)
 
     layer.format = format_;
 
-    if (!introspection && !config().externalUrl) {
-        LOG(warn2)
-            << "External URL unset in configuration, cannot generate "
-            "proper URL template in WMTSCapabilities; please, set "
-            "external URL. Switching to introspection mode.";
-        introspection = true;
-    }
-
     // build root path
     if (introspection) {
         // used in introspection -> local, can be relative from wmts interface
@@ -127,7 +121,7 @@ wmts::WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo)
 
         resources.capabilitiesUrl = "./" + fileInfo.capabilitesName;
     } else {
-        layer.rootPath = *config().externalUrl
+        layer.rootPath = config().externalUrl
             + prependRoot(std::string(), resource()
                           , ResourceRoot::Depth::referenceFrame);
         resources.capabilitiesUrl =
@@ -135,6 +129,15 @@ wmts::WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo)
     }
 
     return resources;
+}
+
+std::string TmsRasterBase::wmtsReadme() const
+{
+    vs::SupportFile::Vars vars;
+    vars["externalUrl"] = config().externalUrl;
+    vars["url"] = url(GeneratorInterface::Interface::wmts);
+
+    return files::wmtsReadme.expand(&vars, nullptr);
 }
 
 Generator::Task TmsRasterBase
@@ -157,6 +160,10 @@ Generator::Task TmsRasterBase
 
     case WmtsFileInfo::Type::listing:
         sink.listing(fi.listing);
+        break;
+
+    case WmtsFileInfo::Type::readme:
+        sink.markdown(wmtsReadme());
         break;
 
     default:

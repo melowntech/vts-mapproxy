@@ -55,6 +55,8 @@ private:
 
     wmts::WmtsResources wmtsResources(const WmtsFileInfo &fileInfo) const;
 
+    std::string wmtsReadme() const;
+
     const vre::Wmts& getWmts() const;
 
     RasterFormat format_;

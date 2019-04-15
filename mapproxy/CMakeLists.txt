@@ -48,7 +48,6 @@ include_directories(${LIBPROC_INCLUDE_DIR})
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-
 find_package(ICU COMPONENTS uc i18n REQUIRED)
 include_directories(${ICU_INCLUDE_DIRS})
 
@@ -57,6 +56,9 @@ include_directories(${PYTHONLIBS_INCLUDE_DIRS})
 
 find_package(TinyXML2 REQUIRED)
 include_directories(${TINYXML2_INCLUDE_DIR})
+
+find_package(Markdown REQUIRED)
+include_directories(${Markdown_INCLUDE_DIR})
 
 # dependencies
 add_subdirectory(src/dbglog)

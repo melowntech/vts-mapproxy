@@ -10,7 +10,8 @@ For every WMTS-enabled reference frame mapproxy provides a
 this particular resource.
 
 There's an [interactive browser](browser.html) provided by mapproxy for testing
-and evaluation.
+and evaluation. Preview:
+<iframe src="browser.html" width="640" height="480" align="center"></iframe>
 
 You can the use the [URL of this directory](.) in tools like
 [GDAL](https://www.gdal.org/) or [QGIS](https://qgis.org/en/site/).
@@ -21,7 +22,7 @@ You can the use the [URL of this directory](.) in tools like
 
 * GDAL: warp whole dataset into a TIF file 1024 px wide with aspect ratio kept
 
-         # gdalwarp wmts:http://.../WMTSCapabilities.xml output.tif -ts 1024 0 -r cubic
+         # gdalwarp wmts:{{{url}}}WMTSCapabilities.xml output.tif -ts 1024 0 -r cubic
 
      (please notice the `wmts:` URL prefix)
 
@@ -42,9 +43,9 @@ In QGIS desktop application:
 
 ---
 
-*Nota bene*: If you want to use WMTS interface outside of introspection browser
-you have to have properly configured the `http.externalUrl` mapproxy
-configuration options. For example:
+*Nota bene*: If you want to use the WMTS interface outside of introspection
+browser you have to have properly configured the `http.externalUrl` mapproxy
+configuration options. Currently set to:
 
     [http]
-    externalUrl = http://myserver.mydomain.com/mapproxy/root
+    externalUrl = {{{externalUrl}}}

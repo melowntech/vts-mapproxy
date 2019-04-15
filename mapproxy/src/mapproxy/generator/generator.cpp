@@ -295,14 +295,14 @@ void Generator::checkReady() const
     throw Unavailable("Generator not ready.");
 }
 
-std::string Generator::url(const std::string &fallbackRoot) const
+std::string Generator::url(GeneratorInterface::Interface iface) const
 {
-    const auto trailer(prependRoot(fs::path("/"), id(), type()
+    const auto trailer(prependRoot(fs::path("/"), id()
+                                   , GeneratorInterface(type(), iface)
                                    , { ResourceRoot::referenceFrame })
                        .string());
 
-    const auto &prefix(config().externalUrl
-                       ? *config().externalUrl : fallbackRoot);
+    const auto &prefix(config().externalUrl);
 
     if (prefix.empty()) { return trailer; }
     if (prefix.back() != '/') { return prefix + "/" + trailer; }
@@ -366,13 +366,9 @@ GroupKey extractGroupKey(const Generator &generator)
 
 Generators::Config fixUp(Generators::Config config)
 {
-    if (config.externalUrl) {
-        // sanity check
-        if (config.externalUrl->empty()) {
-            config.externalUrl = boost::none;
-        } else if (config.externalUrl->back() != '/') {
-            config.externalUrl->push_back('/');
-        }
+    // sanity check
+    if (!config.externalUrl.empty() && (config.externalUrl.back() != '/')) {
+        config.externalUrl.push_back('/');
     }
     return config;
 }
@@ -430,7 +426,7 @@ public:
     bool isReady(const Resource::Id &resourceId) const;
 
     std::string url(const Resource::Id &resourceId
-                    , const std::string &fallbackRoot) const;
+                    , GeneratorInterface::Interface iface) const;
 
     bool updatedSince(const Resource::Id &resourceId
                       , std::uint64_t timestamp, bool nothrow) const;
@@ -1107,7 +1103,8 @@ bool Generators::isReady(const Resource::Id &resourceId) const
 }
 
 std::string Generators::Detail::url(const Resource::Id &resourceId
-                                    , const std::string &fallbackRoot) const
+                                    , GeneratorInterface::Interface iface)
+    const
 {
     std::unique_lock<std::mutex> lock(lock_);
     auto &idx(serving_.get<ResourceIdIdx>());
@@ -1116,13 +1113,13 @@ std::string Generators::Detail::url(const Resource::Id &resourceId
         LOGTHROW(err1, UnknownGenerator)
             << "No such generator <" << resourceId << ">";
     }
-    return (*fserving)->url(fallbackRoot);
+    return (*fserving)->url(iface);
 }
 
 std::string Generators::url(const Resource::Id &resourceId
-                            , const std::string &fallbackRoot) const
+                            , GeneratorInterface::Interface iface) const
 {
-    return detail().url(resourceId, fallbackRoot);
+    return detail().url(resourceId, iface);
 }
 
 bool Generators::Detail::updatedSince(const Resource::Id &resourceId

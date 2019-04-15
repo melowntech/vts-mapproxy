@@ -99,7 +99,7 @@ public:
         const vs::SupportFile::Vars *defaults;
         double defaultFov;
         std::set<Resource::Generator::Type> freezeResourceTypes;
-        boost::optional<std::string> externalUrl;
+        std::string externalUrl;
 
         Config()
             : fileFlags(), variables(), defaults()
@@ -209,9 +209,11 @@ public:
      */
     void commitEnforcedChange();
 
-    /** Build resource URL under config.externalUrl (or root as a fallback root)
+    /** Build resource URL under config.externalUrl.
      */
-    std::string url(const std::string &fallbackRoot) const;
+    std::string url(GeneratorInterface::Interface iface
+                    = GeneratorInterface::Interface::vts)
+        const;
 
     /** Was the resource updated since given timestamp.
      */
@@ -346,7 +348,8 @@ public:
     bool isReady(const Resource::Id &resourceId) const;
 
     std::string url(const Resource::Id &resourceId
-                    , const std::string &fallbackRoot) const;
+                    , GeneratorInterface::Interface
+                    = GeneratorInterface::Interface::vts) const;
 
     // internals
     struct Detail;
