@@ -1,4 +1,4 @@
-<img width="330" alt="VTS Browser JS" src="https://github.com/melowntech/assets/blob/master/vts-mapproxy/vts-mapproxy@2x.png?raw=true">
+<img width="320" alt="VTS Browser JS" src="https://github.com/melowntech/assets/blob/master/vts-mapproxy/vts-mapproxy-no-left-margin.png?raw=true">
 
 [VTS-Mapproxy](https://github.com/melowntech/vts-mapproxy) is an HTTP server that
 converts non-VTS resources (raster or vector) to VTS resources (surface,
