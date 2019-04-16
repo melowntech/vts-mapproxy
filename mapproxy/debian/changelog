@@ -1,3 +1,9 @@
+vts-mapproxy (1.54) stable; urgency=medium
+
+  * README files: combined in directory listing.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Tue, 16 Apr 2019 08:50:15 +0000
+
 vts-mapproxy (1.53) stable; urgency=medium
 
   * Configuring README files on the fly.
