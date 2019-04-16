@@ -81,8 +81,22 @@ void prepareTileIndex(vts::TileIndex &index
     // and clip with dataset tiles
     if (tilesPath) {
         // load definition
+        LOG(debug) << "Loading tiling from " << *tilesPath << ".";
         vts::TileIndex datasetTiles;
         datasetTiles.load(*tilesPath);
+
+        if (resource.lodRange.max > datasetTiles.maxLod()) {
+            LOG(debug) << "Loaded tiling is too shallow ("
+                       << datasetTiles.maxLod() << " vs "
+                       << resource.lodRange.max << "); enlarging.";
+
+            // make tiling available from root to resource max LOD and copy
+            // tiling data from original to new bottom LOD
+            // NB: tiling *should* be from root
+            datasetTiles
+                .makeAvailable(vts::LodRange(0, resource.lodRange.max))
+                .completeDownFromBottom();
+        }
 
         // TODO: unset navtile info if navtiles is true
         auto combiner([&](TiFlag::value_type o, TiFlag::value_type n)
@@ -97,6 +111,7 @@ void prepareTileIndex(vts::TileIndex &index
             return o | n;
         });
 
+        LOG(debug) << "Combining synthetic tileindex with tiling.";
         ti.combine(datasetTiles, combiner, resource.lodRange);
     }
 

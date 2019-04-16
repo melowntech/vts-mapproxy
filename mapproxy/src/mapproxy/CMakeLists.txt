@@ -209,6 +209,8 @@ buildsys_target_compile_definitions(mapproxy ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy)
 set_target_version(mapproxy ${vts-mapproxy_VERSION})
 
+add_subdirectory(test)
+
 # ------------------------------------------------------------------------
 # --- installation
 # ------------------------------------------------------------------------
