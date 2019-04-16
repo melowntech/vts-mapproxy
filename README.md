@@ -1,6 +1,6 @@
 <img width="330" alt="VTS Browser JS" src="https://github.com/melowntech/assets/blob/master/vts-mapproxy/vts-mapproxy@2x.png?raw=true">
 
-[VTS-Mapproxy](https://github.com/melown/vts-mapproxy) is an HTTP server that
+[VTS-Mapproxy](https://github.com/melowntech/vts-mapproxy) is an HTTP server that
 converts non-VTS resources (raster or vector) to VTS resources (surface,
 boundlayer, freelayer) on the fly.
 
@@ -32,15 +32,15 @@ sudo apt-get install cmake g++
 
 #### VTS dependencies
 
-Before you can run [VTS-Mapproxy](https://github.com/melown/vts-mapproxy), you
-need at least [VTS-Registry](https://github.com/melown/vts-registry) downloaded
+Before you can run [VTS-Mapproxy](https://github.com/melowntech/vts-mapproxy), you
+need at least [VTS-Registry](https://github.com/melowntech/vts-registry) downloaded
 and installed in your system. Please refer to related
-[README.md](https://github.com/Melown/vts-registry/blob/master/README.md) file,
+[README.md](https://github.com/melowntech/vts-registry/blob/master/README.md) file,
 about how to install and compile VTS-Registry.
 
 #### Unpackaged deps
 
-[VTS-Mapproxy](https://github.com/melown/vts-mapproxy) is using (among other
+[VTS-Mapproxy](https://github.com/melowntech/vts-mapproxy) is using (among other
 libraries) [OpenMesh](https://www.openmesh.org/). You have to download and
 install OpenMesh library and this is, how you do it
 
@@ -88,13 +88,13 @@ sudo apt-get install \
 ### Clone and Download
 
 The source code can be downloaded from
-[GitHub repository](https://github.com/melown/vts-mapproxy), but since there are
+[GitHub repository](https://github.com/melowntech/vts-mapproxy), but since there are
 external dependences, you have to use `--recursive` switch while cloning the
 repo.
 
 
 ```
-git clone --recursive https://github.com/Melown/vts-mapproxy.git 
+git clone --recursive https://github.com/melowntech/vts-mapproxy.git 
 ```
 
 **NOTE:** If you did clone from GitHub previously without the `--recursive`
@@ -153,7 +153,7 @@ mapproxy --config mapproxy.conf
 ```
 
 **NOTE:** You might need to add also `--registry` parameter, and point it to
-previously compiled [VTS-Registry](https://github.com/melown/vts-registry).
+previously compiled [VTS-Registry](https://github.com/melowntech/vts-registry).
 
 Description of the configuration file can be found in our [user documentation](http://melown.readthedocs.io/en/latest/server/mapproxy.html).
 
