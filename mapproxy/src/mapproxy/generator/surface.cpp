@@ -582,11 +582,12 @@ Generator::Task SurfaceBase
         break;
 
     case TerrainFileInfo::Type::listing:
-        sink.listing(fi.listing);
+        sink.listing(fi.listing, "", markdown(cesiumReadme()));
         break;
 
     case TerrainFileInfo::Type::readme:
-        sink.markdown(cesiumReadme());
+        sink.markdown(utility::format("%s: Terrain Readme", id().fullId())
+                      , cesiumReadme());
         break;
 
     default:

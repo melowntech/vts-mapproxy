@@ -25,6 +25,7 @@
  */
 
 #include "utility/raise.hpp"
+#include "utility/format.hpp"
 #include "utility/httpquery.hpp"
 
 #include "../support/wmts.hpp"
@@ -159,11 +160,12 @@ Generator::Task TmsRasterBase
         break;
 
     case WmtsFileInfo::Type::listing:
-        sink.listing(fi.listing);
+        sink.listing(fi.listing, "", markdown(wmtsReadme()));
         break;
 
     case WmtsFileInfo::Type::readme:
-        sink.markdown(wmtsReadme());
+        sink.markdown(utility::format("%s: WMTS Readme", id().fullId())
+                      , wmtsReadme());
         break;
 
     default:

@@ -31,6 +31,7 @@
 #include <string>
 #include <memory>
 #include <exception>
+#include <sstream>
 
 #include "dbglog/dbglog.hpp"
 
@@ -124,13 +125,13 @@ public:
 
     /** Generates listing.
      */
-    void listing(const Listing &list) {
-        sink_->listing(list);
+    template <typename ...Args> void listing(Args &&...args) {
+        sink_->listing(std::forward<Args>(args)...);
     }
 
     /** Formats markdown as a HTML and sends it to the client.
      */
-    void markdown(const std::string &content);
+    void markdown(const std::string &title, const std::string &content);
 
     /** Sends current exception to the client.
      */
@@ -170,6 +171,14 @@ private:
     const FileClassSettings *fileClassSettings_;
 };
 
+/** Formats markdown as a HTML.
+ */
+void markdown(std::ostream &os, const std::string &content);
+
+/** Formats markdown as a HTML.
+ */
+std::string markdown(const std::string &content);
+
 // inlines
 
 template <typename T>
@@ -199,6 +208,13 @@ inline void
 Sink::assignFileClassSettings(const FileClassSettings &fileClassSettings)
 {
     fileClassSettings_ = &fileClassSettings;
+}
+
+inline std::string markdown(const std::string &content)
+{
+    std::ostringstream os;
+    markdown(os, content);
+    return os.str();
 }
 
 #endif // mapproxy_sink_hpp_included_

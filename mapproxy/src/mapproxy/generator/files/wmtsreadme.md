@@ -1,6 +1,6 @@
 # VTS Mapproxy resource WMTS interface
 
-## Generail info
+## General info
 
 WMTS interface allowd VTS raster resource to be used in WMTS enabled WWW clients
 or GIS tool.
@@ -39,7 +39,7 @@ In QGIS desktop application:
 * New server connection should become selected in the drop-down list
 * Click the `Connect` button
 * Select the only layer available
-* Click the `Add` butto
+* Click the `Add` button
 
 ---
 

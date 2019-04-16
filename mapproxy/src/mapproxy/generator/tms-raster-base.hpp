@@ -30,11 +30,13 @@
 #include <boost/optional.hpp>
 
 #include "vts-libs/registry/extensions.hpp"
+#include "vts-libs/storage/support.hpp"
 
 #include "../support/wmts.hpp"
 #include "../generator.hpp"
 
 namespace vre = vtslibs::registry::extensions;
+namespace vs = vtslibs::storage;
 
 namespace generator {
 

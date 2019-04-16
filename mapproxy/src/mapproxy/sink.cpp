@@ -231,7 +231,7 @@ Sink::FileInfo Sink::update(const FileInfo &stat) const
     return ::update(stat, fileClassSettings_);
 }
 
-void Sink::markdown(const std::string &source)
+void markdown(std::ostream &os, const std::string &source)
 {
     struct Holder {
         MMIOT *md;
@@ -254,7 +254,21 @@ void Sink::markdown(const std::string &source)
         LOGTHROW(err1, InternalError)
             << "Markdown document output failed.";
     }
+    os.write(text, size);
+}
 
+void Sink::markdown(const std::string &title, const std::string &source)
+{
     FileInfo stat("text/html; charset=utf-8");
-    content(text, size, stat, true);
+    std::ostringstream os;
+    os << R"RAW(<html>
+<head><title>Index of )RAW" << title
+           << R"RAW(</title></head>
+<body bgcolor="white">
+)RAW";
+    ::markdown(os, source);
+        os << R"RAW(</body>
+</html>
+)RAW";
+    content(os.str(), stat);
 }

@@ -27,8 +27,8 @@ provider to your Cesium application.
 
 ---
 
-*Nota bene*: The above snipped uses `http.externalUrl` configuration
- option, currently set to:
+*Nota bene*: The above code snippet uses `http.externalUrl` configuration
+option, currently set to:
 
     [http]
     externalUrl = {{{externalUrl}}}
