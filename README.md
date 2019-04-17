@@ -15,7 +15,7 @@ VTS Mapproxy provides on-the-fly access to an array of raster and data vector fo
 
 ## User documentation
 
-VTS-Mapproxy user documentation is available at the [vts-geospatial website].(http://vtsdocs.melown.com/en/latest/reference/server/mapproxy/)
+VTS-Mapproxy user documentation is available at the [vts-geospatial website].(http://vts-geospatial.org/en/latest/reference/server/mapproxy/)
 
 Authoritative resource documentation is available in separated [document](docs/resources.md)
 that should be kept in sync with actual implementation.
@@ -147,9 +147,9 @@ When you specify the `DESTDIR` variable, resulting files will be saved in
 make install DESTDIR=/home/user/tmp/
 ```
 
-## Install from Melown repository
+## Install from Melowntech's package repository
 
-We provide precompiled packages for some popular linux distributions. See [Melown OSS package repository
+We provide precompiled packages for some popular linux distributions. See [Melowntech's OSS package repository
 ](http://cdn.melown.com/packages/) for more information. This repository contains all needed packages to run
 VTS OSS software.
 
