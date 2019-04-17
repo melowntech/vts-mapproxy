@@ -8,14 +8,14 @@ VTS Mapproxy provides on-the-fly access to an array of raster and data vector fo
 
 * dynamic TIN (terrain meshes) generation from DEMs (digital elevaton models)
 * on-the-fly CRS conversion for massive raster datasets
-* CesiumJS terrain provisioning
-* WMTS service for raster datasets 
 * [vts-geospatial](https://vts-geospatial.org/) remote tileset provider
+* [CesiumJS](https://cesiumjs.org) terrain provisioning
+* WMTS service for raster datasets 
 * introspection capabilities (web-based, interactive resource directories with embedded viewers)
 
 ## User documentation
 
-VTS-Mapproxy user documentation is available at the [vts-geospatial website](http://vtsdocs.melown.com/en/latest/reference/server/mapproxy/)
+VTS-Mapproxy user documentation is available at the [vts-geospatial website].(http://vtsdocs.melown.com/en/latest/reference/server/mapproxy/)
 
 Authoritative resource documentation is available in separated [document](docs/resources.md)
 that should be kept in sync with actual implementation.
