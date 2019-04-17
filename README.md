@@ -1,13 +1,21 @@
 <img width="320" alt="VTS Browser JS" src="https://github.com/melowntech/assets/blob/master/vts-mapproxy/vts-mapproxy-no-left-margin.png?raw=true">
 
-[VTS-Mapproxy](https://github.com/melowntech/vts-mapproxy) is an HTTP server that
-converts non-VTS resources (raster or vector) to VTS resources (surface,
-boundlayer, freelayer) on the fly.
+[VTS Mapproxy](https://github.com/melowntech/vts-mapproxy) is a 3D geospatial data streaming server.
+
+VTS Mapproxy provides on-the-fly access to an array of raster and data vector formats and serves those data in formats optimized for 3D streaming and rendering. 
+
+## Features
+
+* dynamic TIN (terrain meshes) generation from DEMs (digital elevaton models)
+* on-the-fly CRS conversion for massive raster datasets
+* CesiumJS terrain provisioning
+* WMTS service for raster datasets 
+* [vts-geospatial](https://vts-geospatial.org/) remote tileset provider
+* introspection capabilities (web-based, interactive resource directories with embedded viewers)
 
 ## User documentation
 
-VTS-Mapproxy user documentation is available at
-https://melown.readthedocs.io/
+VTS-Mapproxy user documentation is available at the [vts-geospatial website](http://vtsdocs.melown.com/en/latest/reference/server/mapproxy/)
 
 Authoritative resource documentation is available in separated [document](docs/resources.md)
 that should be kept in sync with actual implementation.
