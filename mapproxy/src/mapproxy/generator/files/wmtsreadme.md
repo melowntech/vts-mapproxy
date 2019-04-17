@@ -2,8 +2,8 @@
 
 ## General info
 
-WMTS interface allowd VTS raster resource to be used in WMTS enabled WWW clients
-or GIS tool.
+WMTS interface allows a VTS raster resource to be used in WMTS enabled WWW
+clients or GIS tool.
 
 For every WMTS-enabled reference frame mapproxy provides a
 [WMTSCapabilities.xml](WMTSCapabilities.xml) file containing single layer for

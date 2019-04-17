@@ -1,10 +1,9 @@
 # VTS Mapproxy resource Cesium Terrain Provider interface
 
-
 ## General info
 
-Cesium Terrain Proviver interface allowd VTS surface resource to be used in any
-Cesium application as a terrain provider.
+Cesium Terrain Proviver interface allows a VTS surface resource to be used in
+any Cesium application as a terrain provider.
 
 For every terrain-enabled reference frame mapproxy provides a
 [layer.json](layer.json) file containing layer description and appropriate
