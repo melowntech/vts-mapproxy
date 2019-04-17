@@ -98,9 +98,11 @@ private:
     virtual Task generateVtsFile_impl(const FileInfo &fileInfo
                                       , Sink &sink) const;
 
-    void generateTileImage(const vts::TileId &tileId
-                           , const TmsFileInfo &fi
-                           , Sink &sink, Arsenal &arsenal) const;
+    virtual void generateTileImage(const vts::TileId &tileId
+                                   , Sink::FileInfo &&fi
+                                   , RasterFormat format
+                                   , Sink &sink, Arsenal &arsenal
+                                   , bool dontOptimize) const;
 
     void generateTileMask(const vts::TileId &tileId
                           , const TmsFileInfo &fi

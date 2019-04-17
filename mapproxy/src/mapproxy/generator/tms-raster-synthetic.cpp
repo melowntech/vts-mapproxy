@@ -202,31 +202,11 @@ Generator::Task TmsRasterSynthetic
                       , fi.sinkFileInfo(), false);
         break;
 
-    case TmsFileInfo::Type::image: {
-        if (fi.format != definition_.format) {
-            sink.error(utility::makeError<NotFound>
-                        ("Format <%s> is not supported by this resource (%s)."
-                         , fi.format, definition_.format));
-            return {};
-        }
-
-        const vts::NodeInfo nodeInfo(referenceFrame(), fi.tileId);
-        if (!nodeInfo.valid()) {
-            sink.error(utility::makeError<NotFound>
-                       ("TileId outside of valid reference frame tree."));
-            return {};
-        }
-
-        if (!nodeInfo.productive()) {
-            sink.error(utility::makeError<EmptyImage>("No valid data."));
-            return {};
-        }
-
-        return[=](Sink &sink, Arsenal &arsenal) {
-            sink.checkAborted();
-            generateTileImage(fi.tileId, fi, nodeInfo, sink, arsenal);
+    case TmsFileInfo::Type::image:
+        return [=](Sink &sink, Arsenal &arsenal) {
+            generateTileImage(fi.tileId, fi.sinkFileInfo(), fi.format
+                              , sink, arsenal);
         };
-    }
 
     case TmsFileInfo::Type::mask:
         return [=](Sink &sink, Arsenal &arsenal)  {
@@ -240,6 +220,63 @@ Generator::Task TmsRasterSynthetic
     }
 
     return {};
+}
+
+void TmsRasterSynthetic::generateTileImage(const vts::TileId &tileId
+                                           , Sink::FileInfo &&sfi
+                                           , RasterFormat format
+                                           , Sink &sink, Arsenal&
+                                           , bool dontOptimize) const
+{
+    sink.checkAborted();
+    if (format != definition_.format) {
+        return sink.error
+            (utility::makeError<NotFound>
+             ("Format <%s> is not supported by this resource (%s)."
+              , format, definition_.format));
+    }
+
+    const vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.valid()) {
+        return sink.error
+            (utility::makeError<NotFound>
+             ("TileId outside of valid reference frame tree."));
+    }
+
+    bool valid(true);
+    if (!nodeInfo.productive()) {
+        if (!dontOptimize) {
+            return sink.error
+                (utility::makeError<EmptyImage>("No valid data."));
+        }
+
+        // invalid but we cannot optimize
+        valid = false;
+    }
+
+    // generate image
+    const auto tile(valid
+                    ? generateTileImage(tileId)
+                    : cv::Mat_<cv::Vec3b>(vr::BoundLayer::tileHeight
+                                          , vr::BoundLayer::tileWidth
+                                          , cv::Vec3b(0, 0, 0)));
+
+    // serialize
+    std::vector<unsigned char> buf;
+    switch (format) {
+    case RasterFormat::jpg:
+        // TODO: configurable quality
+        cv::imencode(".jpg", tile, buf
+                     , { cv::IMWRITE_JPEG_QUALITY, 75 });
+        break;
+
+    case RasterFormat::png:
+        cv::imencode(".png", tile, buf
+                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+        break;
+    }
+
+    sink.content(buf, sfi);
 }
 
 void TmsRasterSynthetic::generateTileMask(const vts::TileId &tileId

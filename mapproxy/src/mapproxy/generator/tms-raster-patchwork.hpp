@@ -38,10 +38,7 @@ public:
     typedef resource::TmsRasterPatchwork Definition;
 
 private:
-    virtual void generateTileImage(const vts::TileId &tileId
-                                   , const TmsFileInfo &fi
-                                   , const vts::NodeInfo &nodeInfo
-                                   , Sink &sink, Arsenal &arsenal) const;
+    virtual cv::Mat generateTileImage(const vts::TileId &tileId) const;
 
     const Definition &definition_;
 };

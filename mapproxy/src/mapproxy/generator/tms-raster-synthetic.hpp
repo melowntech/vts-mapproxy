@@ -35,6 +35,9 @@
 
 namespace vts = vtslibs::vts;
 
+// fwd
+namespace cv { class Mat; }
+
 namespace generator {
 
 namespace detail {
@@ -66,10 +69,12 @@ private:
     virtual Task generateVtsFile_impl(const FileInfo &fileInfo
                                       , Sink &sink) const;
 
-    virtual void generateTileImage(const vts::TileId &tileId
-                                   , const TmsFileInfo &fi
-                                   , const vts::NodeInfo &nodeInfo
-                                   , Sink &sink, Arsenal &arsenal) const = 0;
+    virtual void
+    generateTileImage(const vts::TileId &tileId, Sink::FileInfo &&fi
+                      , RasterFormat format, Sink &sink, Arsenal &arsenal
+                      , bool dontOptimize = false) const;
+
+    virtual cv::Mat generateTileImage(const vts::TileId &tileId) const = 0;
 
     void generateTileMask(const vts::TileId &tileId
                           , const TmsFileInfo &fi

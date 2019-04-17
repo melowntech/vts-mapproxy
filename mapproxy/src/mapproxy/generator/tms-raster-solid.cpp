@@ -92,10 +92,7 @@ TmsRasterSolid::TmsRasterSolid(const Params &params)
     , burnColor_(rgb2bgr(definition_.color))
 {}
 
-void TmsRasterSolid::generateTileImage(const vts::TileId &tileId
-                                       , const TmsFileInfo &fi
-                                       , const vts::NodeInfo&
-                                       , Sink &sink, Arsenal&) const
+cv::Mat TmsRasterSolid::generateTileImage(const vts::TileId &tileId) const
 {
     unsigned long long int colorIndex(tileId.y);
     colorIndex <<= tileId.lod;
@@ -103,26 +100,9 @@ void TmsRasterSolid::generateTileImage(const vts::TileId &tileId
     // skip black
     colorIndex = 1 + (colorIndex % 254);
 
-    cv::Mat_<cv::Vec3b> tile(vr::BoundLayer::tileHeight
-                             , vr::BoundLayer::tileWidth
-                             , burnColor_);
-
-    // serialize
-    std::vector<unsigned char> buf;
-    switch (fi.format) {
-    case RasterFormat::jpg:
-        // TODO: configurable quality
-        cv::imencode(".jpg", tile, buf
-                     , { cv::IMWRITE_JPEG_QUALITY, 75 });
-        break;
-
-    case RasterFormat::png:
-        cv::imencode(".png", tile, buf
-                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-        break;
-    }
-
-    sink.content(buf, fi.sinkFileInfo());
+    return cv::Mat_<cv::Vec3b>(vr::BoundLayer::tileHeight
+                               , vr::BoundLayer::tileWidth
+                               , burnColor_);
 }
 
 } // namespace generator

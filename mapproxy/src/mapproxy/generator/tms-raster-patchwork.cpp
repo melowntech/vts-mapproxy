@@ -101,11 +101,7 @@ double contrast(int i1, int i2)
 
 } // namespace
 
-void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
-                                           , const TmsFileInfo &fi
-                                           , const vts::NodeInfo&
-                                           , Sink &sink
-                                           , Arsenal&) const
+cv::Mat TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId) const
 {
     unsigned long long int colorIndex(tileId.y);
     colorIndex <<= tileId.lod;
@@ -153,22 +149,7 @@ void TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId
         cv::putText(tile, label, org, face, 1.0, negative, 1.0, thickness);
     }
 
-    // serialize
-    std::vector<unsigned char> buf;
-    switch (fi.format) {
-    case RasterFormat::jpg:
-        // TODO: configurable quality
-        cv::imencode(".jpg", tile, buf
-                     , { cv::IMWRITE_JPEG_QUALITY, 75 });
-        break;
-
-    case RasterFormat::png:
-        cv::imencode(".png", tile, buf
-                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-        break;
-    }
-
-    sink.content(buf, fi.sinkFileInfo());
+    return tile;
 }
 
 } // namespace generator

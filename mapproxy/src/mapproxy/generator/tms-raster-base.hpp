@@ -46,6 +46,13 @@ public:
                   , const boost::optional<RasterFormat> &format
                   = boost::none);
 
+protected:
+    virtual void generateTileImage(const vts::TileId &tileId
+                                   , Sink::FileInfo &&sfi
+                                   , RasterFormat format
+                                   , Sink &sink, Arsenal &arsenal
+                                   , bool dontOptimize = false) const = 0;
+
 private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
                                    , Sink &sink) const;

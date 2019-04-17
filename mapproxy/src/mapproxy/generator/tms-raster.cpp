@@ -339,15 +339,9 @@ Generator::Task TmsRaster::generateVtsFile_impl(const FileInfo &fileInfo
         break;
 
     case TmsFileInfo::Type::image: {
-        if (fi.format != format()) {
-            sink.error(utility::makeError<NotFound>
-                        ("Format <%s> is not supported by this resource (%s)."
-                         , fi.format, format()));
-            return {};
-        }
-
         return[=](Sink &sink, Arsenal &arsenal) {
-            generateTileImage(fi.tileId, fi, sink, arsenal);
+            generateTileImage(fi.tileId, fi.sinkFileInfo(), fi.format
+                              , sink, arsenal, false);
         };
     }
 
@@ -372,24 +366,61 @@ Generator::Task TmsRaster::generateVtsFile_impl(const FileInfo &fileInfo
 }
 
 void TmsRaster::generateTileImage(const vts::TileId &tileId
-                                  , const TmsFileInfo &fi
-                                  , Sink &sink
-                                  , Arsenal &arsenal) const
+                                  , Sink::FileInfo &&fi
+                                  , RasterFormat format
+                                  , Sink &sink, Arsenal &arsenal
+                                  , bool dontOptimize) const
 {
     sink.checkAborted();
 
+    const auto &serialize([&](const cv::Mat &tile, const DatasetDesc &ds)
+                          -> void
+    {
+        // serialize
+        std::vector<unsigned char> buf;
+        switch (format) {
+        case RasterFormat::jpg:
+            // TODO: configurable quality
+            cv::imencode(".jpg", tile, buf
+                         , { cv::IMWRITE_JPEG_QUALITY, 75 });
+            break;
+
+        case RasterFormat::png:
+            cv::imencode(".png", tile, buf
+                         , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+            break;
+        }
+
+        sink.content(buf, fi.setMaxAge(ds.maxAge));
+    });
+
+    if (format != this->format()) {
+        return sink.error
+            (utility::makeError<NotFound>
+             ("Format <%s> is not supported by this resource (%s)."
+              , format, this->format()));
+    }
+
     vts::NodeInfo nodeInfo(referenceFrame(), tileId);
     if (!nodeInfo.valid()) {
-        sink.error(utility::makeError<NotFound>
-                    ("TileId outside of valid reference frame tree."));
-        return;
+        return sink.error
+            (utility::makeError<NotFound>
+             ("TileId outside of valid reference frame tree."));
     }
 
     if (!nodeInfo.productive()
         || (index_ && !vts::TileIndex::Flag::isReal(index_->get(tileId))))
     {
-        sink.error(utility::makeError<EmptyImage>("No valid data."));
-        return;
+        if (!dontOptimize) {
+            return sink.error
+                (utility::makeError<EmptyImage>("No valid data."));
+        }
+
+        // return full blown black image
+        return serialize(cv::Mat_<cv::Vec3b>(vr::BoundLayer::tileHeight
+                                             , vr::BoundLayer::tileWidth
+                                             , cv::Vec3b(0, 0, 0))
+                         , dataset());
     }
 
     // grab dataset to use
@@ -401,8 +432,9 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
     // * dynamic dataset: cannot use since we are unable report different
     //                    caching for empty/full image
     // * transparent: we cannot report transparecny for empty/full image
+    // * dontOptimize set: we are forbidden to return empty/full image
     const auto operation
-        ((ds.dynamic || transparent())
+        ((ds.dynamic || transparent() || dontOptimize)
          ? GdalWarper::RasterRequest::Operation::imageNoOpt
          : GdalWarper::RasterRequest::Operation::image);
 
@@ -422,22 +454,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
                , sink));
     sink.checkAborted();
 
-    // serialize
-    std::vector<unsigned char> buf;
-    switch (fi.format) {
-    case RasterFormat::jpg:
-        // TODO: configurable quality
-        cv::imencode(".jpg", *tile, buf
-                     , { cv::IMWRITE_JPEG_QUALITY, 75 });
-        break;
-
-    case RasterFormat::png:
-        cv::imencode(".png", *tile, buf
-                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-        break;
-    }
-
-    sink.content(buf, fi.sinkFileInfo().setMaxAge(ds.maxAge));
+    serialize(*tile, ds);
 }
 
 void TmsRaster::generateTileMask(const vts::TileId &tileId

@@ -237,7 +237,7 @@ FileInfo::FileInfo(const http::Request &request, int f)
 }
 
 TmsFileInfo::TmsFileInfo(const FileInfo &fi)
-    : fileInfo(fi), type(Type::unknown), support()
+    : fileInfo(fi), type(Type::unknown), format(), support()
 {
     if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
         const std::string ext(p);
@@ -249,11 +249,12 @@ TmsFileInfo::TmsFileInfo(const FileInfo &fi)
             // mask file
             type = Type::metatile;
             return;
-        } else {
-            // another file -> parse as format
-            type = Type::image;
-            if (asEnum<RasterFormat>(ext, format)) { return; }
         }
+
+        // another file -> parse as format
+        type = Type::image;
+        asEnumChecked<RasterFormat, NotFound>(ext, format, "raster format");
+        return;
     }
 
     if (constants::Config == fi.filename) {
@@ -638,8 +639,16 @@ const Sink::Listing TerrainFileInfo::listing {
 };
 
 WmtsFileInfo::WmtsFileInfo(const FileInfo &fi)
-    : fileInfo(fi), type(Type::unknown), support()
+    : fileInfo(fi), type(Type::unknown), format(), support()
 {
+    if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
+        const std::string ext(p);
+        // parse as format
+        type = Type::image;
+        asEnumChecked<RasterFormat, NotFound>(ext, format, "raster format");
+        return;
+    }
+
     if (fi.flags & FileFlags::browserEnabled) {
         LOG(debug) << "Browser enabled, checking browser files.";
 
@@ -676,6 +685,10 @@ WmtsFileInfo::WmtsFileInfo(const FileInfo &fi)
 Sink::FileInfo WmtsFileInfo::sinkFileInfo(std::time_t lastModified) const
 {
     switch (type) {
+    case Type::image:
+        return Sink::FileInfo(contentType(format), lastModified)
+            .setFileClass(FileClass::data);
+
     case Type::support:
         return Sink::FileInfo(support->contentType, support->lastModified)
             .setFileClass(FileClass::support);

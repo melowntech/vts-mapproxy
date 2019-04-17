@@ -111,19 +111,13 @@ wmts::WmtsResources TmsRasterBase::wmtsResources(const WmtsFileInfo &fileInfo)
     // build root path
     if (introspection) {
         // used in introspection -> local, can be relative from wmts interface
-        // to vts interface
-        const auto resdiff
-            (resolveRoot
-             (id(), fi.interface
-              , id(), fi.interface.as(GeneratorInterface::Interface::vts)));
-
-        layer.rootPath =
-            prependRoot(std::string(), resource(), resdiff);
+        layer.rootPath = "./";
 
         resources.capabilitiesUrl = "./" + fileInfo.capabilitesName;
     } else {
         layer.rootPath = config().externalUrl
-            + prependRoot(std::string(), resource()
+            + prependRoot(std::string(), id()
+                          , {type(), GeneratorInterface::Interface::wmts}
                           , ResourceRoot::Depth::referenceFrame);
         resources.capabilitiesUrl =
             layer.rootPath + "/" + fileInfo.capabilitesName;
@@ -150,6 +144,12 @@ Generator::Task TmsRasterBase
     case WmtsFileInfo::Type::unknown:
         sink.error(utility::makeError<NotFound>("Unrecognized filename."));
         break;
+
+    case WmtsFileInfo::Type::image:
+        return [=](Sink &sink, Arsenal &arsenal) {
+            generateTileImage(fi.tileId, fi.sinkFileInfo(), fi.format
+                              , sink, arsenal, true);
+        };
 
     case WmtsFileInfo::Type::capabilities:
         sink.content(wmtsCapabilities(wmtsResources(fi)), fi.sinkFileInfo());

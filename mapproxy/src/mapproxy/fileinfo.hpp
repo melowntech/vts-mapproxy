@@ -256,11 +256,19 @@ struct WmtsFileInfo {
      */
     FileInfo fileInfo;
 
-    enum class Type { unknown, capabilities, support, listing, readme };
+    enum class Type { unknown, image, capabilities, support, listing, readme };
 
     /** File type.
      */
     Type type;
+
+    /** Valid only when type == Type::image
+     */
+    vts::TileId tileId;
+
+    /** Valid only when type == Type::image
+     */
+    RasterFormat format;
 
     /** Valid only when type == Type::support;
      */
