@@ -15,10 +15,9 @@ VTS Mapproxy provides on-the-fly access to an array of raster and data vector fo
 
 ## User documentation
 
-VTS-Mapproxy user documentation is available at the [vts-geospatial website](http://vts-geospatial.org/en/latest/reference/server/mapproxy/)
+VTS-Mapproxy user documentation is available at the [vts-geospatial website](http://vts-geospatial.org/en/latest/reference/server/mapproxy/).
 
-Authoritative resource documentation is available in separated [document](docs/resources.md)
-that should be kept in sync with actual implementation.
+Authoritative resource-definition documentation is available in separated [document](docs/resources.md).
 
 ## Download, build and install
 
@@ -60,17 +59,6 @@ cd build
 cmake ..
 make -j4
 sudo make install
-```
-
-#### Adding UbuntuGIS repo
-
-VTS-Mapproxy needs newer version of [GDAL](http://gdal.org) library, than it is
-available in Ubuntu repos. Therefore you need to add [UbuntuGIS](https://wiki.ubuntu.com/UbuntuGIS)
-repository to your `apt` sources:
-
-```
-sudo add-apt-repository ppa:ubuntugis/ubuntugis-unstable
-sudo apt-get update
 ```
 
 #### Installing packaged dependencies
