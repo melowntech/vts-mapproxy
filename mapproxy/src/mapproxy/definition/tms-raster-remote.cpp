@@ -32,8 +32,6 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "tms.hpp"
 #include "factory.hpp"
 
@@ -71,44 +69,16 @@ void buildDefinition(Json::Value &value
     def.build(value);
 }
 
-void parseDefinition(TmsRasterRemote &def
-                     , const boost::python::dict &value)
-{
-    def.remoteUrl = py2utf8(value["remoteUrl"]);
-
-    if (value.has_key("mask")) {
-        def.mask = py2utf8(value["mask"]);
-    }
-
-    def.parse(value);
-}
-
 } // namespace
 
-void TmsRasterRemote::from_impl(const boost::any &value)
+void TmsRasterRemote::from_impl(const Json::Value &value)
 {
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsRasterRemote: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
+    parseDefinition(*this, value);
 }
 
-void TmsRasterRemote::to_impl(boost::any &value) const
+void TmsRasterRemote::to_impl(Json::Value &value) const
 {
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsRasterRemote:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
+    buildDefinition(value, *this);
 }
 
 Changed TmsRasterRemote::changed_impl(const DefinitionBase &o)

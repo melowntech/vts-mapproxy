@@ -41,7 +41,6 @@
 
 // fwd
 namespace Json { class Value; }
-namespace boost { namespace python { class dict; } }
 
 namespace resource {
 
@@ -66,7 +65,6 @@ public:
 
     void parse(const Json::Value &value);
     void build(Json::Value &value) const;
-    void parse(const boost::python::dict &value);
 
     virtual boost::optional<std::string> getGeoidGrid() const = 0;
 
@@ -86,8 +84,8 @@ struct SurfaceSpheroid : public Surface {
     static constexpr char driverName[] = "surface-spheroid";
 
 private:
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual boost::optional<std::string> getGeoidGrid() const {
         return geoidGrid;
@@ -105,8 +103,8 @@ struct SurfaceDem : public Surface {
     static constexpr char driverName[] = "surface-dem";
 
 private:
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual boost::optional<std::string> getGeoidGrid() const {
         return dem.geoidGrid;

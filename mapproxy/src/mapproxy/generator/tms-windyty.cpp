@@ -48,7 +48,6 @@
 #include "jsoncpp/as.hpp"
 
 #include "../error.hpp"
-#include "../support/python.hpp"
 
 #include "factory.hpp"
 #include "tms-windyty.hpp"

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,29 +24,63 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <boost/lexical_cast.hpp>
-#include <boost/utility/in_place_factory.hpp>
-
-#include "utility/premain.hpp"
-
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/registry/py.hpp"
 
-#include "geodata.hpp"
-#include "factory.hpp"
+#include "../error.hpp"
+
+#include "parse.hpp"
+
+namespace vf = geo::vectorformat;
 
 namespace resource {
 
-constexpr Resource::Generator::Type GeodataVector::type;
-constexpr char GeodataVector::driverName[];
+void parse(geo::VectorFormat &format, const Json::Value &value)
+{
+    Json::check(value, Json::stringValue);
+    try {
+        format = boost::lexical_cast<geo::VectorFormat>(value);
+    } catch (boost::bad_lexical_cast) {
+        utility::raise<FormatError>
+            ("Value stored in format is not a valid height"
+             " coded data format.");
+    }
+}
 
-namespace {
+void build(Json::Value &value, const geo::VectorFormat &format)
+{
+    value = boost::lexical_cast<std::string>(format);
+}
 
-utility::PreMain register_([]() { registerDefinition<GeodataVector>(); });
+void parse(vf::Config &config, geo::VectorFormat format
+           , const Json::Value &value)
+{
+    if (!value.isObject()) {
+        LOGTHROW(err1, FormatError)
+            << "Geodata definition[formatConfig] is not an object.";
+    }
 
-} // namespace
+    switch (format) {
+    case geo::VectorFormat::geodataJson: {
+        auto &c(createGeodataConfig(config));
+        Json::getOpt(c.resolution, value, "resolution");
+    } break;
+
+    default:
+        // ignore
+        break;
+    }
+}
+
+void build(Json::Value &value, const vf::Config &config)
+{
+    value = Json::objectValue;
+    if (const auto *c = boost::get<vf::GeodataConfig>(&config)) {
+        value["resolution"] = c->resolution;
+    }
+}
 
 } // namespace resource

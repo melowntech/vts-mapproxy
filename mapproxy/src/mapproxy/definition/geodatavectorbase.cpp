@@ -33,11 +33,11 @@
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/registry/py.hpp"
 
-#include "../support/python.hpp"
 #include "../support/introspection.hpp"
 
 #include "geodata.hpp"
 #include "options.hpp"
+#include "parse.hpp"
 
 namespace vf = geo::vectorformat;
 
@@ -63,11 +63,6 @@ void parseLayers(boost::optional<geo::heightcoding::Config::LayerNames> &result
     std::sort(result->begin(), result->end());
 }
 
-void parse(vf::GeodataConfig &config, const Json::Value &value)
-{
-    Json::getOpt(config.resolution, value, "resolution");
-}
-
 void parseDefinition(GeodataVectorBase &def
                      , const Json::Value &value)
 {
@@ -84,33 +79,10 @@ void parseDefinition(GeodataVectorBase &def
     parseLayers(def.layers, "layers", value);
     parseLayers(def.clipLayers, "clipLayers", value);
 
-    if (value.isMember("format")) {
-        Json::get(s, value, "format");
-        try {
-            def.format  = boost::lexical_cast<geo::VectorFormat>(s);
-        } catch (boost::bad_lexical_cast) {
-            utility::raise<FormatError>
-                ("Value stored in format is not a valid height"
-                 " coded data format.");
-        }
-    }
+    Json::getOpt(def.format, value, "format");
 
     if (value.isMember("formatConfig")) {
-        const auto formatConfig(value["formatConfig"]);
-        if (!formatConfig.isObject()) {
-            LOGTHROW(err1, FormatError)
-                << "Geodata definition[formatConfig] is not an object.";
-        }
-
-        switch (def.format) {
-        case geo::VectorFormat::geodataJson:
-            parse(createGeodataConfig(def.formatConfig), formatConfig);
-            break;
-
-        default:
-            // ignore
-            break;
-        }
+        parse(def.formatConfig, def.format, value["formatConfig"]);
     }
 
     Json::getOpt(def.styleUrl, value, "styleUrl");
@@ -138,16 +110,7 @@ void parseDefinition(GeodataVectorBase &def
     if (value.isMember("options")) { def.options = value["options"]; }
 
     if (value.isMember("introspection")) {
-        const auto &jintrospection(value["introspection"]);
-
-        def.introspection.surface
-            = introspection::idFrom(jintrospection, "surface");
-
-        if (jintrospection.isMember("browserOptions")) {
-            def.introspection.browserOptions
-                = Json::check(jintrospection["browserOptions"]
-                              , Json::objectValue);
-        }
+        def.introspection.parse(value["introspection"]);
     }
 }
 
@@ -160,12 +123,6 @@ void buildLayers(const boost::optional
     for (const auto &layer : *layers) {
         players.append(layer);
     }
-}
-
-void build(Json::Value &value, const vf::GeodataConfig *config)
-{
-    if (!config) { return; }
-    value["resolution"] = config->resolution;
 }
 
 void buildDefinition(Json::Value &value
@@ -182,17 +139,7 @@ void buildDefinition(Json::Value &value
     buildLayers(def.clipLayers, "clipLayers", value);
 
     value["format"] = boost::lexical_cast<std::string>(def.format);
-    auto &formatConfig(value["formatConfig"] = Json::objectValue);
-    switch (def.format) {
-
-    case geo::VectorFormat::geodataJson:
-        build(formatConfig, boost::get<vf::GeodataConfig>(&def.formatConfig));
-        break;
-
-    default:
-        // ignore
-        break;
-    }
+    build(value["formatConfig"], def.formatConfig);
 
     value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
@@ -209,9 +156,8 @@ void buildDefinition(Json::Value &value
     }
 
     if (def.heightFunction) {
-        boost::any tmp(Json::Value(Json::objectValue));
+        auto &tmp(value["heightFunction"] = Json::objectValue);
         def.heightFunction->build(tmp);
-        value["heightFunction"] = boost::any_cast<const Json::Value&>(tmp);
     }
 
     if (!def.options.empty()) {
@@ -219,190 +165,20 @@ void buildDefinition(Json::Value &value
     }
 
     if (!def.introspection.empty()) {
-        auto &jintrospection(value["introspection"] = Json::objectValue);
-        introspection::idTo(jintrospection, "surface"
-                            , def.introspection.surface);
-
-        if (!def.introspection.browserOptions.empty()) {
-            jintrospection["browserOptions"]
-                = boost::any_cast<const Json::Value&>
-                (def.introspection.browserOptions);
-        }
+        def.introspection.build(value["introspection"]);
     }
-}
-
-void parseLayers(boost::optional<geo::heightcoding::Config::LayerNames> &result
-                 , const std::string &name, const boost::python::dict &value)
-{
-    if (!value.has_key(name)) { return; }
-
-    result = boost::in_place();
-    auto pylayers(value[name]);
-    for (boost::python::stl_input_iterator<boost::python::object>
-             ipylayers(pylayers), epylayers;
-         ipylayers != epylayers; ++ipylayers)
-    {
-        result->push_back(py2utf8(*ipylayers));
-    }
-    std::sort(result->begin(), result->end());
-}
-
-void parse(vf::GeodataConfig &config, const boost::python::dict &value)
-{
-    if (value.has_key("resolution")) {
-        config.resolution
-            = boost::python::extract<int>(value["resolution"]);
-    }
-}
-
-void parseDefinition(GeodataVectorBase &def
-                     , const boost::python::dict &value)
-{
-    def.dataset = py2utf8(value["dataset"]);
-    def.dem.dataset = py2utf8(value["demDataset"]);
-
-    if (value.has_key("geoidGrid")) {
-        def.dem.geoidGrid = py2utf8(value["geoidGrid"]);
-    }
-
-    parseLayers(def.layers, "layers", value);
-    parseLayers(def.clipLayers, "clipLayers", value);
-
-    if (value.has_key("format")) {
-        try {
-            def.format = boost::lexical_cast<geo::VectorFormat>
-                (py2utf8(value["format"]));
-        } catch (boost::bad_lexical_cast) {
-            utility::raise<Error>
-                ("Value stored in format is not a valid height"
-                 " coded data format.");
-        }
-    }
-
-    if (value.has_key("formatConfig")) {
-        boost::python::dict formatConfig(value["formatConfig"]);
-        switch (def.format) {
-        case geo::VectorFormat::geodataJson:
-            parse(createGeodataConfig(def.formatConfig), formatConfig);
-            break;
-
-        default:
-            // ignore
-            break;
-        }
-    }
-
-    def.displaySize = boost::python::extract<int>(value["displaySize"]);
-    def.styleUrl = py2utf8(value["styleUrl"]);
-
-    if (value.has_key("mode")) {
-        try {
-            def.mode = boost::lexical_cast<geo::heightcoding::Mode>
-                (py2utf8(value["mode"]));
-        } catch (boost::bad_lexical_cast) {
-            utility::raise<Error>
-                ("Value stored in mode is not a valid height coding mode.");
-        }
-    }
-
-    if (value.has_key("enhance")) {
-        const auto enhance(value["enhance"]);
-        for (boost::python::stl_input_iterator<boost::python::str>
-                 ilayer(enhance), elayer; ilayer != elayer; ++ilayer)
-        {
-            const auto name(py2utf8(*ilayer));
-            const auto content(enhance[*ilayer]);
-
-            auto &lh(def.layerEnhancers[name]);
-            lh.key = py2utf8(content["key"]);
-            lh.databasePath = py2utf8(content["db"]);
-            lh.table = py2utf8(content["table"]);
-        }
-    }
-
-    def.heightFunction = HeightFunction::parse(value, "heightFunction");
-
-    if (value.has_key("options")) {
-        LOG(warn2)
-            << "Generic options not supported in python geodata "
-            "configuration.";
-    }
-
-    if (value.has_key("introspection")) {
-        boost::python::dict pintrospection(value["introspection"]);
-        def.introspection.surface
-            = introspection::idFrom(pintrospection, "surface");
-    }
-}
-
-bool differ(const vf::GeodataConfig &l, const vf::GeodataConfig *r)
-{
-    // different type?
-    if (!r) { return true; }
-    // same types
-    if (l.resolution != r->resolution) { return true; }
-    return false;
-}
-
-bool differ(const vf::Config &l, const vf::Config &r)
-{
-    if (const auto *cl = boost::get<vf::GeodataConfig>(&l)) {
-        return differ(*cl, boost::get<vf::GeodataConfig>(&r));
-    }
-    // add more config types here
-    return true;
 }
 
 } // namespace
 
-bool GeodataVectorBase::Introspection::empty() const
+void GeodataVectorBase::from_impl(const Json::Value &value)
 {
-    return (!surface && browserOptions.empty());
+    parseDefinition(*this, value);
 }
 
-bool GeodataVectorBase::Introspection::operator!=(const Introspection &other)
-    const
+void GeodataVectorBase::to_impl(Json::Value &value) const
 {
-    // introspection can safely change
-    if (surface != other.surface) { return true; }
-
-    if (browserOptions.empty() != other.browserOptions.empty()) {
-        return true;
-    }
-    if (!browserOptions.empty()
-        && (boost::any_cast<const Json::Value&>(browserOptions)
-            != boost::any_cast<const Json::Value&>(other.browserOptions)))
-    {
-        return true;
-    }
-
-    return false;
-}
-
-void GeodataVectorBase::from_impl(const boost::any &value)
-{
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "GeodataVectorBase: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
-}
-
-void GeodataVectorBase::to_impl(boost::any &value) const
-{
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "GeodataVectorBase:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
+    buildDefinition(value, *this);
 }
 
 Changed GeodataVectorBase::changed_impl(const DefinitionBase &o) const

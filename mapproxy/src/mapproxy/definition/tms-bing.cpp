@@ -32,8 +32,6 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "tms.hpp"
 #include "factory.hpp"
 
@@ -59,38 +57,16 @@ void buildDefinition(Json::Value &value
     value["metadataUrl"] = def.metadataUrl;
 }
 
-void parseDefinition(TmsBing &def
-                     , const boost::python::dict &value)
-{
-    def.metadataUrl = py2utf8(value["metadataUrl"]);
-}
-
 } // namespace
 
-void TmsBing::from_impl(const boost::any &value)
+void TmsBing::from_impl(const Json::Value &value)
 {
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsBing: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
+    parseDefinition(*this, value);
 }
 
-void TmsBing::to_impl(boost::any &value) const
+void TmsBing::to_impl(Json::Value &value) const
 {
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsBing:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
+    buildDefinition(value, *this);
 }
 
 Changed TmsBing::changed_impl(const DefinitionBase &o) const

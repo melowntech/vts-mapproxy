@@ -45,6 +45,9 @@
 
 #include "support/fileclass.hpp"
 
+// fwd
+namespace Json { class Value; }
+
 enum class Changed { yes, no, safely, withRevisionBump };
 
 /** Base of all resource definitions.
@@ -54,8 +57,8 @@ public:
     typedef std::shared_ptr<DefinitionBase> pointer;
     virtual ~DefinitionBase() {}
 
-    void from(const boost::any &value) { from_impl(value); }
-    void to(boost::any &value) const { to_impl(value); }
+    void from(const Json::Value &value) { from_impl(value); }
+    void to(Json::Value &value) const { to_impl(value); }
     Changed changed(const DefinitionBase &other) const {
         return changed_impl(other);
     }
@@ -80,14 +83,12 @@ public:
 
 private:
     /** Fills in this definition from given input value.
-     *  Value can be either Json::Value or boost::python::dict.
      */
-    virtual void from_impl(const boost::any &value) = 0;
+    virtual void from_impl(const Json::Value &value) = 0;
 
     /** Fills in this definition into given output value.
-     *  Value can be either Json::Value or boost::python::dict.
      */
-    virtual void to_impl(boost::any &value) const = 0;
+    virtual void to_impl(Json::Value &value) const = 0;
 
     /** Compares this resource definition the other one and check whether they
      *  are basically the same. The definitions can differ but the difference
@@ -340,20 +341,19 @@ Resource::map loadResources(const boost::filesystem::path &path
                             , const FileClassSettings &fileClassSettings
                             = FileClassSettings());
 
+/** Load resources from given path.
+ */
+Resource::map loadResources(const Json::Value &json
+                            , const boost::filesystem::path &path
+                            , ResourceLoadErrorCallback error
+                            , const FileClassSettings &fileClassSettings
+                            = FileClassSettings());
+
 /** Load single resource from given path.
  */
 Resource::list loadResource(const boost::filesystem::path &path
                             , const FileClassSettings &fileClassSettings
                             = FileClassSettings());
-
-/** Load resources from Python list (passed as a boost::any to hide
- *  implementation)
- */
-Resource::map loadResourcesFromPython(const boost::any &pylist
-                                      , ResourceLoadErrorCallback error
-                                      , const FileClassSettings
-                                      &fileClassSettings
-                                      = FileClassSettings());
 
 /** Save single resource to given path.
  */

@@ -58,7 +58,6 @@
 #include "../support/mesh.hpp"
 #include "../support/srs.hpp"
 #include "../support/grid.hpp"
-#include "../support/python.hpp"
 
 #include "surface-spheroid.hpp"
 #include "factory.hpp"

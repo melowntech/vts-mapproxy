@@ -65,7 +65,6 @@
 #include "../support/geo.hpp"
 #include "../support/grid.hpp"
 #include "../support/coverage.hpp"
-#include "../support/python.hpp"
 #include "../support/tileindex.hpp"
 
 #include "surface-dem.hpp"

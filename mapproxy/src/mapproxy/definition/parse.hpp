@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,13 +24,20 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_support_python_hpp_included_
-#define mapproxy_support_python_hpp_included_
+#ifndef mapproxy_definition_parse_hpp_included_
+#define mapproxy_definition_parse_hpp_included_
 
-#include <boost/python.hpp>
+#include "geo/vectorformat.hpp"
 
-#include "pysupport/string.hpp"
+// fwd
+namespace Json { class Value; }
 
-using pysupport::py2utf8;
+namespace resource {
 
-#endif // mapproxy_support_python_hpp_included_
+void parse(geo::vectorformat::Config &config, geo::VectorFormat format
+           , const Json::Value &value);
+void build(Json::Value &value, const geo::vectorformat::Config &config);
+
+} // namespace resource
+
+#endif // mapproxy_definition_parse_hpp_included_

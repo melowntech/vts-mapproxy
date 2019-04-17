@@ -2,7 +2,7 @@
 # core mapproxy library
 set(mapproxy-core_SOURCES
   error.hpp
-  resource.hpp resource.cpp pyresource.cpp
+  resource.hpp resource.cpp
   support/metatile.hpp support/metatile.cpp
   support/mesh.hpp support/mesh.cpp
   support/geo.hpp support/geo.cpp
@@ -30,6 +30,7 @@ set(mapproxy-core_SOURCES
   definition.hpp
   definition/factory.hpp definition/factory.cpp
   definition/options.hpp definition/options.cpp
+  definition/parse.hpp definition/parse.cpp
 
   definition/tms.hpp
   definition/tms-common.cpp
@@ -48,6 +49,7 @@ set(mapproxy-core_SOURCES
   definition/surface-dem.cpp
 
   definition/geodata.hpp
+  definition/geodata.cpp
   definition/geodatavectorbase.cpp
   definition/geodata-vector.cpp
   definition/geodata-vector-tiled.cpp

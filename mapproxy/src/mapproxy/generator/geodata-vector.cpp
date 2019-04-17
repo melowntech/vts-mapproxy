@@ -38,7 +38,6 @@
 
 #include "vts-libs/storage/fstreams.hpp"
 
-#include "../support/python.hpp"
 #include "../support/tileindex.hpp"
 #include "../support/srs.hpp"
 #include "../support/revision.hpp"

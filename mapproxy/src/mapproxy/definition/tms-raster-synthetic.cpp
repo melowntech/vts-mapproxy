@@ -32,8 +32,6 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "tms.hpp"
 
 namespace resource {
@@ -68,24 +66,6 @@ void buildDefinition(Json::Value &value, const TmsRasterSynthetic &def)
     value["format"] = boost::lexical_cast<std::string>(def.format);
 }
 
-void parseDefinition(TmsRasterSynthetic &def
-                     , const boost::python::dict &value)
-{
-    if (value.has_key("mask")) {
-        def.mask = py2utf8(value["mask"]);
-    }
-
-    if (value.has_key("format")) {
-        try {
-            def.format = boost::lexical_cast<RasterFormat>
-                (py2utf8(value["format"]));
-        } catch (boost::bad_lexical_cast) {
-            utility::raise<Error>
-                ("Value stored in format is not RasterFormat value");
-        }
-    }
-}
-
 } // namespace
 
 void TmsRasterSynthetic::parse(const Json::Value &value)
@@ -98,12 +78,6 @@ void TmsRasterSynthetic::build(Json::Value &value) const
 {
     TmsCommon::build(value);
     buildDefinition(value, *this);
-}
-
-void TmsRasterSynthetic::parse(const boost::python::dict &value)
-{
-    TmsCommon::parse(value);
-    parseDefinition(*this, value);
 }
 
 Changed TmsRasterSynthetic::changed_impl(const DefinitionBase &o) const

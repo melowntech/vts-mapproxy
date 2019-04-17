@@ -59,6 +59,7 @@ private:
                   , const std::string &message) const;
 
     mutable std::recursive_mutex mutex_;
+    boost::filesystem::path script_;
     python::object run_;
     python::object error_;
 };

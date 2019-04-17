@@ -41,12 +41,12 @@ public:
     virtual ~HeightFunction() {}
     virtual double operator()(double h) const = 0;
 
-    static HeightFunction::pointer parse(const boost::any &value
+    static HeightFunction::pointer parse(const Json::Value &value
                                          , const std::string &key);
     static bool changed(const HeightFunction::pointer &l
                         , const HeightFunction::pointer &r);
 
-    virtual void build(boost::any &value) const = 0;
+    virtual void build(Json::Value &value) const = 0;
 
     virtual bool changed(const HeightFunction::pointer &other) const = 0;
 };
@@ -74,7 +74,7 @@ public:
         return apply(h);
     }
 
-    virtual void build(boost::any &value) const;
+    virtual void build(Json::Value &value) const;
     virtual bool changed(const HeightFunction::pointer &other) const;
 
 private:

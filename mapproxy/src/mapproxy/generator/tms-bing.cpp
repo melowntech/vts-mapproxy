@@ -51,7 +51,6 @@
 
 #include "tms-bing.hpp"
 #include "factory.hpp"
-#include "../support/python.hpp"
 
 #include "browser2d/index.html.hpp"
 

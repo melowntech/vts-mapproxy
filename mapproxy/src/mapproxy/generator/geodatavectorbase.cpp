@@ -26,8 +26,6 @@
 
 #include <algorithm>
 
-#include <boost/python.hpp>
-#include <boost/python/stl_iterator.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -39,8 +37,6 @@
 #include "jsoncpp/as.hpp"
 
 #include "vts-libs/storage/fstreams.hpp"
-
-#include "../support/python.hpp"
 
 #include "geodatavectorbase.hpp"
 #include "files.hpp"
