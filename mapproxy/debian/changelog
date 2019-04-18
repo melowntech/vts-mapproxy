@@ -1,3 +1,11 @@
+vts-mapproxy (1.56) stable; urgency=medium
+
+  * refactored python parsing
+  * tms: fixed mask warping
+  * experimental geodata-mesh driver
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 18 Apr 2019 18:07:03 +0000
+
 vts-mapproxy (1.55) stable; urgency=medium
 
   * WMTS interface serves its own set of tiles, parallel to VTS tiles.
