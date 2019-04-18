@@ -48,7 +48,6 @@
 
 #include "tms-raster-remote.hpp"
 #include "factory.hpp"
-#include "../support/python.hpp"
 #include "../support/wmts.hpp"
 
 #include "browser2d/index.html.hpp"

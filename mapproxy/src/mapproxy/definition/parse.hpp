@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,46 +24,20 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_resourcebackend_python_hpp_included_
-#define mapproxy_resourcebackend_python_hpp_included_
+#ifndef mapproxy_definition_parse_hpp_included_
+#define mapproxy_definition_parse_hpp_included_
 
-#include <mutex>
+#include "geo/vectorformat.hpp"
 
-#include <boost/python.hpp>
-#include <boost/python/stl_iterator.hpp>
-#include <boost/filesystem/path.hpp>
+// fwd
+namespace Json { class Value; }
 
-#include "../resourcebackend.hpp"
+namespace resource {
 
-namespace python = boost::python;
+void parse(geo::vectorformat::Config &config, geo::VectorFormat format
+           , const Json::Value &value);
+void build(Json::Value &value, const geo::vectorformat::Config &config);
 
-namespace resource_backend {
+} // namespace resource
 
-class Python : public ResourceBackend {
-public:
-    struct Config {
-        typedef std::map<std::string, std::string> Options;
-        boost::filesystem::path script;
-        Options options;
-    };
-
-    Python(const GenericConfig &genericConfig, const Config &config);
-
-private:
-    virtual Resource::map load_impl() const;
-
-    virtual void error_impl(const Resource::Id &resourceId
-                            , const std::string &message) const;
-
-    void errorRaw(const Resource::Id &resourceId
-                  , const std::string &message) const;
-
-    mutable std::recursive_mutex mutex_;
-    boost::filesystem::path script_;
-    python::object run_;
-    python::object error_;
-};
-
-} // namespace resource_backend
-
-#endif // mapproxy_resourcebackend_python_hpp_included_
+#endif // mapproxy_definition_parse_hpp_included_

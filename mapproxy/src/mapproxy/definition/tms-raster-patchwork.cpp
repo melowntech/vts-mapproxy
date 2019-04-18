@@ -29,8 +29,6 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "tms.hpp"
 #include "factory.hpp"
 
@@ -44,30 +42,14 @@ utility::PreMain register_([]() { registerDefinition<TmsRasterPatchwork>(); });
 
 } // namespace
 
-void TmsRasterPatchwork::from_impl(const boost::any &value)
+void TmsRasterPatchwork::from_impl(const Json::Value &value)
 {
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parse(*json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parse(*py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsRasterPatchwork: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
+    parse(value);
 }
 
-void TmsRasterPatchwork::to_impl(boost::any &value) const
+void TmsRasterPatchwork::to_impl(Json::Value &value) const
 {
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        build(*json);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsRasterPatchwork: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
+    build(value);
 }
 
 Changed TmsRasterPatchwork::changed_impl(const DefinitionBase &other) const

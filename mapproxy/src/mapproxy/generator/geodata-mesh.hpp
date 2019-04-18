@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,13 +24,52 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_support_python_hpp_included_
-#define mapproxy_support_python_hpp_included_
+#ifndef mapproxy_generator_geodata_mesh_hpp_included_
+#define mapproxy_generator_geodata_mesh_hpp_included_
 
-#include <boost/python.hpp>
+#include "../heightfunction.hpp"
+#include "../generator.hpp"
+#include "../definition.hpp"
 
-#include "pysupport/string.hpp"
+namespace generator {
 
-using pysupport::py2utf8;
+class GeodataMesh : public Generator {
+public:
+    GeodataMesh(const Params &params);
 
-#endif // mapproxy_support_python_hpp_included_
+    typedef resource::GeodataMesh Definition;
+
+private:
+    virtual void prepare_impl(Arsenal &arsenal);
+
+    virtual Task generateFile_impl(const FileInfo &fileInfo
+                                   , Sink &sink) const;
+
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const;
+    vr::FreeLayer freeLayer(ResourceRoot root) const;
+
+    void generateGeodata(Sink &sink, const GeodataFileInfo &fileInfo
+                         , Arsenal &arsenal) const;
+
+    Definition definition_;
+
+    /** URL to style.
+     */
+    std::string styleUrl_;
+
+    /** Path to style file if definition.styleUrl starts with `file:`.
+     */
+    boost::filesystem::path stylePath_;
+
+    /** Output metadata.
+     */
+    geo::heightcoding::Metadata metadata_;
+
+    /** Path to cached output data.
+     */
+    boost::filesystem::path dataPath_;
+};
+
+} // namespace generator
+
+#endif // mapproxy_generator_geodata_mesh_hpp_included_

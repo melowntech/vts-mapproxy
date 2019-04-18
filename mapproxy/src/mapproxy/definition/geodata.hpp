@@ -43,14 +43,19 @@ namespace resource {
 
 // geodata vector formats
 
-struct GeodataVectorBase : public DefinitionBase {
-    struct Introspection {
-        boost::optional<Resource::Id> surface;
-        boost::any browserOptions;
+struct GeodataIntrospection {
+    boost::optional<Resource::Id> surface;
+    boost::any browserOptions;
 
-        bool empty() const;
-        bool operator!=(const Introspection &other) const;
-    };
+    bool empty() const;
+    bool operator!=(const GeodataIntrospection &other) const;
+
+    void parse(const Json::Value &value);
+    void build(Json::Value &value) const;
+};
+
+struct GeodataVectorBase : public DefinitionBase {
+    typedef GeodataIntrospection Introspection;
 
     /** Input dataset (can be remote url, interpreted as a template by tiled
      *  version.
@@ -75,8 +80,8 @@ struct GeodataVectorBase : public DefinitionBase {
         , mode(geo::heightcoding::Mode::auto_)
     {}
 
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
 
 protected:
     virtual Changed changed_impl(const DefinitionBase &other) const;
@@ -103,8 +108,8 @@ struct GeodataVectorTiled : GeodataVectorBase {
      */
     boost::optional<vts::Lod> maxSourceLod;
 
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
 
     GeodataVectorTiled() {}
 
@@ -115,6 +120,73 @@ struct GeodataVectorTiled : GeodataVectorBase {
 private:
     virtual Changed changed_impl(const DefinitionBase &other) const;
 };
+
+/** Mesh to monolithic geodata generator.
+ */
+struct GeodataMesh : public DefinitionBase {
+    typedef GeodataIntrospection Introspection;
+
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::geodata;
+    static constexpr char driverName[] = "geodata-mesh";
+
+    /** Path to mesh file (OBJ or PLY).
+     */
+    std::string dataset;
+
+    /** Mesh SRS.
+     */
+    geo::SrsDefinition srs;
+
+    /** Is SRS vertically adjusted?
+     */
+    bool adjustVertical;
+
+    /** Mesh center in mesh SRS. Defaults to [0,0,0].
+     */
+    math::Point3 center;
+
+    geo::VectorFormat format;
+    geo::vectorformat::Config formatConfig;
+    std::string styleUrl;
+    int displaySize;
+    boost::any options;
+
+    Introspection introspection;
+
+    GeodataMesh()
+        : adjustVertical(false), format(geo::VectorFormat::geodataJson)
+        , displaySize(256)
+    {}
+
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
+
+protected:
+    virtual Changed changed_impl(const DefinitionBase &other) const;
+    virtual bool needsRanges_impl() const { return false; }
+};
+
+// helper functions
+
+inline bool differ(const geo::vectorformat::GeodataConfig &l
+                   , const geo::vectorformat::GeodataConfig *r) {
+    // different type?
+    if (!r) { return true; }
+    // same types
+    if (l.resolution != r->resolution) { return true; }
+    return false;
+}
+
+inline bool differ(const geo::vectorformat::Config &l
+                   , const geo::vectorformat::Config &r)
+{
+    if (const auto *cl = boost::get<geo::vectorformat::GeodataConfig>(&l)) {
+        return differ(*cl, boost::get<geo::vectorformat::GeodataConfig>(&r));
+    }
+    // add more config types here
+    return true;
+}
 
 } // namespace resource
 

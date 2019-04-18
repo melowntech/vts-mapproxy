@@ -35,8 +35,6 @@
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/registry/py.hpp"
 
-#include "../support/python.hpp"
-
 #include "geodata.hpp"
 #include "factory.hpp"
 
@@ -57,13 +55,6 @@ void parseDefinition(GeodataVectorTiled &def, const Json::Value &value)
     }
 }
 
-void parseDefinition(GeodataVectorTiled &def, const boost::python::dict &value)
-{
-    if (value.has_key("maxSourceLod")) {
-        def.maxSourceLod = boost::python::extract<int>(value["maxSourceLod"]);
-    }
-}
-
 void buildDefinition(Json::Value &value, const GeodataVectorTiled &def)
 {
     if (def.maxSourceLod) {
@@ -73,36 +64,20 @@ void buildDefinition(Json::Value &value, const GeodataVectorTiled &def)
 
 } // namespace
 
-void GeodataVectorTiled::from_impl(const boost::any &value)
+void GeodataVectorTiled::from_impl(const Json::Value &value)
 {
     // deserialize parent class first
     GeodataVectorBase::from_impl(value);
 
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "GeodataVectorTiled: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
+    parseDefinition(*this, value);
 }
 
-void GeodataVectorTiled::to_impl(boost::any &value) const
+void GeodataVectorTiled::to_impl(Json::Value &value) const
 {
     // serialize parent class first
     GeodataVectorBase::to_impl(value);
 
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "GeodataVectorTiled:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
+    buildDefinition(value, *this);
 }
 
 Changed GeodataVectorTiled::changed_impl(const DefinitionBase &o)

@@ -32,8 +32,6 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "surface.hpp"
 #include "factory.hpp"
 
@@ -73,48 +71,16 @@ void buildDefinition(Json::Value &value, const SurfaceSpheroid &def)
     def.build(value);
 }
 
-void parseDefinition(SurfaceSpheroid &def, const boost::python::dict &value)
-{
-    namespace python = boost::python;
-    if (value.has_key("textureLayerId")) {
-        def.textureLayerId = python::extract<int>(value["textureLayerId"]);
-    }
-
-    if (value.has_key("geoidGrid")) {
-        def.geoidGrid = py2utf8(value["geoidGrid"]);
-    } else {
-        def.geoidGrid = boost::none;
-    }
-
-    def.parse(value);
-}
-
 } // namespace
 
-void SurfaceSpheroid::from_impl(const boost::any &value)
+void SurfaceSpheroid::from_impl(const Json::Value &value)
 {
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "SurfaceSpheroid: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
+    parseDefinition(*this, value);
 }
 
-void SurfaceSpheroid::to_impl(boost::any &value) const
+void SurfaceSpheroid::to_impl(Json::Value &value) const
 {
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "SurfaceSpheroid:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
+    buildDefinition(value, *this);
 }
 
 Changed SurfaceSpheroid::changed_impl(const DefinitionBase &o)

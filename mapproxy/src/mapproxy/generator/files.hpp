@@ -35,6 +35,8 @@ namespace files {
 
 extern const vtslibs::storage::SupportFile defaultStyle;
 
+extern const vtslibs::storage::SupportFile defaultMeshStyle;
+
 extern const vtslibs::storage::SupportFile wmtsReadme;
 
 extern const vtslibs::storage::SupportFile cesiumReadme;

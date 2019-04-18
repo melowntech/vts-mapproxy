@@ -32,8 +32,6 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "tms.hpp"
 #include "factory.hpp"
 
@@ -92,68 +90,16 @@ void buildDefinition(Json::Value &value, const TmsRaster &def)
     def.build(value);
 }
 
-void parseDefinition(TmsRaster &def, const boost::python::dict &value)
-{
-    def.dataset = py2utf8(value["dataset"]);
-
-    if (value.has_key("mask")) {
-        def.mask = py2utf8(value["mask"]);
-    }
-
-    if (value.has_key("format")) {
-        try {
-            def.format = boost::lexical_cast<RasterFormat>
-                (py2utf8(value["format"]));
-        } catch (boost::bad_lexical_cast) {
-            utility::raise<Error>
-                ("Value stored in format is not a RasterFormat value");
-        }
-    }
-
-    if (value.has_key("transparent")) {
-        def.transparent = boost::python::extract<bool>
-            (value["transparent"]);
-    }
-
-    if (value.has_key("resampling")) {
-        try {
-            def.resampling = boost::lexical_cast<geo::GeoDataset::Resampling>
-                (py2utf8(value["resampling"]));
-        } catch (boost::bad_lexical_cast) {
-            utility::raise<Error>
-                ("Value stored in resampling is not a Resampling value");
-        }
-    }
-
-    def.parse(value);
-}
-
 } // namespace
 
-void TmsRaster::from_impl(const boost::any &value)
+void TmsRaster::from_impl(const Json::Value &value)
 {
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsRaster: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
+    parseDefinition(*this, value);
 }
 
-void TmsRaster::to_impl(boost::any &value) const
+void TmsRaster::to_impl(Json::Value &value) const
 {
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "TmsRaster:: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
+    buildDefinition(value, *this);
 }
 
 Changed TmsRaster::changed_impl(const DefinitionBase &o) const

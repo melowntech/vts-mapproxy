@@ -1,16 +1,23 @@
 <img width="320" alt="VTS Browser JS" src="https://github.com/melowntech/assets/blob/master/vts-mapproxy/vts-mapproxy-no-left-margin.png?raw=true">
 
-[VTS-Mapproxy](https://github.com/melowntech/vts-mapproxy) is an HTTP server that
-converts non-VTS resources (raster or vector) to VTS resources (surface,
-boundlayer, freelayer) on the fly.
+[VTS Mapproxy](https://github.com/melowntech/vts-mapproxy) is a 3D geospatial data streaming server.
+
+VTS Mapproxy provides on-the-fly access to an array of raster and data vector formats and serves those data in formats optimized for 3D streaming and rendering. 
+
+## Features
+
+* dynamic TIN (terrain meshes) generation from DEMs (digital elevaton models)
+* on-the-fly CRS conversion for massive raster datasets
+* [vts-geospatial](https://vts-geospatial.org/) remote tileset provider
+* [CesiumJS](https://cesiumjs.org) terrain provisioning
+* WMTS service for raster datasets 
+* introspection capabilities (web-based, interactive resource directories with embedded viewers)
 
 ## User documentation
 
-VTS-Mapproxy user documentation is available at
-https://melown.readthedocs.io/
+VTS-Mapproxy user documentation is available at the [vts-geospatial website](http://vts-geospatial.org/en/latest/reference/server/mapproxy/).
 
-Authoritative resource documentation is available in separated [document](docs/resources.md)
-that should be kept in sync with actual implementation.
+Authoritative resource-definition documentation is available in separated [document](docs/resources.md).
 
 ## Download, build and install
 
@@ -52,17 +59,6 @@ cd build
 cmake ..
 make -j4
 sudo make install
-```
-
-#### Adding UbuntuGIS repo
-
-VTS-Mapproxy needs newer version of [GDAL](http://gdal.org) library, than it is
-available in Ubuntu repos. Therefore you need to add [UbuntuGIS](https://wiki.ubuntu.com/UbuntuGIS)
-repository to your `apt` sources:
-
-```
-sudo add-apt-repository ppa:ubuntugis/ubuntugis-unstable
-sudo apt-get update
 ```
 
 #### Installing packaged dependencies
@@ -139,9 +135,9 @@ When you specify the `DESTDIR` variable, resulting files will be saved in
 make install DESTDIR=/home/user/tmp/
 ```
 
-## Install from Melown repository
+## Install from Melowntech's package repository
 
-We provide precompiled packages for some popular linux distributions. See [Melown OSS package repository
+We provide precompiled packages for some popular linux distributions. See [Melowntech's OSS package repository
 ](http://cdn.melown.com/packages/) for more information. This repository contains all needed packages to run
 VTS OSS software.
 

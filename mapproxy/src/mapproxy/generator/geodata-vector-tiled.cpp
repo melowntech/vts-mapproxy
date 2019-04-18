@@ -38,11 +38,8 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "vts-libs/vts/opencv/navtile.hpp"
 
-#include "../support/python.hpp"
 #include "../support/tileindex.hpp"
 #include "../support/srs.hpp"
 #include "../support/revision.hpp"

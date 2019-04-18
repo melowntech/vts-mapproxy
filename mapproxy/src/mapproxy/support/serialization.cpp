@@ -26,7 +26,6 @@
 
 #include "jsoncpp/as.hpp"
 
-#include "python.hpp"
 #include "introspection.hpp"
 
 namespace introspection {
@@ -100,44 +99,6 @@ void layersTo(Json::Value &introspection, const std::string &key
     for (const auto &l : layers) { boost::apply_visitor(visitor, l); }
 }
 
-Layers layersFrom(const boost::python::dict &introspection
-                  , const std::string &key)
-{
-    if (!introspection.has_key(key)) { return {}; }
-
-    const auto &local([](const boost::python::dict &item) -> LocalLayer
-    {
-        LocalLayer l;
-        l.group = py2utf8(item["group"]);
-        l.id = py2utf8(item["id"]);
-        return l;
-    });
-
-    const auto &remote([](const boost::python::dict &item) -> RemoteLayer
-    {
-        RemoteLayer l;
-        l.id = py2utf8(item["id"]);
-        l.url = py2utf8(item["url"]);
-        return l;
-    });
-
-    Layers out;
-
-    const auto &add([&](const boost::python::dict &item)
-    {
-        if (item.has_key("url")) {
-            out.push_back(remote(item));
-        } else {
-            out.push_back(local(item));
-        }
-    });
-
-    // TODO: support list
-    boost::python::dict value(introspection[key]);
-    add(value);
-    return out;
-}
-
 Resource::OptId idFrom(const Json::Value &introspection
                        , const std::string &key)
 {
@@ -163,23 +124,6 @@ void idTo(Json::Value &introspection, const std::string &key
     auto &item(introspection[key] = Json::objectValue);
     item["group"] = resource->group;
     item["id"] = resource->id;
-}
-
-Resource::OptId idFrom(const boost::python::dict &introspection
-                       , const std::string &key)
-{
-    if (!introspection.has_key(key)) { return {}; }
-
-    auto getRid([](const boost::python::dict &item) -> Resource::Id
-    {
-        Resource::Id rid;
-        rid.group = py2utf8(item["group"]);
-        rid.id = py2utf8(item["id"]);
-        return rid;
-    });
-
-    boost::python::dict value(introspection[key]);
-    return getRid(value);
 }
 
 } // namespace introspection

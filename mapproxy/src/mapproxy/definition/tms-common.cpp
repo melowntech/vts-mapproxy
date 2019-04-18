@@ -32,8 +32,6 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "tms.hpp"
 #include "options.hpp"
 
@@ -50,14 +48,6 @@ void TmsCommon::build(Json::Value &value) const
 {
     if (!options.empty()) {
         value["options"] = boost::any_cast<Json::Value>(options);
-    }
-}
-
-void TmsCommon::parse(const boost::python::dict &value)
-{
-    if (value.has_key("options")) {
-        LOG(warn2)
-            << "Generic options not supported in python TMS configuration.";
     }
 }
 

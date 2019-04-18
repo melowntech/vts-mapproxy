@@ -32,8 +32,6 @@
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "../support/python.hpp"
-
 #include "surface.hpp"
 #include "factory.hpp"
 
@@ -92,58 +90,16 @@ void buildDefinition(Json::Value &value, const SurfaceDem &def)
     def.build(value);
 }
 
-void parseDefinition(SurfaceDem &def
-                     , const boost::python::dict &value)
-{
-    namespace python = boost::python;
-
-    def.dem.dataset = py2utf8(value["dataset"]);
-
-    if (value.has_key("mask")) {
-        def.mask = py2utf8(value["mask"]);
-    }
-
-    if (value.has_key("textureLayerId")) {
-        def.textureLayerId = python::extract<int>(value["textureLayerId"]);
-    }
-
-    if (value.has_key("geoidGrid")) {
-        def.dem.geoidGrid = py2utf8(value["geoidGrid"]);
-    }
-
-    if (value.has_key("heightcodingAlias")) {
-        def.heightcodingAlias = py2utf8(value["heightcodingAlias"]);
-    }
-
-    def.parse(value);
-}
-
 } // namespace
 
-void SurfaceDem::from_impl(const boost::any &value)
+void SurfaceDem::from_impl(const Json::Value &value)
 {
-    if (const auto *json = boost::any_cast<Json::Value>(&value)) {
-        parseDefinition(*this, *json);
-    } else if (const auto *py
-               = boost::any_cast<boost::python::dict>(&value))
-    {
-        parseDefinition(*this, *py);
-    } else {
-        LOGTHROW(err1, Error)
-            << "SurfaceDem: Unsupported configuration from: <"
-            << value.type().name() << ">.";
-    }
+    parseDefinition(*this, value);
 }
 
-void SurfaceDem::to_impl(boost::any &value) const
+void SurfaceDem::to_impl(Json::Value &value) const
 {
-    if (auto *json = boost::any_cast<Json::Value>(&value)) {
-        buildDefinition(*json, *this);
-    } else {
-        LOGTHROW(err1, Error)
-            << "SurfaceDem: Unsupported serialization into: <"
-            << value.type().name() << ">.";
-    }
+    buildDefinition(value, *this);
 }
 
 Changed SurfaceDem::changed_impl(const DefinitionBase &o) const

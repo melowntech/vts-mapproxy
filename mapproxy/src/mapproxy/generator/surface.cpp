@@ -62,7 +62,6 @@
 #include "../support/mesh.hpp"
 #include "../support/srs.hpp"
 #include "../support/grid.hpp"
-#include "../support/python.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
 #include "../support/tilejson.hpp"
 #include "../support/cesiumconf.hpp"

@@ -86,7 +86,7 @@ void parseDefinition(Resource &r, const Json::Value &value, bool hasRanges)
         if (!hasRanges) {
             LOGTHROW(err1, Error)
                 << "Resource <" << r.id
-                << ">: missing mandatory lot/tile ranges.";
+                << ">: missing mandatory lod/tile ranges.";
         }
     } else if (hasRanges) {
         LOG(warn2)
@@ -99,9 +99,9 @@ void parseDefinition(Resource &r, const Json::Value &value, bool hasRanges)
 
 Json::Value buildDefinition(const Resource &r)
 {
-    boost::any tmp(Json::Value(Json::objectValue));
+    Json::Value tmp(Json::objectValue);
     r.definition()->to(tmp);
-    return boost::any_cast<const Json::Value&>(tmp);
+    return tmp;
 }
 
 FileClassSettings parseFileClassSettings(const Json::Value &value
@@ -205,9 +205,11 @@ Resource::list parseResource(const Json::Value &value
 }
 
 void parseResources(Resource::map &resources, const Json::Value &value
+                    , ResourceLoadErrorCallback error
                     , const FileClassSettings &fileClassSettings
                     , const fs::path &path)
 {
+    // TODO: use error callback
     const auto dir(path.parent_path());
 
     // load part of include
@@ -234,7 +236,7 @@ void parseResources(Resource::map &resources, const Json::Value &value
 
         // and recurse
         try {
-            parseResources(resources, config, fileClassSettings
+            parseResources(resources, config, error, fileClassSettings
                            , includePath);
         } catch (const Json::Error &e) {
             LOGTHROW(err1, FormatError)
@@ -324,15 +326,14 @@ void parseResources(Resource::map &resources, const Json::Value &value
     };
 }
 
-Resource::map loadResources(std::istream &in, const fs::path &path
+Resource::map loadResources(const Json::Value &config, const fs::path &path
+                            , ResourceLoadErrorCallback error
                             , const FileClassSettings &fileClassSettings)
 {
-    auto config(Json::read<FormatError>(in, path, "resources"));
-
     Resource::map resources;
 
     try {
-        parseResources(resources, config, fileClassSettings, path);
+        parseResources(resources, config, error, fileClassSettings, path);
     } catch (const Json::Error &e) {
         LOGTHROW(err1, FormatError)
             << "Invalid resource config file " << path
@@ -344,6 +345,14 @@ Resource::map loadResources(std::istream &in, const fs::path &path
     }
 
     return resources;
+}
+
+Resource::map loadResources(std::istream &in, const fs::path &path
+                            , const FileClassSettings &fileClassSettings)
+{
+    return detail::loadResources(Json::read<FormatError>(in, path, "resources")
+                                 , path, ResourceLoadErrorCallback()
+                                 , fileClassSettings);
 }
 
 Resource::list loadResource(std::istream &in, const fs::path &path
@@ -433,6 +442,14 @@ Resource::map loadResources(const boost::filesystem::path &path
     }
 
     return detail::loadResources(f, path, fileClassSettings);
+}
+
+Resource::map loadResources(const Json::Value &json
+                            , const boost::filesystem::path &path
+                            , ResourceLoadErrorCallback error
+                            , const FileClassSettings &fileClassSettings)
+{
+    return detail::loadResources(json, path, error, fileClassSettings);
 }
 
 Resource::list loadResource(const boost::filesystem::path &path

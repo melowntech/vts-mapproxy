@@ -27,15 +27,13 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/utility/in_place_factory.hpp>
 
+#include "utility/premain.hpp"
+
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "vts-libs/registry/json.hpp"
-#include "vts-libs/registry/py.hpp"
-
-#include "../support/introspection.hpp"
-
 #include "geodata.hpp"
+#include "factory.hpp"
 #include "options.hpp"
 #include "parse.hpp"
 
@@ -43,41 +41,29 @@ namespace vf = geo::vectorformat;
 
 namespace resource {
 
+constexpr Resource::Generator::Type GeodataMesh::type;
+constexpr char GeodataMesh::driverName[];
+
 namespace {
 
-void parseLayers(boost::optional<geo::heightcoding::Config::LayerNames> &result
-                 , const std::string &name, const Json::Value &value)
+utility::PreMain register_([]() { registerDefinition<GeodataMesh>(); });
+
+void parseDefinition(GeodataMesh &def, const Json::Value &value)
 {
-    if (!value.isMember(name)) { return; }
-
-    const auto layers(value[name]);
-    if (!layers.isArray()) {
-        LOGTHROW(err1, FormatError)
-            << "Geodata definition[layers] is not an array.";
-    }
-
-    result = boost::in_place();
-    for (const auto &layer : layers) {
-        result->push_back(layer.asString());
-    }
-    std::sort(result->begin(), result->end());
-}
-
-void parseDefinition(GeodataVectorBase &def
-                     , const Json::Value &value)
-{
-    std::string s;
 
     Json::get(def.dataset, value, "dataset");
-    Json::get(def.dem.dataset, value, "demDataset");
 
-    if (value.isMember("geoidGrid")) {
-        def.dem.geoidGrid = boost::in_place();
-        Json::get(*def.dem.geoidGrid, value, "geoidGrid");
+    {
+        std::string s;
+        Json::get(s, value, "srs");
+        def.srs = geo::SrsDefinition::fromString(s);
     }
 
-    parseLayers(def.layers, "layers", value);
-    parseLayers(def.clipLayers, "clipLayers", value);
+    Json::getOpt(def.adjustVertical, value, "adjustVertical");
+
+    Json::get(def.center(0), value, "center", 0);
+    Json::get(def.center(1), value, "center", 1);
+    Json::get(def.center(2), value, "center", 2);
 
     Json::getOpt(def.format, value, "format");
 
@@ -87,25 +73,6 @@ void parseDefinition(GeodataVectorBase &def
 
     Json::getOpt(def.styleUrl, value, "styleUrl");
     Json::get(def.displaySize, value, "displaySize");
-    Json::getOpt(def.mode, value, "mode");
-
-    if (value.isMember("enhance")) {
-        const auto enhance(value["enhance"]);
-        if (!enhance.isObject()) {
-            LOGTHROW(err1, FormatError)
-                << "Geodata definition[enhance] is not an object.";
-        }
-
-        for (const auto &layerName : enhance.getMemberNames()) {
-            const auto &layer(enhance[layerName]);
-            auto &lh(def.layerEnhancers[layerName]);
-            Json::get(lh.key, layer, "key");
-            Json::get(lh.databasePath, layer, "db");
-            Json::get(lh.table, layer, "table");
-        }
-    }
-
-    def.heightFunction = HeightFunction::parse(value, "heightFunction");
 
     if (value.isMember("options")) { def.options = value["options"]; }
 
@@ -114,51 +81,24 @@ void parseDefinition(GeodataVectorBase &def
     }
 }
 
-void buildLayers(const boost::optional
-                 <geo::heightcoding::Config::LayerNames> &layers
-                 , const std::string &name, Json::Value &value)
-{
-    if (!layers) { return; }
-    auto &players(value[name] = Json::arrayValue);
-    for (const auto &layer : *layers) {
-        players.append(layer);
-    }
-}
-
-void buildDefinition(Json::Value &value
-                     , const GeodataVectorBase &def)
+void buildDefinition(Json::Value &value, const GeodataMesh &def)
 {
     value["dataset"] = def.dataset;
-    value["demDataset"] = def.dem.dataset;
+    value["srs"] = def.srs.toString();
+    if (def.adjustVertical) { value["adjustVertical"] = def.adjustVertical; }
 
-    if (def.dem.geoidGrid) {
-        value["geoidGrid"] = *def.dem.geoidGrid;
+    if (def.center != math::Point3()) {
+        auto &center(value["center"] = Json::arrayValue);
+        center.append(def.center(0));
+        center.append(def.center(1));
+        center.append(def.center(2));
     }
-
-    buildLayers(def.layers, "layers", value);
-    buildLayers(def.clipLayers, "clipLayers", value);
 
     value["format"] = boost::lexical_cast<std::string>(def.format);
     build(value["formatConfig"], def.formatConfig);
 
     value["displaySize"] = def.displaySize;
     value["styleUrl"] = def.styleUrl;
-    value["mode"] = boost::lexical_cast<std::string>(def.mode);
-
-    if (!def.layerEnhancers.empty()) {
-        auto &layerEnhancers(value["enhance"] = Json::objectValue);
-        for (const auto &item : def.layerEnhancers) {
-            auto &layer(layerEnhancers[item.first] = Json::objectValue);
-            layer["key"] = item.second.key;
-            layer["db"] = item.second.databasePath;
-            layer["table"] = item.second.table;
-        }
-    }
-
-    if (def.heightFunction) {
-        auto &tmp(value["heightFunction"] = Json::objectValue);
-        def.heightFunction->build(tmp);
-    }
 
     if (!def.options.empty()) {
         value["options"] = boost::any_cast<Json::Value>(def.options);
@@ -171,34 +111,31 @@ void buildDefinition(Json::Value &value
 
 } // namespace
 
-void GeodataVectorBase::from_impl(const Json::Value &value)
+void GeodataMesh::from_impl(const Json::Value &value)
 {
     parseDefinition(*this, value);
 }
 
-void GeodataVectorBase::to_impl(Json::Value &value) const
+void GeodataMesh::to_impl(Json::Value &value) const
 {
     buildDefinition(value, *this);
 }
 
-Changed GeodataVectorBase::changed_impl(const DefinitionBase &o) const
+Changed GeodataMesh::changed_impl(const DefinitionBase &o) const
 {
-    const auto &other(o.as<GeodataVectorBase>());
+    const auto &other(o.as<GeodataMesh>());
 
     // accumulate revision bump/safe changes
     bool bump(false);
     bool safe(false);
 
     // changing these bumps version
-    if (dem != other.dem) { bump = true; }
     if (dataset != other.dataset) { bump = true; }
-    if (layers != other.layers) { bump = true; }
-    if (clipLayers != other.clipLayers) { bump = true; }
-    if (mode != other.mode) { bump = true; }
-    if (layerEnhancers != other.layerEnhancers) { bump = true; }
-    if (HeightFunction::changed(heightFunction, other.heightFunction)) {
+    if ((srs.type != other.srs.type) || srs.srs != other.srs.srs) {
         bump = true;
     }
+    if (adjustVertical != other.adjustVertical) { bump = true; }
+    if (center != other.center) { bump = true; }
 
     // different format leads to version bump!
     if (format != other.format) { bump = true; }
@@ -206,6 +143,7 @@ Changed GeodataVectorBase::changed_impl(const DefinitionBase &o) const
     if (differ(formatConfig, other.formatConfig)) { bump = true; }
     // displaySize can change
     if (displaySize != other.displaySize) { safe = true; }
+
     // styleUrl can change
     if (styleUrl != other.styleUrl) { safe = true; }
 
@@ -221,4 +159,4 @@ Changed GeodataVectorBase::changed_impl(const DefinitionBase &o) const
     return Changed::no;
 }
 
-} // namespace resource
+} // namespace resource[

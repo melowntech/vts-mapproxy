@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,72 +24,63 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <boost/lexical_cast.hpp>
-#include <boost/utility/in_place_factory.hpp>
-
-#include "utility/premain.hpp"
-
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
-#include "tms.hpp"
-#include "factory.hpp"
+#include "vts-libs/registry/json.hpp"
+#include "vts-libs/registry/py.hpp"
+
+#include "../error.hpp"
+
+#include "parse.hpp"
+
+namespace vf = geo::vectorformat;
 
 namespace resource {
 
-constexpr char TmsRasterRemote::driverName[];
-
-namespace {
-
-utility::PreMain register_([]() { registerDefinition<TmsRasterRemote>(); });
-
-void parseDefinition(TmsRasterRemote &def
-                     , const Json::Value &value)
+void parse(geo::VectorFormat &format, const Json::Value &value)
 {
-    std::string s;
+    Json::check(value, Json::stringValue);
+    try {
+        format = boost::lexical_cast<geo::VectorFormat>(value);
+    } catch (boost::bad_lexical_cast) {
+        utility::raise<FormatError>
+            ("Value stored in format is not a valid height"
+             " coded data format.");
+    }
+}
 
-    Json::get(def.remoteUrl, value, "remoteUrl");
-    if (value.isMember("mask")) {
-        std::string s;
-        Json::get(s, value, "mask");
-        def.mask = s;;
+void build(Json::Value &value, const geo::VectorFormat &format)
+{
+    value = boost::lexical_cast<std::string>(format);
+}
+
+void parse(vf::Config &config, geo::VectorFormat format
+           , const Json::Value &value)
+{
+    if (!value.isObject()) {
+        LOGTHROW(err1, FormatError)
+            << "Geodata definition[formatConfig] is not an object.";
     }
 
-    def.parse(value);
-}
+    switch (format) {
+    case geo::VectorFormat::geodataJson: {
+        auto &c(createGeodataConfig(config));
+        Json::getOpt(c.resolution, value, "resolution");
+    } break;
 
-void buildDefinition(Json::Value &value
-                     , const TmsRasterRemote &def)
-{
-    value["remoteUrl"] = def.remoteUrl;
-    if (def.mask) {
-        value["mask"] = def.mask->string();
+    default:
+        // ignore
+        break;
     }
-
-    def.build(value);
 }
 
-} // namespace
-
-void TmsRasterRemote::from_impl(const Json::Value &value)
+void build(Json::Value &value, const vf::Config &config)
 {
-    parseDefinition(*this, value);
-}
-
-void TmsRasterRemote::to_impl(Json::Value &value) const
-{
-    buildDefinition(value, *this);
-}
-
-Changed TmsRasterRemote::changed_impl(const DefinitionBase &o)
-    const
-{
-    const auto &other(o.as<TmsRasterRemote>());
-
-    if (remoteUrl != other.remoteUrl) { return Changed::yes; }
-    if (mask != other.mask) { return Changed::yes; }
-
-    return TmsCommon::changed_impl(o);
+    value = Json::objectValue;
+    if (const auto *c = boost::get<vf::GeodataConfig>(&config)) {
+        value["resolution"] = c->resolution;
+    }
 }
 
 } // namespace resource

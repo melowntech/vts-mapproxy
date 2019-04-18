@@ -36,7 +36,6 @@
 
 // fwd
 namespace Json { class Value; }
-namespace boost { namespace python { class dict; } }
 
 namespace resource {
 
@@ -50,7 +49,6 @@ struct TmsCommon : public DefinitionBase {
 
     void parse(const Json::Value &value);
     void build(Json::Value &value) const;
-    void parse(const boost::python::dict &value);
 
 protected:
     virtual Changed changed_impl(const DefinitionBase &other) const;
@@ -64,7 +62,6 @@ struct TmsRasterSynthetic : public TmsCommon {
 
     void parse(const Json::Value &value);
     void build(Json::Value &value) const;
-    void parse(const boost::python::dict &value);
 
 protected:
     virtual Changed changed_impl(const DefinitionBase &other) const;
@@ -76,8 +73,8 @@ struct TmsRasterPatchwork : public TmsRasterSynthetic {
     static constexpr char driverName[] = "tms-raster-patchwork";
 
 private:
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual bool frozenCredits_impl() const { return false; }
 };
@@ -90,8 +87,8 @@ struct TmsRasterSolid : public TmsRasterSynthetic {
     static constexpr char driverName[] = "tms-raster-solid";
 
 private:
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual bool frozenCredits_impl() const { return false; }
 };
@@ -108,8 +105,8 @@ struct TmsRaster : public TmsCommon {
     static constexpr char driverName[] = "tms-raster";
 
 protected:
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual bool frozenCredits_impl() const { return false; }
 };
@@ -123,8 +120,8 @@ struct TmsRasterRemote : public TmsCommon {
     static constexpr char driverName[] = "tms-raster-remote";
 
 private:
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual bool frozenCredits_impl() const { return false; }
 };
@@ -137,8 +134,8 @@ struct TmsBing : public TmsCommon {
     static constexpr char driverName[] = "tms-bing";
 
 private:
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual bool frozenCredits_impl() const { return false; }
 };
@@ -151,8 +148,8 @@ struct TmsWindyty : public TmsRaster {
     static constexpr char driverName[] = "tms-windyty";
 
 private:
-    virtual void from_impl(const boost::any &value);
-    virtual void to_impl(boost::any &value) const;
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
     virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual bool frozenCredits_impl() const { return false; }
 };

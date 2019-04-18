@@ -33,6 +33,7 @@
 #include "pydbglog/dbglogmodule.hpp"
 #include "pysupport/import.hpp"
 #include "pysupport/formatexception.hpp"
+#include "pysupport/json.hpp"
 
 #include "../error.hpp"
 #include "python.hpp"
@@ -149,7 +150,9 @@ utility::PreMain Factory::register_([]()
 } // namespace
 
 Python::Python(const GenericConfig &genericConfig, const Config &config)
-    : ResourceBackend(genericConfig), run_(), error_()
+    : ResourceBackend(genericConfig)
+    , script_(config.script)
+    , run_(), error_()
 {
     try {
         python::dict options;
@@ -157,14 +160,14 @@ Python::Python(const GenericConfig &genericConfig, const Config &config)
             options[option.first] = option.second;
         }
 
-        run_ = pysupport::import(config.script)
+        run_ = pysupport::import(script_)
             .attr("resource_backend")(options);
         if (PyObject_HasAttrString(run_.ptr(), "error")) {
             error_ = run_.attr("error");
         }
     } catch (const python::error_already_set&) {
         LOGTHROW(err2, Error)
-            << "Run importing python script from " << config.script << ": "
+            << "Run importing python script from " << script_ << ": "
             << pysupport::formatCurrentException();
     }
 }
@@ -174,11 +177,12 @@ Resource::map Python::load_impl() const
     std::unique_lock<decltype(mutex_)> lock(mutex_);
     try {
         LOG(info4) << "Loading resources";
-        return loadResourcesFromPython
-            (python::list(run_())
-             , [this](const Resource::Id &id, const std::string &error) {
-                error_impl(id, error);
-            }, genericConfig_.fileClassSettings);
+        loadResources(pysupport::asJson(python::list(run_()))
+                      , script_
+                      , [this](const Resource::Id &id
+                               , const std::string &error)
+                      { error_impl(id, error); }
+                      , genericConfig_.fileClassSettings);
     } catch (const python::error_already_set&) {
         python::handle_exception();
         LOGTHROW(err3, Error)

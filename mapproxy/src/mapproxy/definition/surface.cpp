@@ -33,8 +33,6 @@
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/registry/py.hpp"
 
-#include "../support/python.hpp"
-
 #include "surface.hpp"
 
 namespace vr = vtslibs::registry;
@@ -114,9 +112,8 @@ void Surface::build(Json::Value &value) const
     }
 
     if (heightFunction) {
-        boost::any tmp(Json::Value(Json::objectValue));
+        auto &tmp(value["heightFunction"] = Json::objectValue);
         heightFunction->build(tmp);
-        value["heightFunction"] = boost::any_cast<const Json::Value&>(tmp);
     }
 
     if (!introspection.empty()) {
@@ -133,35 +130,6 @@ void Surface::build(Json::Value &value) const
             jintrospection["browserOptions"]
                 = boost::any_cast<const Json::Value&>
                 (introspection.browserOptions);
-        }
-    }
-}
-
-void Surface::parse(const boost::python::dict &value)
-{
-    if (value.has_key("nominalTexelSize")) {
-        nominalTexelSize
-            = boost::python::extract<double>(value["nominalTexelSize"]);
-    }
-
-    if (value.has_key("mergeBottomLod")) {
-        mergeBottomLod = boost::python::extract
-            <vts::Lod>(value["mergeBottomLod"]);
-    }
-
-    heightFunction = HeightFunction::parse(value, "heightFunction");
-
-    if (value.has_key("introspection")) {
-        boost::python::dict pintrospection(value["introspection"]);
-        introspection.tms
-            = introspection::layersFrom(pintrospection, "tms");
-        introspection.geodata
-            = introspection::layersFrom(pintrospection, "geodata");
-
-        if (pintrospection.has_key("position")) {
-            introspection.position = boost::in_place();
-            vr::fromPython(*introspection.position
-                           , pintrospection["position"]);
         }
     }
 }

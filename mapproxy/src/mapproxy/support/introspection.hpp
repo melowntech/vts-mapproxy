@@ -36,7 +36,6 @@
 
 // fwd
 namespace Json { class Value; }
-namespace boost { namespace python { class dict; } }
 namespace vtslibs { namespace vts { struct ExtraTileSetProperties; } }
 
 namespace introspection {
@@ -81,17 +80,11 @@ Layers layersFrom(const Json::Value &introspection, const std::string &key);
 void layersTo(Json::Value &introspection, const std::string &key
               , const Layers &layers);
 
-Layers layersFrom(const boost::python::dict &introspection
-                  , const std::string &key);
-
 Resource::OptId idFrom(const Json::Value &introspection
                        , const std::string &key);
 
 void idTo(Json::Value &introspection, const std::string &key
           , const Resource::OptId &resource);
-
-Resource::OptId idFrom(const boost::python::dict &introspection
-                       , const std::string &key);
 
 // inlines
 
