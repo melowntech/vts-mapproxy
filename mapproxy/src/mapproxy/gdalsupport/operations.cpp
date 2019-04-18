@@ -72,10 +72,15 @@ cv::Mat* allocateMat(ManagedBuffer &mb
 }
 
 inline geo::OptionalNodataValue
-asOptNodata(const geo::NodataValue &nodata
-            , const geo::NodataValue &dflt = boost::none)
+asOptNodata(const geo::NodataValue &nodata, const geo::NodataValue &dflt)
 {
     return nodata ? nodata : dflt;
+}
+
+inline geo::OptionalNodataValue asOptNodata(const geo::NodataValue &nodata)
+{
+    if (nodata) { return nodata; }
+    return boost::none;
 }
 
 cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
