@@ -1,3 +1,9 @@
+vts-mapproxy (1.55) stable; urgency=medium
+
+  * WMTS interface serves its own set of tiles, parallel to VTS tiles.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Wed, 17 Apr 2019 11:27:45 +0000
+
 vts-mapproxy (1.54) stable; urgency=medium
 
   * README files: combined in directory listing.
