@@ -32,6 +32,8 @@
 
 #include "vts-libs/storage/range.hpp"
 
+namespace Json { class Value; }
+
 /** Generic height function for surface manipulation.
  */
 class HeightFunction {

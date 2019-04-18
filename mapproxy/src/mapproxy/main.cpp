@@ -233,6 +233,7 @@ void Daemon::configuration(po::options_description &cmdline
 
         ("vts.builtinBrowserUrl"
          , po::value(&variables_["VTS_BUILTIN_BROWSER_URL"])
+         ->default_value(variables_["VTS_BUILTIN_BROWSER_URL"])
          , "URL of built in browser.")
 
         ("introspection.defaultFov"

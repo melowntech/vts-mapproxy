@@ -86,7 +86,7 @@ void parseDefinition(Resource &r, const Json::Value &value, bool hasRanges)
         if (!hasRanges) {
             LOGTHROW(err1, Error)
                 << "Resource <" << r.id
-                << ">: missing mandatory lot/tile ranges.";
+                << ">: missing mandatory lod/tile ranges.";
         }
     } else if (hasRanges) {
         LOG(warn2)

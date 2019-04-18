@@ -121,6 +121,52 @@ private:
     virtual Changed changed_impl(const DefinitionBase &other) const;
 };
 
+/** Mesh to monolithic geodata generator.
+ */
+struct GeodataMesh : public DefinitionBase {
+    typedef GeodataIntrospection Introspection;
+
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::geodata;
+    static constexpr char driverName[] = "geodata-mesh";
+
+    /** Path to mesh file (OBJ or PLY).
+     */
+    std::string dataset;
+
+    /** Mesh SRS.
+     */
+    geo::SrsDefinition srs;
+
+    /** Is SRS vertically adjusted?
+     */
+    bool adjustVertical;
+
+    /** Mesh center in mesh SRS. Defaults to [0,0,0].
+     */
+    math::Point3 center;
+
+    geo::VectorFormat format;
+    geo::vectorformat::Config formatConfig;
+    std::string styleUrl;
+    int displaySize;
+    boost::any options;
+
+    Introspection introspection;
+
+    GeodataMesh()
+        : adjustVertical(false), format(geo::VectorFormat::geodataJson)
+        , displaySize(256)
+    {}
+
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
+
+protected:
+    virtual Changed changed_impl(const DefinitionBase &other) const;
+    virtual bool needsRanges_impl() const { return false; }
+};
+
 // helper functions
 
 inline bool differ(const geo::vectorformat::GeodataConfig &l

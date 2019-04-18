@@ -27,6 +27,7 @@
 #include "files.hpp"
 
 #include "generator/files/defaultstyle.json.hpp"
+#include "generator/files/defaultstyle.mesh.json.hpp"
 #include "generator/files/wmtsreadme.md.hpp"
 #include "generator/files/cesiumreadme.md.hpp"
 
@@ -36,6 +37,13 @@ const vtslibs::storage::SupportFile defaultStyle = {
     defaultstyle_json
     , sizeof(defaultstyle_json)
     , defaultstyle_json_attr_lastModified
+    , "application/json; charset=utf-8"
+};
+
+const vtslibs::storage::SupportFile defaultMeshStyle = {
+    defaultstyle_mesh_json
+    , sizeof(defaultstyle_mesh_json)
+    , defaultstyle_mesh_json_attr_lastModified
     , "application/json; charset=utf-8"
 };
 

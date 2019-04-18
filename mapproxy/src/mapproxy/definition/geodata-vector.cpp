@@ -24,16 +24,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <boost/lexical_cast.hpp>
-#include <boost/utility/in_place_factory.hpp>
-
 #include "utility/premain.hpp"
-
-#include "jsoncpp/json.hpp"
-#include "jsoncpp/as.hpp"
-
-#include "vts-libs/registry/json.hpp"
-#include "vts-libs/registry/py.hpp"
 
 #include "geodata.hpp"
 #include "factory.hpp"

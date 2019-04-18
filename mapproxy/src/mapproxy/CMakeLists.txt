@@ -53,6 +53,7 @@ set(mapproxy-core_SOURCES
   definition/geodatavectorbase.cpp
   definition/geodata-vector.cpp
   definition/geodata-vector-tiled.cpp
+  definition/geodata-mesh.cpp
 
   # control socket interface
   mapproxy.hpp mapproxy.cpp
@@ -144,6 +145,7 @@ set(mapproxy_SOURCES
   generator/geodatavectorbase.hpp generator/geodatavectorbase.cpp
   generator/geodata-vector-tiled.hpp generator/geodata-vector-tiled.cpp
   generator/geodata-vector.hpp generator/geodata-vector.cpp
+  generator/geodata-mesh.hpp generator/geodata-mesh.cpp
 
   sink.hpp sink.cpp
 
@@ -169,6 +171,9 @@ set(mapproxy_FILES_SOURCES
 file_to_cpp(mapproxy_FILES_SOURCES
   files::defaultstyle_json
   generator/files/defaultstyle.json)
+file_to_cpp(mapproxy_FILES_SOURCES
+  files::defaultstyle_mesh_json
+  generator/files/defaultstyle.mesh.json)
 file_to_cpp(mapproxy_FILES_SOURCES
   files::wmtsreadme_md
   generator/files//wmtsreadme.md)
