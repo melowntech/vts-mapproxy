@@ -1,9 +1,12 @@
 {
-  "layers": {
-    "polygons": {
-      "polygon": true,
-      "polygon-color": [237, 16, 204, 255],
-      "zbuffer-offset": [-10, 0, 0]
+    "layers": {
+        "polygons": {
+            "polygon": true,
+            "polygon-style": "flatshade",
+            "polygon-use-stencil": false,
+            "polygon-culling": "back",
+            "polygon-color": [204, 204, 204, 255],
+            "zbuffer-offset": [-10, 0, 0]
+        }
     }
-  }
 }

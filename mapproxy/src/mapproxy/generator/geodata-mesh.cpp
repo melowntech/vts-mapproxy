@@ -107,7 +107,20 @@ GeodataMesh::GeodataMesh(const Params &params)
 
 namespace {
 
-geo::FeatureLayers mesh2fl(const geometry::Mesh &mesh
+struct NamedMesh {
+    std::string name;
+    geometry::Mesh mesh;
+
+    typedef std::vector<NamedMesh> list;
+
+    NamedMesh() = default;
+    NamedMesh(std::string &&name) : name(std::move(name))  {}
+    NamedMesh(std::string &&name, geometry::Mesh &&mesh)
+        : name(std::move(name)), mesh(std::move(mesh))
+    {}
+};
+
+geo::FeatureLayers mesh2fl(const NamedMesh::list meshes
                            , const geo::SrsDefinition &srs
                            , bool adjustVertical
                            , const math::Point3 &center)
@@ -118,26 +131,94 @@ geo::FeatureLayers mesh2fl(const geometry::Mesh &mesh
     auto &l(fl.layers.back());
     l.adjustVertical = adjustVertical;
 
-    geo::FeatureLayers::Features::Surface s(1, "mesh", {});
+    int fid(0);
+    for (const auto &nmesh : meshes) {
+        const auto &mesh(nmesh.mesh);
+        geo::FeatureLayers::Features::Properties props;
+        props["name"] = nmesh.name;
+        geo::FeatureLayers::Features::Surface s(++fid, nmesh.name, props);
 
-    s.vertices.resize(mesh.vertices.size());
-    std::transform(mesh.vertices.begin(), mesh.vertices.end()
-                   , s.vertices.begin()
-                   , [&center](const math::Point3 &p) -> math::Point3 {
-                       return p + center;
-                   });
+        s.vertices.resize(mesh.vertices.size());
+        std::transform(mesh.vertices.begin(), mesh.vertices.end()
+                       , s.vertices.begin()
+                       , [&center](const math::Point3 &p) -> math::Point3 {
+                           return p + center;
+                       });
 
-    for (const auto &face : mesh.faces) {
-        s.surface.emplace_back();
-        auto &p(s.surface.back());
-        p(0) = face.a;
-        p(1) = face.b;
-        p(2) = face.c;
+        for (const auto &face : mesh.faces) {
+            s.surface.emplace_back();
+            auto &p(s.surface.back());
+            p(0) = face.a;
+            p(1) = face.b;
+            p(2) = face.c;
+        }
+
+        l.features.addSurface(s);
     }
 
-    l.features.addSurface(s);
-
     return fl;
+}
+
+NamedMesh::list loadMesh(const fs::path &dataset)
+{
+    geometry::ObjMaterial mtl;
+    auto mesh(geometry::loadObj(dataset, &mtl));
+
+    if (mtl.libs.empty()) {
+        // no material definition -> just one mesh
+        return { { "mesh", std::move(mesh) } };
+    }
+
+    // split by material
+    typedef geometry::Face::index_type index_type;
+
+    typedef std::map<math::Point3, index_type> PointMap;
+    struct MeshBuilder {
+        PointMap pmap;
+        NamedMesh nmesh;
+
+        typedef std::map<index_type, MeshBuilder> map;
+
+        MeshBuilder(NamedMesh &&nmesh) : nmesh(std::move(nmesh)) {}
+    };
+
+    // create builders
+    MeshBuilder::map builders;
+    for (const auto &face : mesh.faces) {
+        auto fbuilders(builders.find(face.imageId));
+        if (fbuilders == builders.end()) {
+            builders.insert
+                (MeshBuilder::map::value_type
+                 (face.imageId, NamedMesh(mtl.name(face.imageId))));
+        }
+    }
+
+    const auto &addVertex([](MeshBuilder &builder, const math::Point3 &p)
+                          -> index_type
+    {
+        auto fpmap(builder.pmap.find(p));
+        if (fpmap == builder.pmap.end()) {
+            const auto index(builder.nmesh.mesh.vertices.size());
+            builder.nmesh.mesh.vertices.push_back(p);
+            fpmap = builder.pmap.insert(PointMap::value_type(p, index)).first;
+        }
+        return fpmap->second;
+    });
+
+    for (const auto &face : mesh.faces) {
+        // we have prepopulated all builders so no check is needed here
+        auto &builder(builders.find(face.imageId)->second);
+        builder.nmesh.mesh.faces.emplace_back
+            (addVertex(builder, mesh.a(face))
+             , addVertex(builder, mesh.b(face))
+             , addVertex(builder, mesh.c(face)));
+    }
+
+    NamedMesh::list out;
+    for (auto &builder : builders) {
+        out.push_back(std::move(builder.second.nmesh));
+    }
+    return out;
 }
 
 } // namespace
@@ -146,10 +227,8 @@ void GeodataMesh::prepare_impl(Arsenal&)
 {
     const auto dataset(absoluteDataset(definition_.dataset));
 
-    // TODO: allow ply as well
-    auto fl(mesh2fl(geometry::loadObj(dataset)
-                    , definition_.srs, definition_.adjustVertical
-                    , definition_.center));
+    auto fl(mesh2fl(loadMesh(dataset), definition_.srs
+                    , definition_.adjustVertical, definition_.center));
 
     // get physical srs
     const auto srs(vr::system.srs
