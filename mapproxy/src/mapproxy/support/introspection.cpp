@@ -62,7 +62,7 @@ remote(Resource::Generator::Type type, const Layer &layer
                  / ((type_ == Resource::Generator::Type::geodata)
                     ? "freelayer.json" : "boundlayer.json"));
 
-            return RemoteLayer(resource_.id.fullId(), path.string());
+            return RemoteLayer(otherId, path.string());
         }
 
         boost::optional<RemoteLayer> operator()(RemoteLayer l) const {
