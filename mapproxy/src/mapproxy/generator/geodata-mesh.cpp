@@ -155,39 +155,40 @@ void GeodataMesh::prepare_impl(Arsenal&)
     const auto srs(vr::system.srs
                    (resource().referenceFrame->model.physicalSrs));
 
-    // TODO: check proper vertical adjustment application in featurelayers
     fl.transform(srs.srsDef, srs.adjustVertical());
 
     if (const auto extents = fl.boundingBox()) {
         metadata_.extents = *extents;
     }
 
-    // TODO: save directly to output file, gzipped
-    std::ostringstream os;
-    switch (definition_.format) {
-    case geo::VectorFormat::geodataJson:
-        os.precision(15);
-        if (const auto *c = boost::get<geo::vectorformat::GeodataConfig>
-            (&definition_.formatConfig))
-        {
-            fl.dumpVTSGeodata(os, c->resolution);
-        } else {
+    {
+        utility::ofstreambuf f(dataPath_.string());
+        f.precision(15);
+
+        switch (definition_.format) {
+        case geo::VectorFormat::geodataJson:
+            if (const auto *c = boost::get<geo::vectorformat::GeodataConfig>
+                (&definition_.formatConfig))
+            {
+                fl.dumpVTSGeodata(f, c->resolution);
+            } else {
+                LOGTHROW(err1, std::runtime_error)
+                    << "Missing configuration for vector format <"
+                    << definition_.format << ">.";
+            }
+            break;
+
+        default:
+            // unsupported
             LOGTHROW(err1, std::runtime_error)
-                << "Missing configuration for vector format <"
+                << "Unsupported output vector format <"
                 << definition_.format << ">.";
         }
-        break;
 
-    default:
-        // unsupported
-        LOGTHROW(err1, std::runtime_error)
-            << "Unsupported output vector format <"
-            << definition_.format << ">.";
+        f.close();
     }
 
-    const auto str(os.str());
-    utility::write(dataPath_, str.data(), str.size());
-    metadata_.fileSize = str.size();
+    metadata_.fileSize = fs::file_size(dataPath_);
     geo::heightcoding::saveMetadata(root() / "metadata.json", metadata_);
 }
 
