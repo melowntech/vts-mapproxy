@@ -40,7 +40,8 @@ a JSON file on disk (for JSON resource backend) or a python data tree.
  * `Int`: integral JSON number/python integer
  * `Double`: real JSON number/python double
  * `Boolean`: boolean JSON/python value
- * `Array<type>`: array of given type(s)
+ * `Array<type>`: unbounded array of given type(s)
+ * `Array<type, size>`: bounded array of given type(s) and size
  * `Optional` given entry is optional
  * `Enum` string data type limited to enumerated values
  * `Any` any data type
