@@ -46,6 +46,10 @@ a JSON file on disk (for JSON resource backend) or a python data tree.
  * `Any` any data type
  * `?` no fixed name
  
+Special types:
+ * `SRS` string with spatial reference system. Supports Proj.4 string, EPSG:code, EPSG:code+code, WKT string and custom [ENU](https://github.com/melowntech/true3d-format-spec/blob/master/enu.md).
+ * `Point3` alias to Array<Double, 3>, point in Cartesian space
+ 
 Complex datatypes:
 
 ```javascript
@@ -476,3 +480,34 @@ definition += {
     Optional Array<String> clipLayers // list of layers that are clipped to tile extents (in spatial division SRS)
 }
 ```
+
+### Driver: geodata-mesh
+
+Generates monolithic free layer (`geodata` type) from an OBJ file. Only triangular meshes are supported. Texture and normal
+vertices are ignored.
+
+```javascript
+definition = {
+    String dataset                 // path to OBJ file
+    SRS srs                        // source spatial reference system of vertices in OBJ file
+    Optional bool adjustVertical   // Z coordinates are vertically adjusted if true; defaults to false.
+    Optional Point3 center         // coordinate of mesh center in source SRS; defaults to [0, 0, 0].
+    Optional String format         // output file format, so far only "geodataJson" is supported (default)
+    Optional Object formatConfig   // format-specific configuration
+    Optional String styleUrl       // URL to default geodata style
+    Int displaySize                // nominal size of tile in pixels.
+    Optional Object introspection  // extended configuration for mapConfig.json served by mapproxy
+    Optional Object options        // generic options, passed to client
+}
+```
+
+Dataset is a path to valid OBJ mesh file. To allow smaller values in coordinates mesh is first shifted to `center` before 
+processing.
+
+Values of`srs` and `adjustVertical` fully describe source mesh spatial reference system.
+
+All other options are the same as used `geodata-vector` driver.
+
+Generated geodata file contains single layer `mesh` with one or more features. Each feature contains all faces that share the 
+same material, feature ID is set to name of the material. If there is no material used in the input file then all faces are
+put in single feature with ID `mesh`.
