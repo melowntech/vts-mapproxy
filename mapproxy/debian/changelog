@@ -1,3 +1,9 @@
+vts-mapproxy (1.57) stable; urgency=medium
+
+  * better geodata-mesh driver: splits OBJ mesh, feature per material
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Wed, 24 Apr 2019 08:15:50 +0000
+
 vts-mapproxy (1.56) stable; urgency=medium
 
   * refactored python parsing
