@@ -1,6 +1,6 @@
-# test program
+# program
 define_module(BINARY mp-calipers
-  DEPENDS vts-libs service gdal-drivers geometry geo
+  DEPENDS vts-libs service gdal-drivers geometry geo mapproxy-core
   Boost_FILESYSTEM
   Boost_PROGRAM_OPTIONS)
 
@@ -17,7 +17,7 @@ buildsys_library(mp-calipers)
 # --- installation
 # ------------------------------------------------------------------------
 
-# test program
+# program
 define_module(BINARY mapproxy-calipers
   DEPENDS vts-libs service gdal-drivers geometry geo
   Boost_FILESYSTEM

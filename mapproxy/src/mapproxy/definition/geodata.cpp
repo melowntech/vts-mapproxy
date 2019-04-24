@@ -44,7 +44,7 @@ namespace resource {
 
 bool GeodataIntrospection::empty() const
 {
-    return (!surface && browserOptions.empty());
+    return (!surface && !position && browserOptions.empty());
 }
 
 bool GeodataIntrospection::operator!=(const GeodataIntrospection &other)
@@ -52,6 +52,8 @@ bool GeodataIntrospection::operator!=(const GeodataIntrospection &other)
 {
     // introspection can safely change
     if (surface != other.surface) { return true; }
+
+    if (position != other.position) { return true; }
 
     if (browserOptions.empty() != other.browserOptions.empty()) {
         return true;
@@ -70,6 +72,10 @@ void GeodataIntrospection::parse(const Json::Value &value)
 {
     surface = introspection::idFrom(value, "surface");
 
+    if (value.isMember("position")) {
+        position = vr::positionFromJson(value["position"]);
+    }
+
     if (value.isMember("browserOptions")) {
         browserOptions = Json::check(value["browserOptions"]
                                      , Json::objectValue);
@@ -81,6 +87,8 @@ void GeodataIntrospection::build(Json::Value &value) const
     value = Json::objectValue;
 
     introspection::idTo(value, "surface", surface);
+
+    if (position) { value["position"] = vr::asJson(*position); }
 
     if (!browserOptions.empty()) {
         value["browserOptions"]

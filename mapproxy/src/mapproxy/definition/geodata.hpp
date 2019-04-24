@@ -33,11 +33,15 @@
 #include "geo/geodataset.hpp"
 #include "geo/heightcoding.hpp"
 
+#include "vts-libs/registry/referenceframe.hpp"
+
 #include "../support/layerenancer.hpp"
 #include "../support/geo.hpp"
 #include "../resource.hpp"
 
 #include "../heightfunction.hpp"
+
+namespace vr = vtslibs::registry;
 
 namespace resource {
 
@@ -45,6 +49,7 @@ namespace resource {
 
 struct GeodataIntrospection {
     boost::optional<Resource::Id> surface;
+    boost::optional<vr::Position> position;
     boost::any browserOptions;
 
     bool empty() const;

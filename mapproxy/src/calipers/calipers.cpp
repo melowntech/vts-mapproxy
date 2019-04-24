@@ -34,7 +34,9 @@
 #include "vts-libs/vts/basetypes.hpp"
 #include "vts-libs/vts/math.hpp"
 
-#include "./calipers.hpp"
+#include "mapproxy/support/geo.hpp"
+
+#include "calipers.hpp"
 
 namespace vts = vtslibs::vts;
 namespace vr = vtslibs::registry;
@@ -454,34 +456,6 @@ void Node::minLod()
     minLod_ = node.nodeId().lod + lod;
 }
 
-::OGRSpatialReference localTm(const vr::ReferenceFrame &rf
-                              , const geo::SrsDefinition &srsDef
-                              , const math::Point2d point)
-{
-    auto navSrs(vr::system.srs(rf.model.navigationSrs).srsDef.reference());
-
-    ::OGRSpatialReference latlon;
-    if (OGRERR_NONE != latlon.CopyGeogCSFrom(&navSrs)) {
-        LOGTHROW(err3, std::runtime_error)
-            << "Cannot copy GeoCS from navigation SRS.";
-    }
-
-    const auto llCenter(geo::CsConvertor(srsDef, latlon)(point));
-
-    // construct tmerc
-    ::OGRSpatialReference tm;
-    if (OGRERR_NONE != tm.CopyGeogCSFrom(&navSrs)) {
-        LOGTHROW(err3, std::runtime_error)
-            << "Cannot copy GeoCS from navigation SRS.";
-    }
-    if (OGRERR_NONE != tm.SetTM(llCenter(1), llCenter(0), 1.0, 0.0, 0.0)) {
-        LOGTHROW(err3, std::runtime_error)
-            << "Cannot set tmerc.";
-    }
-
-    return tm;
-}
-
 double computeGsd(const geo::GeoDataset::Descriptor &ds
                   , const vr::ReferenceFrame &rf)
 {
@@ -549,56 +523,6 @@ void Node::updateCameraExtents(math::Matrix4 &trafo
                 (cameraExtents, math::Point2d(projected(0), projected(1)));
         }
     }
-}
-
-math::Matrix4 makePlaneTrafo(const vr::ReferenceFrame &rf
-                             , const math::Point2 &navCenter)
-{
-    // construct convertor from local tmerc to physical system
-    const auto navSrs(vr::system.srs(rf.model.navigationSrs).srsDef);
-    const vts::CsConvertor tm2phys(localTm(rf, navSrs, navCenter)
-                                   , rf.model.physicalSrs);
-
-    const auto center(tm2phys(math::Point3d(0, 0, 0)));
-    const auto eye(tm2phys(math::Point3d(0, 0, -1)));
-    const auto upOfCenter(tm2phys(math::Point3d(0, 1, 0)));
-
-    const auto look(math::Point3(eye - center));
-    const auto up(math::Point3(upOfCenter - center));
-
-#if 0
-    LOG(info4) << std::fixed << "center: " << center;
-    LOG(info4) << std::fixed << "eye: " << eye;
-    LOG(info4) << std::fixed << "upOfCenter: " << upOfCenter;
-    LOG(info4) << std::fixed << "look: " << look;
-    LOG(info4) << std::fixed << "up: " << up;
-#endif
-
-    // ec to wc camera
-    math::Matrix4 ec2wc(4, 4);
-
-    // fetch all 4 columns of EC2WC matrix
-    auto e1_(ublas::column(ec2wc, 0));
-    auto e2_(ublas::column(ec2wc, 1));
-    auto e3_(ublas::column(ec2wc, 2));
-    auto e4_(ublas::column(ec2wc, 3));
-
-    // fetch only first 3 elements of each column of EC2WC matrix
-    // (cannot be chained because resulting vector expression is read-only :()
-    auto e1(ublas::subrange(e1_, 0, 3));
-    auto e2(ublas::subrange(e2_, 0, 3));
-    auto e3(ublas::subrange(e3_, 0, 3));
-    auto e4(ublas::subrange(e4_, 0, 3));
-
-    // reset last row to (0, 0, 0, 1)
-    ublas::row(ec2wc, 3) = ublas::unit_vector<double>(4, 3);
-
-    e3 = math::normalize(math::normalize(look));
-    e1 = math::normalize(math::crossProduct(up, e3));
-    e2 = math::crossProduct(e3, e1);
-    e4 = eye;
-
-    return math::matrixInvert(ec2wc);
 }
 
 boost::optional<int> xOverlap(const geo::GeoDataset::Descriptor &dataset)

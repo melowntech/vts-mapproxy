@@ -39,6 +39,23 @@ public:
 
     typedef resource::GeodataMesh Definition;
 
+    /** Metadata of processed output.
+     */
+    struct Metadata {
+        /** Full 3D extents of generated output in physical SRS.
+         */
+        math::Extents3 extents;
+
+        /** Size of data written to the output.
+         */
+        std::size_t fileSize;
+
+        /** Introspection position. Overrides any position in introspection
+         * surface.
+         */
+        vr::Position position;
+    };
+
 private:
     virtual void prepare_impl(Arsenal &arsenal);
 
@@ -61,13 +78,13 @@ private:
      */
     boost::filesystem::path stylePath_;
 
-    /** Output metadata.
-     */
-    geo::heightcoding::Metadata metadata_;
-
     /** Path to cached output data.
      */
     boost::filesystem::path dataPath_;
+
+    /** Metadata of processed output.
+     */
+    Metadata metadata_;
 };
 
 } // namespace generator

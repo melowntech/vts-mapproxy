@@ -35,12 +35,19 @@
 #include "utility/format.hpp"
 #include "utility/path.hpp"
 
+#include "math/transform.hpp"
+
 #include "geo/featurelayers.hpp"
 #include "geometry/meshop.hpp"
 
+#include "jsoncpp/as.hpp"
+#include "jsoncpp/io.hpp"
+
 #include "vts-libs/storage/fstreams.hpp"
+#include "vts-libs/registry/json.hpp"
 
 #include "../support/revision.hpp"
+#include "../support/geo.hpp"
 
 #include "geodata-mesh.hpp"
 #include "factory.hpp"
@@ -69,6 +76,80 @@ utility::PreMain Factory::register_([]()
     Generator::registerType<GeodataMesh>(std::make_shared<Factory>());
 });
 
+void build(Json::Value &value, const GeodataMesh::Metadata &metadata)
+{
+    auto &extents(value["extents"] = Json::arrayValue);
+    extents.append(metadata.extents.ll(0));
+    extents.append(metadata.extents.ll(1));
+    extents.append(metadata.extents.ll(2));
+    extents.append(metadata.extents.ur(0));
+    extents.append(metadata.extents.ur(1));
+    extents.append(metadata.extents.ur(2));
+
+    value["fileSize"] = int(metadata.fileSize);
+    value["position"] = vr::asJson(metadata.position);
+}
+
+void parse(GeodataMesh::Metadata &metadata, const Json::Value &value)
+{
+    const auto &extents(Json::check(value["extents"], Json::arrayValue));
+    metadata.extents.ll(0) = extents[0].asDouble();
+    metadata.extents.ll(1) = extents[1].asDouble();
+    metadata.extents.ll(2) = extents[2].asDouble();
+    metadata.extents.ur(0) = extents[3].asDouble();
+    metadata.extents.ur(1) = extents[4].asDouble();
+    metadata.extents.ur(2) = extents[5].asDouble();
+
+    Json::get(metadata.fileSize, value, "fileSize");
+
+    if (value.isMember("position")) {
+        metadata.position = vr::positionFromJson(value["position"]);
+    }
+}
+
+GeodataMesh::Metadata loadMetadata(const boost::filesystem::path &path)
+{
+    LOG(info1) << "Loading heightcoding::Metadata from " << path  << ".";
+    std::ifstream f;
+    f.exceptions(std::ios::badbit | std::ios::failbit);
+    try {
+        f.open(path.string(), std::ios_base::in);
+    } catch (const std::exception &e) {
+        LOGTHROW(err1, std::runtime_error)
+            << "Unable to load heightcoding::Metadata from " << path << ".";
+    }
+    // load json
+    auto content(Json::read<std::runtime_error>
+                 (f, path, "heightcoding::Metadata"));
+
+    GeodataMesh::Metadata metadata;
+    parse(metadata, content);
+    f.close();
+    return metadata;
+}
+
+void saveMetadata(const boost::filesystem::path &path
+                  , const GeodataMesh::Metadata &metadata)
+{
+    LOG(info1) << "Saving heightcoding::Metadata into " << path  << ".";
+    std::ofstream f;
+    try {
+        f.exceptions(std::ios::badbit | std::ios::failbit);
+        f.open(path.string(), std::ios_base::out);
+    } catch (const std::exception &e) {
+        LOGTHROW(err1, std::runtime_error)
+            << "Unable to save heightcoding::Metadata into "
+            << path << ".";
+    }
+
+    Json::Value content;
+    build(content, metadata);
+    f.precision(15);
+    Json::write(f, content);
+
+    f.close();
+}
+
 } // namespace
 
 GeodataMesh::GeodataMesh(const Params &params)
@@ -92,8 +173,7 @@ GeodataMesh::GeodataMesh(const Params &params)
     }
 
     try {
-        metadata_ = geo::heightcoding::loadMetadata
-            (root() / "metadata.json");
+        metadata_ = loadMetadata(root() / "metadata.json");
         if (fs::file_size(dataPath_) == metadata_.fileSize) {
             // valid file
             makeReady();
@@ -234,8 +314,38 @@ void GeodataMesh::prepare_impl(Arsenal&)
     const auto srs(vr::system.srs
                    (resource().referenceFrame->model.physicalSrs));
 
+    if (const auto extents = fl.boundingBox()) {
+        // mesh center in navigation SRS
+        const auto c(vts::CsConvertor
+                     (definition_.srs
+                      , resource().referenceFrame->model.navigationSrs)
+                     (math::center(*extents)));
+
+        auto &pos(metadata_.position);
+        pos.type = vr::Position::Type::objective;
+        pos.heightMode = vr::Position::HeightMode::floating;
+        pos.position = c;
+        pos.position[2] = 0.0; // floating -> zero
+        pos.lookDown();
+        pos.verticalFov = vr::Position::naturalFov();
+
+        // compute vertical extent by taking a "photo" of physical data from
+        // view's "camera"
+        const auto trafo(makePlaneTrafo(referenceFrame(), pos.position));
+        math::Extents2 cameraExtents(math::InvalidExtents{});
+        fl.for_each_vertex([&](const math::Point3d &p)
+        {
+            math::update(cameraExtents, math::transform(trafo, p));
+        });
+
+        const auto cameraExtentsSize(math::size(cameraExtents));
+        pos.verticalExtent = std::max(cameraExtentsSize.width
+                                      , cameraExtentsSize.height);
+    }
+
     fl.transform(srs.srsDef, srs.adjustVertical());
 
+    // measure extents in physical SRS
     if (const auto extents = fl.boundingBox()) {
         metadata_.extents = *extents;
     }
@@ -268,7 +378,7 @@ void GeodataMesh::prepare_impl(Arsenal&)
     }
 
     metadata_.fileSize = fs::file_size(dataPath_);
-    geo::heightcoding::saveMetadata(root() / "metadata.json", metadata_);
+    saveMetadata(root() / "metadata.json", metadata_);
 }
 
 vr::FreeLayer GeodataMesh::freeLayer(ResourceRoot root) const
@@ -320,6 +430,15 @@ vts::MapConfig GeodataMesh::mapConfig_impl(ResourceRoot root) const
             mapConfig.merge(other->mapConfig
                             (resolveRoot(resource(), other->resource())));
         }
+    }
+
+    // override position
+    if (definition_.introspection.position) {
+        // user supplied
+        mapConfig.position = *definition_.introspection.position;
+    } else {
+        // calculated
+        mapConfig.position = metadata_.position;
     }
 
     // browser options (must be Json::Value!); overrides browser options from

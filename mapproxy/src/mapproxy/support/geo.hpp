@@ -32,6 +32,10 @@
 #include "vts-libs/vts/nodeinfo.hpp"
 
 namespace vts = vtslibs::vts;
+namespace vr = vtslibs::registry;
+
+// fwd
+class OGRSpatialReference;
 
 struct DemDataset {
     std::string dataset;
@@ -58,6 +62,17 @@ double tileCircumference(const math::Extents2 &extents
 math::Extents2 extentsPlusHalfPixel(const math::Extents2 &extents
                                     , const math::Size2 &pixels);
 
+/** Local Transversal Mercator.
+ */
+::OGRSpatialReference localTm(const vr::ReferenceFrame &rf
+                              , const geo::SrsDefinition &srsDef
+                              , const math::Point2d point);
+
+/** Constructs trasformation matrix for projecting physical coordinates to plane
+ *  defined by point in navigation coordinates.
+ */
+math::Matrix4 makePlaneTrafo(const vr::ReferenceFrame &rf
+                             , const math::Point2 &navCenter);
 
 // inlines
 
