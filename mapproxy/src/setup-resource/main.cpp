@@ -81,7 +81,7 @@ UTILITY_GENERATE_ENUM_CI(ResourceType,
 struct Config {
     boost::optional<std::string> geoidGrid;
     RasterFormat format;
-    boost::optional<geo::GeoDataset::Resampling> resampling;
+    boost::optional<geo::GeoDataset::Resampling> tmsResampling;
     bool transparent;
     std::vector<std::string> attributions;
 
@@ -152,7 +152,7 @@ void SetupResource::configuration(po::options_description &cmdline
          , "TMS: image format to use when generating tiles (jpg or png).")
         ("tms.resampling", po::value<geo::GeoDataset::Resampling>()
          , utility::concat
-         ("TMS: GDAL resampling used to generate tiles. One of ["
+         ("TMS: GDAL resampling used to generate tiles and overview. One of ["
           , enumerationString(geo::GeoDataset::Resampling())
           , "].").c_str())
         ("tms.transparent", po::value(&config_.transparent)
@@ -197,7 +197,7 @@ void SetupResource::configure(const po::variables_map &vars)
     }
 
     if (vars.count("tms.resampling")) {
-        config_.resampling = vars["tms.resampling"]
+        config_.tmsResampling = vars["tms.resampling"]
             .as<geo::GeoDataset::Resampling>();
     }
 
@@ -550,7 +550,8 @@ fs::path vrtWOPath(const calipers::Measurement &cm, const fs::path &rootDir)
 
 fs::path createVrtWO(const calipers::Measurement &cm
                      , const fs::path &datasetPath
-                     , const fs::path &rootDir)
+                     , const fs::path &rootDir
+                     , const Config &config)
 {
     LOG(info4) << "Generating dataset overviews.";
     LogLinePrefix linePrefix(" (ovr)");
@@ -583,7 +584,9 @@ fs::path createVrtWO(const calipers::Measurement &cm
         {
             LogLinePrefix linePrefix(" (ophoto)");
             createVrtWO(datasetPath, rootDir, "ophoto"
-                        , geo::GeoDataset::Resampling::texture, cm);
+                        , (config.tmsResampling ? *config.tmsResampling
+                           : geo::GeoDataset::Resampling::texture)
+                        , cm);
         }
         break;
 
@@ -610,7 +613,7 @@ void buildDefinition(resource::TmsRaster &def, const calipers::Measurement&
 {
     def.dataset = dataset.string();
     def.format = config.format;
-    def.resampling = config.resampling;
+    def.resampling = config.tmsResampling;
     def.transparent = config.transparent;
 }
 
@@ -762,7 +765,7 @@ int SetupResource::run()
             ds.copyFiles(datasetPath);
 
             // 6) create vrtwo derived datasets
-            createVrtWO(cm, tmpDatasetPath , tmpRootDir);
+            createVrtWO(cm, tmpDatasetPath , tmpRootDir, config_);
 
             // commit
             fs::rename(tmpRootDir, rootDir);
