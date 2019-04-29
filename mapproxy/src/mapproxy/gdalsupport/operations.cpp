@@ -115,12 +115,11 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
         }
     }
 
-    // grab destination
-    auto dstMat(dst.cdata());
-    auto type(CV_MAKETYPE(CV_8U, dstMat.channels()));
-
-    auto *tile(allocateMat(mb, size, type));
-    dstMat.convertTo(*tile, type);
+    /** Load data into matrix in shared memory. Expand paletted image into 3
+     *  channels. (TODO: make #channels configurable?)
+     */
+    auto *tile(allocateMat(mb, size, dst.makeDataType(CV_8U, 3)));
+    dst.readDataInto(CV_8U, *tile, 3);
     return tile;
 }
 
