@@ -232,7 +232,7 @@ Setup makeSetup(const geo::GeoDataset::Descriptor &ds
     return setup;
 }
 
-geo::GeoDataset::Format asVrt(geo::GeoDataset::Format &f)
+geo::GeoDataset::Format asVrt(geo::GeoDataset::Format f)
 {
     f.storageType = geo::GeoDataset::Format::Storage::vrt;
     return f;
@@ -278,7 +278,7 @@ class VrtDs {
 public:
     VrtDs(const fs::path &path, const geo::SrsDefinition &srs
           , const math::Extents2 &extents, const math::Size2 &size
-          , geo::GeoDataset::Format format
+          , const geo::GeoDataset::Format &format
           , const geo::GeoDataset::NodataValue &nodata
           , MaskType maskType)
         : path_(path.string())
