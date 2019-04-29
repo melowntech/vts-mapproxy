@@ -1,3 +1,10 @@
+vts-mapproxy (1.59) stable; urgency=medium
+
+  * setup-resource: using tms.resampling (if configurd) for overview generation
+  * mapproxy: supporting paletted datasets (expanding to RGB)
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 29 Apr 2019 15:36:13 +0200
+
 vts-mapproxy (1.58) stable; urgency=medium
 
   * geodata-mesh: computing initial (overrideable) position
