@@ -749,6 +749,11 @@ int SetupResource::run()
             << "overlap of " << *cm.xOverlap << " pixels.";
     }
 
+    // apply bottom LOD
+    if (config_.bottomLod) {
+        cm.lodRange.max = std::max(cm.lodRange.max, *config_.bottomLod);
+    }
+
     // 4) allocate attributions
     const auto credits(attributions2credits(config_));
 
@@ -794,11 +799,7 @@ int SetupResource::run()
     {
         LogLinePrefix linePrefix(" (tiling)");
         tiling::Config tilingConfig;
-        auto lodRange(cm.lodRange);
-        if (config_.bottomLod && (*config_.bottomLod > lodRange.max)) {
-            lodRange.max = *config_.bottomLod;
-        }
-        auto ti(tiling::generate(mainDataset, *rf, lodRange
+        auto ti(tiling::generate(mainDataset, *rf, cm.lodRange
                                  , cm.lodTileRanges(), tilingConfig));
 
         ti.save(rootDir / ("tiling." + resourceId_.referenceFrame));
