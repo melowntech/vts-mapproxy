@@ -84,6 +84,7 @@ struct Config {
     boost::optional<geo::GeoDataset::Resampling> tmsResampling;
     bool transparent;
     std::vector<std::string> attributions;
+    boost::optional<vts::Lod> bottomLod;
 
     int autoCreditId;
 
@@ -166,6 +167,10 @@ void SetupResource::configuration(po::options_description &cmdline
         ("attribution", po::value(&config_.attributions)->required()
          , "Atribution text, one per attribution. "
          "At least one attribution is required.")
+
+        ("bottomLod", po::value<vts::Lod>()
+         , "Desired bottom LOD. The actual bottom might be deeper in "
+         "case of more detail dataset.")
         ;
 
     config.add_options()
@@ -201,6 +206,10 @@ void SetupResource::configure(const po::variables_map &vars)
             .as<geo::GeoDataset::Resampling>();
     }
 
+    if (vars.count("bottomLod")) {
+        config_.bottomLod = vars["bottomLod"].as<vts::Lod>();
+    }
+
     LOG(info3, log_)
         << "Config:"
         << "\nmapproxy.dataRoot = " << config_.mapproxyDataRoot
@@ -208,6 +217,11 @@ void SetupResource::configure(const po::variables_map &vars)
         << "\nmapproxy.ctrl = " << config_.mapproxyCtrl
         << "\nreferenceFrame = " << resourceId_.referenceFrame
         << "\ncredits.firstNumericId = " << config_.autoCreditId
+        << "\nbottomLod = " << utility::LManip([&](std::ostream &os)
+        {
+            if (config_.bottomLod) { os << *config_.bottomLod; }
+            else { os << "none"; }
+        })
         << "\n"
         ;
 }
@@ -780,7 +794,11 @@ int SetupResource::run()
     {
         LogLinePrefix linePrefix(" (tiling)");
         tiling::Config tilingConfig;
-        auto ti(tiling::generate(mainDataset, *rf, cm.lodRange
+        auto lodRange(cm.lodRange);
+        if (config_.bottomLod && (*config_.bottomLod > lodRange.max)) {
+            lodRange.max = *config_.bottomLod;
+        }
+        auto ti(tiling::generate(mainDataset, *rf, lodRange
                                  , cm.lodTileRanges(), tilingConfig));
 
         ti.save(rootDir / ("tiling." + resourceId_.referenceFrame));
