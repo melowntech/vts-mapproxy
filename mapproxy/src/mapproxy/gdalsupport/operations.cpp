@@ -504,9 +504,11 @@ public:
             if (!std::strcmp(name, "id")) { continue; }
             const auto *text(reinterpret_cast<const char*>
                              (::sqlite3_column_text(select_, column)));
-            const auto size(::sqlite3_column_bytes(select_, column));
-            properties.insert(FeatureProperties::value_type
-                              (name, std::string(text, size)));
+            if (text) {
+                const auto size(::sqlite3_column_bytes(select_, column));
+                properties.insert(FeatureProperties::value_type
+                                  (name, std::string(text, size)));
+            }
         }
     }
 
