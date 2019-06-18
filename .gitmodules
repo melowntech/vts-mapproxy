@@ -52,3 +52,6 @@
 [submodule "externals/libminiball"]
 	path = externals/libminiball
 	url = https://github.com/melowntech/libminiball.git
+[submodule "externals/libsemantic"]
+	path = externals/libsemantic
+	url = git@gitlab.citationtech.net:vaclav.blazek/libsemantic

@@ -24,13 +24,48 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_definition_hpp_included_
-#define mapproxy_definition_hpp_included_
+#ifndef mapproxy_definition_geodata_semantic_hpp_included_
+#define mapproxy_definition_geodata_semantic_hpp_included_
 
-#include "definition/factory.hpp"
-#include "definition/tms.hpp"
-#include "definition/surface.hpp"
-#include "definition/geodata.hpp"
-#include "definition/geodata-semantic.hpp"
+#include "geodata.hpp"
 
-#endif // mapproxy_definition_hpp_included_
+namespace vr = vtslibs::registry;
+
+namespace resource {
+
+/** Semantic world description to monolithic geodata generator.
+ */
+struct GeodataSemantic : public DefinitionBase {
+    typedef GeodataIntrospection Introspection;
+
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::geodata;
+    static constexpr char driverName[] = "geodata-semantic";
+
+    /** Path to mesh file (OBJ or PLY).
+     */
+    std::string dataset;
+
+    geo::VectorFormat format;
+    geo::vectorformat::Config formatConfig;
+    std::string styleUrl;
+    int displaySize;
+    boost::any options;
+
+    Introspection introspection;
+
+    GeodataSemantic()
+        : format(geo::VectorFormat::geodataJson), displaySize(256)
+    {}
+
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
+
+protected:
+    virtual Changed changed_impl(const DefinitionBase &other) const;
+    virtual bool needsRanges_impl() const { return false; }
+};
+
+} // namespace resource
+
+#endif // mapproxy_definition_geodata_semantic_hpp_included_

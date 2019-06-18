@@ -74,6 +74,7 @@ add_subdirectory(src/gdal-drivers)
 add_subdirectory(src/http)
 add_subdirectory(src/miniball)
 add_subdirectory(src/qmf)
+add_subdirectory(src/semantic)
 
 # python stuff
 set(PYDBGLOG_STATIC TRUE)

@@ -55,13 +55,16 @@ set(mapproxy-core_SOURCES
   definition/geodata-vector-tiled.cpp
   definition/geodata-mesh.cpp
 
+  definition/geodata-semantic.hpp
+  definition/geodata-semantic.cpp
+
   # control socket interface
   mapproxy.hpp mapproxy.cpp
   )
 
 define_module(LIBRARY mapproxy-core
   DEPENDS
-  qmf
+  qmf semantic
   pysupport pydbglog
   vts-libs>=2.4 http>=1.0 geo>=1.28 geometry>=1.7
   jsoncpp>=2.1
@@ -146,6 +149,7 @@ set(mapproxy_SOURCES
   generator/geodata-vector-tiled.hpp generator/geodata-vector-tiled.cpp
   generator/geodata-vector.hpp generator/geodata-vector.cpp
   generator/geodata-mesh.hpp generator/geodata-mesh.cpp
+  generator/geodata-semantic.hpp generator/geodata-semantic.cpp
 
   sink.hpp sink.cpp
 
