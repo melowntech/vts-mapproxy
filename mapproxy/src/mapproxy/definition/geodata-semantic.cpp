@@ -48,7 +48,7 @@ namespace {
 
 utility::PreMain register_([]() { registerDefinition<GeodataSemantic>(); });
 
-void parseDefinition(GeodataSemantic &def, const Json::Value &value)
+void parseDefinition(GeodataSemanticBase &def, const Json::Value &value)
 {
 
     Json::get(def.dataset, value, "dataset");
@@ -68,7 +68,7 @@ void parseDefinition(GeodataSemantic &def, const Json::Value &value)
     }
 }
 
-void buildDefinition(Json::Value &value, const GeodataSemantic &def)
+void buildDefinition(Json::Value &value, const GeodataSemanticBase &def)
 {
     value["dataset"] = def.dataset;
 
@@ -89,19 +89,19 @@ void buildDefinition(Json::Value &value, const GeodataSemantic &def)
 
 } // namespace
 
-void GeodataSemantic::from_impl(const Json::Value &value)
+void GeodataSemanticBase::from_impl(const Json::Value &value)
 {
     parseDefinition(*this, value);
 }
 
-void GeodataSemantic::to_impl(Json::Value &value) const
+void GeodataSemanticBase::to_impl(Json::Value &value) const
 {
     buildDefinition(value, *this);
 }
 
-Changed GeodataSemantic::changed_impl(const DefinitionBase &o) const
+Changed GeodataSemanticBase::changed_impl(const DefinitionBase &o) const
 {
-    const auto &other(o.as<GeodataSemantic>());
+    const auto &other(o.as<GeodataSemanticBase>());
 
     // accumulate revision bump/safe changes
     bool bump(false);

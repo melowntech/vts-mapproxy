@@ -33,16 +33,10 @@ namespace vr = vtslibs::registry;
 
 namespace resource {
 
-/** Semantic world description to monolithic geodata generator.
- */
-struct GeodataSemantic : public DefinitionBase {
+struct GeodataSemanticBase : public DefinitionBase {
     typedef GeodataIntrospection Introspection;
 
-    static constexpr Resource::Generator::Type type
-        = Resource::Generator::Type::geodata;
-    static constexpr char driverName[] = "geodata-semantic";
-
-    /** Path to mesh file (OBJ or PLY).
+    /** Path to semantic world file.
      */
     std::string dataset;
 
@@ -54,7 +48,7 @@ struct GeodataSemantic : public DefinitionBase {
 
     Introspection introspection;
 
-    GeodataSemantic()
+    GeodataSemanticBase()
         : format(geo::VectorFormat::geodataJson), displaySize(256)
     {}
 
@@ -63,7 +57,33 @@ struct GeodataSemantic : public DefinitionBase {
 
 protected:
     virtual Changed changed_impl(const DefinitionBase &other) const;
+};
+
+/** Semantic world description to monolithic geodata generator.
+ */
+struct GeodataSemantic : public GeodataSemanticBase {
+    typedef GeodataIntrospection Introspection;
+
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::geodata;
+    static constexpr char driverName[] = "geodata-semantic";
+
+    GeodataSemantic() = default;
+
+protected:
     virtual bool needsRanges_impl() const { return false; }
+};
+
+/** Semantic world description to tiled geodata generator.
+ */
+struct GeodataSemanticTiled : public GeodataSemanticBase {
+    typedef GeodataIntrospection Introspection;
+
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::geodata;
+    static constexpr char driverName[] = "geodata-semantic-tiled";
+
+    GeodataSemanticTiled() = default;
 };
 
 } // namespace resource
