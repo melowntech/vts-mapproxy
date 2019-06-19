@@ -190,20 +190,8 @@ GeodataSemantic::GeodataSemantic(const Params &params)
 
 namespace {
 
-struct NamedMesh {
-    std::string name;
-    geometry::Mesh mesh;
-
-    typedef std::vector<NamedMesh> list;
-
-    NamedMesh() = default;
-    NamedMesh(std::string name) : name(std::move(name))  {}
-    NamedMesh(std::string &&name, geometry::Mesh &&mesh)
-        : name(std::move(name)), mesh(std::move(mesh))
-    {}
-};
-
-geo::FeatureLayers mesh2fl(const NamedMesh::list meshes
+geo::FeatureLayers mesh2fl(const geometry::Mesh::list meshes
+                           , const std::vector<std::string> &materials
                            , const geo::SrsDefinition &srs
                            , bool adjustVertical)
 {
@@ -214,11 +202,11 @@ geo::FeatureLayers mesh2fl(const NamedMesh::list meshes
     l.adjustVertical = adjustVertical;
 
     int fid(0);
-    for (const auto &nmesh : meshes) {
-        const auto &mesh(nmesh.mesh);
+    for (const auto &mesh : meshes) {
         geo::FeatureLayers::Features::Properties props;
-        props["name"] = nmesh.name;
-        geo::FeatureLayers::Features::Surface s(++fid, nmesh.name, props);
+        const auto &meshName(materials[mesh.faces.front().imageId]);
+        props["name"] = meshName;
+        geo::FeatureLayers::Features::Surface s(++fid, meshName, props);
 
         s.vertices = mesh.vertices;
 
@@ -236,62 +224,6 @@ geo::FeatureLayers mesh2fl(const NamedMesh::list meshes
     return fl;
 }
 
-NamedMesh::list namedMesh(const geometry::Mesh &mesh)
-{
-    const auto materials(semantic::materials());
-
-    // split by material
-    typedef geometry::Face::index_type index_type;
-
-    typedef std::map<math::Point3, index_type> PointMap;
-    struct MeshBuilder {
-        PointMap pmap;
-        NamedMesh nmesh;
-
-        typedef std::map<index_type, MeshBuilder> map;
-
-        MeshBuilder(NamedMesh &&nmesh) : nmesh(std::move(nmesh)) {}
-    };
-
-    // create builders
-    MeshBuilder::map builders;
-    for (const auto &face : mesh.faces) {
-        auto fbuilders(builders.find(face.imageId));
-        if (fbuilders == builders.end()) {
-            builders.insert
-                (MeshBuilder::map::value_type
-                 (face.imageId, NamedMesh(materials[face.imageId])));
-        }
-    }
-
-    const auto &addVertex([](MeshBuilder &builder, const math::Point3 &p)
-                          -> index_type
-    {
-        auto fpmap(builder.pmap.find(p));
-        if (fpmap == builder.pmap.end()) {
-            const auto index(builder.nmesh.mesh.vertices.size());
-            builder.nmesh.mesh.vertices.push_back(p);
-            fpmap = builder.pmap.insert(PointMap::value_type(p, index)).first;
-        }
-        return fpmap->second;
-    });
-
-    for (const auto &face : mesh.faces) {
-        // we have prepopulated all builders so no check is needed here
-        auto &builder(builders.find(face.imageId)->second);
-        builder.nmesh.mesh.faces.emplace_back
-            (addVertex(builder, mesh.a(face))
-             , addVertex(builder, mesh.b(face))
-             , addVertex(builder, mesh.c(face)));
-    }
-
-    NamedMesh::list out;
-    for (auto &builder : builders) {
-        out.push_back(std::move(builder.second.nmesh));
-    }
-    return out;
-}
-
 } // namespace
 
 void GeodataSemantic::prepare_impl(Arsenal&)
@@ -300,7 +232,11 @@ void GeodataSemantic::prepare_impl(Arsenal&)
 
     const auto world(semantic::load(dataset));
 
-    auto fl(mesh2fl(namedMesh(semantic::mesh(world, {}, 2))
+    /** Generate mesh and split it by material (i.e. imageId); we expect the
+     *  mesh to be optimized, i.e. no duplicate vertex exist.
+     */
+    auto fl(mesh2fl(geometry::splitById(semantic::mesh(world, {}, 2))
+                    , semantic::materials()
                     , world.srs, world.adjustVertical));
 
     // get physical srs
