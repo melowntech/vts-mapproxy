@@ -132,4 +132,52 @@ Changed GeodataSemanticBase::changed_impl(const DefinitionBase &o) const
     return Changed::no;
 }
 
+namespace {
+
+void parseDefinition(GeodataSemantic &def, const Json::Value &value)
+{
+    if (value.isMember("simplified")) {
+        Json::get(def.simplified, value, "simplified");
+    }
+}
+
+void buildDefinition(Json::Value &value, const GeodataSemantic &def)
+{
+    if (def.simplified) { value["simplified"] = def.simplified; }
+}
+
+} // namespace
+
+void GeodataSemantic::from_impl(const Json::Value &value)
+{
+    // deserialize parent class first
+    GeodataSemanticBase::from_impl(value);
+
+    parseDefinition(*this, value);
+}
+
+void GeodataSemantic::to_impl(Json::Value &value) const
+{
+    // serialize parent class first
+    GeodataSemanticBase::to_impl(value);
+
+    buildDefinition(value, *this);
+}
+
+Changed GeodataSemantic::changed_impl(const DefinitionBase &o) const
+{
+    const auto changed(GeodataSemanticBase::changed_impl(o));
+    if (changed == Changed::yes) { return changed; }
+
+    const auto &other(o.as<GeodataSemantic>());
+
+    // simplified change leads to revision bump
+    if (simplified != other.simplified) {
+        return Changed::withRevisionBump;
+    }
+
+    // pass result from parent
+    return changed;
+}
+
 } // namespace resource

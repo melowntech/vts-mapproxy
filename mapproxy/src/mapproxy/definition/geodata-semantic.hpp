@@ -62,7 +62,7 @@ protected:
 /** Semantic world description to monolithic geodata generator.
  */
 struct GeodataSemantic : public GeodataSemanticBase {
-    typedef GeodataIntrospection Introspection;
+    bool simplified = false;
 
     static constexpr Resource::Generator::Type type
         = Resource::Generator::Type::geodata;
@@ -70,14 +70,17 @@ struct GeodataSemantic : public GeodataSemanticBase {
 
     GeodataSemantic() = default;
 
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
+
 protected:
+    virtual Changed changed_impl(const DefinitionBase &other) const;
     virtual bool needsRanges_impl() const { return false; }
 };
 
 /** Semantic world description to tiled geodata generator.
  */
 struct GeodataSemanticTiled : public GeodataSemanticBase {
-    typedef GeodataIntrospection Introspection;
 
     static constexpr Resource::Generator::Type type
         = Resource::Generator::Type::geodata;

@@ -224,6 +224,29 @@ geo::FeatureLayers mesh2fl(const geometry::Mesh::list meshes
     return fl;
 }
 
+geo::FeatureLayers generateLayer(const semantic::World &world)
+{
+    geo::FeatureLayers fl;
+
+    (void) world;
+
+    return fl;
+}
+
+geo::FeatureLayers generateLayer(const semantic::World &world, bool simplified)
+{
+    if (simplified) {
+        /** Generate mesh and split it by material (i.e. imageId); we expect the
+         *  mesh to be optimized, i.e. no duplicate vertex exist.
+         */
+        return mesh2fl(geometry::splitById(semantic::mesh(world, {}, 2))
+                       , semantic::materials()
+                       , world.srs, world.adjustVertical);
+    }
+
+    return generateLayer(world);
+}
+
 } // namespace
 
 void GeodataSemantic::prepare_impl(Arsenal&)
@@ -232,12 +255,7 @@ void GeodataSemantic::prepare_impl(Arsenal&)
 
     const auto world(semantic::load(dataset));
 
-    /** Generate mesh and split it by material (i.e. imageId); we expect the
-     *  mesh to be optimized, i.e. no duplicate vertex exist.
-     */
-    auto fl(mesh2fl(geometry::splitById(semantic::mesh(world, {}, 2))
-                    , semantic::materials()
-                    , world.srs, world.adjustVertical));
+    auto fl(generateLayer(world, definition_.simplified));
 
     // get physical srs
     const auto srs(vr::system.srs
