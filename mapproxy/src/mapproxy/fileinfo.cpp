@@ -173,7 +173,6 @@ FileInfo::FileInfo(const http::Request &request, int f)
     case 3:
         // only reference frame -> allow only map config
         resourceId.referenceFrame = checkReferenceFrame(components[1]);
-        // TODO: check if reference frame supports given interface
         asEnumChecked<GeneratorInterface, NotFound>
             (components[2], interface, "Unknown generator interface.");
         filename = components[3];
@@ -195,7 +194,6 @@ FileInfo::FileInfo(const http::Request &request, int f)
     case 4:
         // only reference frame -> allow only map config
         resourceId.referenceFrame = checkReferenceFrame(components[1]);
-        // TODO: check if reference frame supports given interface
         asEnumChecked<GeneratorInterface, NotFound>
             (components[2], interface, "Unknown generator interface.");
         resourceId.group = components[3];
@@ -218,7 +216,6 @@ FileInfo::FileInfo(const http::Request &request, int f)
     case 5:
         // full resource file path
         resourceId.referenceFrame = checkReferenceFrame(components[1]);
-        // TODO: check if reference frame supports given interface
         asEnumChecked<GeneratorInterface, NotFound>
             (components[2], interface, "Unknown generator interface.");
         resourceId.group = components[3];
@@ -459,7 +456,6 @@ GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled
     : fileInfo(fi), type(Type::unknown), support()
     , format(format)
 {
-    // TODO: use vts::parseTileIdPrefix function
     if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
         std::string ext(p);
         if (ext == "geo") {
