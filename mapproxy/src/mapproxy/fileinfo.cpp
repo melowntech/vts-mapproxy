@@ -456,16 +456,18 @@ GeodataFileInfo::GeodataFileInfo(const FileInfo &fi, bool tiled
     : fileInfo(fi), type(Type::unknown), support()
     , format(format)
 {
-    if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
-        std::string ext(p);
-        if (ext == "geo") {
-            // mask file
-            type = Type::geo;
-            return;
-        } else if (ext == "meta") {
-            // mask file
-            type = Type::metatile;
-            return;
+    if (tiled) {
+        if (const auto *p = vts::parseTileIdPrefix(tileId, fi.filename)) {
+            std::string ext(p);
+            if (ext == "geo") {
+                // mask file
+                type = Type::geo;
+                return;
+            } else if (ext == "meta") {
+                // mask file
+                type = Type::metatile;
+                return;
+            }
         }
     }
 

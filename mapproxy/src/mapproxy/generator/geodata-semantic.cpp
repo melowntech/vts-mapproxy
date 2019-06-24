@@ -254,9 +254,6 @@ private:
               , const geometry::Mesh &mesh)
     {
         auto &l(layer(cls));
-        (void) l;
-        (void) id;
-        (void) mesh;
 
         for (const auto &sm : geometry::splitById(mesh)) {
             // TODO: get more properties from the source
@@ -314,10 +311,6 @@ void GeodataSemantic::prepare_impl(Arsenal&)
 
     auto fl(generateLayer(world, definition_.simplified));
 
-    // get physical srs
-    const auto srs(vr::system.srs
-                   (resource().referenceFrame->model.physicalSrs));
-
     if (const auto extents = fl.boundingBox()) {
         // mesh center in navigation SRS
         const auto c(vts::CsConvertor
@@ -347,6 +340,9 @@ void GeodataSemantic::prepare_impl(Arsenal&)
                                       , cameraExtentsSize.height);
     }
 
+    // get physical srs
+    const auto srs(vr::system.srs
+                   (resource().referenceFrame->model.physicalSrs));
     fl.transform(srs.srsDef, srs.adjustVertical());
 
     // measure extents in physical SRS
