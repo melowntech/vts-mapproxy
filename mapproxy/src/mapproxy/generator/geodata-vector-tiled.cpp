@@ -221,6 +221,7 @@ vr::FreeLayer GeodataVectorTiled::freeLayer_impl(ResourceRoot root) const
          , resource(), root);
     def.style = styleUrl();
 
+    def.displaySize = definition_.displaySize;
     def.lodRange = res.lodRange;
     def.tileRange = res.tileRange;
     fl.credits = asInlineCredits(res);
