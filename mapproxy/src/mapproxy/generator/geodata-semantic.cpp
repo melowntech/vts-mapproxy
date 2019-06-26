@@ -231,9 +231,9 @@ public:
         , materials_(semantic::materials())
     {
         semantic::mesh(world, semantic::MeshConfig()
-                       , [this](semantic::Class cls, const std::string &id
-                             , const geometry::Mesh &mesh)
-                       { this->mesh(cls, id, mesh); }
+                       , [this](auto&&... args) {
+                           this->mesh(std::forward<decltype(args)>(args)...);
+                       }
                        , 2);
     }
 
@@ -250,10 +250,10 @@ private:
     using LayerMap = std::map<semantic::Class, Layer>;
     using Features = geo::FeatureLayers::Features;
 
-    void mesh(semantic::Class cls, const std::string &id
-              , const geometry::Mesh &mesh)
+    template <typename Entity>
+    void mesh(const Entity &entity, const geometry::Mesh &mesh)
     {
-        auto &l(layer(cls));
+        auto &l(layer(entity.cls));
 
         for (const auto &sm : geometry::splitById(mesh)) {
             // TODO: get more properties from the source
@@ -261,7 +261,7 @@ private:
             props["material"] = materials_[sm.faces.front().imageId];
 
             // add surface
-            auto &s(l.features.addSurface(++fid_, id, props));
+            auto &s(l.features.addSurface(++fid_, entity.id, props));
             s.vertices = sm.vertices;
             for (const auto &face : sm.faces) {
                 s.surface.emplace_back(face.a, face.b, face.c);
