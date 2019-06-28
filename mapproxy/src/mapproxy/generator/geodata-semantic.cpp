@@ -277,7 +277,7 @@ private:
         return layers_.emplace
             (std::piecewise_construct
              , std::forward_as_tuple(cls)
-             , std::forward_as_tuple(name, world_.srs, world_.adjustVertical))
+             , std::forward_as_tuple(name, world_.srs, true))
             .first->second;
     }
 
@@ -294,8 +294,7 @@ geo::FeatureLayers generateLayer(const semantic::World &world, bool simplified)
          *  mesh to be optimized, i.e. no duplicate vertex exist.
          */
         return mesh2fl(geometry::splitById(semantic::mesh(world, {}, 2))
-                       , semantic::materials()
-                       , world.srs, world.adjustVertical);
+                       , semantic::materials(), world.srs, true);
     }
 
     return LayerBuilder(world).featureLayers();
