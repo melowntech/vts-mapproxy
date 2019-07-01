@@ -28,18 +28,7 @@
 #define mapproxy_gdalsupport_requests_hpp_included_
 
 #include "../gdalsupport.hpp"
-#include "types.hpp"
-
-
-class ShRequestBase {
-public:
-    virtual ~ShRequestBase() {}
-
-    void done() { done_impl(); }
-
-private:
-    virtual void done_impl() = 0;
-};
+#include "requestbase.hpp"
 
 class ShRaster : boost::noncopyable {
 public:

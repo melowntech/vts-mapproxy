@@ -24,22 +24,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_factory_hpp_included_
-#define mapproxy_generator_factory_hpp_included_
+#ifndef mapproxy_gdalsupport_requestbase_hpp_included_
+#define mapproxy_gdalsupport_requestbase_hpp_included_
 
-#include <memory>
+#include "types.hpp"
 
-#include "../generator.hpp"
+class ShRequestBase {
+public:
+    virtual ~ShRequestBase() {}
 
-struct Generator::Factory {
-    typedef std::shared_ptr<Factory> pointer;
-    virtual ~Factory() {}
-    virtual Generator::pointer create(const Params &params) = 0;
+    void done() { done_impl(); }
 
-    /** If true is returned a default system resource is generated for each
-     *  reference frame.
-     */
-    virtual bool systemInstance() const { return false; }
+private:
+    virtual void done_impl() = 0;
 };
 
-#endif // mapproxy_generator_factory_hpp_included_
+#endif // mapproxy_gdalsupport_requestsbase_hpp_included_

@@ -52,6 +52,7 @@
 #include "types.hpp"
 #include "operations.hpp"
 #include "requests.hpp"
+#include "custom.hpp"
 
 namespace asio = boost::asio;
 namespace bs = boost::system;
@@ -74,6 +75,8 @@ SystemTime absTime(const Delta &delta)
 
 typedef boost::posix_time::milliseconds milliseconds;
 
+/** TODO: check for allocation failures.
+ */
 class ShRequest : boost::noncopyable, public ShRequestBase {
 public:
     typedef bi::deleter<ShRequest, SegmentManager> Deleter;
@@ -87,6 +90,7 @@ public:
         , raster_(sm.construct<ShRaster>
                   (bi::anonymous_instance)(other, sm, this))
         , heightcode_()
+        , custom_()
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
@@ -106,15 +110,31 @@ public:
                       (bi::anonymous_instance)
                       (vectorDs, rasterDs, config, vectorGeoidGrid
                        , openOptions, layerEnhancers, sm, this))
+        , custom_()
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
         , ec_()
     {}
 
+    ShRequest(const GdalWarper::CustomGenerator &customGenerator
+              , ManagedBuffer &sm)
+        : sm_(sm)
+        , raster_()
+        , heightcode_()
+        , custom_()
+        , done_(false)
+        , error_(sm.get_allocator<char>())
+        , errorType_(ErrorType::none)
+        , ec_()
+    {
+        custom_ = customGenerator(CustomRequestParams(sm_));
+    }
+
     ~ShRequest() {
         if (raster_) { sm_.destroy_ptr(raster_); }
         if (heightcode_) { sm_.destroy_ptr(heightcode_); }
+        if (custom_) { sm_.destroy_ptr(custom_); }
     }
 
     template <typename T>
@@ -132,6 +152,8 @@ public:
 
     GdalWarper::Heightcoded::pointer getHeightcoded(Lock &lock);
     GdalWarper::Heightcoded::pointer getHeightcoded(bi::interprocess_mutex &mutex);
+
+    void consumeCustom(Lock &lock);
 
     virtual void done_impl();
     void process(bi::interprocess_mutex &mutex, DatasetCache &cache);
@@ -161,11 +183,21 @@ public:
                        , mb.get_deleter<ShRequest>());
     }
 
+    static pointer create(const GdalWarper::CustomGenerator &custom
+                          , ManagedBuffer &mb)
+    {
+        return pointer(mb.construct<ShRequest>
+                       (bi::anonymous_instance)(custom, mb)
+                       , mb.get_allocator<void>()
+                       , mb.get_deleter<ShRequest>());
+    }
+
 private:
     ManagedBuffer &sm_;
 
     ShRaster *raster_;
     ShHeightCode *heightcode_;
+    CustomRequest *custom_;
 
     // response condition and flag
     bi::interprocess_condition cond_;
@@ -198,6 +230,15 @@ void ShRequest::process(bi::interprocess_mutex &mutex, DatasetCache &cache)
                                  , heightcode_->vectorGeoidGrid()
                                  , heightcode_->openOptions()
                                  , heightcode_->layerEnhancers()));
+        return;
+    }
+
+    if (custom_) {
+        custom_->process(mutex, cache);
+        {
+            Lock lock(mutex);
+            done();
+        }
         return;
     }
 
@@ -359,6 +400,38 @@ ShRequest::getHeightcoded(bi::interprocess_mutex &mutex)
     return getHeightcoded(lock);
 }
 
+void ShRequest::consumeCustom(Lock &lock)
+{
+    cond_.wait(lock, [&]()
+    {
+        return done_;
+    });
+
+    if (!custom_) {
+        throw std::logic_error("This shared request is not handling a "
+                               "custom operation!");
+    }
+
+    std::exception_ptr err;
+    if (!error_.empty()) {
+        try {
+            switch (errorType_) {
+            case ErrorType::none: break; // handled at the end of function
+            case ErrorType::emptyImage: throw EmptyImage(asString(error_));
+            case ErrorType::fullImage: throw FullImage(asString(error_));
+            case ErrorType::emptyGeoData: throw EmptyGeoData(asString(error_));
+            case ErrorType::errorCode:
+                utility::throwErrorCode(ec_, asString(error_));
+            }
+            throw std::runtime_error("Unknown exception!");
+        } catch (...) {
+            err = std::current_exception();
+        }
+   }
+
+    custom_->consume(lock, err);
+}
+
 struct Worker {
     typedef bi::deleter<Worker, SegmentManager> Deleter;
     typedef bi::shared_ptr<Worker, Allocator, Deleter> pointer;
@@ -444,6 +517,9 @@ public:
                , const LayerEnhancer::map &layerEnhancers
                , Aborter &aborter);
 
+    void custom(const CustomGenerator &customGenerator
+                , Aborter &aborter);
+
     void housekeeping();
 
     void stat(std::ostream &os) const;
@@ -508,6 +584,12 @@ GdalWarper::heightcode(const std::string &vectorDs
 {
     return detail().heightcode(vectorDs, rasterDs, config, vectorGeoidGrid
                                , openOptions, layerEnhancers, aborter);
+}
+
+void GdalWarper::custom(const CustomGenerator &customGenerator
+                        , Aborter &aborter)
+{
+    return detail().custom(customGenerator, aborter);
 }
 
 void GdalWarper::housekeeping()
@@ -918,6 +1000,35 @@ GdalWarper::Heightcoded::pointer GdalWarper::Detail
     heightcodeCounter_.event();
 
     return result;
+}
+
+void GdalWarper::Detail
+::custom(const CustomGenerator &customGenerator, Aborter &aborter)
+{
+    Lock lock(mutex());
+
+    ShRequest::pointer shReq(ShRequest::create(customGenerator, mb_));
+    queue_->push_back(shReq);
+    cond().notify_one();
+
+    {
+        // set aborter for this request
+        ShRequest::wpointer wreq(shReq);
+        aborter.setAborter([wreq, this]()
+        {
+            if (auto r = wreq.lock()) {
+                r->setError
+                    (mutex(), RequestAborted("Request has been aborted"));
+            }
+        });
+    }
+
+    /** Consume response for custom request
+     */
+    shReq->consumeCustom(lock);
+    lock.unlock();
+
+    // TODO: record event
 }
 
 void GdalWarper::Detail::stat(std::ostream &os) const

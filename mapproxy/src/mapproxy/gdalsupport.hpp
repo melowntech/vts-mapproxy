@@ -42,9 +42,15 @@
 #include "geo/vectorformat.hpp"
 #include "geo/heightcoding.hpp"
 
+#include "semantic/mesh.hpp"
+
 #include "support/geo.hpp"
 #include "support/layerenancer.hpp"
 #include "support/aborter.hpp"
+
+// forward declaration for custom sh request
+class CustomRequest;
+class CustomRequestParams;
 
 class GdalWarper {
 public:
@@ -149,7 +155,6 @@ public:
 
         const char *data;
         std::size_t size;
-
         geo::heightcoding::Metadata metadata;
 
         Heightcoded(const char *data, std::size_t size
@@ -172,6 +177,12 @@ public:
                , const OpenOptions &openOptions
                , const LayerEnhancer::map &layerEnancers
                , Aborter &aborter);
+
+    typedef std::function<CustomRequest*(const CustomRequestParams&)>
+        CustomGenerator;
+    /** Custom operations.
+     */
+    void custom(const CustomGenerator &customGenerator, Aborter &aborter);
 
     /** Do housekeeping. Must be called in the process where internals are being
      * run.

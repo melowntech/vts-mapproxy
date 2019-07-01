@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,22 +24,29 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_factory_hpp_included_
-#define mapproxy_generator_factory_hpp_included_
+#ifndef mapproxy_gdalsupport_custom_hpp_included_
+#define mapproxy_gdalsupport_custom_hpp_included_
 
-#include <memory>
+#include "types.hpp"
+#include "datasetcache.hpp"
 
-#include "../generator.hpp"
+// forward declaration for custom sh request
+class CustomRequest : boost::noncopyable {
+public:
+    CustomRequest(ManagedBuffer &sm) : sm_(sm) {}
 
-struct Generator::Factory {
-    typedef std::shared_ptr<Factory> pointer;
-    virtual ~Factory() {}
-    virtual Generator::pointer create(const Params &params) = 0;
+    virtual ~CustomRequest();
+    virtual void process(bi::interprocess_mutex &mutex, DatasetCache &cache)
+    = 0;
+    virtual void consume(Lock &lock, const std::exception_ptr &err) = 0;
 
-    /** If true is returned a default system resource is generated for each
-     *  reference frame.
-     */
-    virtual bool systemInstance() const { return false; }
+protected:
+    ManagedBuffer &sm_;
 };
 
-#endif // mapproxy_generator_factory_hpp_included_
+struct CustomRequestParams {
+    ManagedBuffer &sm;
+    CustomRequestParams(ManagedBuffer &sm) : sm(sm) {}
+};
+
+#endif // mapproxy_gdalsupport_custom_hpp_included_
