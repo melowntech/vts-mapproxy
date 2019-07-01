@@ -150,6 +150,7 @@ set(mapproxy_SOURCES
   generator/geodata-vector.hpp generator/geodata-vector.cpp
   generator/geodata-mesh.hpp generator/geodata-mesh.cpp
   generator/geodata-semantic.hpp generator/geodata-semantic.cpp
+  generator/geodata-semantic-tiled.hpp generator/geodata-semantic-tiled.cpp
 
   sink.hpp sink.cpp
 

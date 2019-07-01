@@ -27,8 +27,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/utility/in_place_factory.hpp>
 
-#include "utility/premain.hpp"
-
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 
@@ -43,10 +41,12 @@ namespace resource {
 
 constexpr Resource::Generator::Type GeodataSemantic::type;
 constexpr char GeodataSemantic::driverName[];
+constexpr char GeodataSemanticTiled::driverName[];
+
+MAPPROXY_DEFINITION_REGISTER(GeodataSemantic)
+MAPPROXY_DEFINITION_REGISTER(GeodataSemanticTiled)
 
 namespace {
-
-utility::PreMain register_([]() { registerDefinition<GeodataSemantic>(); });
 
 void parseDefinition(GeodataSemanticBase &def, const Json::Value &value)
 {
@@ -132,6 +132,8 @@ Changed GeodataSemanticBase::changed_impl(const DefinitionBase &o) const
     return Changed::no;
 }
 
+// monolithic
+
 namespace {
 
 void parseDefinition(GeodataSemantic &def, const Json::Value &value)
@@ -173,6 +175,59 @@ Changed GeodataSemantic::changed_impl(const DefinitionBase &o) const
 
     // simplified change leads to revision bump
     if (simplified != other.simplified) {
+        return Changed::withRevisionBump;
+    }
+
+    // pass result from parent
+    return changed;
+}
+
+// tiled
+
+namespace {
+
+void parseDefinition(GeodataSemanticTiled &def, const Json::Value &value)
+{
+    Json::get(def.dem.dataset, value, "demDataset");
+    if (value.isMember("geoidGrid")) {
+        def.dem.geoidGrid = boost::in_place();
+        Json::get(*def.dem.geoidGrid, value, "geoidGrid");
+    }
+}
+
+void buildDefinition(Json::Value &value, const GeodataSemanticTiled &def)
+{
+    value["demDataset"] = def.dem.dataset;
+    if (def.dem.geoidGrid) { value["geoidGrid"] = *def.dem.geoidGrid; }
+}
+
+} // namespace
+
+void GeodataSemanticTiled::from_impl(const Json::Value &value)
+{
+    // deserialize parent class first
+    GeodataSemanticBase::from_impl(value);
+
+    parseDefinition(*this, value);
+}
+
+void GeodataSemanticTiled::to_impl(Json::Value &value) const
+{
+    // serialize parent class first
+    GeodataSemanticBase::to_impl(value);
+
+    buildDefinition(value, *this);
+}
+
+Changed GeodataSemanticTiled::changed_impl(const DefinitionBase &o) const
+{
+    const auto changed(GeodataSemanticBase::changed_impl(o));
+    if (changed == Changed::yes) { return changed; }
+
+    const auto &other(o.as<GeodataSemanticTiled>());
+
+    // simplified change leads to revision bump
+    if (dem != other.dem) {
         return Changed::withRevisionBump;
     }
 

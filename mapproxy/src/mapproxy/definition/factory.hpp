@@ -29,6 +29,8 @@
 
 #include <functional>
 
+#include "utility/premain.hpp"
+
 #include "../resource.hpp"
 
 namespace resource {
@@ -53,6 +55,20 @@ template <typename Definition> void registerDefinition() {
                            return std::make_shared<Definition>();
                        });
 }
+
+#define MAPPROXY_DEFINITION_REGISTER_ALN(x) \
+    MAPPROXY_DEFINITION_REGISTER_ALN1(x,__LINE__)
+#define MAPPROXY_DEFINITION_REGISTER_ALN1(x, y) \
+    MAPPROXY_DEFINITION_REGISTER_ALN2(x, y)
+#define MAPPROXY_DEFINITION_REGISTER_ALN2(x, y) x##y
+
+#define MAPPROXY_DEFINITION_REGISTER(DEFINITION)                       \
+    namespace {                                                        \
+        utility::PreMain                                               \
+        MAPPROXY_DEFINITION_REGISTER_ALN(mapproxy_regdef_)([]() {      \
+                registerDefinition<DEFINITION>();                      \
+            });                                                        \
+    }
 
 } // namespace resource
 

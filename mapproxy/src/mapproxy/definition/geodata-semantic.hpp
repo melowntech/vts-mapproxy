@@ -62,11 +62,11 @@ protected:
 /** Semantic world description to monolithic geodata generator.
  */
 struct GeodataSemantic : public GeodataSemanticBase {
-    bool simplified = false;
-
     static constexpr Resource::Generator::Type type
         = Resource::Generator::Type::geodata;
     static constexpr char driverName[] = "geodata-semantic";
+
+    bool simplified = false;
 
     GeodataSemantic() = default;
 
@@ -81,12 +81,19 @@ protected:
 /** Semantic world description to tiled geodata generator.
  */
 struct GeodataSemanticTiled : public GeodataSemanticBase {
-
     static constexpr Resource::Generator::Type type
         = Resource::Generator::Type::geodata;
     static constexpr char driverName[] = "geodata-semantic-tiled";
 
+    DemDataset dem;
+
     GeodataSemanticTiled() = default;
+
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
+
+protected:
+    virtual Changed changed_impl(const DefinitionBase &other) const;
 };
 
 } // namespace resource

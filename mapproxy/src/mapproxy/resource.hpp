@@ -29,6 +29,7 @@
 
 #include <memory>
 #include <iostream>
+#include <tuple>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/any.hpp>
@@ -426,9 +427,7 @@ inline bool Resource::Id::operator==(const Id &o) const {
 }
 
 inline bool Resource::Generator::operator<(const Generator &o) const {
-    if (type < o.type) { return true; }
-    else if (o.type < type) { return false; }
-    return driver < o.driver;
+    return std::tie(type, driver) < std::tie(o.type, o.driver);
 }
 
 inline bool Resource::Generator::operator==(const Generator &o) const {
