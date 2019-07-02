@@ -87,7 +87,9 @@ buildsys_target_compile_definitions(mapproxy-core ${MODULE_DEFINITIONS})
 set(mapproxy-gdal_SOURCES
   gdalsupport.hpp gdalsupport/gdalsupport.cpp
   gdalsupport/types.hpp
+  gdalsupport/requestbase.hpp
   gdalsupport/requests.hpp gdalsupport/requests.cpp
+  gdalsupport/workrequest.hpp gdalsupport/workrequest.cpp
   gdalsupport/process.hpp gdalsupport/process.cpp
   gdalsupport/datasetcache.hpp gdalsupport/datasetcache.cpp
   gdalsupport/operations.hpp gdalsupport/operations.cpp

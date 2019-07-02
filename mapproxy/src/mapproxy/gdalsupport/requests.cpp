@@ -27,7 +27,6 @@
 #include <boost/utility/in_place_factory.hpp>
 
 #include "requests.hpp"
-#include "custom.hpp"
 
 ShRaster::ShRaster(const GdalWarper::RasterRequest &other
                    , ManagedBuffer &sm, ShRequestBase *owner)
@@ -319,5 +318,3 @@ void ShHeightCode::response(bi::interprocess_mutex &mutex
     response_ = response;
     owner_->done();
 }
-
-CustomRequest::~CustomRequest() {}

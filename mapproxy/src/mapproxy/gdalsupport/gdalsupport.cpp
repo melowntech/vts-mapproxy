@@ -52,7 +52,7 @@
 #include "types.hpp"
 #include "operations.hpp"
 #include "requests.hpp"
-#include "custom.hpp"
+#include "workrequest.hpp"
 
 namespace asio = boost::asio;
 namespace bs = boost::system;
@@ -90,7 +90,7 @@ public:
         , raster_(sm.construct<ShRaster>
                   (bi::anonymous_instance)(other, sm, this))
         , heightcode_()
-        , custom_()
+        , work_()
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
@@ -110,31 +110,31 @@ public:
                       (bi::anonymous_instance)
                       (vectorDs, rasterDs, config, vectorGeoidGrid
                        , openOptions, layerEnhancers, sm, this))
-        , custom_()
+        , work_()
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
         , ec_()
     {}
 
-    ShRequest(const GdalWarper::CustomGenerator &customGenerator
+    ShRequest(const GdalWarper::WorkGenerator &workGenerator
               , ManagedBuffer &sm)
         : sm_(sm)
         , raster_()
         , heightcode_()
-        , custom_()
+        , work_()
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
         , ec_()
     {
-        custom_ = customGenerator(CustomRequestParams(sm_));
+        work_ = workGenerator(WorkRequestParams(sm_));
     }
 
     ~ShRequest() {
         if (raster_) { sm_.destroy_ptr(raster_); }
         if (heightcode_) { sm_.destroy_ptr(heightcode_); }
-        if (custom_) { sm_.destroy_ptr(custom_); }
+        if (work_) { sm_.destroy_ptr(work_); }
     }
 
     template <typename T>
@@ -153,7 +153,7 @@ public:
     GdalWarper::Heightcoded::pointer getHeightcoded(Lock &lock);
     GdalWarper::Heightcoded::pointer getHeightcoded(bi::interprocess_mutex &mutex);
 
-    void consumeCustom(Lock &lock);
+    void consumeWork(Lock &lock);
 
     virtual void done_impl();
     void process(bi::interprocess_mutex &mutex, DatasetCache &cache);
@@ -183,11 +183,11 @@ public:
                        , mb.get_deleter<ShRequest>());
     }
 
-    static pointer create(const GdalWarper::CustomGenerator &custom
+    static pointer create(const GdalWarper::WorkGenerator &work
                           , ManagedBuffer &mb)
     {
         return pointer(mb.construct<ShRequest>
-                       (bi::anonymous_instance)(custom, mb)
+                       (bi::anonymous_instance)(work, mb)
                        , mb.get_allocator<void>()
                        , mb.get_deleter<ShRequest>());
     }
@@ -197,7 +197,7 @@ private:
 
     ShRaster *raster_;
     ShHeightCode *heightcode_;
-    CustomRequest *custom_;
+    WorkRequest *work_;
 
     // response condition and flag
     bi::interprocess_condition cond_;
@@ -233,8 +233,8 @@ void ShRequest::process(bi::interprocess_mutex &mutex, DatasetCache &cache)
         return;
     }
 
-    if (custom_) {
-        custom_->process(mutex, cache);
+    if (work_) {
+        work_->process(mutex, cache);
         {
             Lock lock(mutex);
             done();
@@ -400,16 +400,16 @@ ShRequest::getHeightcoded(bi::interprocess_mutex &mutex)
     return getHeightcoded(lock);
 }
 
-void ShRequest::consumeCustom(Lock &lock)
+void ShRequest::consumeWork(Lock &lock)
 {
     cond_.wait(lock, [&]()
     {
         return done_;
     });
 
-    if (!custom_) {
+    if (!work_) {
         throw std::logic_error("This shared request is not handling a "
-                               "custom operation!");
+                               "job!");
     }
 
     std::exception_ptr err;
@@ -429,7 +429,7 @@ void ShRequest::consumeCustom(Lock &lock)
         }
    }
 
-    custom_->consume(lock, err);
+    work_->consume(lock, err);
 }
 
 struct Worker {
@@ -517,8 +517,7 @@ public:
                , const LayerEnhancer::map &layerEnhancers
                , Aborter &aborter);
 
-    void custom(const CustomGenerator &customGenerator
-                , Aborter &aborter);
+    void job(const WorkGenerator &workGenerator, Aborter &aborter);
 
     void housekeeping();
 
@@ -586,10 +585,10 @@ GdalWarper::heightcode(const std::string &vectorDs
                                , openOptions, layerEnhancers, aborter);
 }
 
-void GdalWarper::custom(const CustomGenerator &customGenerator
-                        , Aborter &aborter)
+void GdalWarper::job(const WorkGenerator &workGenerator
+                      , Aborter &aborter)
 {
-    return detail().custom(customGenerator, aborter);
+    return detail().job(workGenerator, aborter);
 }
 
 void GdalWarper::housekeeping()
@@ -1003,11 +1002,11 @@ GdalWarper::Heightcoded::pointer GdalWarper::Detail
 }
 
 void GdalWarper::Detail
-::custom(const CustomGenerator &customGenerator, Aborter &aborter)
+::job(const WorkGenerator &workGenerator, Aborter &aborter)
 {
     Lock lock(mutex());
 
-    ShRequest::pointer shReq(ShRequest::create(customGenerator, mb_));
+    ShRequest::pointer shReq(ShRequest::create(workGenerator, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 
@@ -1023,9 +1022,9 @@ void GdalWarper::Detail
         });
     }
 
-    /** Consume response for custom request
+    /** Consume response for a work request
      */
-    shReq->consumeCustom(lock);
+    shReq->consumeWork(lock);
     lock.unlock();
 
     // TODO: record event

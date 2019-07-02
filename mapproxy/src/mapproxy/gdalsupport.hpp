@@ -49,8 +49,8 @@
 #include "support/aborter.hpp"
 
 // forward declaration for custom sh request
-class CustomRequest;
-class CustomRequestParams;
+class WorkRequest;
+class WorkRequestParams;
 
 class GdalWarper {
 public:
@@ -178,11 +178,12 @@ public:
                , const LayerEnhancer::map &layerEnancers
                , Aborter &aborter);
 
-    typedef std::function<CustomRequest*(const CustomRequestParams&)>
-        CustomGenerator;
-    /** Custom operations.
+    typedef std::function<WorkRequest*(const WorkRequestParams&)>
+        WorkGenerator;
+
+    /** Any job.
      */
-    void custom(const CustomGenerator &customGenerator, Aborter &aborter);
+    void job(const WorkGenerator &workGenerator, Aborter &aborter);
 
     /** Do housekeeping. Must be called in the process where internals are being
      * run.

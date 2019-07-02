@@ -57,7 +57,7 @@
 #include "factory.hpp"
 #include "metatile.hpp"
 #include "files.hpp"
-#include "../gdalsupport/custom.hpp"
+#include "../gdalsupport/workrequest.hpp"
 
 namespace ba = boost::algorithm;
 namespace fs = boost::filesystem;
@@ -378,10 +378,10 @@ void GeodataSemanticTiled::generateMetatile(Sink &sink
     sink.content(os.str(), fi.sinkFileInfo());
 }
 
-class SemanticRequest : public CustomRequest {
+class SemanticRequest : public WorkRequest {
 public:
-    SemanticRequest(const CustomRequestParams &p)
-        : CustomRequest(p.sm)
+    SemanticRequest(const WorkRequestParams &p)
+        : WorkRequest(p.sm)
     {}
 
     ~SemanticRequest() {}
@@ -407,7 +407,7 @@ void GeodataSemanticTiled::generateGeodata(Sink &sink
 {
     (void) fi;
 
-    arsenal.warper.custom([&](const CustomRequestParams &params) {
+    arsenal.warper.job([&](const WorkRequestParams &params) {
             return params.sm.construct<SemanticRequest>
                 (bi::anonymous_instance)(params);
         }, sink);

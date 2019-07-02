@@ -24,29 +24,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_gdalsupport_custom_hpp_included_
-#define mapproxy_gdalsupport_custom_hpp_included_
+#include "workrequest.hpp"
 
-#include "types.hpp"
-#include "datasetcache.hpp"
-
-// forward declaration for custom sh request
-class CustomRequest : boost::noncopyable {
-public:
-    CustomRequest(ManagedBuffer &sm) : sm_(sm) {}
-
-    virtual ~CustomRequest();
-    virtual void process(bi::interprocess_mutex &mutex, DatasetCache &cache)
-    = 0;
-    virtual void consume(Lock &lock, const std::exception_ptr &err) = 0;
-
-protected:
-    ManagedBuffer &sm_;
-};
-
-struct CustomRequestParams {
-    ManagedBuffer &sm;
-    CustomRequestParams(ManagedBuffer &sm) : sm(sm) {}
-};
-
-#endif // mapproxy_gdalsupport_custom_hpp_included_
+WorkRequest::~WorkRequest() {}

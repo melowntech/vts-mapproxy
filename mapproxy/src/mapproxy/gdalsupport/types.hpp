@@ -27,6 +27,8 @@
 #ifndef mapproxy_gdalsupport_types_hpp_included_
 #define mapproxy_gdalsupport_types_hpp_included_
 
+#include <boost/optional.hpp>
+
 #include <boost/interprocess/smart_ptr/shared_ptr.hpp>
 #include <boost/interprocess/smart_ptr/weak_ptr.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
@@ -44,6 +46,8 @@
 
 #include <boost/date_time/microsec_time_clock.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
+
+#include "geo/srsdef.hpp"
 
 namespace bi = boost::interprocess;
 
@@ -64,7 +68,8 @@ typedef bi::basic_string<
 
 typedef bi::vector<String, bi::allocator<String, SegmentManager>> StringVector;
 
-typedef bi::scoped_lock<bi::interprocess_mutex> Lock;
+typedef bi::interprocess_mutex Mutex;
+typedef bi::scoped_lock<Mutex> Lock;
 
 inline std::string asString(const String &str) {
     return { str.data(), str.size() };
