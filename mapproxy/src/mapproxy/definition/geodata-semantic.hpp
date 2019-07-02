@@ -86,8 +86,9 @@ struct GeodataSemanticTiled : public GeodataSemanticBase {
     static constexpr char driverName[] = "geodata-semantic-tiled";
 
     DemDataset dem;
+    int lod;
 
-    GeodataSemanticTiled() = default;
+    GeodataSemanticTiled() : lod(2) {}
 
     virtual void from_impl(const Json::Value &value);
     virtual void to_impl(Json::Value &value) const;

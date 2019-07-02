@@ -117,24 +117,21 @@ public:
         , ec_()
     {}
 
-    ShRequest(const GdalWarper::WorkGenerator &workGenerator
-              , ManagedBuffer &sm)
+    ShRequest(WorkRequest *work, ManagedBuffer &sm)
         : sm_(sm)
         , raster_()
         , heightcode_()
-        , work_()
+        , work_(work)
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
         , ec_()
-    {
-        work_ = workGenerator(WorkRequestParams(sm_));
-    }
+    {}
 
     ~ShRequest() {
         if (raster_) { sm_.destroy_ptr(raster_); }
         if (heightcode_) { sm_.destroy_ptr(heightcode_); }
-        if (work_) { sm_.destroy_ptr(work_); }
+        if (work_) { work_->destroy(); }
     }
 
     template <typename T>
@@ -153,7 +150,7 @@ public:
     GdalWarper::Heightcoded::pointer getHeightcoded(Lock &lock);
     GdalWarper::Heightcoded::pointer getHeightcoded(bi::interprocess_mutex &mutex);
 
-    void consumeWork(Lock &lock);
+    WorkRequest::Response consumeWork(Lock &lock);
 
     virtual void done_impl();
     void process(bi::interprocess_mutex &mutex, DatasetCache &cache);
@@ -187,7 +184,7 @@ public:
                           , ManagedBuffer &mb)
     {
         return pointer(mb.construct<ShRequest>
-                       (bi::anonymous_instance)(work, mb)
+                       (bi::anonymous_instance)(work(mb), mb)
                        , mb.get_allocator<void>()
                        , mb.get_deleter<ShRequest>());
     }
@@ -400,7 +397,7 @@ ShRequest::getHeightcoded(bi::interprocess_mutex &mutex)
     return getHeightcoded(lock);
 }
 
-void ShRequest::consumeWork(Lock &lock)
+WorkRequest::Response ShRequest::consumeWork(Lock &lock)
 {
     cond_.wait(lock, [&]()
     {
@@ -412,24 +409,19 @@ void ShRequest::consumeWork(Lock &lock)
                                "job!");
     }
 
-    std::exception_ptr err;
     if (!error_.empty()) {
-        try {
-            switch (errorType_) {
-            case ErrorType::none: break; // handled at the end of function
-            case ErrorType::emptyImage: throw EmptyImage(asString(error_));
-            case ErrorType::fullImage: throw FullImage(asString(error_));
-            case ErrorType::emptyGeoData: throw EmptyGeoData(asString(error_));
-            case ErrorType::errorCode:
-                utility::throwErrorCode(ec_, asString(error_));
-            }
-            throw std::runtime_error("Unknown exception!");
-        } catch (...) {
-            err = std::current_exception();
+        switch (errorType_) {
+        case ErrorType::none: break; // handled at the end of function
+        case ErrorType::emptyImage: throw EmptyImage(asString(error_));
+        case ErrorType::fullImage: throw FullImage(asString(error_));
+        case ErrorType::emptyGeoData: throw EmptyGeoData(asString(error_));
+        case ErrorType::errorCode:
+            utility::throwErrorCode(ec_, asString(error_));
         }
-   }
+        throw std::runtime_error("Unknown exception!");
+    }
 
-    work_->consume(lock, err);
+    return work_->response(lock);
 }
 
 struct Worker {
@@ -517,7 +509,8 @@ public:
                , const LayerEnhancer::map &layerEnhancers
                , Aborter &aborter);
 
-    void job(const WorkGenerator &workGenerator, Aborter &aborter);
+    WorkRequest::Response job(const WorkGenerator &workGenerator
+                              , Aborter &aborter);
 
     void housekeeping();
 
@@ -585,8 +578,8 @@ GdalWarper::heightcode(const std::string &vectorDs
                                , openOptions, layerEnhancers, aborter);
 }
 
-void GdalWarper::job(const WorkGenerator &workGenerator
-                      , Aborter &aborter)
+WorkRequest::Response GdalWarper::job(const WorkGenerator &workGenerator
+                                      , Aborter &aborter)
 {
     return detail().job(workGenerator, aborter);
 }
@@ -1001,12 +994,12 @@ GdalWarper::Heightcoded::pointer GdalWarper::Detail
     return result;
 }
 
-void GdalWarper::Detail
+WorkRequest::Response GdalWarper::Detail
 ::job(const WorkGenerator &workGenerator, Aborter &aborter)
 {
     Lock lock(mutex());
 
-    ShRequest::pointer shReq(ShRequest::create(workGenerator, mb_));
+    auto shReq(ShRequest::create(workGenerator, mb_));
     queue_->push_back(shReq);
     cond().notify_one();
 
@@ -1024,10 +1017,7 @@ void GdalWarper::Detail
 
     /** Consume response for a work request
      */
-    shReq->consumeWork(lock);
-    lock.unlock();
-
-    // TODO: record event
+    return shReq->consumeWork(lock);
 }
 
 void GdalWarper::Detail::stat(std::ostream &os) const

@@ -74,6 +74,8 @@ private:
      */
     const boost::filesystem::path dataset_;
 
+    const vr::Srs &physicalSrs_;
+
     boost::optional<mmapped::Index> index_;
 };
 

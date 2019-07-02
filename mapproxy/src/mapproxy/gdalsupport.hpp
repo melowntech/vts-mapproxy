@@ -48,9 +48,7 @@
 #include "support/layerenancer.hpp"
 #include "support/aborter.hpp"
 
-// forward declaration for custom sh request
-class WorkRequest;
-class WorkRequestParams;
+#include "gdalsupport/workrequestfwd.hpp"
 
 class GdalWarper {
 public:
@@ -183,7 +181,7 @@ public:
 
     /** Any job.
      */
-    void job(const WorkGenerator &workGenerator, Aborter &aborter);
+    WorkResponse job(const WorkGenerator &workGenerator, Aborter &aborter);
 
     /** Do housekeeping. Must be called in the process where internals are being
      * run.

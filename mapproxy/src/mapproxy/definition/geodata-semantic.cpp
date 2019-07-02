@@ -189,16 +189,15 @@ namespace {
 void parseDefinition(GeodataSemanticTiled &def, const Json::Value &value)
 {
     Json::get(def.dem.dataset, value, "demDataset");
-    if (value.isMember("geoidGrid")) {
-        def.dem.geoidGrid = boost::in_place();
-        Json::get(*def.dem.geoidGrid, value, "geoidGrid");
-    }
+    Json::get(def.dem.geoidGrid, value, "geoidGrid");
+    Json::get(def.lod, value, "lod");
 }
 
 void buildDefinition(Json::Value &value, const GeodataSemanticTiled &def)
 {
     value["demDataset"] = def.dem.dataset;
     if (def.dem.geoidGrid) { value["geoidGrid"] = *def.dem.geoidGrid; }
+    value["lod"] = def.lod;
 }
 
 } // namespace
@@ -228,6 +227,11 @@ Changed GeodataSemanticTiled::changed_impl(const DefinitionBase &o) const
 
     // simplified change leads to revision bump
     if (dem != other.dem) {
+        return Changed::withRevisionBump;
+    }
+
+    // simplified change leads to revision bump
+    if (lod != other.lod) {
         return Changed::withRevisionBump;
     }
 

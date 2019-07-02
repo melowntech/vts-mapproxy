@@ -24,42 +24,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_gdalsupport_workrequest_hpp_included_
-#define mapproxy_gdalsupport_workrequest_hpp_included_
+#ifndef mapproxy_gdalsupport_workrequestfwd_hpp_included_
+#define mapproxy_gdalsupport_workrequestfwd_hpp_included_
 
-#include "types.hpp"
-#include "datasetcache.hpp"
-#include "workrequestfwd.hpp"
+class WorkRequest;
+struct WorkRequestParams;
+using WorkResponse = std::shared_ptr<void>;
 
-// forward declaration for custom sh request
-class WorkRequest : boost::noncopyable {
-public:
-    WorkRequest(ManagedBuffer &sm) : sm_(sm) {}
-
-    virtual ~WorkRequest();
-    virtual void process(bi::interprocess_mutex &mutex, DatasetCache &cache)
-    = 0;
-
-    using Response = WorkResponse;
-
-    virtual Response response(Lock &lock) = 0;
-
-    /** Destroys this instance. Needed because ManagedBuffer::destroy_ptr()
-     *  doesn't cope with polymorphism.
-     *
-     *  Should call sm().destroy_ptr(this), nothing else!
-     */
-    virtual void destroy() = 0;
-
-    ManagedBuffer& sm() { return sm_; };
-
-private:
-    ManagedBuffer &sm_;
-};
-
-struct WorkRequestParams {
-    ManagedBuffer &sm;
-    WorkRequestParams(ManagedBuffer &sm) : sm(sm) {}
-};
-
-#endif // mapproxy_gdalsupport_workrequest_hpp_included_
+#endif // mapproxy_gdalsupport_workrequestfwd_hpp_included_

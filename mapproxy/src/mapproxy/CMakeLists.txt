@@ -89,6 +89,7 @@ set(mapproxy-gdal_SOURCES
   gdalsupport/types.hpp
   gdalsupport/requestbase.hpp
   gdalsupport/requests.hpp gdalsupport/requests.cpp
+  gdalsupport/workrequestfwd.hpp
   gdalsupport/workrequest.hpp gdalsupport/workrequest.cpp
   gdalsupport/process.hpp gdalsupport/process.cpp
   gdalsupport/datasetcache.hpp gdalsupport/datasetcache.cpp

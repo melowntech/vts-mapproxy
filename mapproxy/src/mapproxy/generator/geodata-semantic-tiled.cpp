@@ -91,6 +91,8 @@ GeodataSemanticTiled::GeodataSemanticTiled(const Params &params)
            , definition_.dem.geoidGrid)
     , styleUrl_(definition_.styleUrl)
     , dataset_(definition_.dataset)
+    , physicalSrs_
+      (vr::system.srs(resource().referenceFrame->model.physicalSrs))
 {
     auto ds(geo::GeoDataset::open(dem_.dataset));
 
@@ -359,6 +361,7 @@ void GeodataSemanticTiled::generateMetatile(Sink &sink
                                             , const GeodataFileInfo &fi
                                             , Arsenal &arsenal) const
 {
+    // TODO: generate metadata from geodata
     sink.checkAborted();
 
     if (!index_->meta(fi.tileId)) {
@@ -378,39 +381,134 @@ void GeodataSemanticTiled::generateMetatile(Sink &sink
     sink.content(os.str(), fi.sinkFileInfo());
 }
 
-class SemanticRequest : public WorkRequest {
-public:
-    SemanticRequest(const WorkRequestParams &p)
-        : WorkRequest(p.sm)
+struct MemoryBlock {
+    const char *data;
+    std::size_t size;
+
+    typedef std::shared_ptr<MemoryBlock> pointer;
+
+    MemoryBlock(const char *data = nullptr, std::size_t size = 0)
+        : data(data), size(size)
     {}
 
-    ~SemanticRequest() {}
+    static MemoryBlock* allocate(ManagedBuffer &mb
+                                 , const char *data, std::size_t size);
+};
+
+MemoryBlock* MemoryBlock::allocate(ManagedBuffer &mb
+                                   , const char *data, std::size_t size)
+{
+    auto *raw(static_cast<char*>
+              (mb.allocate_aligned
+               (sizeof(MemoryBlock) + size, alignof(MemoryBlock))));
+
+    // poiter to output data
+    auto *dataPtr(raw + sizeof(MemoryBlock));
+
+    // copy data into block
+    std::copy(data, data + size, dataPtr);
+
+    return new (raw) MemoryBlock(dataPtr, size);
+}
+
+class SemanticJob : public WorkRequest {
+public:
+    SemanticJob(const WorkRequestParams &p
+                , const geo::SrsDefinition &outputSrs
+                , bool outputAdjustVertical
+                , const geo::SrsDefinition &srs
+                , const math::Extents2 &extents
+                , int lod)
+        : WorkRequest(p.sm)
+        , rawTile_()
+    {
+        (void) outputSrs;
+        (void) outputAdjustVertical;
+        (void) srs;
+        (void) extents;
+        (void) lod;
+    }
+
+    ~SemanticJob() {
+        if (rawTile_) { sm().deallocate(rawTile_); }
+    }
 
     virtual void process(bi::interprocess_mutex &mutex, DatasetCache &cache) {
-        LOG(info4) << "Semantic: process.";
         (void) mutex;
         (void) cache;
+
+        rawTile_ = MemoryBlock::allocate(sm(), "test\n", 5);
     }
 
-    virtual void consume(Lock &lock, const std::exception_ptr &err) {
-        (void) lock;
-        (void) err;
+    virtual Response response(Lock&) {
         LOG(info4) << "Semantic: consume.";
+
+        if (!rawTile_) {
+            LOGTHROW(err2, std::runtime_error)
+                << "No tile generated";
+        }
+
+        MemoryBlock::pointer tile(rawTile_, [&sm=sm()](MemoryBlock *block)
+        {
+            // deallocate data
+            sm.deallocate(block);
+        });
+        rawTile_ = nullptr;
+
+        return tile;
     }
+
+    virtual void destroy() { sm().destroy_ptr(this); }
 
 private:
+    MemoryBlock *rawTile_;
 };
+
+MemoryBlock::pointer
+semantic2GeodataTile(Arsenal &arsenal, Aborter &aborter
+                     , const geo::SrsDefinition &outputSrs
+                     , bool outputAdjustVertical
+                     , const geo::SrsDefinition &srs
+                     , const math::Extents2 &extents
+                     , int lod)
+{
+    auto response
+        (arsenal.warper.job([&](const WorkRequestParams &params) {
+                return params.sm.construct<SemanticJob>
+                    (bi::anonymous_instance)
+                    (params, outputSrs, outputAdjustVertical
+                     , srs, extents, lod);
+            }, aborter));
+
+    return std::static_pointer_cast<MemoryBlock>(response);
+}
 
 void GeodataSemanticTiled::generateGeodata(Sink &sink
                                            , const GeodataFileInfo &fi
                                            , Arsenal &arsenal) const
 {
-    (void) fi;
+    const auto &tileId(fi.tileId);
+    // TODO: get availability from geodata
+    auto flags(index_->tileIndex.get(tileId));
+    if (!vts::TileIndex::Flag::isReal(flags)) {
+        sink.error(utility::makeError<NotFound>("No geodata for this tile."));
+        return;
+    }
 
-    arsenal.warper.job([&](const WorkRequestParams &params) {
-            return params.sm.construct<SemanticRequest>
-                (bi::anonymous_instance)(params);
-        }, sink);
+    vts::NodeInfo nodeInfo(referenceFrame(), tileId);
+    if (!nodeInfo.productive()) {
+        sink.error(utility::makeError<NotFound>
+                   ("TileId outside of valid reference frame tree."));
+        return;
+    }
+
+    auto tile(semantic2GeodataTile
+              (arsenal, sink
+               , physicalSrs_.srsDef, physicalSrs_.adjustVertical()
+               , nodeInfo.srs(), nodeInfo.extents()
+               , definition_.lod));
+
+    sink.content(tile->data, tile->size, fi.sinkFileInfo(), true);
 }
 
 } // namespace generator
