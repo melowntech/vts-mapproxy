@@ -110,6 +110,16 @@ GeodataSemanticTiled::GeodataSemanticTiled(const Params &params)
         return;
     }
 
+    try {
+        // map delivery index
+        auto deliveryIndexPath(root() / "delivery.index");
+        index_ = boost::in_place(referenceFrame().metaBinaryOrder
+                                 , deliveryIndexPath);
+        return;
+    } catch (const std::exception &e) {
+        // not ready
+    }
+
     LOG(info1) << "Generator for <" << id() << "> not ready.";
 }
 
@@ -434,6 +444,7 @@ public:
     }
 
     virtual void process(bi::interprocess_mutex &mutex, DatasetCache &cache) {
+        LOG(info4) << "Semantic: process.";
         (void) mutex;
         (void) cache;
 
@@ -441,7 +452,7 @@ public:
     }
 
     virtual Response response(Lock&) {
-        LOG(info4) << "Semantic: consume.";
+        LOG(info4) << "Semantic: response.";
 
         if (!rawTile_) {
             LOGTHROW(err2, std::runtime_error)

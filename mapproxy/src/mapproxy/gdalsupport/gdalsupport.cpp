@@ -117,16 +117,19 @@ public:
         , ec_()
     {}
 
-    ShRequest(WorkRequest *work, ManagedBuffer &sm)
+    ShRequest(const GdalWarper::WorkGenerator &workGenerator
+              , ManagedBuffer &sm)
         : sm_(sm)
         , raster_()
         , heightcode_()
-        , work_(work)
+        , work_()
         , done_(false)
         , error_(sm.get_allocator<char>())
         , errorType_(ErrorType::none)
         , ec_()
-    {}
+    {
+        work_ = workGenerator(sm);
+    }
 
     ~ShRequest() {
         if (raster_) { sm_.destroy_ptr(raster_); }
@@ -180,11 +183,11 @@ public:
                        , mb.get_deleter<ShRequest>());
     }
 
-    static pointer create(const GdalWarper::WorkGenerator &work
+    static pointer create(const GdalWarper::WorkGenerator &workGenerator
                           , ManagedBuffer &mb)
     {
         return pointer(mb.construct<ShRequest>
-                       (bi::anonymous_instance)(work(mb), mb)
+                       (bi::anonymous_instance)(workGenerator, mb)
                        , mb.get_allocator<void>()
                        , mb.get_deleter<ShRequest>());
     }
