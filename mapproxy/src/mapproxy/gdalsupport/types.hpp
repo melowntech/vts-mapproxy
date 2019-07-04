@@ -80,11 +80,32 @@ inline boost::optional<std::string> asOptional(const String &str) {
     return std::string(str.data(), str.size());
 }
 
+struct ShSrsDefinition {
+    String srs;
+    geo::SrsDefinition::Type type;
+
+    ShSrsDefinition(const geo::SrsDefinition &srs, ManagedBuffer &sm)
+        : srs(srs.srs.data(), srs.srs.size(), sm.get_allocator<char>())
+        , type(srs.type)
+    {}
+
+    operator geo::SrsDefinition() const {
+        return geo::SrsDefinition(std::string(srs.data(), srs.size()), type);
+    }
+};
+
 inline boost::optional<geo::SrsDefinition>
 asOptional(const String &str, geo::SrsDefinition::Type type)
 {
     if (str.empty()) { return {}; }
     return geo::SrsDefinition(std::string(str.data(), str.size()), type);
+}
+
+inline boost::optional<geo::SrsDefinition>
+asOptional(const ShSrsDefinition &srs)
+{
+    if (srs.srs.empty()) { return {}; }
+    return geo::SrsDefinition(srs);
 }
 
 struct ConstBlock {

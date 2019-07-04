@@ -4,6 +4,7 @@ build.*
 lib
 obj-*
 core
+vgcore.*
 tmp
 *.log
 *.pid

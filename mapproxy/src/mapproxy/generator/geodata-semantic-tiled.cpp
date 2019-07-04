@@ -424,6 +424,7 @@ MemoryBlock* MemoryBlock::allocate(ManagedBuffer &mb
 class SemanticJob : public WorkRequest {
 public:
     SemanticJob(const WorkRequestParams &p
+                , const std::string &dataset
                 , const geo::SrsDefinition &outputSrs
                 , bool outputAdjustVertical
                 , const geo::SrsDefinition &srs
@@ -431,19 +432,19 @@ public:
                 , int lod)
         : WorkRequest(p.sm)
         , rawTile_()
-    {
-        (void) outputSrs;
-        (void) outputAdjustVertical;
-        (void) srs;
-        (void) extents;
-        (void) lod;
-    }
+        , dataset_(dataset.data(), dataset.size(), p.sm.get_allocator<char>())
+        , outputSrs_(outputSrs, p.sm)
+        , outputAdjustVertical_(outputAdjustVertical)
+        , srs_(srs, p.sm)
+        , extents_(extents)
+        , lod_(lod)
+    {}
 
     ~SemanticJob() {
         if (rawTile_) { sm().deallocate(rawTile_); }
     }
 
-    virtual void process(bi::interprocess_mutex &mutex, DatasetCache &cache) {
+    virtual void process(Mutex &mutex, DatasetCache &cache) {
         LOG(info4) << "Semantic: process.";
         (void) mutex;
         (void) cache;
@@ -452,31 +453,39 @@ public:
     }
 
     virtual Response response(Lock&) {
-        LOG(info4) << "Semantic: response.";
-
         if (!rawTile_) {
             LOGTHROW(err2, std::runtime_error)
                 << "No tile generated";
         }
 
-        MemoryBlock::pointer tile(rawTile_, [&sm=sm()](MemoryBlock *block)
+        MemoryBlock::pointer tile(rawTile_, [&sm=sm()](MemoryBlock *tile)
         {
             // deallocate data
-            sm.deallocate(block);
+            sm.deallocate(tile);
         });
         rawTile_ = nullptr;
 
         return tile;
     }
 
+    /** Destroys this object. Only to be called from warper machinery.
+     */
     virtual void destroy() { sm().destroy_ptr(this); }
 
 private:
     MemoryBlock *rawTile_;
+
+    String dataset_;
+    ShSrsDefinition outputSrs_;
+    bool outputAdjustVertical_;
+    ShSrsDefinition srs_;
+    math::Extents2 extents_;
+    int lod_;
 };
 
 MemoryBlock::pointer
 semantic2GeodataTile(Arsenal &arsenal, Aborter &aborter
+                     , const std::string &dataset
                      , const geo::SrsDefinition &outputSrs
                      , bool outputAdjustVertical
                      , const geo::SrsDefinition &srs
@@ -487,7 +496,7 @@ semantic2GeodataTile(Arsenal &arsenal, Aborter &aborter
         (arsenal.warper.job([&](const WorkRequestParams &params) {
                 return params.sm.construct<SemanticJob>
                     (bi::anonymous_instance)
-                    (params, outputSrs, outputAdjustVertical
+                    (params, dataset, outputSrs, outputAdjustVertical
                      , srs, extents, lod);
             }, aborter));
 
@@ -515,6 +524,7 @@ void GeodataSemanticTiled::generateGeodata(Sink &sink
 
     auto tile(semantic2GeodataTile
               (arsenal, sink
+               , definition_.dataset
                , physicalSrs_.srsDef, physicalSrs_.adjustVertical()
                , nodeInfo.srs(), nodeInfo.extents()
                , definition_.lod));
