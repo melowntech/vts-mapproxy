@@ -76,6 +76,8 @@ private:
 
     const vr::Srs &physicalSrs_;
 
+    geo::vectorformat::GeodataConfig geodataConfig_;
+
     boost::optional<mmapped::Index> index_;
 };
 

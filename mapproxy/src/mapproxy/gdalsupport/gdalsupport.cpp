@@ -919,8 +919,6 @@ void GdalWarper::Detail::worker(std::size_t id, Process::Id parentId
                 << "Uncaught exception in worker: <" << e.what()
                 << ">. Going on.";
         }
-
-        if (cache.worn()) { break; }
     }
 
     LOG(info2) << "GDAL worker id:" << id << " finishing.";

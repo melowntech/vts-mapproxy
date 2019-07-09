@@ -37,8 +37,6 @@ public:
 
     geo::GeoDataset& operator()(const std::string &path);
 
-    bool worn();
-
 private:
     typedef std::map<std::string, geo::GeoDataset> Cache;
 

@@ -45,6 +45,7 @@
 
 #include "semantic/io.hpp"
 #include "semantic/mesh.hpp"
+#include "semantic/gpkg.hpp"
 
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/registry/json.hpp"
@@ -90,10 +91,25 @@ GeodataSemanticTiled::GeodataSemanticTiled(const Params &params)
     , dem_(absoluteDataset(definition_.dem.dataset + "/dem")
            , definition_.dem.geoidGrid)
     , styleUrl_(definition_.styleUrl)
-    , dataset_(definition_.dataset)
+    , dataset_(absoluteDataset(definition_.dataset))
     , physicalSrs_
       (vr::system.srs(resource().referenceFrame->model.physicalSrs))
 {
+    if (definition_.format != geo::VectorFormat::geodataJson) {
+        LOGTHROW(err1, std::runtime_error)
+            << "Unsupported output vector format <"
+            << definition_.format << ">.";
+    }
+    if (const auto *config = boost::get<geo::vectorformat::GeodataConfig>
+        (&definition_.formatConfig))
+    {
+        geodataConfig_ = *config;
+    } else {
+        LOGTHROW(err1, std::runtime_error)
+            << "Missing configuration for vector format <"
+            << definition_.format << ">.";
+    }
+
     auto ds(geo::GeoDataset::open(dem_.dataset));
 
     if (styleUrl_.empty()) {
@@ -127,7 +143,11 @@ namespace {
 
 class LayerBuilder {
 public:
-    LayerBuilder(const semantic::World &world)
+    /** TODO: 
+     *    * Add clipping
+     *    * Add destination SRS
+     */
+    LayerBuilder(const semantic::World &world, int lod = 2)
         : world_(world), fid_()
         , materials_(semantic::materials())
     {
@@ -135,7 +155,7 @@ public:
                        , [this](auto&&... args) {
                            this->mesh(std::forward<decltype(args)>(args)...);
                        }
-                       , 2);
+                       , lod);
     }
 
     geo::FeatureLayers featureLayers() {
@@ -429,7 +449,8 @@ public:
                 , bool outputAdjustVertical
                 , const geo::SrsDefinition &srs
                 , const math::Extents2 &extents
-                , int lod)
+                , int lod
+                , const geo::vectorformat::GeodataConfig &geodataConfig)
         : WorkRequest(p.sm)
         , rawTile_()
         , dataset_(dataset.data(), dataset.size(), p.sm.get_allocator<char>())
@@ -438,18 +459,37 @@ public:
         , srs_(srs, p.sm)
         , extents_(extents)
         , lod_(lod)
+        , geodataConfig_(geodataConfig)
     {}
 
     ~SemanticJob() {
         if (rawTile_) { sm().deallocate(rawTile_); }
     }
 
-    virtual void process(Mutex &mutex, DatasetCache &cache) {
+    virtual void process(Mutex&, DatasetCache&) {
         LOG(info4) << "Semantic: process.";
-        (void) mutex;
-        (void) cache;
 
-        rawTile_ = MemoryBlock::allocate(sm(), "test\n", 5);
+        const std::string dataset(dataset_.data(), dataset_.size());
+        auto &ds(openDataset(dataset));
+
+        semantic::GeoPackage::Query query;
+        query.extents = extents_;
+        query.srs = srs_;
+
+        auto world(ds.world(query));
+
+        // TODO: add meshconfig
+        auto fl(LayerBuilder(world, lod_).featureLayers());
+        fl.transform(outputSrs_, outputAdjustVertical_);
+
+        {
+            std::ostringstream os;
+            os.precision(15);
+            fl.dumpVTSGeodata(os, geodataConfig_.resolution);
+
+            const auto str(os.str());
+            rawTile_ = MemoryBlock::allocate(sm(), str.data(), str.size());
+        }
     }
 
     virtual Response response(Lock&) {
@@ -473,6 +513,15 @@ public:
     virtual void destroy() { sm().destroy_ptr(this); }
 
 private:
+    using GeoPackageCache = std::map<std::string, semantic::GeoPackage>;
+    static GeoPackageCache cache_;
+
+    static const semantic::GeoPackage& openDataset(const std::string &path) {
+        auto fcache(cache_.find(path));
+        if (fcache != cache_.end()) { return fcache->second; }
+        return cache_.emplace(path, path).first->second;
+    }
+
     MemoryBlock *rawTile_;
 
     String dataset_;
@@ -481,7 +530,10 @@ private:
     ShSrsDefinition srs_;
     math::Extents2 extents_;
     int lod_;
+    geo::vectorformat::GeodataConfig geodataConfig_;
 };
+
+SemanticJob::GeoPackageCache SemanticJob::cache_;
 
 MemoryBlock::pointer
 semantic2GeodataTile(Arsenal &arsenal, Aborter &aborter
@@ -490,14 +542,15 @@ semantic2GeodataTile(Arsenal &arsenal, Aborter &aborter
                      , bool outputAdjustVertical
                      , const geo::SrsDefinition &srs
                      , const math::Extents2 &extents
-                     , int lod)
+                     , int lod
+                     , const geo::vectorformat::GeodataConfig &geodataConfig)
 {
     auto response
         (arsenal.warper.job([&](const WorkRequestParams &params) {
                 return params.sm.construct<SemanticJob>
                     (bi::anonymous_instance)
                     (params, dataset, outputSrs, outputAdjustVertical
-                     , srs, extents, lod);
+                     , srs, extents, lod, geodataConfig);
             }, aborter));
 
     return std::static_pointer_cast<MemoryBlock>(response);
@@ -524,10 +577,10 @@ void GeodataSemanticTiled::generateGeodata(Sink &sink
 
     auto tile(semantic2GeodataTile
               (arsenal, sink
-               , definition_.dataset
+               , dataset_.string()
                , physicalSrs_.srsDef, physicalSrs_.adjustVertical()
                , nodeInfo.srs(), nodeInfo.extents()
-               , definition_.lod));
+               , definition_.lod, geodataConfig_));
 
     sink.content(tile->data, tile->size, fi.sinkFileInfo(), true);
 }

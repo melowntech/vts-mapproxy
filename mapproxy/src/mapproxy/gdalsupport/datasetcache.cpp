@@ -37,8 +37,3 @@ geo::GeoDataset& DatasetCache::operator()(const std::string &path)
     return datasets_.insert(Cache::value_type
                             (path, geo::GeoDataset::open(path))).first->second;
 }
-
-bool DatasetCache::worn()
-{
-    return false;
-}
