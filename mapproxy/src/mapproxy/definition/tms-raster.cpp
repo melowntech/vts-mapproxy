@@ -57,7 +57,7 @@ void parseDefinition(TmsRaster &def, const Json::Value &value)
         Json::get(s, value, "format");
         try {
             def.format = boost::lexical_cast<RasterFormat>(s);
-        } catch (boost::bad_lexical_cast) {
+        } catch (const boost::bad_lexical_cast&) {
             utility::raise<Json::Error>
                 ("Value stored in format is not RasterFormat value");
         }

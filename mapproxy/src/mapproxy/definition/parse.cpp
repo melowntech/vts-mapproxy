@@ -43,7 +43,7 @@ void parse(geo::VectorFormat &format, const Json::Value &value)
     Json::check(value, Json::stringValue);
     try {
         format = boost::lexical_cast<geo::VectorFormat>(value);
-    } catch (boost::bad_lexical_cast) {
+    } catch (const boost::bad_lexical_cast&) {
         utility::raise<FormatError>
             ("Value stored in format is not a valid height"
              " coded data format.");

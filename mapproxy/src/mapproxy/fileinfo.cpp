@@ -85,7 +85,7 @@ bool asEnum(const std::string &str, E &value)
 {
     try {
         value = boost::lexical_cast<E>(str);
-    } catch (boost::bad_lexical_cast) {
+    } catch (const boost::bad_lexical_cast&) {
         return false;
     }
     return true;
