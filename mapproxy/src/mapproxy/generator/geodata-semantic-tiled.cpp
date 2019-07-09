@@ -467,8 +467,6 @@ public:
     }
 
     virtual void process(Mutex&, DatasetCache&) {
-        LOG(info4) << "Semantic: process.";
-
         const std::string dataset(dataset_.data(), dataset_.size());
         auto &ds(openDataset(dataset));
 
@@ -579,7 +577,7 @@ void GeodataSemanticTiled::generateGeodata(Sink &sink
               (arsenal, sink
                , dataset_.string()
                , physicalSrs_.srsDef, physicalSrs_.adjustVertical()
-               , nodeInfo.srs(), nodeInfo.extents()
+               , nodeInfo.srsDef(), nodeInfo.extents()
                , definition_.lod, geodataConfig_));
 
     sink.content(tile->data, tile->size, fi.sinkFileInfo(), true);
