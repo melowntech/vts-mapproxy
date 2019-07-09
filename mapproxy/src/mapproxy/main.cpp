@@ -294,7 +294,7 @@ void Daemon::configure(const po::variables_map &vars)
             try {
                 generatorsConfig_.freezeResourceTypes.insert
                     (boost::lexical_cast<Resource::Generator::Type>(part));
-            } catch (boost::bad_lexical_cast) {
+            } catch (const boost::bad_lexical_cast&) {
                 throw po::validation_error
                     (po::validation_error::invalid_option_value, value);
             }
@@ -556,7 +556,7 @@ int Daemon::run()
             gdalWarper_->housekeeping();
             ::usleep(100000);
         }
-    } catch (AbandonAll) {
+    } catch (const AbandonAll&) {
         return EXIT_FAILURE;
     }
 

@@ -396,7 +396,13 @@ void VrtDs::addSimpleSource(int band, const fs::path &filename
 
     // try to create simple source from parsed string
     std::unique_ptr< ::VRTSimpleSource> src(new ::VRTSimpleSource());
-    if (src->XMLInit(xmlNodeFromString(os.str()).get(), nullptr) != CE_None) {
+#if GDAL_VERSION_NUM >= 2040000
+    if (src->XMLInit(xmlNodeFromString(os.str()).get(), nullptr, nullptr)
+        != CE_None)
+#else
+    if (src->XMLInit(xmlNodeFromString(os.str()).get(), nullptr) != CE_None)
+#endif
+    {
         LOGTHROW(err2, std::runtime_error)
             << "Cannot parse VRT source from XML: <"
             << ::CPLGetLastErrorNo() << ", "

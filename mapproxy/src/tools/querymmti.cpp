@@ -103,7 +103,7 @@ int QueryMappedTileIndex::run()
 
     try {
         mti = boost::in_place(ti_);
-    } catch (std::exception) {
+    } catch (const std::exception&) {
         ti = boost::in_place();
         ti->load(ti_);
     }
