@@ -37,7 +37,6 @@
 
 #include "math/transform.hpp"
 
-#include "geo/featurelayers.hpp"
 #include "geometry/meshop.hpp"
 
 #include "jsoncpp/as.hpp"
@@ -45,6 +44,7 @@
 
 #include "semantic/io.hpp"
 #include "semantic/mesh.hpp"
+#include "semantic/featurelayers.hpp"
 
 #include "vts-libs/storage/fstreams.hpp"
 #include "vts-libs/registry/json.hpp"
@@ -224,69 +224,6 @@ geo::FeatureLayers mesh2fl(const geometry::Mesh::list meshes
     return fl;
 }
 
-class LayerBuilder {
-public:
-    LayerBuilder(const semantic::World &world)
-        : world_(world), fid_()
-        , materials_(semantic::materials())
-    {
-        semantic::mesh(world, semantic::MeshConfig()
-                       , [this](auto&&... args) {
-                           this->mesh(std::forward<decltype(args)>(args)...);
-                       }
-                       , 2);
-    }
-
-    geo::FeatureLayers featureLayers() {
-        geo::FeatureLayers fl;
-        for (auto &item : layers_) {
-            fl.layers.emplace_back(std::move(item.second));
-        }
-        return fl;
-    }
-
-private:
-    using Layer = geo::FeatureLayers::Layer;
-    using LayerMap = std::map<semantic::Class, Layer>;
-    using Features = geo::FeatureLayers::Features;
-
-    template <typename Entity>
-    void mesh(const Entity &entity, const geometry::Mesh &mesh)
-    {
-        auto &l(layer(entity.cls));
-
-        for (const auto &sm : geometry::splitById(mesh)) {
-            // TODO: get more properties from the source
-            Features::Properties props;
-            props["material"] = materials_[sm.faces.front().imageId];
-
-            // add surface
-            auto &s(l.features.addSurface(++fid_, entity.id, props));
-            s.vertices = sm.vertices;
-            for (const auto &face : sm.faces) {
-                s.surface.emplace_back(face.a, face.b, face.c);
-            }
-        }
-    }
-
-    Layer& layer(semantic::Class cls) {
-        auto flayers(layers_.find(cls));
-        if (flayers != layers_.end()) { return flayers->second; }
-
-        const auto name(boost::lexical_cast<std::string>(cls));
-        return layers_.emplace
-            (std::piecewise_construct
-             , std::forward_as_tuple(cls)
-             , std::forward_as_tuple(name, world_.srs, true))
-            .first->second;
-    }
-
-    const semantic::World &world_;
-    LayerMap layers_;
-    Features::Fid fid_;
-    std::vector<std::string> materials_;
-};
-
 geo::FeatureLayers generateLayer(const semantic::World &world, bool simplified)
 {
     if (simplified) {
@@ -297,7 +234,7 @@ geo::FeatureLayers generateLayer(const semantic::World &world, bool simplified)
                        , semantic::materials(), world.srs, true);
     }
 
-    return LayerBuilder(world).featureLayers();
+    return semantic::featureLayers(world, {});
 }
 
 } // namespace
