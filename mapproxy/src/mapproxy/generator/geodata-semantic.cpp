@@ -51,6 +51,7 @@
 
 #include "../support/revision.hpp"
 #include "../support/geo.hpp"
+#include "../support/position.hpp"
 
 #include "geodata-semantic.hpp"
 #include "factory.hpp"
@@ -248,32 +249,10 @@ void GeodataSemantic::prepare_impl(Arsenal&)
     auto fl(generateLayer(world, definition_.simplified));
 
     if (const auto extents = fl.boundingBox()) {
-        // mesh center in navigation SRS
-        const auto c(vts::CsConvertor
-                     (world.srs
-                      , resource().referenceFrame->model.navigationSrs)
-                     (math::center(*extents)));
-
-        auto &pos(metadata_.position);
-        pos.type = vr::Position::Type::objective;
-        pos.heightMode = vr::Position::HeightMode::floating;
-        pos.position = c;
-        pos.position[2] = 0.0; // floating -> zero
-        pos.lookDown();
-        pos.verticalFov = vr::Position::naturalFov();
-
-        // compute vertical extent by taking a "photo" of physical data from
-        // view's "camera"
-        const auto trafo(makePlaneTrafo(referenceFrame(), pos.position));
-        math::Extents2 cameraExtents(math::InvalidExtents{});
-        fl.for_each_vertex([&](const math::Point3d &p)
-        {
-            math::update(cameraExtents, math::transform(trafo, p));
-        });
-
-        const auto cameraExtentsSize(math::size(cameraExtents));
-        pos.verticalExtent = std::max(cameraExtentsSize.width
-                                      , cameraExtentsSize.height);
+        const auto center(math::center(*extents));
+        metadata_.position = positionFromPoints
+            (referenceFrame(), world.srs, math::Point2(center(0), center(1))
+             , [&](const auto &callback) { fl.for_each_vertex(callback); });
     }
 
     // get physical srs

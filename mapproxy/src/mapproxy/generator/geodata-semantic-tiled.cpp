@@ -50,6 +50,7 @@
 #include "../support/tileindex.hpp"
 #include "../support/revision.hpp"
 #include "../support/geo.hpp"
+#include "../support/position.hpp"
 
 #include "geodata-semantic-tiled.hpp"
 #include "factory.hpp"
@@ -106,8 +107,7 @@ GeodataSemanticTiled::GeodataSemanticTiled(const Params &params)
             << "Missing configuration for vector format <"
             << definition_.format << ">.";
     }
-
-    auto ds(geo::GeoDataset::open(dem_.dataset));
+    geo::GeoDataset::open(dem_.dataset);
 
     if (styleUrl_.empty()) {
         styleUrl_ = "style.json";
@@ -141,6 +141,20 @@ void GeodataSemanticTiled::prepare_impl(Arsenal&)
     LOG(info2) << "Preparing <" << id() << ">.";
 
     const auto &r(resource());
+
+    {
+        semantic::GeoPackage gpkg(dataset_);
+        const auto extents(gpkg.extents());
+
+        auto position
+            (positionFromPoints
+             (referenceFrame(), gpkg.srs(), math::center(extents)
+              , [&](const auto &callback) {
+                 for (const auto &p : math::vertices(extents)) {
+                     callback(p);
+                 }
+             }));
+    }
 
     // try to open datasets
     geo::GeoDataset::open(dem_.dataset);
