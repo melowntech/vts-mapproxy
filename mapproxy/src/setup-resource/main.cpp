@@ -555,6 +555,8 @@ fs::path vrtWOPath(const calipers::Measurement &cm, const fs::path &rootDir)
 
     case calipers::DatasetType::ophoto:
         return rootDir / "ophoto";
+
+    default: break;
     }
 
     LOGTHROW(err3, std::logic_error)
@@ -653,6 +655,10 @@ void buildDefinition(Resource &r, const calipers::Measurement &cm
     case calipers::DatasetType::ophoto:
         buildDefinition<resource::TmsRaster>(r, cm, dataset, config);
         break;
+
+    default:
+        LOGTHROW(err2, std::runtime_error)
+            << "Unsupported dataset type <" << cm.datasetType << ">.";
     }
 }
 

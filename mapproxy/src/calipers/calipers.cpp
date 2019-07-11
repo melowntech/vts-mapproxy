@@ -52,6 +52,8 @@ DatasetType detectType(const geo::GeoDataset::Descriptor &ds
 
     if (ds.bands >= 3) { return DatasetType::ophoto; }
 
+    if (!ds.bands) { return DatasetType::vector; }
+
     if (ds.bands != 1) {
         LOGTHROW(err2, std::runtime_error)
             << "Cannot autodetect dataset type, unsupported number of bands ("
@@ -454,6 +456,9 @@ void Node::minLod()
 
     // make global
     minLod_ = node.nodeId().lod + lod;
+
+    // sanitized
+    if (minLod_ > this->lod) { minLod_ = this->lod; }
 }
 
 double computeGsd(const geo::GeoDataset::Descriptor &ds

@@ -41,6 +41,7 @@ namespace calipers {
 UTILITY_GENERATE_ENUM_CI(DatasetType,
                          ((dem)("dem")("dsm"))
                          ((ophoto))
+                         ((vector))
                          )
 
 struct Config {

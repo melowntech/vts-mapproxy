@@ -28,6 +28,9 @@
 #include <utility>
 #include <functional>
 #include <map>
+#include <memory>
+
+#include <ogrsf_frmts.h>
 
 #include <boost/optional.hpp>
 #include <boost/utility/in_place_factory.hpp>
@@ -82,6 +85,7 @@ class Calipers : public service::Cmdline {
 public:
     Calipers()
         : service::Cmdline("mapproxy-calipers", BUILD_TARGET_VERSION)
+        , vectorResolution_(1.0)
     {}
 
 private:
@@ -98,6 +102,7 @@ private:
     fs::path dataset_;
     std::string referenceFrameId_;
     calipers::Config config_;
+    double vectorResolution_;
 };
 
 void Calipers::configuration(po::options_description &cmdline
@@ -126,6 +131,10 @@ void Calipers::configuration(po::options_description &cmdline
          ->default_value(config_.tileFractionLimit)->required()
          , "Fraction of tile when rastrization algorithm stops."
          "Inverse value, 4 means 1/4 of tile.")
+
+        ("vectorResolution", po::value(&vectorResolution_)
+         ->default_value(vectorResolution_)->required()
+         , "Resolution of vector dataset to use.")
         ;
 
     pd.add("dataset", 1)
@@ -199,9 +208,77 @@ bool Calipers::help(std::ostream &out, const std::string &what) const
 }
 
 
+geo::GeoDataset::Descriptor probe(const fs::path &path
+                                  , double vectorResolution)
+{
+    auto handle(::GDALOpenEx
+                (path.c_str()
+                 , GDAL_OF_RASTER | GDAL_OF_VECTOR | GDAL_OF_READONLY
+                 , nullptr, nullptr, nullptr));
+
+    if (!handle) {
+        LOGTHROW(err2, std::runtime_error)
+            << "Failed to open dataset " << path << ".";
+    }
+
+    std::unique_ptr< ::GDALDataset>
+        dataset(static_cast< ::GDALDataset*>(handle));
+
+    if (dataset->GetRasterCount()) {
+        // raster dataset
+        return geo::GeoDataset::use(std::move(dataset)).descriptor();
+    }
+
+    // valid GDAL dataset without any raster -> probably vector dataset
+    geo::GeoDataset::Descriptor ds;
+    ds.resolution(0) = ds.resolution(1) = vectorResolution;
+    ds.driverName = dataset->GetDriverName();
+
+    // measure extents
+    {
+        bool hasSrs(false);
+        ds.extents = math::Extents2(math::InvalidExtents{});
+        for (int i(0), e(dataset->GetLayerCount()); i < e; ++i) {
+            auto layer(dataset->GetLayer(i));
+
+            if (!layer->GetFeatureCount(TRUE)) { continue; }
+
+            ::OGREnvelope envelope;
+            if (layer->GetExtent(&envelope, TRUE) == OGRERR_NONE) {
+                update(ds.extents, envelope.MinX, envelope.MinY);
+                update(ds.extents, envelope.MaxX, envelope.MaxY);
+            }
+
+            if (!hasSrs) {
+                if (const auto *ref = layer->GetSpatialRef()) {
+                    ds.srs = geo::SrsDefinition::fromReference(*ref);
+                    hasSrs = true;
+                }
+            }
+        }
+    }
+
+    if (!valid(ds.extents)) {
+        LOGTHROW(err2, std::runtime_error)
+            << "Failed to measure dataset " << path << ".";
+    }
+
+    // compute size from extents and resolution
+    {
+        auto size(math::size(ds.extents));
+        ds.size.width = int(size.width / ds.resolution(0));
+        ds.size.height = int(size.height / ds.resolution(0));
+    }
+
+    // no band
+    // TODO: construct geotransform?
+
+    return ds;
+}
+
 int Calipers::run()
 {
-    const auto ds(geo::GeoDataset::open(dataset_).descriptor());
+    const auto ds(probe(dataset_, vectorResolution_));
 
     auto m(calipers::measure(vr::system.referenceFrames(referenceFrameId_)
                              , ds, config_));
@@ -233,5 +310,6 @@ int Calipers::run()
 int main(int argc, char *argv[])
 {
     gdal_drivers::registerAll();
+    ::OGRRegisterAll();
     return Calipers()(argc, argv);
 }
