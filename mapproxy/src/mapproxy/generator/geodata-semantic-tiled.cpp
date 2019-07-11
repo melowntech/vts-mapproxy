@@ -81,6 +81,61 @@ utility::PreMain Factory::register_([]()
     Generator::registerType<GeodataSemanticTiled>(std::make_shared<Factory>());
 });
 
+void build(Json::Value &value, const GeodataSemanticTiled::Metadata &metadata)
+{
+    value["position"] = vr::asJson(metadata.position);
+}
+
+void parse(GeodataSemanticTiled::Metadata &metadata, const Json::Value &value)
+{
+    if (value.isMember("position")) {
+        metadata.position = vr::positionFromJson(value["position"]);
+    }
+}
+
+GeodataSemanticTiled::Metadata
+loadMetadata(const boost::filesystem::path &path)
+{
+    LOG(info1) << "Loading Metadata from " << path  << ".";
+    std::ifstream f;
+    f.exceptions(std::ios::badbit | std::ios::failbit);
+    try {
+        f.open(path.string(), std::ios_base::in);
+    } catch (const std::exception &e) {
+        LOGTHROW(err1, std::runtime_error)
+            << "Unable to load Metadata from " << path << ".";
+    }
+    // load json
+    auto content(Json::read<std::runtime_error>
+                 (f, path, "Metadata"));
+
+    GeodataSemanticTiled::Metadata metadata;
+    parse(metadata, content);
+    f.close();
+    return metadata;
+}
+
+void saveMetadata(const boost::filesystem::path &path
+                  , const GeodataSemanticTiled::Metadata &metadata)
+{
+    LOG(info1) << "Saving Metadata into " << path  << ".";
+    std::ofstream f;
+    try {
+        f.exceptions(std::ios::badbit | std::ios::failbit);
+        f.open(path.string(), std::ios_base::out);
+    } catch (const std::exception &e) {
+        LOGTHROW(err1, std::runtime_error)
+            << "Unable to save Metadata into "
+            << path << ".";
+    }
+
+    Json::Value content;
+    build(content, metadata);
+    f.precision(15);
+    Json::write(f, content);
+
+    f.close();
+}
 } // namespace
 
 GeodataSemanticTiled::GeodataSemanticTiled(const Params &params)
@@ -128,6 +183,7 @@ GeodataSemanticTiled::GeodataSemanticTiled(const Params &params)
         auto deliveryIndexPath(root() / "delivery.index");
         index_ = boost::in_place(referenceFrame().metaBinaryOrder
                                  , deliveryIndexPath);
+        metadata_ = loadMetadata(root() / "metadata.json");
         return;
     } catch (const std::exception &e) {
         // not ready
@@ -146,14 +202,14 @@ void GeodataSemanticTiled::prepare_impl(Arsenal&)
         semantic::GeoPackage gpkg(dataset_);
         const auto extents(gpkg.extents());
 
-        auto position
-            (positionFromPoints
+        metadata_.position
+            = positionFromPoints
              (referenceFrame(), gpkg.srs(), math::center(extents)
               , [&](const auto &callback) {
                  for (const auto &p : math::vertices(extents)) {
-                     callback(p);
+                     callback(math::Point3(p(0), p(1), 0.0));
                  }
-             }));
+             });
     }
 
     // try to open datasets
@@ -182,6 +238,8 @@ void GeodataSemanticTiled::prepare_impl(Arsenal&)
         index_ = boost::in_place(referenceFrame().metaBinaryOrder
                                  , deliveryIndexPath);
     }
+
+    saveMetadata(root() / "metadata.json", metadata_);
 }
 
 vr::FreeLayer GeodataSemanticTiled::freeLayer(ResourceRoot root) const
@@ -248,8 +306,7 @@ vts::MapConfig GeodataSemanticTiled::mapConfig_impl(ResourceRoot root) const
         mapConfig.position = *definition_.introspection.position;
     } else {
         // calculated
-        // TODO: store metadata
-        // mapConfig.position = metadata_.position;
+        mapConfig.position = metadata_.position;
     }
 
     // browser options (must be Json::Value!); overrides browser options from

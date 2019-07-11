@@ -41,6 +41,15 @@ public:
 
     typedef resource::GeodataSemanticTiled Definition;
 
+    /** Metadata of processed output.
+     */
+    struct Metadata {
+        /** Introspection position. Overrides any position in introspection
+         * surface.
+         */
+        vr::Position position;
+    };
+
 private:
     virtual void prepare_impl(Arsenal &arsenal);
 
@@ -79,6 +88,10 @@ private:
     geo::vectorformat::GeodataConfig geodataConfig_;
 
     boost::optional<mmapped::Index> index_;
+
+    /** Generator metadata.
+     */
+    Metadata metadata_;
 };
 
 } // namespace generator
