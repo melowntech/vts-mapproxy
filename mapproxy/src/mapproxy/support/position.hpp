@@ -63,8 +63,6 @@ vr::Position positionFromPoints(const vr::ReferenceFrame &rf
     // mesh center in navigation SRS
     const auto c(vts::CsConvertor(srsDef, rf.model.navigationSrs)(center));
 
-    LOG(info4) << "c: " << c;
-
     vr::Position pos;
     pos.type = vr::Position::Type::objective;
     pos.heightMode = vr::Position::HeightMode::floating;
