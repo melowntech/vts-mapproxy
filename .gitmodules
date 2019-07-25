@@ -57,4 +57,4 @@
 	url = git@gitlab.citationtech.net:vaclav.blazek/libsemantic
 [submodule "externals/libshtools"]
 	path = externals/libshtools
-	url = git@gitlab.citationtech.net:vaclav.blazek/libshtools
+	url = https://github.com/melowntech/libshtools.git
