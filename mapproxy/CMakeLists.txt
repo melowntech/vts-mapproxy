@@ -1,5 +1,6 @@
 # bootstrap build system
 cmake_minimum_required(VERSION 2.8.11)
+enable_language(Fortran)
 project(vts-mapproxy)
 # by default, this is OSS build (can be overrided by customer machinery)
 set(BUILDSYS_DEFAULT_CUSTOMER_NAME oss)
@@ -75,6 +76,7 @@ add_subdirectory(src/gdal-drivers)
 add_subdirectory(src/http)
 add_subdirectory(src/miniball)
 add_subdirectory(src/qmf)
+add_subdirectory(src/shtools)
 add_subdirectory(src/semantic)
 
 # python stuff
