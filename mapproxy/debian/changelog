@@ -1,3 +1,9 @@
+vts-mapproxy (1.62) stable; urgency=medium
+
+  * geodata: semantic world support
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Tue, 20 Aug 2019 15:03:49 +0000
+
 vts-mapproxy (1.61) stable; urgency=medium
 
   * geodata: layer enhancer ignores NULL entries

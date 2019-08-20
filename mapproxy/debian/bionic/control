@@ -19,4 +19,5 @@ m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 11), libboost1.65-all-dev
     , libicu-dev (>= 60.2-3ubuntu3)
     , libtinyxml2-dev
     , libmarkdown2-dev
-    , gawk, pandoc}}})m4_dnl
+    , libfftw3-dev, liblapack-dev, libblas-dev
+    , gawk, pandoc, gfortran}}})m4_dnl

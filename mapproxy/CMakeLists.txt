@@ -106,4 +106,6 @@ add_subdirectory(src/setup-resource)
 
 # for testing
 add_subdirectory(src/utility/tools EXCLUDE_FROM_ALL)
-add_subdirectory(src/semantic/tools EXCLUDE_FROM_ALL)
+
+set(semantic-tools-INSTALL-COMPONENT tools)
+add_subdirectory(src/semantic/tools)

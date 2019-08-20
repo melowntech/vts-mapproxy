@@ -18,4 +18,5 @@ m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 9.20150101+deb8u2), libboost1.
     , libmagic-dev (>= 5.25)
     , libtinyxml2-dev
     , libmarkdown2-dev
-    , gawk, pandoc}}})m4_dnl
+    , libfftw3-dev, liblapack-dev, libblas-dev
+    , gawk, pandoc, gfortran}}})m4_dnl
