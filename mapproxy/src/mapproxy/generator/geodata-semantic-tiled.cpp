@@ -514,7 +514,7 @@ private:
     static const semantic::GeoPackage& openDataset(const std::string &path) {
         auto fcache(cache_.find(path));
         if (fcache != cache_.end()) { return fcache->second; }
-        return cache_.emplace(path, path).first->second;
+        return cache_.emplace(path, fs::path(path)).first->second;
     }
 
     MemoryBlock *rawTile_;
