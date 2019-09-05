@@ -532,8 +532,6 @@ Changed Resource::changed(const Resource &o) const
         return Changed::yes;
     }
 
-    // TODO: registry ?
-
     // check definition, it must check mandatory stuff first, save stuff
     // second
     auto def(definition_->changed(*o.definition()));
@@ -542,6 +540,8 @@ Changed Resource::changed(const Resource &o) const
     // from here down only safely-changed stuff can follow
 
     if (changedCredits) { return Changed::safely; }
+
+    if (registry != o.registry) { return Changed::safely; }
 
     // not changed at all
     return Changed::no;
