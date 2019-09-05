@@ -1,3 +1,10 @@
+vts-mapproxy (1.63) stable; urgency=medium
+
+  * resources: Resource is updated when local registry is changed.
+  * heightcoding: unset fields are ignored instead of outputing empty string.
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 05 Sep 2019 17:09:20 +0200
+
 vts-mapproxy (1.62) stable; urgency=medium
 
   * geodata: semantic world support
