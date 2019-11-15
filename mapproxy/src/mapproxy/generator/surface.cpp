@@ -71,6 +71,7 @@
 
 #include "files.hpp"
 #include "surface.hpp"
+#include "providers.hpp"
 
 namespace fs = boost::filesystem;
 namespace bio = boost::iostreams;
@@ -93,6 +94,54 @@ terrainSupport(const Generator::Params &params)
 }
 
 } // namespace
+
+class SurfaceProvider
+    : public Generator::Provider
+    , public VtsTilesetProvider
+{
+public:
+    SurfaceProvider(SurfaceBase &surface)
+        : surface_(surface)
+    {}
+
+private:
+    Generator::Task generateMesh_impl(const vts::TileId &tileId
+                                      , Sink&
+                                      , const SurfaceFileInfo &fileInfo
+                                      , Arsenal&
+                                      , vts::SubMesh::TextureMode textureMode)
+        const override
+    {
+        return[=](Sink &sink, Arsenal &arsenal) {
+            return surface_.generateMesh
+                (tileId, sink, fileInfo, arsenal, textureMode);
+        };
+    }
+
+    Generator::Task generateFile_impl(const FileInfo &fileInfo, Sink sink)
+        const override
+    {
+        return surface_.generateFile(fileInfo, sink);
+    }
+
+    /** Returns path to VTS file if supported.
+     */
+    boost::optional<fs::path> path_impl(vts::File file) const override
+    {
+        switch (file) {
+        case vts::File::config:
+        case vts::File::tileIndex:
+            break;
+
+        default:
+            return boost::none;
+        }
+
+        return surface_.filePath(file);
+    }
+
+    SurfaceBase &surface_;
+};
 
 fs::path SurfaceBase::filePath(vts::File fileType) const
 {
@@ -360,7 +409,8 @@ Generator::Task SurfaceBase
 void SurfaceBase::generateMesh(const vts::TileId &tileId
                                , Sink &sink
                                , const SurfaceFileInfo &fi
-                               , Arsenal &arsenal) const
+                               , Arsenal &arsenal
+                               , vts::SubMesh::TextureMode textureMode) const
 {
     auto flags(index_->tileIndex.get(tileId));
     if (!vts::TileIndex::Flag::isReal(flags)) {
@@ -385,7 +435,8 @@ void SurfaceBase::generateMesh(const vts::TileId &tileId
     vts::Mesh mesh(false);
     if (!lm.mesh.vertices.empty()) {
         // local mesh is valid -> add as a submesh into output mesh
-        auto &sm(addSubMesh(mesh, lm.mesh, nodeInfo, lm.geoidGrid));
+        auto &sm(addSubMesh(mesh, lm.mesh, nodeInfo, lm.geoidGrid
+                            , textureMode));
         if (lm.textureLayerId) {
             sm.textureLayer = lm.textureLayerId;
         }

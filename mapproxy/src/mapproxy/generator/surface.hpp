@@ -76,7 +76,9 @@ private:
     void generateMesh(const vts::TileId &tileId
                       , Sink &sink
                       , const SurfaceFileInfo &fileInfo
-                      , Arsenal &arsenal) const;
+                      , Arsenal &arsenal
+                      , vts::SubMesh::TextureMode textureMode
+                      = vts::SubMesh::external) const;
 
     void generate2dMask(const vts::TileId &tileId
                         , Sink &sink
@@ -130,6 +132,8 @@ private:
 
     const Definition &definition_;
     const vre::Tms *tms_;
+
+    friend class SurfaceProvider;
 };
 
 } // namespace generator

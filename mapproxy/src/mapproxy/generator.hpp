@@ -219,6 +219,10 @@ public:
      */
     bool updatedSince(std::uint64_t timestamp) const;
 
+    /** Generic type for provider handling
+     */
+    struct Provider { virtual ~Provider() {} };
+
 protected:
     Generator(const Params &params, const Properties &props = Properties());
 
@@ -265,6 +269,16 @@ protected:
      */
     bool changeEnforced() const { return changeEnforced_; }
 
+    /** Returns generators provider machinery. Returns null if provider of given
+     *  type is not available.
+     */
+    template <typename ProviderType>
+    ProviderType* getProvider() const;
+
+    /** Sets new provider. Value is stolen.
+     */
+    void setProvider(std::unique_ptr<Provider> &&provider);
+
 private:
     virtual void prepare_impl(Arsenal &arsenal) = 0;
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;
@@ -284,6 +298,7 @@ private:
     std::atomic<std::uint64_t> readySince_;
     DemRegistry::pointer demRegistry_;
     Generator::pointer replace_;
+    std::unique_ptr<Provider> provider_;
 };
 
 /** Set of dataset generators.
@@ -394,6 +409,18 @@ Generator::otherGenerator(Resource::Generator::Type generatorType
                           , const Resource::Id &resourceId) const
 {
     return generatorFinder_->findGenerator(generatorType, resourceId);
+}
+
+template <typename ProviderType>
+ProviderType* Generator::getProvider() const
+{
+    if (!provider_) { return nullptr; }
+    return dynamic_cast<ProviderType>(provider_.get());
+}
+
+inline void Generator::setProvider(std::unique_ptr<Provider> &&provider)
+{
+    provider_ = std::move(provider);
 }
 
 #endif // mapproxy_generator_hpp_included_
