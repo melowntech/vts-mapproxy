@@ -411,12 +411,12 @@ vts::SubMesh& addSubMesh(vts::Mesh &mesh, const geometry::Mesh &gmesh
         }
     }
 
-    // texture faces same as regular faces
-    if (generateTc) { sm.facesTc = sm.faces; }
-
     for (const auto &f : gmesh.faces) {
         sm.faces.emplace_back(f.a, f.b, f.c);
     }
+
+    // texture faces same as regular faces
+    if (generateTc) { sm.facesTc = sm.faces; }
 
     return sm;
 }

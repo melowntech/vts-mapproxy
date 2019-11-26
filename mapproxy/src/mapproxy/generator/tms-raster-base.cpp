@@ -33,6 +33,7 @@
 #include "files.hpp"
 
 #include "tms-raster-base.hpp"
+#include "providers.hpp"
 
 namespace uq = utility::query;
 
@@ -53,6 +54,32 @@ wmtsSupport(const Generator::Params &params
 
 } // namespace
 
+class AtlasProvider
+    : public Generator::Provider
+    , public VtsAtlasProvider
+{
+public:
+    AtlasProvider(TmsRasterBase &tms)
+        : tms_(tms)
+    {}
+
+private:
+    Generator::Task generateAtlas_impl(const vts::TileId &tileId, Sink&
+                                       , const Sink::FileInfo &sfi
+                                       , bool atlas) const override
+    {
+        TmsRasterBase::ImageFlags imageFlags;
+        imageFlags.forceFormat = true;
+        imageFlags.atlas = atlas;
+        return[=](Sink &sink, Arsenal &arsenal) {
+            tms_.generateTileImage(tileId, sfi, RasterFormat::jpg
+                                   , sink, arsenal, imageFlags);
+        };
+    }
+
+    TmsRasterBase &tms_;
+};
+
 TmsRasterBase
 ::TmsRasterBase(const Params &params
                 , const boost::optional<RasterFormat> &format)
@@ -61,7 +88,9 @@ TmsRasterBase
     , wmts_(properties().isSupported(GeneratorInterface::Interface::wmts)
             ? params.resource.referenceFrame->findExtension<vre::Wmts>()
             : nullptr)
-{}
+{
+    setProvider(std::make_unique<AtlasProvider>(*this));
+}
 
 Generator::Task TmsRasterBase
 ::generateFile_impl(const FileInfo &fileInfo, Sink &sink) const
@@ -147,8 +176,10 @@ Generator::Task TmsRasterBase
 
     case WmtsFileInfo::Type::image:
         return [=](Sink &sink, Arsenal &arsenal) {
+            ImageFlags imageFlags;
+            imageFlags.dontOptimize = true;
             generateTileImage(fi.tileId, fi.sinkFileInfo(), fi.format
-                              , sink, arsenal, true);
+                              , sink, arsenal, imageFlags);
         };
 
     case WmtsFileInfo::Type::capabilities:

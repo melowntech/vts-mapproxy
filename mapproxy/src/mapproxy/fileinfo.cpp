@@ -318,7 +318,8 @@ Sink::FileInfo TmsFileInfo::sinkFileInfo(std::time_t lastModified) const
 
 SurfaceFileInfo::SurfaceFileInfo(const FileInfo &fi)
     : fileInfo(fi), type(Type::unknown), fileType(vs::File::config)
-    , tileType(vts::TileFile::meta), flavor(vts::FileFlavor::regular)
+    , tileType(vts::TileFile::meta), subTileIndex()
+    , flavor(vts::FileFlavor::regular)
     , support(), registry(), serviceFile()
 {
     if (vts::fromFilename

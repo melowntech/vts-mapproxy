@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,14 +24,51 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_definition_hpp_included_
-#define mapproxy_definition_hpp_included_
+#ifndef mapproxy_generator_surface_meta_hpp_included_
+#define mapproxy_generator_surface_meta_hpp_included_
 
-#include "definition/factory.hpp"
-#include "definition/tms.hpp"
-#include "definition/surface.hpp"
-#include "definition/surface-meta.hpp"
-#include "definition/geodata.hpp"
-#include "definition/geodata-semantic.hpp"
+#include "../generator.hpp"
+#include "../definition.hpp"
 
-#endif // mapproxy_definition_hpp_included_
+#include "providers.hpp"
+
+namespace vts = vtslibs::vts;
+namespace vr = vtslibs::registry;
+
+namespace generator {
+
+class SurfaceMeta : public Generator {
+public:
+    SurfaceMeta(const Params &params);
+
+    ~SurfaceMeta();
+
+    typedef resource::SurfaceMeta Definition;
+
+private:
+    virtual void prepare_impl(Arsenal &arsenal);
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const ;
+
+    virtual Task generateFile_impl(const FileInfo &fileInfo
+                                   , Sink &sink) const;
+
+    Generator::Task tileindex(const SurfaceFileInfo &fileInfo, Sink &sink)
+        const;
+
+    const Definition &definition_;
+
+    pointer surface_;
+    pointer tms_;
+
+    /** Pointer owned by surface.
+     */
+    VtsTilesetProvider *ts_;
+
+    /** Pointer owned by tms.
+     */
+    VtsAtlasProvider *atlas_;
+};
+
+} // namespace generator
+
+#endif // mapproxy_generator_surface_meta_hpp_included_

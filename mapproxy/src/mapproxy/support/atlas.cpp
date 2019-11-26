@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,14 +24,44 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_definition_hpp_included_
-#define mapproxy_definition_hpp_included_
+#include <opencv2/highgui/highgui.hpp>
 
-#include "definition/factory.hpp"
-#include "definition/tms.hpp"
-#include "definition/surface.hpp"
-#include "definition/surface-meta.hpp"
-#include "definition/geodata.hpp"
-#include "definition/geodata-semantic.hpp"
+#include "vts-libs/vts/opencv/atlas.hpp"
 
-#endif // mapproxy_definition_hpp_included_
+#include "atlas.hpp"
+
+namespace vts = vtslibs::vts;
+
+void sendImage(const cv::Mat &image, const Sink::FileInfo &sfi
+               , RasterFormat format, bool atlas, Sink &sink)
+{
+    if (atlas) {
+        // serialize as a single-image atlas
+
+        // TODO: make quality configurable
+        vts::opencv::Atlas a(75);
+        a.add(image);
+
+        std::ostringstream os;
+        a.serialize(os);
+        sink.content(os.str(), sfi);
+        return;
+    }
+
+    // serialize as a raw image
+    std::vector<unsigned char> buf;
+    switch (format) {
+    case RasterFormat::jpg:
+        // TODO: make quality configurable
+        cv::imencode(".jpg", image, buf
+                     , { cv::IMWRITE_JPEG_QUALITY, 75 });
+        break;
+
+    case RasterFormat::png:
+        cv::imencode(".png", image, buf
+                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+        break;
+    }
+
+    sink.content(buf, sfi);
+}

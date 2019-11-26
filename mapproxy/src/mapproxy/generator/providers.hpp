@@ -53,7 +53,6 @@ public:
     Generator::Task generateMesh(const vts::TileId &tileId
                                  , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
-                                 , Arsenal &arsenal
                                  , vts::SubMesh::TextureMode textureMode
                                  = vts::SubMesh::external) const;
 
@@ -65,12 +64,15 @@ public:
      */
     boost::optional<boost::filesystem::path> path(vts::File file) const;
 
+    /** Returns tileset properties.
+     */
+    vts::FullTileSetProperties properties() const;
+
 private:
     virtual Generator::Task
     generateMesh_impl(const vts::TileId &tileId
                       , Sink &sink
                       , const SurfaceFileInfo &fileInfo
-                      , Arsenal &arsenal
                       , vts::SubMesh::TextureMode textureMode)
         const = 0;
 
@@ -79,33 +81,64 @@ private:
 
     virtual boost::optional<boost::filesystem::path> path_impl(vts::File file)
         const = 0;
+
+    virtual vts::FullTileSetProperties properties_impl() const = 0;
+};
+
+class VtsAtlasProvider {
+public:
+    virtual ~VtsAtlasProvider() {}
+
+    /** Generates image/atlas and sends it to the output.
+     */
+    Generator::Task generateAtlas(const vts::TileId &tileId, Sink &sink
+                                  , const Sink::FileInfo &sfi
+                                  , bool atlas = false) const;
+
+private:
+    /** Generates image/atlas and sends it to the output.
+     */
+    virtual Generator::Task
+    generateAtlas_impl(const vts::TileId &tileId, Sink &sink
+                       , const Sink::FileInfo &sfi
+                       , bool atlas = false) const = 0;
 };
 
 // inlines
 
-/** Generates mesh and sends it to the output.
- */
-Generator::Task
+inline Generator::Task
 VtsTilesetProvider::generateMesh(const vts::TileId &tileId
                                  , Sink &sink
                                  , const SurfaceFileInfo &fileInfo
-                                 , Arsenal &arsenal
-                                 , vts::SubMesh::TextureMode textureMode) const
+                                 , vts::SubMesh::TextureMode textureMode)
+    const
 {
-    return generateMesh_impl(tileId, sink, fileInfo, arsenal, textureMode);
+    return generateMesh_impl(tileId, sink, fileInfo, textureMode);
 }
 
-Generator::Task
-VtsTilesetProvider::generateFile(const FileInfo &fileInfo, Sink sink)
-    const
+inline Generator::Task
+VtsTilesetProvider::generateFile(const FileInfo &fileInfo, Sink sink) const
 {
     return generateFile_impl(fileInfo, sink);
 }
 
-boost::optional<boost::filesystem::path>
+inline boost::optional<boost::filesystem::path>
 VtsTilesetProvider::path(vts::File file) const
 {
     return path_impl(file);
+}
+
+inline vts::FullTileSetProperties VtsTilesetProvider::properties() const
+{
+    return properties_impl();
+}
+
+inline Generator::Task
+VtsAtlasProvider::generateAtlas(const vts::TileId &tileId, Sink &sink
+                                , const Sink::FileInfo &sfi
+                                , bool atlas) const
+{
+    return generateAtlas_impl(tileId, sink, sfi, atlas);
 }
 
 } // namespace generator

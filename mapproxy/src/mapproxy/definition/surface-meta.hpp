@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,14 +24,37 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_definition_hpp_included_
-#define mapproxy_definition_hpp_included_
+#ifndef mapproxy_definition_surface_meta_hpp_included_
+#define mapproxy_definition_surface_meta_hpp_included_
 
-#include "definition/factory.hpp"
-#include "definition/tms.hpp"
-#include "definition/surface.hpp"
-#include "definition/surface-meta.hpp"
-#include "definition/geodata.hpp"
-#include "definition/geodata-semantic.hpp"
+#include "../resource.hpp"
 
-#endif // mapproxy_definition_hpp_included_
+// fwd
+namespace Json { class Value; }
+
+namespace resource {
+
+// meta surface: combines existing surface with existing TMS
+
+class SurfaceMeta : public DefinitionBase {
+public:
+    Resource::Id surface;
+    Resource::Id tms;
+
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::surface;
+
+    static constexpr char driverName[] = "surface-meta";
+
+protected:
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
+    virtual Changed changed_impl(const DefinitionBase &other) const;
+    virtual Resource::Id::list needsResources_impl() const;
+    virtual bool needsRanges_impl() const { return false; }
+};
+
+} // namespace resource
+
+#endif // mapproxy_definition_surface_meta_hpp_included_
+

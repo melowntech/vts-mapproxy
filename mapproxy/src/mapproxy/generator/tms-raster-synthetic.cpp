@@ -49,6 +49,7 @@
 #include "../support/metatile.hpp"
 #include "../support/tileindex.hpp"
 #include "../support/revision.hpp"
+#include "../support/atlas.hpp"
 
 #include "tms-raster-synthetic.hpp"
 #include "factory.hpp"
@@ -222,13 +223,14 @@ Generator::Task TmsRasterSynthetic
 }
 
 void TmsRasterSynthetic::generateTileImage(const vts::TileId &tileId
-                                           , Sink::FileInfo &&sfi
+                                           , const Sink::FileInfo &sfi
                                            , RasterFormat format
                                            , Sink &sink, Arsenal&
-                                           , bool dontOptimize) const
+                                           , const ImageFlags &imageFlags)
+    const
 {
     sink.checkAborted();
-    if (format != definition_.format) {
+    if (!imageFlags.checkFormat(format, definition_.format)) {
         return sink.error
             (utility::makeError<NotFound>
              ("Format <%s> is not supported by this resource (%s)."
@@ -244,7 +246,7 @@ void TmsRasterSynthetic::generateTileImage(const vts::TileId &tileId
 
     bool valid(true);
     if (!nodeInfo.productive()) {
-        if (!dontOptimize) {
+        if (!imageFlags.dontOptimize) {
             return sink.error
                 (utility::makeError<EmptyImage>("No valid data."));
         }
@@ -260,22 +262,8 @@ void TmsRasterSynthetic::generateTileImage(const vts::TileId &tileId
                                           , vr::BoundLayer::tileWidth
                                           , cv::Vec3b(0, 0, 0)));
 
-    // serialize
-    std::vector<unsigned char> buf;
-    switch (format) {
-    case RasterFormat::jpg:
-        // TODO: configurable quality
-        cv::imencode(".jpg", tile, buf
-                     , { cv::IMWRITE_JPEG_QUALITY, 75 });
-        break;
-
-    case RasterFormat::png:
-        cv::imencode(".png", tile, buf
-                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-        break;
-    }
-
-    sink.content(buf, sfi);
+    // send image to client
+    sendImage(tile, sfi, format, imageFlags.atlas, sink);
 }
 
 void TmsRasterSynthetic::generateTileMask(const vts::TileId &tileId

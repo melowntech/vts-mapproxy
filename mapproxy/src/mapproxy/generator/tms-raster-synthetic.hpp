@@ -70,9 +70,10 @@ private:
                                       , Sink &sink) const;
 
     virtual void
-    generateTileImage(const vts::TileId &tileId, Sink::FileInfo &&fi
-                      , RasterFormat format, Sink &sink, Arsenal &arsenal
-                      , bool dontOptimize = false) const;
+    generateTileImage(const vts::TileId &tileId, const Sink::FileInfo &fi
+                      , RasterFormat format
+                      , Sink &sink, Arsenal &arsenal
+                      , const ImageFlags &imageFlags = ImageFlags()) const;
 
     virtual cv::Mat generateTileImage(const vts::TileId &tileId) const = 0;
 

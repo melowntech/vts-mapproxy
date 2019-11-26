@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,14 +24,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_definition_hpp_included_
-#define mapproxy_definition_hpp_included_
+#ifndef mapproxy_support_atlas_hpp_included_
+#define mapproxy_support_atlas_hpp_included_
 
-#include "definition/factory.hpp"
-#include "definition/tms.hpp"
-#include "definition/surface.hpp"
-#include "definition/surface-meta.hpp"
-#include "definition/geodata.hpp"
-#include "definition/geodata-semantic.hpp"
+#include <opencv2/core/core.hpp>
 
-#endif // mapproxy_definition_hpp_included_
+#include "../resource.hpp"
+#include "../sink.hpp"
+
+/** Sends image from cv::Mat into sink in given format. If atlas is set it
+ *  generates single-image VTS atlas (always JPEG).
+ */
+void sendImage(const cv::Mat &image, const Sink::FileInfo &sfi
+               , RasterFormat format, bool atlas, Sink &sink);
+
+#endif // mapproxy_support_atlas_hpp_included_

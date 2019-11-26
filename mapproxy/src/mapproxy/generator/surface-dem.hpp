@@ -24,8 +24,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_surface_spheroid_hpp_included_
-#define mapproxy_generator_surface_spheroid_hpp_included_
+#ifndef mapproxy_generator_surface_dem_hpp_included_
+#define mapproxy_generator_surface_dem_hpp_included_
 
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
@@ -85,4 +85,4 @@ private:
 
 } // namespace generator
 
-#endif // mapproxy_generator_surface_spheroid_hpp_included_
+#endif // mapproxy_generator_surface_dem_hpp_included_

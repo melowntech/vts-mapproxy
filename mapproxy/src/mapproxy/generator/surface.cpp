@@ -36,6 +36,7 @@
 #include "utility/raise.hpp"
 #include "utility/path.hpp"
 #include "utility/gzipper.hpp"
+#include "utility/cppversion.hpp"
 
 #include "imgproc/rastermask/cvmat.hpp"
 #include "imgproc/png.hpp"
@@ -105,15 +106,13 @@ public:
     {}
 
 private:
-    Generator::Task generateMesh_impl(const vts::TileId &tileId
-                                      , Sink&
+    Generator::Task generateMesh_impl(const vts::TileId &tileId, Sink&
                                       , const SurfaceFileInfo &fileInfo
-                                      , Arsenal&
                                       , vts::SubMesh::TextureMode textureMode)
         const override
     {
         return[=](Sink &sink, Arsenal &arsenal) {
-            return surface_.generateMesh
+            surface_.generateMesh
                 (tileId, sink, fileInfo, arsenal, textureMode);
         };
     }
@@ -140,6 +139,10 @@ private:
         return surface_.filePath(file);
     }
 
+    vts::FullTileSetProperties properties_impl() const {
+        return surface_.properties_;
+    }
+
     SurfaceBase &surface_;
 };
 
@@ -160,7 +163,9 @@ SurfaceBase::SurfaceBase(const Params &params)
     : Generator(params, terrainSupport(params))
     , definition_(resource().definition<Definition>())
     , tms_(params.resource.referenceFrame->findExtension<vre::Tms>())
-{}
+{
+    setProvider(std::make_unique<SurfaceProvider>(*this));
+}
 
 bool SurfaceBase::loadFiles(const Definition &definition)
 {
