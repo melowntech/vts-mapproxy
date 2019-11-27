@@ -348,6 +348,31 @@ definition = {
 }
 ```
 
+### Driver: surface-meta
+
+This driver is a special kind of beast. It combines existing surface with TMS to produce internally textured surface.
+It doesn't generate any content on its own but forward all requests to existing surface and TMS resources.
+These drivers must exist in the system.
+
+Caveats:
+
+* This driver does not support any introspection. If introspection is instroduced in the future it would lack the boundlayer 
+specification (TMS) because this driver already produces its own imagery.
+
+* Keeps original surface's credits burned in the metatiles.
+
+* So far, during runtime, this driver doesn't watch for changes in the underlying surface/TMS and keeps the old driver
+instance alive while the original resource has been reconfigured and is being served by new driver instance.
+
+```javascript
+definition = {
+    // see common surface driver configuration options above
+    ResourceId surface                // Resource ID od underlying surface resource
+    ResourceId tms                    // Resource ID od underlying tms resource
+}
+```
+
+
 ## Geodata drivers
 
 Geodata drivers generate vector geographic data in the form of VTS free layer.
