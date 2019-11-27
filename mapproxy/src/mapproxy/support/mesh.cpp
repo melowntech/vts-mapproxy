@@ -382,32 +382,41 @@ private:
 
 vts::SubMesh& addSubMesh(vts::Mesh &mesh, const geometry::Mesh &gmesh
                          , const vts::NodeInfo &nodeInfo
-                         , const boost::optional<std::string> &geoidGrid)
+                         , const boost::optional<std::string> &geoidGrid
+                         , vts::SubMesh::TextureMode textureMode)
 {
     const auto extents(nodeInfo.extents());
     const auto l2g(geo::local2geo(extents));
 
     mesh.submeshes.emplace_back();
     auto &sm(mesh.submeshes.back());
-    sm.textureMode = vts::SubMesh::external;
+    sm.textureMode = textureMode;
+    const bool generateTc(textureMode == vts::SubMesh::TextureMode::internal);
 
     TextureNormalizer tn(extents);
     const auto conv(sds2phys(nodeInfo, geoidGrid));
 
-    bool generateEtc(nodeInfo.node().externalTexture);
+    const bool generateEtc(nodeInfo.node().externalTexture);
+
+    const bool textured(generateEtc || generateTc);
     for (const auto &v : gmesh.vertices) {
         // convert v from local coordinates to division SRS then to physical SRS
         sm.vertices.push_back(conv(transform(l2g, v)));
 
-        // generate external texture coordinates if instructed
-        if (generateEtc) {
-            sm.etc.push_back(tn(v));
+        // generate external/internal texture coordinates if instructed
+        if (textured) {
+            const auto tc(tn(v));
+            if (generateEtc) { sm.etc.push_back(tc); }
+            if (generateTc) { sm.tc.push_back(tc); }
         }
     }
 
     for (const auto &f : gmesh.faces) {
         sm.faces.emplace_back(f.a, f.b, f.c);
     }
+
+    // texture faces same as regular faces
+    if (generateTc) { sm.facesTc = sm.faces; }
 
     return sm;
 }

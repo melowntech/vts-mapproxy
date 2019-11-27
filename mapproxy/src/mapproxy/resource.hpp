@@ -51,61 +51,8 @@ namespace Json { class Value; }
 
 enum class Changed { yes, no, safely, withRevisionBump };
 
-/** Base of all resource definitions.
- */
-class DefinitionBase {
-public:
-    typedef std::shared_ptr<DefinitionBase> pointer;
-    virtual ~DefinitionBase() {}
-
-    void from(const Json::Value &value) { from_impl(value); }
-    void to(Json::Value &value) const { to_impl(value); }
-    Changed changed(const DefinitionBase &other) const {
-        return changed_impl(other);
-    }
-
-    /** Are credits frozen in the resources's dataset?
-     */
-    bool frozenCredits() const { return frozenCredits_impl(); }
-
-    /** Returns true if resource needs lod and tile ranges.
-     */
-    bool needsRanges() const { return needsRanges_impl(); }
-
-    template <typename T> const T& as() const {
-        if (const auto *value = dynamic_cast<const T*>(this)) {
-            return *value;
-        }
-        LOGTHROW(err1, Error)
-            << "Incompatible resource definitions: cannot convert <"
-            << typeid(*this).name() << "> into <" << typeid(T).name() << ">.";
-        throw;
-    }
-
-private:
-    /** Fills in this definition from given input value.
-     */
-    virtual void from_impl(const Json::Value &value) = 0;
-
-    /** Fills in this definition into given output value.
-     */
-    virtual void to_impl(Json::Value &value) const = 0;
-
-    /** Compares this resource definition the other one and check whether they
-     *  are basically the same. The definitions can differ but the difference
-     *  must not affect resource generation.
-     */
-    virtual Changed changed_impl(const DefinitionBase &other) const = 0;
-
-    /** If generated dataset freezes credit info into its published data then
-     *  credits cannot be changed.
-     */
-    virtual bool frozenCredits_impl() const { return true; }
-
-    /** Returns true if resource needs lod and tile ranges.
-     */
-    virtual bool needsRanges_impl() const { return true; }
-};
+// fwd
+class DefinitionBase;
 
 namespace vr = vtslibs::registry;
 namespace vts = vtslibs::vts;
@@ -159,8 +106,12 @@ struct Resource {
         Id(const std::string &referenceFrame, const std::string &group
            , const std::string &id)
             : referenceFrame(referenceFrame), group(group), id(id) {}
+
+        Id(const std::string &referenceFrame, const Id &id)
+            : referenceFrame(referenceFrame), group(id.group), id(id.id) {}
         bool operator<(const Id &o) const;
         bool operator==(const Id &o) const;
+        bool operator!=(const Id &o) const;
 
         typedef std::vector<Id> list;
     };
@@ -178,6 +129,7 @@ struct Resource {
             : type(type), driver(driver) {}
         bool operator<(const Generator &o) const;
         bool operator==(const Generator &o) const;
+        bool operator!=(const Generator &o) const;
 
         template <typename Definition> static Generator from() {
             return { Definition::type, Definition::driverName };
@@ -203,15 +155,11 @@ struct Resource {
 
     FileClassSettings fileClassSettings;
 
-    DefinitionBase::pointer definition() const {
-        return definition_;
-    }
+    std::shared_ptr<DefinitionBase> definition() const { return definition_; }
 
-    template <typename T> const T& definition() const {
-        return definition_->as<T>();
-    }
+    template <typename T> const T& definition() const;
 
-    void definition(const DefinitionBase::pointer &definition) {
+    void definition(const std::shared_ptr<DefinitionBase> &definition) {
         definition_ = definition;
     }
 
@@ -224,11 +172,79 @@ struct Resource {
 
     Changed changed(const Resource &o) const;
 
+    Id::list needsResources() const;
+
 private:
     /** Definition: based on type and driver, created by resource
      *  parser/generator and interpreted by driver.
      */
-    DefinitionBase::pointer definition_;
+    std::shared_ptr<DefinitionBase> definition_;
+};
+
+/** Base of all resource definitions.
+ */
+class DefinitionBase {
+public:
+    typedef std::shared_ptr<DefinitionBase> pointer;
+    virtual ~DefinitionBase() {}
+
+    void from(const Json::Value &value) { from_impl(value); }
+    void to(Json::Value &value) const { to_impl(value); }
+    Changed changed(const DefinitionBase &other) const {
+        return changed_impl(other);
+    }
+
+    /** Are credits frozen in the resources's dataset?
+     */
+    bool frozenCredits() const { return frozenCredits_impl(); }
+
+    /** Returns true if resource needs lod and tile ranges.
+     */
+    bool needsRanges() const { return needsRanges_impl(); }
+
+    /** Returns list of resources this resource depends on.
+     */
+    Resource::Id::list needsResources() const { return needsResources_impl(); }
+
+    template <typename T> const T& as() const {
+        if (const auto *value = dynamic_cast<const T*>(this)) {
+            return *value;
+        }
+        LOGTHROW(err1, Error)
+            << "Incompatible resource definitions: cannot convert <"
+            << typeid(*this).name() << "> into <" << typeid(T).name() << ">.";
+        throw;
+    }
+
+private:
+    /** Fills in this definition from given input value.
+     */
+    virtual void from_impl(const Json::Value &value) = 0;
+
+    /** Fills in this definition into given output value.
+     */
+    virtual void to_impl(Json::Value &value) const = 0;
+
+    /** Compares this resource definition the other one and check whether they
+     *  are basically the same. The definitions can differ but the difference
+     *  must not affect resource generation.
+     */
+    virtual Changed changed_impl(const DefinitionBase &other) const = 0;
+
+    /** If generated dataset freezes credit info into its published data then
+     *  credits cannot be changed.
+     */
+    virtual bool frozenCredits_impl() const { return true; }
+
+    /** Returns true if resource needs lod and tile ranges.
+     */
+    virtual bool needsRanges_impl() const { return true; }
+
+    /** Returns list of resources this resource depends on.
+     */
+    virtual Resource::Id::list needsResources_impl() const {
+        return {};
+    }
 };
 
 struct GeneratorInterface {
@@ -426,6 +442,10 @@ inline bool Resource::Id::operator==(const Id &o) const {
             && (id == o.id));
 }
 
+inline bool Resource::Id::operator!=(const Id &o) const {
+    return !operator==(o);
+}
+
 inline bool Resource::Generator::operator<(const Generator &o) const {
     return std::tie(type, driver) < std::tie(o.type, o.driver);
 }
@@ -433,6 +453,10 @@ inline bool Resource::Generator::operator<(const Generator &o) const {
 inline bool Resource::Generator::operator==(const Generator &o) const {
     return ((type == o.type)
             && (driver == o.driver));
+}
+
+inline bool Resource::Generator::operator!=(const Generator &o) const {
+    return !operator==(o);
 }
 
 inline Resource::Id addReferenceFrame(Resource::Id rid
@@ -508,6 +532,10 @@ operator&(GeneratorInterface::Interface l, GeneratorInterface::Interface r)
     return static_cast<GeneratorInterface::Interface>
         (static_cast<std::uint8_t>(l)
          & static_cast<std::uint8_t>(r));
+}
+
+template <typename T> const T& Resource::definition() const {
+    return definition_->as<T>();
 }
 
 #endif // mapproxy_resource_hpp_included_

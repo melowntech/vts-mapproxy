@@ -39,6 +39,7 @@
 #include <boost/filesystem/path.hpp>
 
 #include "utility/resourcefetcher.hpp"
+#include "utility/format.hpp"
 
 #include "vts-libs/storage/support.hpp"
 #include "vts-libs/vts/mapconfig.hpp"
@@ -71,12 +72,28 @@ public:
 
     std::shared_ptr<Generator>
     findGenerator(Resource::Generator::Type generatorType
-                  , const Resource::Id &resourceId) const;
+                  , const Resource::Id &resourceId
+                  , bool mustBeReady = true) const;
 
 private:
     virtual std::shared_ptr<Generator>
     findGenerator_impl(Resource::Generator::Type generatorType
-                       , const Resource::Id &resourceId) const = 0;
+                       , const Resource::Id &resourceId
+                       , bool mustBeReady) const = 0;
+};
+
+struct GeneratorNotFound : std::runtime_error {
+    GeneratorNotFound(Resource::Generator::Type generatorType
+                      , const Resource::Id &resourceId)
+        : std::runtime_error
+          (utility::format("Cannot find <%s> generator for resource <%s>."
+                           , generatorType, resourceId))
+        , generatorType(generatorType)
+        , resourceId(resourceId)
+    {}
+
+    Resource::Generator::Type generatorType;
+    const Resource::Id &resourceId;
 };
 
 /** Dataset generator.
@@ -219,6 +236,16 @@ public:
      */
     bool updatedSince(std::uint64_t timestamp) const;
 
+    /** Generic type for provider handling
+     */
+    struct Provider { virtual ~Provider() {} };
+
+    /** Returns generators provider machinery. Returns null if provider of given
+     *  type is not available.
+     */
+    template <typename ProviderType>
+    ProviderType* getProvider() const;
+
 protected:
     Generator(const Params &params, const Properties &props = Properties());
 
@@ -252,7 +279,9 @@ protected:
         const;
 
     Generator::pointer otherGenerator(Resource::Generator::Type generatorType
-                                      , const Resource::Id &resourceId) const;
+                                      , const Resource::Id &resourceId
+                                      , bool mustBeReady = true
+                                      , bool mandatory = false) const;
 
     void supportFile(const vs::SupportFile &support, Sink &sink
                      , const Sink::FileInfo &fileInfo) const;
@@ -264,6 +293,10 @@ protected:
      *  not be made ready.
      */
     bool changeEnforced() const { return changeEnforced_; }
+
+    /** Sets new provider. Value is stolen.
+     */
+    void setProvider(std::unique_ptr<Provider> &&provider);
 
 private:
     virtual void prepare_impl(Arsenal &arsenal) = 0;
@@ -284,6 +317,7 @@ private:
     std::atomic<std::uint64_t> readySince_;
     DemRegistry::pointer demRegistry_;
     Generator::pointer replace_;
+    std::unique_ptr<Provider> provider_;
 };
 
 /** Set of dataset generators.
@@ -384,16 +418,36 @@ inline Generator::pointer Generators::generator(const FileInfo &fileInfo) const
 
 std::shared_ptr<Generator>
 inline GeneratorFinder::findGenerator(Resource::Generator::Type generatorType
-                                      , const Resource::Id &resourceId) const
+                                      , const Resource::Id &resourceId
+                                      , bool mustBeReady) const
 {
-    return findGenerator_impl(generatorType, resourceId);
+    return findGenerator_impl(generatorType, resourceId, mustBeReady);
 }
 
 inline Generator::pointer
 Generator::otherGenerator(Resource::Generator::Type generatorType
-                          , const Resource::Id &resourceId) const
+                          , const Resource::Id &resourceId
+                          , bool mustBeReady, bool mandatory)
+    const
 {
-    return generatorFinder_->findGenerator(generatorType, resourceId);
+    auto other(generatorFinder_->findGenerator
+               (generatorType, resourceId, mustBeReady));
+    if (!other && mandatory) {
+        throw GeneratorNotFound(generatorType, resourceId);
+    }
+    return other;
+}
+
+template <typename ProviderType>
+ProviderType* Generator::getProvider() const
+{
+    if (!provider_) { return nullptr; }
+    return dynamic_cast<ProviderType*>(provider_.get());
+}
+
+inline void Generator::setProvider(std::unique_ptr<Provider> &&provider)
+{
+    provider_ = std::move(provider);
 }
 
 #endif // mapproxy_generator_hpp_included_

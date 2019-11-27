@@ -99,10 +99,11 @@ private:
                                       , Sink &sink) const;
 
     virtual void generateTileImage(const vts::TileId &tileId
-                                   , Sink::FileInfo &&fi
+                                   , const Sink::FileInfo &fi
                                    , RasterFormat format
                                    , Sink &sink, Arsenal &arsenal
-                                   , bool dontOptimize) const;
+                                   , const ImageFlags &imageFlags
+                                   = ImageFlags()) const;
 
     void generateTileMask(const vts::TileId &tileId
                           , const TmsFileInfo &fi

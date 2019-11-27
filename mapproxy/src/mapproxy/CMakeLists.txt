@@ -22,6 +22,7 @@ set(mapproxy-core_SOURCES
   support/mmapped/memory.hpp support/mmapped/memory-impl.hpp
   support/mmapped/tileflags.hpp
   support/mmapped/qtree-rasterize.hpp
+  support/atlas.hpp support/atlas.cpp
 
   support/mmapped/tilesetindex.hpp support/mmapped/tilesetindex.cpp
   heightfunction.hpp heightfunction.cpp
@@ -47,6 +48,7 @@ set(mapproxy-core_SOURCES
   definition/surface.cpp
   definition/surface-spheroid.cpp
   definition/surface-dem.cpp
+  definition/surface-meta.hpp definition/surface-meta.cpp
 
   definition/geodata.hpp
   definition/geodata.cpp
@@ -128,9 +130,12 @@ set(mapproxy_SOURCES
 
   generator.hpp
   generator/generator.cpp
+  generator/generators.hpp generator/generators.cpp
+  generator/registry.hpp generator/registry.cpp
   generator/factory.hpp
   generator/metatile.hpp generator/metatile.cpp
   generator/demregistry.hpp generator/demregistry.cpp
+  generator/providers.hpp
 
   # bound layers
   generator/tms-raster-base.hpp generator/tms-raster-base.cpp
@@ -146,6 +151,7 @@ set(mapproxy_SOURCES
   generator/surface.hpp generator/surface.cpp
   generator/surface-spheroid.hpp generator/surface-spheroid.cpp
   generator/surface-dem.hpp generator/surface-dem.cpp
+  generator/surface-meta.hpp generator/surface-meta.cpp
 
   # free layers
   generator/geodatavectorbase.hpp generator/geodatavectorbase.cpp

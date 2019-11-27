@@ -47,11 +47,24 @@ public:
                   = boost::none);
 
 protected:
+    struct ImageFlags {
+        bool dontOptimize;
+        bool atlas;
+        bool forceFormat;
+
+        ImageFlags()
+            : dontOptimize(false), atlas(false), forceFormat(false)
+        {}
+        bool checkFormat(RasterFormat requested, RasterFormat configured)
+            const;
+    };
+
     virtual void generateTileImage(const vts::TileId &tileId
-                                   , Sink::FileInfo &&sfi
+                                   , const Sink::FileInfo &sfi
                                    , RasterFormat format
                                    , Sink &sink, Arsenal &arsenal
-                                   , bool dontOptimize = false) const = 0;
+                                   , const ImageFlags &imageFlags
+                                   = ImageFlags()) const = 0;
 
 private:
     virtual Task generateFile_impl(const FileInfo &fileInfo
@@ -70,7 +83,17 @@ private:
 
     RasterFormat format_;
     const vre::Wmts *wmts_;
+
+    friend class AtlasProvider;
 };
+
+inline bool TmsRasterBase::ImageFlags::checkFormat(RasterFormat requested
+                                                   , RasterFormat configured)
+    const
+{
+    if (atlas || forceFormat) { return true; }
+    return (requested == configured);
+}
 
 } // namespace generator
 

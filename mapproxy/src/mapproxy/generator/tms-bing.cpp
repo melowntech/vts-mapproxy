@@ -89,7 +89,6 @@ TmsBing::TmsBing(const Params &params)
 void TmsBing::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
-    makeReady();
 }
 
 namespace {

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,33 +24,37 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_factory_hpp_included_
-#define mapproxy_generator_factory_hpp_included_
+#ifndef mapproxy_definition_surface_meta_hpp_included_
+#define mapproxy_definition_surface_meta_hpp_included_
 
-#include <memory>
+#include "../resource.hpp"
 
-#include "../generator.hpp"
+// fwd
+namespace Json { class Value; }
 
-struct Generator::Factory {
-    typedef std::shared_ptr<Factory> pointer;
-    virtual ~Factory() {}
-    virtual Generator::pointer create(const Params &params) = 0;
+namespace resource {
 
-    /** If true is returned a default system resource is generated for each
-     *  reference frame.
-     */
-    virtual bool systemInstance() const { return false; }
+// meta surface: combines existing surface with existing TMS
 
-    /** Factory registry support
-     */
-    typedef std::map<Resource::Generator, pointer> Registry;
+class SurfaceMeta : public DefinitionBase {
+public:
+    Resource::Id surface;
+    Resource::Id tms;
 
-    static pointer findFactory(const Resource::Generator &type);
+    static constexpr Resource::Generator::Type type
+        = Resource::Generator::Type::surface;
 
-    static void registerType(const Resource::Generator &type
-                             , const pointer &factory);
+    static constexpr char driverName[] = "surface-meta";
 
-    static Registry &registry();
+protected:
+    virtual void from_impl(const Json::Value &value);
+    virtual void to_impl(Json::Value &value) const;
+    virtual Changed changed_impl(const DefinitionBase &other) const;
+    virtual Resource::Id::list needsResources_impl() const;
+    virtual bool needsRanges_impl() const { return false; }
 };
 
-#endif // mapproxy_generator_factory_hpp_included_
+} // namespace resource
+
+#endif // mapproxy_definition_surface_meta_hpp_included_
+

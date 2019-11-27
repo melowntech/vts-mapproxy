@@ -89,7 +89,9 @@ void addSkirt(geometry::Mesh &mesh, const vts::NodeInfo &nodeInfo);
 
 vts::SubMesh& addSubMesh(vts::Mesh &mesh, const geometry::Mesh &gmesh
                          , const vts::NodeInfo &nodeInfo
-                         , const boost::optional<std::string> &geoidGrid);
+                         , const boost::optional<std::string> &geoidGrid
+                         , vts::SubMesh::TextureMode textureMode
+                         = vts::SubMesh::external);
 
 qmf::Mesh qmfMesh(const geometry::Mesh &gmesh, const vts::NodeInfo &nodeInfo
                   , const std::string &srs

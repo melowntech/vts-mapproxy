@@ -716,3 +716,12 @@ std::istream& operator>>(std::istream &is, GeneratorInterface &gi)
     return is;
 }
 
+Resource::Id::list Resource::needsResources() const
+{
+    // fetch list of needed resource IDs and inject reference frame
+    auto neededIds(definition_->needsResources());
+    for (auto &neededId : neededIds) {
+        neededId.referenceFrame = id.referenceFrame;
+    }
+    return neededIds;
+}

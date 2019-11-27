@@ -51,6 +51,7 @@
 #include "../support/mmapped/qtree.hpp"
 #include "../support/mmapped/qtree-rasterize.hpp"
 #include "../support/revision.hpp"
+#include "../support/atlas.hpp"
 #include "../support/wmts.hpp"
 
 #include "tms-raster.hpp"
@@ -173,7 +174,6 @@ void TmsRaster::prepare_impl(Arsenal&)
         index_ = boost::in_place(deliveryIndexPath);
 
         // done
-        makeReady();
         return;
     }
 
@@ -204,8 +204,6 @@ void TmsRaster::prepare_impl(Arsenal&)
         // some invalid pixels
         hasMetatiles_ = !ds.allValid();
     }
-
-    makeReady();
 }
 
 RasterFormat TmsRaster::format() const
@@ -340,7 +338,7 @@ Generator::Task TmsRaster::generateVtsFile_impl(const FileInfo &fileInfo
     case TmsFileInfo::Type::image: {
         return[=](Sink &sink, Arsenal &arsenal) {
             generateTileImage(fi.tileId, fi.sinkFileInfo(), fi.format
-                              , sink, arsenal, false);
+                              , sink, arsenal, ImageFlags());
         };
     }
 
@@ -365,35 +363,21 @@ Generator::Task TmsRaster::generateVtsFile_impl(const FileInfo &fileInfo
 }
 
 void TmsRaster::generateTileImage(const vts::TileId &tileId
-                                  , Sink::FileInfo &&fi
+                                  , const Sink::FileInfo &fi
                                   , RasterFormat format
                                   , Sink &sink, Arsenal &arsenal
-                                  , bool dontOptimize) const
+                                  , const ImageFlags &imageFlags) const
 {
     sink.checkAborted();
 
     const auto &serialize([&](const cv::Mat &tile, const DatasetDesc &ds)
                           -> void
     {
-        // serialize
-        std::vector<unsigned char> buf;
-        switch (format) {
-        case RasterFormat::jpg:
-            // TODO: configurable quality
-            cv::imencode(".jpg", tile, buf
-                         , { cv::IMWRITE_JPEG_QUALITY, 75 });
-            break;
-
-        case RasterFormat::png:
-            cv::imencode(".png", tile, buf
-                         , { cv::IMWRITE_PNG_COMPRESSION, 9 });
-            break;
-        }
-
-        sink.content(buf, fi.setMaxAge(ds.maxAge));
+        sendImage(tile, Sink::FileInfo(fi).setMaxAge(ds.maxAge)
+                  , format, imageFlags.atlas, sink);
     });
 
-    if (format != this->format()) {
+    if (!imageFlags.checkFormat(format, this->format())) {
         return sink.error
             (utility::makeError<NotFound>
              ("Format <%s> is not supported by this resource (%s)."
@@ -410,7 +394,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
     if (!nodeInfo.productive()
         || (index_ && !vts::TileIndex::Flag::isReal(index_->get(tileId))))
     {
-        if (!dontOptimize) {
+        if (!imageFlags.dontOptimize) {
             return sink.error
                 (utility::makeError<EmptyImage>("No valid data."));
         }
@@ -433,7 +417,7 @@ void TmsRaster::generateTileImage(const vts::TileId &tileId
     // * transparent: we cannot report transparecny for empty/full image
     // * dontOptimize set: we are forbidden to return empty/full image
     const auto operation
-        ((ds.dynamic || transparent() || dontOptimize)
+        ((ds.dynamic || transparent() || imageFlags.dontOptimize)
          ? GdalWarper::RasterRequest::Operation::imageNoOpt
          : GdalWarper::RasterRequest::Operation::image);
 

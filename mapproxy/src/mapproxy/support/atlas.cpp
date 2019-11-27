@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,33 +24,44 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_factory_hpp_included_
-#define mapproxy_generator_factory_hpp_included_
+#include <opencv2/highgui/highgui.hpp>
 
-#include <memory>
+#include "vts-libs/vts/opencv/atlas.hpp"
 
-#include "../generator.hpp"
+#include "atlas.hpp"
 
-struct Generator::Factory {
-    typedef std::shared_ptr<Factory> pointer;
-    virtual ~Factory() {}
-    virtual Generator::pointer create(const Params &params) = 0;
+namespace vts = vtslibs::vts;
 
-    /** If true is returned a default system resource is generated for each
-     *  reference frame.
-     */
-    virtual bool systemInstance() const { return false; }
+void sendImage(const cv::Mat &image, const Sink::FileInfo &sfi
+               , RasterFormat format, bool atlas, Sink &sink)
+{
+    if (atlas) {
+        // serialize as a single-image atlas
 
-    /** Factory registry support
-     */
-    typedef std::map<Resource::Generator, pointer> Registry;
+        // TODO: make quality configurable
+        vts::opencv::Atlas a(75);
+        a.add(image);
 
-    static pointer findFactory(const Resource::Generator &type);
+        std::ostringstream os;
+        a.serialize(os);
+        sink.content(os.str(), sfi);
+        return;
+    }
 
-    static void registerType(const Resource::Generator &type
-                             , const pointer &factory);
+    // serialize as a raw image
+    std::vector<unsigned char> buf;
+    switch (format) {
+    case RasterFormat::jpg:
+        // TODO: make quality configurable
+        cv::imencode(".jpg", image, buf
+                     , { cv::IMWRITE_JPEG_QUALITY, 75 });
+        break;
 
-    static Registry &registry();
-};
+    case RasterFormat::png:
+        cv::imencode(".png", image, buf
+                     , { cv::IMWRITE_PNG_COMPRESSION, 9 });
+        break;
+    }
 
-#endif // mapproxy_generator_factory_hpp_included_
+    sink.content(buf, sfi);
+}

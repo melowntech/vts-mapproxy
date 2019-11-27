@@ -24,8 +24,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_surface_spheroid_hpp_included_
-#define mapproxy_generator_surface_spheroid_hpp_included_
+#ifndef mapproxy_generator_surface_dem_hpp_included_
+#define mapproxy_generator_surface_dem_hpp_included_
 
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
 #include "vts-libs/vts/tileset/properties.hpp"
@@ -54,7 +54,9 @@ private:
     virtual void generateMetatile(const vts::TileId &tileId
                                   , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
-                                  , Arsenal &arsenal) const;
+                                  , Arsenal &arsenal
+                                  , vts::SubMesh::TextureMode textureMode)
+        const;
 
     virtual AugmentedMesh
     generateMeshImpl(const vts::NodeInfo &nodeInfo, Sink &sink
@@ -66,8 +68,10 @@ private:
                                  , Arsenal &arsenal) const;
 
     vts::MetaTile generateMetatileImpl(const vts::TileId &tileId
-                                       , Sink &sink
-                                       , Arsenal &arsenal) const;
+                                       , Sink &sink, Arsenal &arsenal
+                                       , vts::SubMesh::TextureMode textureMode
+                                       = vts::SubMesh::external)
+        const;
 
     void addToRegistry();
 
@@ -85,4 +89,4 @@ private:
 
 } // namespace generator
 
-#endif // mapproxy_generator_surface_spheroid_hpp_included_
+#endif // mapproxy_generator_surface_dem_hpp_included_

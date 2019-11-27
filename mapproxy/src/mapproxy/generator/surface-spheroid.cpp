@@ -241,7 +241,9 @@ const int metatileSamplesPerTile(8);
 void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                                        , Sink &sink
                                        , const SurfaceFileInfo &fi
-                                       , Arsenal&) const
+                                       , Arsenal&
+                                       , vts::SubMesh::TextureMode textureMode)
+    const
 {
     sink.checkAborted();
 
@@ -292,6 +294,10 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
             }
         }
     });
+
+    // set internal texture count to 1 if we are generating internal textures
+    const std::size_t internalTextureCount
+        (textureMode == vts::SubMesh::internal);
 
     for (const auto &block : blocks) {
         const auto &view(block.view);
@@ -425,6 +431,9 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
                 // set credits
                 node.updateCredits(resource().credits);
+
+                // texturing
+                node.internalTextureCount(internalTextureCount);
 
                 // mesh is (almost) flat -> use tile area
                 if (geometry) {

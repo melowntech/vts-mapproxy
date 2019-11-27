@@ -30,6 +30,7 @@
 #include "definition/factory.hpp"
 #include "definition/tms.hpp"
 #include "definition/surface.hpp"
+#include "definition/surface-meta.hpp"
 #include "definition/geodata.hpp"
 #include "definition/geodata-semantic.hpp"
 

@@ -228,7 +228,9 @@ vts::MapConfig SurfaceDem::mapConfig_impl(ResourceRoot root) const
 void SurfaceDem::generateMetatile(const vts::TileId &tileId
                                   , Sink &sink
                                   , const SurfaceFileInfo &fi
-                                  , Arsenal &arsenal) const
+                                  , Arsenal &arsenal
+                                  , vts::SubMesh::TextureMode textureMode)
+    const
 {
     sink.checkAborted();
 
@@ -237,7 +239,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         return;
     }
 
-    auto metatile(generateMetatileImpl(tileId, sink, arsenal));
+    auto metatile(generateMetatileImpl(tileId, sink, arsenal, textureMode));
 
     // write metatile to stream
     std::ostringstream os;
@@ -247,13 +249,14 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
 
 vts::MetaTile
 SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
-                                 , Sink &sink
-                                 , Arsenal &arsenal) const
+                                 , Sink &sink, Arsenal &arsenal
+                                 , vts::SubMesh::TextureMode textureMode) const
 {
     return metatileFromDem(tileId, sink, arsenal, resource()
                            , index_->tileIndex, dem_.dataset
                            , dem_.geoidGrid, maskTree_, boost::none
-                           , definition_.heightFunction);
+                           , definition_.heightFunction
+                           , textureMode);
 }
 
 namespace {

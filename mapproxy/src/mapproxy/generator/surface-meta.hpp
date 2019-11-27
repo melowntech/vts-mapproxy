@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,33 +24,51 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_factory_hpp_included_
-#define mapproxy_generator_factory_hpp_included_
-
-#include <memory>
+#ifndef mapproxy_generator_surface_meta_hpp_included_
+#define mapproxy_generator_surface_meta_hpp_included_
 
 #include "../generator.hpp"
+#include "../definition.hpp"
 
-struct Generator::Factory {
-    typedef std::shared_ptr<Factory> pointer;
-    virtual ~Factory() {}
-    virtual Generator::pointer create(const Params &params) = 0;
+#include "providers.hpp"
 
-    /** If true is returned a default system resource is generated for each
-     *  reference frame.
+namespace vts = vtslibs::vts;
+namespace vr = vtslibs::registry;
+
+namespace generator {
+
+class SurfaceMeta : public Generator {
+public:
+    SurfaceMeta(const Params &params);
+
+    ~SurfaceMeta();
+
+    typedef resource::SurfaceMeta Definition;
+
+private:
+    virtual void prepare_impl(Arsenal &arsenal);
+    virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const ;
+
+    virtual Task generateFile_impl(const FileInfo &fileInfo
+                                   , Sink &sink) const;
+
+    Generator::Task tileindex(const SurfaceFileInfo &fileInfo, Sink &sink)
+        const;
+
+    const Definition &definition_;
+
+    pointer surface_;
+    pointer tms_;
+
+    /** Pointer owned by surface.
      */
-    virtual bool systemInstance() const { return false; }
+    VtsTilesetProvider *ts_;
 
-    /** Factory registry support
+    /** Pointer owned by tms.
      */
-    typedef std::map<Resource::Generator, pointer> Registry;
-
-    static pointer findFactory(const Resource::Generator &type);
-
-    static void registerType(const Resource::Generator &type
-                             , const pointer &factory);
-
-    static Registry &registry();
+    VtsAtlasProvider *atlas_;
 };
 
-#endif // mapproxy_generator_factory_hpp_included_
+} // namespace generator
+
+#endif // mapproxy_generator_surface_meta_hpp_included_

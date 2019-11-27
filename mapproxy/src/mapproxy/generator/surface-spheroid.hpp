@@ -49,7 +49,9 @@ private:
     virtual void generateMetatile(const vts::TileId &tileId
                                   , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
-                                  , Arsenal &arsenal) const;
+                                  , Arsenal &arsenal
+                                  , vts::SubMesh::TextureMode textureMode)
+        const;
 
     virtual AugmentedMesh generateMeshImpl(const vts::NodeInfo &nodeInfo
                                            , Sink &sink
