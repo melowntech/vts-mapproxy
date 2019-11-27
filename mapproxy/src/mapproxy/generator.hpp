@@ -298,6 +298,11 @@ protected:
      */
     void setProvider(std::unique_ptr<Provider> &&provider);
 
+    /** Updates revision in this resource. Revision is updated only if more
+     *  recent revision is used.
+     */
+    void updateRevision(unsigned int revision);
+
 private:
     virtual void prepare_impl(Arsenal &arsenal) = 0;
     virtual vts::MapConfig mapConfig_impl(ResourceRoot root) const = 0;

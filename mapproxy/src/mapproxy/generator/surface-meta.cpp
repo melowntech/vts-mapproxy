@@ -58,6 +58,7 @@
 #include "vts-libs/vts/opencv/navtile.hpp"
 #include "vts-libs/vts/service.hpp"
 #include "vts-libs/vts/tileset/tilesetindex.hpp"
+#include "vts-libs/vts/tileset/config.hpp"
 
 #include "../error.hpp"
 #include "../support/metatile.hpp"
@@ -133,14 +134,24 @@ void SurfaceMeta::prepare_impl(Arsenal&)
             << Resource::Id(referenceFrameId(), definition_.surface)
             << "> doesn't provide VTS atlas support.";
     }
+
+    // reflect revision changes in the underlying resources
+    updateRevision(surface_->resource().revision);
+    updateRevision(tms_->resource().revision);
+}
+
+vts::FullTileSetProperties SurfaceMeta::properties() const
+{
+    auto properties(ts_->properties());
+    properties.revision = resource().revision;
+    return properties;
 }
 
 vts::MapConfig SurfaceMeta::mapConfig_impl(ResourceRoot root) const
 {
     const auto path(prependRoot(fs::path(), resource(), root));
 
-    auto mc(vts::mapConfig
-            (ts_->properties(), resource().registry, {}, path));
+    auto mc(vts::mapConfig(properties(), resource().registry, {}, path));
 
     // force 2d interface existence
     mc.surfaces.front().has2dInterface = true;
@@ -192,6 +203,37 @@ Generator::Task SurfaceMeta
     case SurfaceFileInfo::Type::file: {
 
         switch (fi.fileType) {
+        case vts::File::config: {
+            switch (fi.flavor) {
+            // handled by mapconfig machinery
+            case vts::FileFlavor::regular: break;
+
+            case vts::FileFlavor::raw: {
+                std::ostringstream os;
+                vts::tileset::saveConfig(os, properties());
+                sink.content(os.str(), fi.sinkFileInfo()
+                             .setFileClass(FileClass::unknown));
+            } return {};
+
+            case vts::FileFlavor::debug: {
+                std::ostringstream os;
+                const auto debug
+                    (vts::debugConfig
+                     (vts::meshTilesConfig
+                      (properties(), vts::ExtraTileSetProperties()
+                       , prependRoot(fs::path(), resource()
+                                     , ResourceRoot::none))));
+                vts::saveDebug(os, debug);
+                sink.content(os.str(), fi.sinkFileInfo());
+            } return {};
+
+            default:
+                sink.error(utility::makeError<NotFound>
+                           ("Unsupported file flavor %s.", fi.flavor));
+                break;
+            }
+        } break;
+
         case vts::File::tileIndex:
             return tileindex(fi, sink);
         default: break;
@@ -219,6 +261,18 @@ Generator::Task SurfaceMeta
         } break;
 
     } break;
+
+    case SurfaceFileInfo::Type::definition: {
+        auto fl(vts::freeLayer
+                (vts::meshTilesConfig
+                 (properties(), vts::ExtraTileSetProperties()
+                  , prependRoot(fs::path(), resource(), ResourceRoot::none))));
+
+        std::ostringstream os;
+        vr::saveFreeLayer(os, fl);
+        sink.content(os.str(), fi.sinkFileInfo());
+        return {};
+    }
 
     default: break;
     }

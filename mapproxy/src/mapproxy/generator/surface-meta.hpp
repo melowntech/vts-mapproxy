@@ -55,6 +55,8 @@ private:
     Generator::Task tileindex(const SurfaceFileInfo &fileInfo, Sink &sink)
         const;
 
+    vts::FullTileSetProperties properties() const;
+
     const Definition &definition_;
 
     pointer surface_;

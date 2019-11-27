@@ -308,3 +308,8 @@ Generator::Task Generator::generateFile(const FileInfo &fileInfo, Sink sink)
 
     return generateFile_impl(fileInfo, sink);
 }
+
+void Generator::updateRevision(unsigned int revision)
+{
+    resource_.revision = std::max(resource_.revision, revision);
+}
