@@ -130,6 +130,8 @@ set(mapproxy_SOURCES
 
   generator.hpp
   generator/generator.cpp
+  generator/generators.hpp generator/generators.cpp
+  generator/registry.hpp generator/registry.cpp
   generator/factory.hpp
   generator/metatile.hpp generator/metatile.cpp
   generator/demregistry.hpp generator/demregistry.cpp

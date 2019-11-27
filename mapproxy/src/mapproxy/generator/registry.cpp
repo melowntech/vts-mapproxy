@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 Melown Technologies SE
+ * Copyright (c) 2019 Melown Technologies SE
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -24,33 +24,28 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef mapproxy_generator_factory_hpp_included_
-#define mapproxy_generator_factory_hpp_included_
+#include "factory.hpp"
 
-#include <memory>
+Generator::Factory::pointer
+Generator::Factory::findFactory(const Resource::Generator &type)
+{
+    const auto &r(registry());
+    auto fregistry(r.find(type));
+    if (fregistry == r.end()) {
+        LOGTHROW(err1, UnknownGenerator)
+            << "Unknown generator type <" << type << ">.";
+    }
+    return fregistry->second;
+}
 
-#include "../generator.hpp"
+void Generator::Factory::registerType(const Resource::Generator &type
+                                      , const pointer &factory)
+{
+    registry().insert(Registry::value_type(type, factory));
+}
 
-struct Generator::Factory {
-    typedef std::shared_ptr<Factory> pointer;
-    virtual ~Factory() {}
-    virtual Generator::pointer create(const Params &params) = 0;
-
-    /** If true is returned a default system resource is generated for each
-     *  reference frame.
-     */
-    virtual bool systemInstance() const { return false; }
-
-    /** Factory registry support
-     */
-    typedef std::map<Resource::Generator, pointer> Registry;
-
-    static pointer findFactory(const Resource::Generator &type);
-
-    static void registerType(const Resource::Generator &type
-                             , const pointer &factory);
-
-    static Registry &registry();
-};
-
-#endif // mapproxy_generator_factory_hpp_included_
+Generator::Factory::Registry& Generator::Factory::registry()
+{
+    static Registry registry;
+    return registry;
+}
