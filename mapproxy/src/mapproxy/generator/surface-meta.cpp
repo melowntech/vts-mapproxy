@@ -207,15 +207,18 @@ Generator::Task SurfaceMeta
     case SurfaceFileInfo::Type::tile: {
 
         switch (fi.tileType) {
+        case vts::TileFile::meta:
+            return ts_->generateMetatile(fi.tileId, sink, fi
+                                         , vts::SubMesh::internal);
+
         case vts::TileFile::mesh:
             return ts_->generateMesh(fi.tileId, sink, fi
                                      , vts::SubMesh::internal);
 
-        case vts::TileFile::atlas: {
+        case vts::TileFile::atlas:
             return atlas_->generateAtlas
                 (fi.tileId, sink, fi.sinkFileInfo()
                  , (fi.flavor == vts::FileFlavor::raw));
-        } break;
 
         default: break;
         } break;

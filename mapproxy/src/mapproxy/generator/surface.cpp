@@ -111,9 +111,28 @@ private:
                                       , vts::SubMesh::TextureMode textureMode)
         const override
     {
-        return[=](Sink &sink, Arsenal &arsenal) {
+        return [=](Sink &sink, Arsenal &arsenal) {
             surface_.generateMesh
                 (tileId, sink, fileInfo, arsenal, textureMode);
+        };
+    }
+
+    Generator::Task generateMetatile_impl(const vts::TileId &tileId, Sink&
+                                          , const SurfaceFileInfo &fileInfo
+                                          , vts::SubMesh::TextureMode
+                                          textureMode)
+        const override
+    {
+        return [=](Sink &sink, Arsenal &arsenal) {
+            if (fileInfo.flavor == vts::FileFlavor::debug) {
+                // debug metanode
+                surface_.generateDebugNode
+                    (tileId, sink, fileInfo, arsenal, textureMode);
+            } else {
+                // real metatile
+                surface_.generateMetatile
+                    (tileId, sink, fileInfo, arsenal, textureMode);
+            }
         };
     }
 
@@ -335,7 +354,7 @@ Generator::Task SurfaceBase
     case SurfaceFileInfo::Type::tile: {
         switch (fi.tileType) {
         case vts::TileFile::meta:
-            return[=](Sink &sink, Arsenal &arsenal) {
+            return [=](Sink &sink, Arsenal &arsenal) {
                 if (fi.flavor == vts::FileFlavor::debug) {
                     // debug metanode
                     generateDebugNode(fi.tileId, sink, fi, arsenal);
@@ -346,7 +365,7 @@ Generator::Task SurfaceBase
             };
 
         case vts::TileFile::mesh:
-            return[=](Sink &sink, Arsenal &arsenal) {
+            return [=](Sink &sink, Arsenal &arsenal) {
                 generateMesh(fi.tileId, sink, fi, arsenal);
             };
 
@@ -356,19 +375,19 @@ Generator::Task SurfaceBase
             break;
 
         case vts::TileFile::navtile:
-            return[=](Sink &sink, Arsenal &arsenal) {
+            return [=](Sink &sink, Arsenal &arsenal) {
                 generateNavtile(fi.tileId, sink, fi, arsenal);
             };
             break;
 
         case vts::TileFile::meta2d:
-            return[=](Sink &sink, Arsenal &arsenal) {
+            return [=](Sink &sink, Arsenal &arsenal) {
                 generate2dMetatile(fi.tileId, sink, fi, arsenal);
             };
             break;
 
         case vts::TileFile::mask:
-            return[=](Sink &sink, Arsenal &arsenal) {
+            return [=](Sink &sink, Arsenal &arsenal) {
                 generate2dMask(fi.tileId, sink, fi, arsenal);
             };
             break;
@@ -379,7 +398,7 @@ Generator::Task SurfaceBase
             break;
 
         case vts::TileFile::credits:
-            return[=](Sink &sink, Arsenal &arsenal) {
+            return [=](Sink &sink, Arsenal &arsenal) {
                 generateCredits(fi.tileId, sink, fi, arsenal);
             };
             break;
@@ -544,10 +563,25 @@ void SurfaceBase::generateCredits(const vts::TileId&
 void SurfaceBase::generateDebugNode(const vts::TileId &tileId
                                     , Sink &sink
                                     , const SurfaceFileInfo &fi
-                                    , Arsenal &) const
+                                    , Arsenal &
+                                    , vts::SubMesh::TextureMode textureMode)
+    const
 {
     // generate debug metanode
-    const auto debugNode(vts::getNodeDebugInfo(index_->tileIndex, tileId));
+    const auto debugNode([&]()
+    {
+        if (textureMode == vts::SubMesh::external) {
+            return vts::getNodeDebugInfo(index_->tileIndex, tileId);
+        }
+
+        // internal texture -> add atlas flag
+        return vts::getNodeDebugInfo
+            (index_->tileIndex, tileId
+             , [](vts::TileIndex::Flag::value_type f) {
+                return (vts::TileIndex::Flag::isReal(f)
+                        ? (f | vts::TileIndex::Flag::atlas) : f);
+            });
+    }());
 
     std::ostringstream os;
     vts::saveDebug(os, debugNode);
@@ -620,7 +654,7 @@ Generator::Task SurfaceBase
         break;
 
     case TerrainFileInfo::Type::tile:
-        return[=](Sink &sink, Arsenal &arsenal) {
+        return [=](Sink &sink, Arsenal &arsenal) {
             generateTerrain(fi.tileId, sink, fi, arsenal, tms);
         };
 

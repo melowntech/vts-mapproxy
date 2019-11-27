@@ -56,6 +56,13 @@ public:
                                  , vts::SubMesh::TextureMode textureMode
                                  = vts::SubMesh::external) const;
 
+    /** Generates metatile/debug node and sends it to the output.
+     */
+    Generator::Task generateMetatile(const vts::TileId &tileId, Sink &sink
+                                     , const SurfaceFileInfo &fileInfo
+                                     , vts::SubMesh::TextureMode textureMode
+                                     = vts::SubMesh::external) const;
+
     /** Alias for surface file generation.
      */
     Generator::Task generateFile(const FileInfo &fileInfo, Sink sink) const;
@@ -70,11 +77,14 @@ public:
 
 private:
     virtual Generator::Task
-    generateMesh_impl(const vts::TileId &tileId
-                      , Sink &sink
+    generateMesh_impl(const vts::TileId &tileId, Sink &sink
                       , const SurfaceFileInfo &fileInfo
-                      , vts::SubMesh::TextureMode textureMode)
-        const = 0;
+                      , vts::SubMesh::TextureMode textureMode) const = 0;
+
+    virtual Generator::Task
+    generateMetatile_impl(const vts::TileId &tileId, Sink &sink
+                          , const SurfaceFileInfo &fileInfo
+                          , vts::SubMesh::TextureMode textureMode) const = 0;
 
     virtual Generator::Task
     generateFile_impl(const FileInfo &fileInfo, Sink sink) const = 0;
@@ -107,13 +117,22 @@ private:
 // inlines
 
 inline Generator::Task
-VtsTilesetProvider::generateMesh(const vts::TileId &tileId
-                                 , Sink &sink
+VtsTilesetProvider::generateMesh(const vts::TileId &tileId, Sink &sink
                                  , const SurfaceFileInfo &fileInfo
                                  , vts::SubMesh::TextureMode textureMode)
     const
 {
     return generateMesh_impl(tileId, sink, fileInfo, textureMode);
+}
+
+inline Generator::Task
+VtsTilesetProvider::generateMetatile(const vts::TileId &tileId, Sink &sink
+                                     , const SurfaceFileInfo &fileInfo
+                                     , vts::SubMesh::TextureMode
+                                     textureMode)
+    const
+{
+    return generateMetatile_impl(tileId, sink, fileInfo, textureMode);
 }
 
 inline Generator::Task

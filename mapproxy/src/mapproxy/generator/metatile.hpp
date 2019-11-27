@@ -47,7 +47,9 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , const boost::optional<int> &displaySize
                               = boost::none
                               , const HeightFunction::pointer &heightFunction
-                              = HeightFunction::pointer());
+                              = HeightFunction::pointer()
+                              , vts::SubMesh::TextureMode textureMode
+                              = vts::SubMesh::external);
 
 vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , Arsenal &arsenal
@@ -59,6 +61,8 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , const boost::optional<int> &displaySize
                               = boost::none
                               , const HeightFunction::pointer &heightFunction
-                              = HeightFunction::pointer());
+                              = HeightFunction::pointer()
+                              , vts::SubMesh::TextureMode textureMode
+                              = vts::SubMesh::external);
 
 #endif // mapproxy_metatile_hpp_included_

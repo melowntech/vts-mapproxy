@@ -179,7 +179,8 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                     , const boost::optional<std::string> &geoidGrid
                     , const MaskTree &maskTree
                     , const boost::optional<int> &displaySize
-                    , const HeightFunction::pointer &heightFunction)
+                    , const HeightFunction::pointer &heightFunction
+                    , vts::SubMesh::TextureMode textureMode)
 {
     auto blocks(metatileBlocks(resource, tileId));
 
@@ -191,6 +192,9 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
     const auto &rf(*resource.referenceFrame);
 
     vts::MetaTile metatile(tileId, rf.metaBinaryOrder);
+
+    const std::size_t internalTextureCount
+        (textureMode == vts::SubMesh::internal);
 
     auto setChildren([&](const MetatileBlock &block
                          , const vts::TileId &nodeId, vts::MetaNode &node)
@@ -412,6 +416,9 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                     // set credits
                     node.updateCredits(resource.credits);
 
+                    // texturing
+                    node.internalTextureCount(internalTextureCount);
+
                     if (displaySize) {
                         // use display size
                         node.applyDisplaySize(true);
@@ -464,12 +471,13 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 , const boost::optional<std::string> &geoidGrid
                 , const MaskTree &maskTree
                 , const boost::optional<int> &displaySize
-                , const HeightFunction::pointer &heightFunction)
+                , const HeightFunction::pointer &heightFunction
+                , vts::SubMesh::TextureMode textureMode)
 
 {
     return metatileFromDemImpl(tileId, sink, arsenal, resource, tileIndex
                                , demDataset, geoidGrid, maskTree, displaySize
-                               , heightFunction);
+                               , heightFunction, textureMode);
 }
 
 
@@ -481,10 +489,11 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 , const boost::optional<std::string> &geoidGrid
                 , const MaskTree &maskTree
                 , const boost::optional<int> &displaySize
-                , const HeightFunction::pointer &heightFunction)
+                , const HeightFunction::pointer &heightFunction
+                , vts::SubMesh::TextureMode textureMode)
 {
     return metatileFromDemImpl(tileId, sink, arsenal, resource, tileIndex
                                , demDataset, geoidGrid, maskTree, displaySize
-                               , heightFunction);
+                               , heightFunction, textureMode);
 
 }
