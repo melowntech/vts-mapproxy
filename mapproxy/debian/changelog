@@ -1,3 +1,10 @@
+vts-mapproxy (1.64) stable; urgency=medium
+
+  * added surface/surface-meta driver that combines existing surface and tms
+    drivers into internally textured surface
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Wed, 27 Nov 2019 19:06:25 +0100
+
 vts-mapproxy (1.63) stable; urgency=medium
 
   * resources: Resource is updated when local registry is changed.
