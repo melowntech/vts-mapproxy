@@ -172,6 +172,8 @@ struct Resource {
 
     Changed changed(const Resource &o) const;
 
+    Id::list needsResources() const;
+
 private:
     /** Definition: based on type and driver, created by resource
      *  parser/generator and interpreted by driver.

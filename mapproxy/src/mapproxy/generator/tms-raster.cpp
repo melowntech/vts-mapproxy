@@ -174,7 +174,6 @@ void TmsRaster::prepare_impl(Arsenal&)
         index_ = boost::in_place(deliveryIndexPath);
 
         // done
-        makeReady();
         return;
     }
 
@@ -205,8 +204,6 @@ void TmsRaster::prepare_impl(Arsenal&)
         // some invalid pixels
         hasMetatiles_ = !ds.allValid();
     }
-
-    makeReady();
 }
 
 RasterFormat TmsRaster::format() const

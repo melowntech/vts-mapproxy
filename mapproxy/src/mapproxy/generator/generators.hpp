@@ -100,7 +100,8 @@ public:
     void checkReady() const;
 
     Generator::pointer generator(Resource::Generator::Type generatorType
-                                 , const Resource::Id &resourceId) const;
+                                 , const Resource::Id &resourceId
+                                 , bool noReadyCheck = false) const;
 
     Generator::list referenceFrame(const std::string &referenceFrame) const;
 
@@ -149,7 +150,8 @@ private:
 
     virtual Generator::pointer
     findGenerator_impl(Resource::Generator::Type generatorType
-                       , const Resource::Id &resourceId) const;
+                       , const Resource::Id &resourceId
+                       , bool mustBeReady) const;
 
     const Config config_;
     ResourceBackend::pointer resourceBackend_;

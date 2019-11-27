@@ -422,26 +422,24 @@ void Generators::Detail::update(const Resource::map &resources)
         }
     }
 
-    // add stuff
-    for (const auto &generator : toAdd) {
-        {
-            std::unique_lock<std::mutex> lock(lock_);
-            serving_.insert(generator);
-        }
-
-        if (!generator->ready()) {
-            prepare(generator);
-        }
-    }
-
     // remove stuff
     for (const auto &generator : toRemove) {
         {
             std::unique_lock<std::mutex> lock(lock_);
             serving_.erase(generator);
         }
+    }
 
-        // TODO: mark as to be removed for prepare workers
+    // add generators; not prepared yet to make them available to the others
+    // when prepared
+    for (const auto &generator : toAdd) {
+        std::unique_lock<std::mutex> lock(lock_);
+        serving_.insert(generator);
+    }
+
+    // prepare generators if not ready
+    for (const auto &generator : toAdd) {
+        if (!generator->ready()) { prepare(generator); }
     }
 
     // replace stuff (prepare)
@@ -489,10 +487,11 @@ Generators::Detail::referenceFrame(const std::string &referenceFrame)
 
 Generator::pointer
 Generators::Detail::generator(Resource::Generator::Type generatorType
-                              , const Resource::Id &resourceId)
+                              , const Resource::Id &resourceId
+                              , bool noReadyCheck)
     const
 {
-    checkReady();
+    if (!noReadyCheck) { checkReady(); }
 
     // find generator (under lock)
     auto generator([&]() -> Generator::pointer
@@ -518,10 +517,12 @@ Generators::Detail::generator(Resource::Generator::Type generatorType
 
 Generator::pointer
 Generators::Detail::findGenerator_impl(Resource::Generator::Type generatorType
-                                       , const Resource::Id &resourceId) const
+                                       , const Resource::Id &resourceId
+                                       , bool mustBeReady) const
 {
-    auto g(generator(generatorType, resourceId));
-    if (!g || !g->ready()) { return {}; }
+    auto g(generator(generatorType, resourceId, !mustBeReady));
+    if (!g) { return {}; }
+    if (mustBeReady && !g->ready()) { return {}; }
     return g;
 }
 

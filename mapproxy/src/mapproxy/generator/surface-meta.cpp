@@ -108,18 +108,15 @@ void SurfaceMeta::prepare_impl(Arsenal&)
 {
     LOG(info2) << "Preparing <" << id() << ">.";
 
-    // find surface and tms generators
-
+    // find surface and tms generators (no need to be ready but fail when not
+    // present)
     surface_ = otherGenerator
         (Resource::Generator::Type::surface
-         , Resource::Id(referenceFrameId(), definition_.surface), true);
+         , Resource::Id(referenceFrameId(), definition_.surface), false, true);
 
     tms_ = otherGenerator
         (Resource::Generator::Type::tms
-         , Resource::Id(referenceFrameId(), definition_.tms), true);
-
-    LOG(info4) << "surface: " << surface_;
-    LOG(info4) << "tms: " << tms_;
+         , Resource::Id(referenceFrameId(), definition_.tms), false, true);
 
     ts_ = surface_->getProvider<VtsTilesetProvider>();
     if (!ts_) {
@@ -128,7 +125,6 @@ void SurfaceMeta::prepare_impl(Arsenal&)
             << Resource::Id(referenceFrameId(), definition_.surface)
             << "> doesn't provide VTS tileset support.";
     }
-    LOG(info4) << "ts: " << ts_;
 
     atlas_ = tms_->getProvider<VtsAtlasProvider>();
     if (!atlas_) {
@@ -137,7 +133,6 @@ void SurfaceMeta::prepare_impl(Arsenal&)
             << Resource::Id(referenceFrameId(), definition_.surface)
             << "> doesn't provide VTS atlas support.";
     }
-    LOG(info4) << "atlas: " << atlas_;
 }
 
 vts::MapConfig SurfaceMeta::mapConfig_impl(ResourceRoot root) const

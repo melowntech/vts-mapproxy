@@ -72,12 +72,14 @@ public:
 
     std::shared_ptr<Generator>
     findGenerator(Resource::Generator::Type generatorType
-                  , const Resource::Id &resourceId) const;
+                  , const Resource::Id &resourceId
+                  , bool mustBeReady = true) const;
 
 private:
     virtual std::shared_ptr<Generator>
     findGenerator_impl(Resource::Generator::Type generatorType
-                       , const Resource::Id &resourceId) const = 0;
+                       , const Resource::Id &resourceId
+                       , bool mustBeReady) const = 0;
 };
 
 struct GeneratorNotFound : std::runtime_error {
@@ -278,6 +280,7 @@ protected:
 
     Generator::pointer otherGenerator(Resource::Generator::Type generatorType
                                       , const Resource::Id &resourceId
+                                      , bool mustBeReady = true
                                       , bool mandatory = false) const;
 
     void supportFile(const vs::SupportFile &support, Sink &sink
@@ -415,17 +418,20 @@ inline Generator::pointer Generators::generator(const FileInfo &fileInfo) const
 
 std::shared_ptr<Generator>
 inline GeneratorFinder::findGenerator(Resource::Generator::Type generatorType
-                                      , const Resource::Id &resourceId) const
+                                      , const Resource::Id &resourceId
+                                      , bool mustBeReady) const
 {
-    return findGenerator_impl(generatorType, resourceId);
+    return findGenerator_impl(generatorType, resourceId, mustBeReady);
 }
 
 inline Generator::pointer
 Generator::otherGenerator(Resource::Generator::Type generatorType
-                          , const Resource::Id &resourceId, bool mandatory)
+                          , const Resource::Id &resourceId
+                          , bool mustBeReady, bool mandatory)
     const
 {
-    auto other(generatorFinder_->findGenerator(generatorType, resourceId));
+    auto other(generatorFinder_->findGenerator
+               (generatorType, resourceId, mustBeReady));
     if (!other && mandatory) {
         throw GeneratorNotFound(generatorType, resourceId);
     }
