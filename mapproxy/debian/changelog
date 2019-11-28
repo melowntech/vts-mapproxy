@@ -1,3 +1,9 @@
+vts-mapproxy (1.65) stable; urgency=medium
+
+  * surface-meta: proper handling of credits
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 28 Nov 2019 11:31:45 +0100
+
 vts-mapproxy (1.64) stable; urgency=medium
 
   * added surface/surface-meta driver that combines existing surface and tms
