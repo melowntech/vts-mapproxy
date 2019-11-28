@@ -73,8 +73,8 @@ private:
                                   , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
                                   , Arsenal &arsenal
-                                  , const MetatileOverrides &overrides
-                                  = MetatileOverrides()) const = 0;
+                                  , const MetatileOverrides &overrides = {})
+        const = 0;
 
     void generateMesh(const vts::TileId &tileId
                       , Sink &sink

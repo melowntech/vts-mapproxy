@@ -70,7 +70,7 @@ private:
     vts::MetaTile generateMetatileImpl(const vts::TileId &tileId
                                        , Sink &sink, Arsenal &arsenal
                                        , const MetatileOverrides &overrides
-                                       = MetatileOverrides())
+                                       = {})
         const;
 
     void addToRegistry();

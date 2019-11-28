@@ -40,19 +40,13 @@
 struct MetatileOverrides {
     enum class CreditsMode { replace, add };
 
-    vts::SubMesh::TextureMode textureMode;
+    vts::SubMesh::TextureMode textureMode = vts::SubMesh::external;
     DualId::set credits;
-    CreditsMode creditsMode;
+    CreditsMode creditsMode = CreditsMode::add;
 
-    MetatileOverrides()
-        : textureMode(vts::SubMesh::external)
-        , creditsMode(CreditsMode::add)
-    {}
-
+    MetatileOverrides() = default;
     MetatileOverrides(vts::SubMesh::TextureMode textureMode)
         : textureMode(textureMode)
-        , creditsMode(CreditsMode::add)
-
     {}
 
     void addCredits(const DualId::set &addition);
@@ -73,8 +67,7 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               = boost::none
                               , const HeightFunction::pointer &heightFunction
                               = HeightFunction::pointer()
-                              , const MetatileOverrides &overrides
-                              = MetatileOverrides());
+                              , const MetatileOverrides &overrides = {});
 
 vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , Arsenal &arsenal
@@ -87,8 +80,7 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               = boost::none
                               , const HeightFunction::pointer &heightFunction
                               = HeightFunction::pointer()
-                              , const MetatileOverrides &overrides
-                              = MetatileOverrides());
+                              , const MetatileOverrides &overrides = {});
 
 // inines
 
