@@ -354,15 +354,14 @@ This driver is a special kind of beast. It combines existing surface with TMS to
 It doesn't generate any content on its own but forward all requests to existing surface and TMS resources.
 These drivers must exist in the system.
 
+Resource's credits are combined with surface's and tms's credits.
+
 Caveats/TODO:
 
 * This driver does not support any introspection. If introspection is instroduced in the future it would lack the boundlayer 
 specification (TMS) because this driver already produces its own imagery.
 
 * Also, this driver does not support any other common surface configuration.
-
-* Keeps original surface's credits burned in the metatiles nor `tileset.conf`. In the future, TMS credits (plus any other credits
-configured in this resource) would be included as well.
 
 * So far, during runtime, this driver doesn't watch for changes in the underlying surface/TMS and keeps the old driver
 instance alive while the original resource has been reconfigured and is being served by new driver instance. Restart mapproxy
@@ -383,7 +382,7 @@ Geodata drivers generate vector geographic data in the form of VTS free layer.
 
 The introspection interface (i.e. the built-in browser) is identical to surface drivers, sans the terrain provider-related stuff.
 
-### Common TMS configuration
+### Common geodata configuration
 
 ```javascript
 definition = {
