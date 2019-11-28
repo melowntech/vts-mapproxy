@@ -180,7 +180,7 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                     , const MaskTree &maskTree
                     , const boost::optional<int> &displaySize
                     , const HeightFunction::pointer &heightFunction
-                    , vts::SubMesh::TextureMode textureMode)
+                    , const MetatileOverrides &overrides)
 {
     auto blocks(metatileBlocks(resource, tileId));
 
@@ -194,7 +194,9 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
     vts::MetaTile metatile(tileId, rf.metaBinaryOrder);
 
     const std::size_t internalTextureCount
-        (textureMode == vts::SubMesh::internal);
+        (overrides.textureMode == vts::SubMesh::internal);
+
+    const auto credits(overrides.mergedCredits(resource.credits));
 
     auto setChildren([&](const MetatileBlock &block
                          , const vts::TileId &nodeId, vts::MetaNode &node)
@@ -414,7 +416,7 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 // calculate texel size and surrogate
                 if (geometry) {
                     // set credits
-                    node.updateCredits(resource.credits);
+                    node.updateCredits(credits);
 
                     // texturing
                     node.internalTextureCount(internalTextureCount);
@@ -472,12 +474,12 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 , const MaskTree &maskTree
                 , const boost::optional<int> &displaySize
                 , const HeightFunction::pointer &heightFunction
-                , vts::SubMesh::TextureMode textureMode)
+                , const MetatileOverrides &overrides)
 
 {
     return metatileFromDemImpl(tileId, sink, arsenal, resource, tileIndex
                                , demDataset, geoidGrid, maskTree, displaySize
-                               , heightFunction, textureMode);
+                               , heightFunction, overrides);
 }
 
 
@@ -490,10 +492,10 @@ metatileFromDem(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 , const MaskTree &maskTree
                 , const boost::optional<int> &displaySize
                 , const HeightFunction::pointer &heightFunction
-                , vts::SubMesh::TextureMode textureMode)
+                , const MetatileOverrides &overrides)
 {
     return metatileFromDemImpl(tileId, sink, arsenal, resource, tileIndex
                                , demDataset, geoidGrid, maskTree, displaySize
-                               , heightFunction, textureMode);
+                               , heightFunction, overrides);
 
 }

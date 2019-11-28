@@ -101,6 +101,7 @@ utility::PreMain Factory::register_([]()
 SurfaceMeta::SurfaceMeta(const Params &params)
     : Generator(params)
     , definition_(resource().definition<Definition>())
+    , metatileOverrides_(vts::SubMesh::internal)
 {}
 
 SurfaceMeta::~SurfaceMeta() {}
@@ -138,12 +139,17 @@ void SurfaceMeta::prepare_impl(Arsenal&)
     // reflect revision changes in the underlying resources
     updateRevision(surface_->resource().revision);
     updateRevision(tms_->resource().revision);
+
+    // join this resource's credits with tms credits
+    metatileOverrides_.addCredits(resource().credits);
+    metatileOverrides_.addCredits(tms_->resource().credits);
 }
 
 vts::FullTileSetProperties SurfaceMeta::properties() const
 {
     auto properties(ts_->properties());
     properties.revision = resource().revision;
+    properties.credits = metatileOverrides_.mergedCredits(properties.credits);
     return properties;
 }
 
@@ -193,7 +199,7 @@ Generator::Task SurfaceMeta
 ::generateFile_impl(const FileInfo &fileInfo, Sink &sink) const
 {
     if (fileInfo.interface.interface != GeneratorInterface::Interface::vts) {
-        return ts_->generateFile(fileInfo, sink);
+        return ts_->file(fileInfo, sink);
     }
 
     SurfaceFileInfo fi(fileInfo);
@@ -245,15 +251,13 @@ Generator::Task SurfaceMeta
 
         switch (fi.tileType) {
         case vts::TileFile::meta:
-            return ts_->generateMetatile(fi.tileId, sink, fi
-                                         , vts::SubMesh::internal);
+            return ts_->metatile(fi.tileId, sink, fi, metatileOverrides_);
 
         case vts::TileFile::mesh:
-            return ts_->generateMesh(fi.tileId, sink, fi
-                                     , vts::SubMesh::internal);
+            return ts_->mesh(fi.tileId, sink, fi, vts::SubMesh::internal);
 
         case vts::TileFile::atlas:
-            return atlas_->generateAtlas
+            return atlas_->atlas
                 (fi.tileId, sink, fi.sinkFileInfo()
                  , (fi.flavor == vts::FileFlavor::raw));
 
@@ -277,7 +281,7 @@ Generator::Task SurfaceMeta
     default: break;
     }
 
-    return ts_->generateFile(fileInfo, sink);
+    return ts_->file(fileInfo, sink);
 }
 
 } // namespace generator

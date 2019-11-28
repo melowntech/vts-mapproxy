@@ -69,6 +69,8 @@ private:
     /** Pointer owned by tms.
      */
     VtsAtlasProvider *atlas_;
+
+    MetatileOverrides metatileOverrides_;
 };
 
 } // namespace generator

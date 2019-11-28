@@ -50,7 +50,7 @@ private:
                                   , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
                                   , Arsenal &arsenal
-                                  , vts::SubMesh::TextureMode textureMode)
+                                  , const MetatileOverrides &overrides)
         const;
 
     virtual AugmentedMesh generateMeshImpl(const vts::NodeInfo &nodeInfo

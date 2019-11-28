@@ -106,9 +106,9 @@ public:
     {}
 
 private:
-    Generator::Task generateMesh_impl(const vts::TileId &tileId, Sink&
-                                      , const SurfaceFileInfo &fileInfo
-                                      , vts::SubMesh::TextureMode textureMode)
+    Generator::Task mesh_impl(const vts::TileId &tileId, Sink&
+                              , const SurfaceFileInfo &fileInfo
+                              , vts::SubMesh::TextureMode textureMode)
         const override
     {
         return [=](Sink &sink, Arsenal &arsenal) {
@@ -117,26 +117,25 @@ private:
         };
     }
 
-    Generator::Task generateMetatile_impl(const vts::TileId &tileId, Sink&
-                                          , const SurfaceFileInfo &fileInfo
-                                          , vts::SubMesh::TextureMode
-                                          textureMode)
+    Generator::Task metatile_impl(const vts::TileId &tileId, Sink&
+                                  , const SurfaceFileInfo &fileInfo
+                                  , const MetatileOverrides &overrides)
         const override
     {
         return [=](Sink &sink, Arsenal &arsenal) {
             if (fileInfo.flavor == vts::FileFlavor::debug) {
                 // debug metanode
                 surface_.generateDebugNode
-                    (tileId, sink, fileInfo, arsenal, textureMode);
+                    (tileId, sink, fileInfo, arsenal, overrides.textureMode);
             } else {
                 // real metatile
                 surface_.generateMetatile
-                    (tileId, sink, fileInfo, arsenal, textureMode);
+                    (tileId, sink, fileInfo, arsenal, overrides);
             }
         };
     }
 
-    Generator::Task generateFile_impl(const FileInfo &fileInfo, Sink sink)
+    Generator::Task file_impl(const FileInfo &fileInfo, Sink sink)
         const override
     {
         return surface_.generateFile(fileInfo, sink);

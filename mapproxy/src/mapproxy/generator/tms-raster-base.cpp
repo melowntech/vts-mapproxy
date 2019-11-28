@@ -64,9 +64,9 @@ public:
     {}
 
 private:
-    Generator::Task generateAtlas_impl(const vts::TileId &tileId, Sink&
-                                       , const Sink::FileInfo &sfi
-                                       , bool atlas) const override
+    Generator::Task atlas_impl(const vts::TileId &tileId, Sink&
+                               , const Sink::FileInfo &sfi
+                               , bool atlas) const override
     {
         TmsRasterBase::ImageFlags imageFlags;
         imageFlags.forceFormat = true;

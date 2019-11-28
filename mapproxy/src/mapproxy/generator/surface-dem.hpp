@@ -55,7 +55,7 @@ private:
                                   , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
                                   , Arsenal &arsenal
-                                  , vts::SubMesh::TextureMode textureMode)
+                                  , const MetatileOverrides &overrides)
         const;
 
     virtual AugmentedMesh
@@ -69,8 +69,8 @@ private:
 
     vts::MetaTile generateMetatileImpl(const vts::TileId &tileId
                                        , Sink &sink, Arsenal &arsenal
-                                       , vts::SubMesh::TextureMode textureMode
-                                       = vts::SubMesh::external)
+                                       , const MetatileOverrides &overrides
+                                       = MetatileOverrides())
         const;
 
     void addToRegistry();

@@ -39,6 +39,8 @@
 #include "../generator.hpp"
 #include "../definition.hpp"
 
+#include "metatile.hpp"
+
 namespace vts = vtslibs::vts;
 namespace vre = vtslibs::registry::extensions;
 
@@ -50,22 +52,21 @@ public:
 
     /** Generates mesh and sends it to the output.
      */
-    Generator::Task generateMesh(const vts::TileId &tileId
-                                 , Sink &sink
-                                 , const SurfaceFileInfo &fileInfo
-                                 , vts::SubMesh::TextureMode textureMode
-                                 = vts::SubMesh::external) const;
+    Generator::Task mesh(const vts::TileId &tileId, Sink &sink
+                         , const SurfaceFileInfo &fileInfo
+                         , vts::SubMesh::TextureMode textureMode
+                         = vts::SubMesh::external) const;
 
     /** Generates metatile/debug node and sends it to the output.
      */
-    Generator::Task generateMetatile(const vts::TileId &tileId, Sink &sink
-                                     , const SurfaceFileInfo &fileInfo
-                                     , vts::SubMesh::TextureMode textureMode
-                                     = vts::SubMesh::external) const;
+    Generator::Task metatile(const vts::TileId &tileId, Sink &sink
+                             , const SurfaceFileInfo &fileInfo
+                             , const MetatileOverrides &overrides
+                             = MetatileOverrides()) const;
 
     /** Alias for surface file generation.
      */
-    Generator::Task generateFile(const FileInfo &fileInfo, Sink sink) const;
+    Generator::Task file(const FileInfo &fileInfo, Sink sink) const;
 
     /** Returns path to VTS file if supported.
      */
@@ -77,17 +78,17 @@ public:
 
 private:
     virtual Generator::Task
-    generateMesh_impl(const vts::TileId &tileId, Sink &sink
-                      , const SurfaceFileInfo &fileInfo
-                      , vts::SubMesh::TextureMode textureMode) const = 0;
+    mesh_impl(const vts::TileId &tileId, Sink &sink
+              , const SurfaceFileInfo &fileInfo
+              , vts::SubMesh::TextureMode textureMode) const = 0;
 
     virtual Generator::Task
-    generateMetatile_impl(const vts::TileId &tileId, Sink &sink
-                          , const SurfaceFileInfo &fileInfo
-                          , vts::SubMesh::TextureMode textureMode) const = 0;
+    metatile_impl(const vts::TileId &tileId, Sink &sink
+                  , const SurfaceFileInfo &fileInfo
+                  , const MetatileOverrides &overrides) const = 0;
 
     virtual Generator::Task
-    generateFile_impl(const FileInfo &fileInfo, Sink sink) const = 0;
+    file_impl(const FileInfo &fileInfo, Sink sink) const = 0;
 
     virtual boost::optional<boost::filesystem::path> path_impl(vts::File file)
         const = 0;
@@ -101,44 +102,43 @@ public:
 
     /** Generates image/atlas and sends it to the output.
      */
-    Generator::Task generateAtlas(const vts::TileId &tileId, Sink &sink
-                                  , const Sink::FileInfo &sfi
-                                  , bool atlas = false) const;
+    Generator::Task atlas(const vts::TileId &tileId, Sink &sink
+                          , const Sink::FileInfo &sfi
+                          , bool atlas = false) const;
 
 private:
     /** Generates image/atlas and sends it to the output.
      */
     virtual Generator::Task
-    generateAtlas_impl(const vts::TileId &tileId, Sink &sink
-                       , const Sink::FileInfo &sfi
-                       , bool atlas = false) const = 0;
+    atlas_impl(const vts::TileId &tileId, Sink &sink
+               , const Sink::FileInfo &sfi
+               , bool atlas = false) const = 0;
 };
 
 // inlines
 
 inline Generator::Task
-VtsTilesetProvider::generateMesh(const vts::TileId &tileId, Sink &sink
-                                 , const SurfaceFileInfo &fileInfo
-                                 , vts::SubMesh::TextureMode textureMode)
+VtsTilesetProvider::mesh(const vts::TileId &tileId, Sink &sink
+                         , const SurfaceFileInfo &fileInfo
+                         , vts::SubMesh::TextureMode textureMode)
     const
 {
-    return generateMesh_impl(tileId, sink, fileInfo, textureMode);
+    return mesh_impl(tileId, sink, fileInfo, textureMode);
 }
 
 inline Generator::Task
-VtsTilesetProvider::generateMetatile(const vts::TileId &tileId, Sink &sink
-                                     , const SurfaceFileInfo &fileInfo
-                                     , vts::SubMesh::TextureMode
-                                     textureMode)
+VtsTilesetProvider::metatile(const vts::TileId &tileId, Sink &sink
+                             , const SurfaceFileInfo &fileInfo
+                             , const MetatileOverrides &overrides)
     const
 {
-    return generateMetatile_impl(tileId, sink, fileInfo, textureMode);
+    return metatile_impl(tileId, sink, fileInfo, overrides);
 }
 
 inline Generator::Task
-VtsTilesetProvider::generateFile(const FileInfo &fileInfo, Sink sink) const
+VtsTilesetProvider::file(const FileInfo &fileInfo, Sink sink) const
 {
-    return generateFile_impl(fileInfo, sink);
+    return file_impl(fileInfo, sink);
 }
 
 inline boost::optional<boost::filesystem::path>
@@ -153,11 +153,11 @@ inline vts::FullTileSetProperties VtsTilesetProvider::properties() const
 }
 
 inline Generator::Task
-VtsAtlasProvider::generateAtlas(const vts::TileId &tileId, Sink &sink
-                                , const Sink::FileInfo &sfi
-                                , bool atlas) const
+VtsAtlasProvider::atlas(const vts::TileId &tileId, Sink &sink
+                        , const Sink::FileInfo &sfi
+                        , bool atlas) const
 {
-    return generateAtlas_impl(tileId, sink, sfi, atlas);
+    return atlas_impl(tileId, sink, sfi, atlas);
 }
 
 } // namespace generator

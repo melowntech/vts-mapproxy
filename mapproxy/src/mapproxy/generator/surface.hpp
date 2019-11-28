@@ -38,6 +38,7 @@
 #include "../support/mmapped/tilesetindex.hpp"
 #include "../generator.hpp"
 #include "../definition.hpp"
+#include "metatile.hpp"
 
 namespace vts = vtslibs::vts;
 namespace vre = vtslibs::registry::extensions;
@@ -72,8 +73,8 @@ private:
                                   , Sink &sink
                                   , const SurfaceFileInfo &fileInfo
                                   , Arsenal &arsenal
-                                  , vts::SubMesh::TextureMode textureMode
-                                  = vts::SubMesh::external) const = 0;
+                                  , const MetatileOverrides &overrides
+                                  = MetatileOverrides()) const = 0;
 
     void generateMesh(const vts::TileId &tileId
                       , Sink &sink

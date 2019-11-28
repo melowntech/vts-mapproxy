@@ -37,6 +37,31 @@
 
 #include "../heightfunction.hpp"
 
+struct MetatileOverrides {
+    enum class CreditsMode { replace, add };
+
+    vts::SubMesh::TextureMode textureMode;
+    DualId::set credits;
+    CreditsMode creditsMode;
+
+    MetatileOverrides()
+        : textureMode(vts::SubMesh::external)
+        , creditsMode(CreditsMode::add)
+    {}
+
+    MetatileOverrides(vts::SubMesh::TextureMode textureMode)
+        : textureMode(textureMode)
+        , creditsMode(CreditsMode::add)
+
+    {}
+
+    void addCredits(const DualId::set &addition);
+
+    DualId::set mergedCredits(const DualId::set &original) const;
+
+    vr::IdSet mergedCredits(const vr::IdSet &original) const;
+};
+
 vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , Arsenal &arsenal
                               , const Resource &resource
@@ -48,8 +73,8 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               = boost::none
                               , const HeightFunction::pointer &heightFunction
                               = HeightFunction::pointer()
-                              , vts::SubMesh::TextureMode textureMode
-                              = vts::SubMesh::external);
+                              , const MetatileOverrides &overrides
+                              = MetatileOverrides());
 
 vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               , Arsenal &arsenal
@@ -62,7 +87,39 @@ vts::MetaTile metatileFromDem(const vts::TileId &tileId, Sink &sink
                               = boost::none
                               , const HeightFunction::pointer &heightFunction
                               = HeightFunction::pointer()
-                              , vts::SubMesh::TextureMode textureMode
-                              = vts::SubMesh::external);
+                              , const MetatileOverrides &overrides
+                              = MetatileOverrides());
+
+// inines
+
+inline DualId::set
+MetatileOverrides::mergedCredits(const DualId::set &original) const
+{
+    // just send configured credits
+    if (creditsMode == CreditsMode::replace) { return credits; }
+
+    // merge original with configured credits
+    auto c(original);
+    c.insert(credits.begin(), credits.end());
+    return c;
+}
+
+inline vr::IdSet
+MetatileOverrides::mergedCredits(const vr::IdSet &original) const
+{
+    const auto thisCredits(asIntSet(credits));
+    // just send configured credits
+    if (creditsMode == CreditsMode::replace) { return thisCredits; }
+
+    // merge original with configured credits
+    auto c(original);
+    c.insert(thisCredits.begin(), thisCredits.end());
+    return c;
+}
+
+inline void MetatileOverrides::addCredits(const DualId::set &addition)
+{
+    credits.insert(addition.begin(), addition.end());
+}
 
 #endif // mapproxy_metatile_hpp_included_

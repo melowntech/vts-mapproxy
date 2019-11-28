@@ -242,7 +242,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                                        , Sink &sink
                                        , const SurfaceFileInfo &fi
                                        , Arsenal&
-                                       , vts::SubMesh::TextureMode textureMode)
+                                       , const MetatileOverrides &overrides)
     const
 {
     sink.checkAborted();
@@ -297,7 +297,8 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
     // set internal texture count to 1 if we are generating internal textures
     const std::size_t internalTextureCount
-        (textureMode == vts::SubMesh::internal);
+        (overrides.textureMode == vts::SubMesh::internal);
+    const auto credits(overrides.mergedCredits(resource().credits));
 
     for (const auto &block : blocks) {
         const auto &view(block.view);
@@ -430,7 +431,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                 node.heightRange.max = std::ceil(heightRange.max);
 
                 // set credits
-                node.updateCredits(resource().credits);
+                node.updateCredits(credits);
 
                 // texturing
                 node.internalTextureCount(internalTextureCount);

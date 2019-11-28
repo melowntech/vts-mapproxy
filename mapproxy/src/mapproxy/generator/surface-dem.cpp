@@ -229,7 +229,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
                                   , Sink &sink
                                   , const SurfaceFileInfo &fi
                                   , Arsenal &arsenal
-                                  , vts::SubMesh::TextureMode textureMode)
+                                  , const MetatileOverrides &overrides)
     const
 {
     sink.checkAborted();
@@ -239,7 +239,7 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
         return;
     }
 
-    auto metatile(generateMetatileImpl(tileId, sink, arsenal, textureMode));
+    auto metatile(generateMetatileImpl(tileId, sink, arsenal, overrides));
 
     // write metatile to stream
     std::ostringstream os;
@@ -250,13 +250,13 @@ void SurfaceDem::generateMetatile(const vts::TileId &tileId
 vts::MetaTile
 SurfaceDem::generateMetatileImpl(const vts::TileId &tileId
                                  , Sink &sink, Arsenal &arsenal
-                                 , vts::SubMesh::TextureMode textureMode) const
+                                 , const MetatileOverrides &overrides) const
 {
     return metatileFromDem(tileId, sink, arsenal, resource()
                            , index_->tileIndex, dem_.dataset
                            , dem_.geoidGrid, maskTree_, boost::none
                            , definition_.heightFunction
-                           , textureMode);
+                           , overrides);
 }
 
 namespace {
