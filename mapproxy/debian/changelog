@@ -1,3 +1,9 @@
+vts-mapproxy (1.66) stable; urgency=medium
+
+  * Updated semantic support: trees (trunks, different crown type)
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Wed, 04 Dec 2019 14:23:10 +0100
+
 vts-mapproxy (1.65) stable; urgency=medium
 
   * surface-meta: proper handling of credits
