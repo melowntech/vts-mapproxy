@@ -31,6 +31,11 @@ find_package(magic REQUIRED)
 find_package(JsonCPP REQUIRED)
 include_directories(${JSONCPP_INCLUDE_DIRS})
 
+# needed by shtools
+find_package(LAPACK REQUIRED)
+find_package(BLAS REQUIRED)
+find_package(FFTW3 REQUIRED)
+
 # Protobuf: needed by mvt ogr driver
 find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})
