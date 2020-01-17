@@ -2,7 +2,8 @@ m4_dnl ###############################################################
 m4_dnl ## Build dependencies
 m4_dnl ###############################################################
 m4_dnl
-m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 12.1), libboost1.67-all-dev
+m4_define({{{VAR_BuildDepends}}},{{{debhelper (>= 12.1), devscripts
+    , libboost1.67-all-dev
     , libopencv-core-dev (>= 2.4.9)
     , libopencv-highgui-dev (>= 2.4.9)
     , libopencv-photo-dev (>= 2.4.9)
