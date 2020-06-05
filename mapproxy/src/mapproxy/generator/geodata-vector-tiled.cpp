@@ -261,6 +261,10 @@ vts::MapConfig GeodataVectorTiled::mapConfig_impl(ResourceRoot root)
         }
     }
 
+    if (definition_.introspection.position) {
+        mapConfig.position = *definition_.introspection.position;
+    }
+
     // browser options (must be Json::Value!); overrides browser options from
     // surface's introspection
     if (!definition_.introspection.browserOptions.empty()) {
