@@ -27,7 +27,7 @@
 #ifndef mapproxy_support_qtree_rasterize_hpp_included_
 #define mapproxy_support_qtree_rasterize_hpp_included_
 
-#include <boost/gil/gil_all.hpp>
+#include "imgproc/gil.hpp"
 
 #include "dbglog/dbglog.hpp"
 
