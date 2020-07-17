@@ -1,5 +1,5 @@
 # bootstrap build system
-cmake_minimum_required(VERSION 2.8.11)
+cmake_minimum_required(VERSION 3.3)
 enable_language(Fortran)
 project(vts-mapproxy)
 # by default, this is OSS build (can be overrided by customer machinery)
@@ -58,7 +58,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 find_package(ICU COMPONENTS uc i18n REQUIRED)
 include_directories(${ICU_INCLUDE_DIRS})
 
-enable_python(2.7)
+enable_python(3)
 include_directories(${PYTHONLIBS_INCLUDE_DIRS})
 
 find_package(TinyXML2 REQUIRED)

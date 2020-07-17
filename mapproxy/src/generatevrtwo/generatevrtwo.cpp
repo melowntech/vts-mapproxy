@@ -396,7 +396,11 @@ void VrtDs::addSimpleSource(int band, const fs::path &filename
 
     // try to create simple source from parsed string
     std::unique_ptr< ::VRTSimpleSource> src(new ::VRTSimpleSource());
-#if GDAL_VERSION_NUM >= 2040000
+#if GDAL_VERSION_NUM >= 3000000
+    std::map<CPLString, GDALDataset*> dsMap;
+    if (src->XMLInit(xmlNodeFromString(os.str()).get(), nullptr, nullptr
+                     , dsMap) != CE_None)
+#elif GDAL_VERSION_NUM >= 2040000
     if (src->XMLInit(xmlNodeFromString(os.str()).get(), nullptr, nullptr)
         != CE_None)
 #else
@@ -665,9 +669,9 @@ bool compare(const geo::GeoDataset::Block &block, const math::Size2 &size
         return compareValue<std::int16_t>(block.data, size, value);
 
     case ::GDT_UInt32:
-        return compareValue<std::uint32_t>(block.data, size, value);
-
     case ::GDT_Int32:
+        // use signed comparison for unsigned int since OpenCV 4 has no
+        // specialization for unsigned int
         return compareValue<std::int32_t>(block.data, size, value);
 
     case ::GDT_Float32:
