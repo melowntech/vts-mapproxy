@@ -37,7 +37,6 @@
 
 #include "imgproc/rastermask/cvmat.hpp"
 #include "imgproc/png.hpp"
-#include "imgproc/cvcompat.hpp"
 
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
@@ -137,7 +136,7 @@ cv::Mat TmsRasterPatchwork::generateTileImage(const vts::TileId &tileId) const
         }());
 
         const auto label(boost::lexical_cast<std::string>(tileId));
-        const auto face(IMGPROC_FONT_HERSHEY(COMPLEX_SMALL));
+        const auto face(cv::FONT_HERSHEY_COMPLEX_SMALL);
         const int thickness(1);
         int baseline;
         const auto size(cv::getTextSize(label, face, 1.0
