@@ -1,3 +1,9 @@
+vts-mapproxy (1.67) stable; urgency=medium
+
+  *  Various improvements not related to features
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 17 Aug 2020 15:20:33 +0200
+
 vts-mapproxy (1.66) stable; urgency=medium
 
   * Updated semantic support: trees (trunks, different crown type)
