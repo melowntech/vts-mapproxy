@@ -39,9 +39,9 @@ namespace resource {
 
 constexpr char SurfaceDem::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(SurfaceDem)
 
-utility::PreMain register_([]() { registerDefinition<SurfaceDem>(); });
+namespace {
 
 void parseDefinition(SurfaceDem &def, const Json::Value &value)
 {

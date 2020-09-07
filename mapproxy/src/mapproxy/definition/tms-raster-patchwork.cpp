@@ -36,11 +36,7 @@ namespace resource {
 
 constexpr char TmsRasterPatchwork::driverName[];
 
-namespace {
-
-utility::PreMain register_([]() { registerDefinition<TmsRasterPatchwork>(); });
-
-} // namespace
+MAPPROXY_DEFINITION_REGISTER(TmsRasterPatchwork)
 
 void TmsRasterPatchwork::from_impl(const Json::Value &value)
 {

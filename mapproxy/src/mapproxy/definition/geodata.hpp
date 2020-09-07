@@ -101,9 +101,9 @@ public:
     static constexpr char driverName[] = "geodata-vector";
 
 private:
-    virtual bool frozenCredits_impl() const { return false; }
+    virtual bool frozenCredits_impl() const;
 
-    virtual bool needsRanges_impl() const { return false; }
+    virtual bool needsRanges_impl() const;
 };
 
 struct GeodataVectorTiled : GeodataVectorBase {

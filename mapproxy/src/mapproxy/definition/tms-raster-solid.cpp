@@ -36,9 +36,9 @@ namespace resource {
 
 constexpr char TmsRasterSolid::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(TmsRasterSolid)
 
-utility::PreMain register_([]() { registerDefinition<TmsRasterSolid>(); });
+namespace {
 
 void parseDefinition(TmsRasterSolid &def, const Json::Value &value)
 {

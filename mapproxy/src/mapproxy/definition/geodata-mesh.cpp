@@ -44,9 +44,9 @@ namespace resource {
 constexpr Resource::Generator::Type GeodataMesh::type;
 constexpr char GeodataMesh::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(GeodataMesh)
 
-utility::PreMain register_([]() { registerDefinition<GeodataMesh>(); });
+namespace {
 
 void parseDefinition(GeodataMesh &def, const Json::Value &value)
 {

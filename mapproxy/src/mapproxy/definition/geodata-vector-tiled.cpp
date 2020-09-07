@@ -43,9 +43,9 @@ namespace resource {
 constexpr Resource::Generator::Type GeodataVectorTiled::type;
 constexpr char GeodataVectorTiled::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(GeodataVectorTiled)
 
-utility::PreMain register_([]() { registerDefinition<GeodataVectorTiled>(); });
+namespace {
 
 void parseDefinition(GeodataVectorTiled &def, const Json::Value &value)
 {

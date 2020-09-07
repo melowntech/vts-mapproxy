@@ -39,9 +39,9 @@ namespace resource {
 
 constexpr char TmsRasterRemote::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(TmsRasterRemote)
 
-utility::PreMain register_([]() { registerDefinition<TmsRasterRemote>(); });
+namespace {
 
 void parseDefinition(TmsRasterRemote &def
                      , const Json::Value &value)

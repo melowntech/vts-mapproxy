@@ -24,8 +24,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "utility/premain.hpp"
-
 #include "geodata.hpp"
 #include "factory.hpp"
 
@@ -34,10 +32,10 @@ namespace resource {
 constexpr Resource::Generator::Type GeodataVector::type;
 constexpr char GeodataVector::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(GeodataVector)
 
-utility::PreMain register_([]() { registerDefinition<GeodataVector>(); });
+bool GeodataVector::frozenCredits_impl() const { return false; }
 
-} // namespace
+bool GeodataVector::needsRanges_impl() const { return false; }
 
 } // namespace resource

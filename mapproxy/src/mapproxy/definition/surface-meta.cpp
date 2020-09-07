@@ -36,9 +36,9 @@ namespace resource {
 
 constexpr char SurfaceMeta::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(SurfaceMeta)
 
-utility::PreMain register_([]() { registerDefinition<SurfaceMeta>(); });
+namespace {
 
 void parseDefinition(SurfaceMeta &def, const Json::Value &value)
 {

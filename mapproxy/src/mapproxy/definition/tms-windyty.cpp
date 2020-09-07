@@ -39,9 +39,9 @@ namespace resource {
 
 constexpr char TmsWindyty::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(TmsWindyty)
 
-utility::PreMain register_([]() { registerDefinition<TmsWindyty>(); });
+namespace {
 
 void parseDefinition(TmsWindyty &def, const Json::Value &value)
 {

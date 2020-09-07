@@ -39,9 +39,9 @@ namespace resource {
 
 constexpr char TmsBing::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(TmsBing)
 
-utility::PreMain register_([]() { registerDefinition<TmsBing>(); });
+namespace {
 
 void parseDefinition(TmsBing &def
                      , const Json::Value &value)

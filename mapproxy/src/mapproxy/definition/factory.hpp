@@ -30,6 +30,7 @@
 #include <functional>
 
 #include "utility/premain.hpp"
+#include "utility/gccversion.hpp"
 
 #include "../resource.hpp"
 
@@ -56,19 +57,16 @@ template <typename Definition> void registerDefinition() {
                        });
 }
 
-#define MAPPROXY_DEFINITION_REGISTER_ALN(x) \
-    MAPPROXY_DEFINITION_REGISTER_ALN1(x,__LINE__)
-#define MAPPROXY_DEFINITION_REGISTER_ALN1(x, y) \
-    MAPPROXY_DEFINITION_REGISTER_ALN2(x, y)
-#define MAPPROXY_DEFINITION_REGISTER_ALN2(x, y) x##y
+#define MAPPROXY_DEFINITION_REGISTER_ALN(x, y)      \
+    MAPPROXY_DEFINITION_REGISTER_ALN1(x, y)
+#define MAPPROXY_DEFINITION_REGISTER_ALN1(x, y) x##y
 
-#define MAPPROXY_DEFINITION_REGISTER(DEFINITION)                       \
-    namespace {                                                        \
-        utility::PreMain                                               \
-        MAPPROXY_DEFINITION_REGISTER_ALN(mapproxy_regdef_)([]() {      \
-                registerDefinition<DEFINITION>();                      \
-            });                                                        \
-    }
+#define MAPPROXY_DEFINITION_REGISTER(DEFINITION)                        \
+    namespace {                                                         \
+        utility::PreMain MAPPROXY_DEFINITION_REGISTER_ALN               \
+            (mapproxy_regdef_, DEFINITION)                              \
+            ([]() { registerDefinition<DEFINITION>(); }); \
+    } // namespace
 
 } // namespace resource
 

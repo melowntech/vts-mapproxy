@@ -39,9 +39,9 @@ namespace resource {
 
 constexpr char SurfaceSpheroid::driverName[];
 
-namespace {
+MAPPROXY_DEFINITION_REGISTER(SurfaceSpheroid)
 
-utility::PreMain register_([]() { registerDefinition<SurfaceSpheroid>(); });
+namespace {
 
 void parseDefinition(SurfaceSpheroid &def, const Json::Value &value)
 {
