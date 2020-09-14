@@ -96,6 +96,7 @@ cv::Mat* warpImage(DatasetCache &cache, ManagedBuffer &mb
     auto &src(cache(dataset));
     auto dst(geo::GeoDataset::deriveInMemory
              (src, srs, size, extents, boost::none, asOptNodata(nodata)));
+
     src.warpInto(dst, resampling);
 
     if (optimize && dst.cmask().empty()) {
@@ -135,6 +136,7 @@ cv::Mat* warpMask(DatasetCache &cache, ManagedBuffer &mb
     auto &src(cache(dataset));
     auto dst(geo::GeoDataset::deriveInMemory
              (src, srs, size, extents, boost::none, asOptNodata(nodata)));
+
     src.warpInto(dst, resampling);
 
     // fetch mask from dataset (optimized, all valid -> invalid matrix)
@@ -213,6 +215,7 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
     // choose finer overview on GDAL>=2.2, since there is something rotten there
     warpOptions.overviewBias = -1;
 #endif
+    warpOptions.workingDataType = GDT_Float32;
 
     auto wri(src.warpInto(dst, resampling, warpOptions));
     minSrc.warpInto(minDst, geo::GeoDataset::Resampling::minimum
@@ -300,7 +303,10 @@ cv::Mat* warpDem(DatasetCache &cache, ManagedBuffer &mb
              (src, srs, gridSize, gridExtents, ::GDT_Float32
               , asOptNodata(nodata, ForcedNodata)));
 
-    auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem));
+    geo::GeoDataset::WarpOptions wo;
+    wo.workingDataType = ::GDT_Float32;
+
+    auto wri(src.warpInto(dst, geo::GeoDataset::Resampling::dem, wo));
     LOG(info1) << "Warp result: scale=" << wri.scale
                << ", resampling=" << wri.resampling << ".";
 
