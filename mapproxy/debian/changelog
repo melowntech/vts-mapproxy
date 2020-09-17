@@ -1,3 +1,11 @@
+vts-mapproxy (1.68) stable; urgency=medium
+
+  * Fixed for GDAL >= 2.4
+  * mapproxy-setup-resource: empty geoid grid means no geoid grid, even if
+    reference frame body has a default
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Thu, 17 Sep 2020 16:47:06 +0200
+
 vts-mapproxy (1.67) stable; urgency=medium
 
   *  Various improvements not related to features
