@@ -146,7 +146,8 @@ void SetupResource::configuration(po::options_description &cmdline
 
         ("tin.geoidGrid", po::value<std::string>()
          , "TIN: Geoid grid to inject into dataset's SRS. Defaults to "
-         "reference frame's body default geoid grid if not specified.")
+         "reference frame's body default geoid grid. Use empty string "
+         "to disable geoid grid at all.")
 
         ("tms.format", po::value(&config_.format)
          ->default_value(config_.format)->required()
@@ -697,11 +698,18 @@ int SetupResource::run()
         return EXIT_FAILURE;
     }
 
-    // copy config and update
+    // copy config and update; do not use config_ in this function from this
+    // point
     auto config(config_);
-    if (!config.geoidGrid && rf->body) {
-        const auto &body(vr::system.bodies(*rf->body));
-        config.geoidGrid = body.defaultGeoidGrid;
+    if (!config.geoidGrid) {
+        // rf body default geoid requested
+        if (rf->body) {
+            const auto &body(vr::system.bodies(*rf->body));
+            config.geoidGrid = body.defaultGeoidGrid;
+        }
+    } else if (config.geoidGrid->empty()) {
+        // no geoid grid
+        config.geoidGrid = boost::none;
     }
 
     // open dataset
@@ -715,7 +723,7 @@ int SetupResource::run()
     // 2) check resource existence in mapproxy
     LOG(info4) << "Checking for resource existence.";
     {
-        Mapproxy mp(config_.mapproxyCtrl);
+        Mapproxy mp(config.mapproxyCtrl);
         if (!mp.supportsReferenceFrame(resourceId_.referenceFrame)) {
             LOG(fatal)
                 << "Given reference frame is not supporte by mapproxy. "
@@ -756,12 +764,12 @@ int SetupResource::run()
     }
 
     // apply bottom LOD
-    if (config_.bottomLod) {
-        cm.lodRange.max = std::max(cm.lodRange.max, *config_.bottomLod);
+    if (config.bottomLod) {
+        cm.lodRange.max = std::max(cm.lodRange.max, *config.bottomLod);
     }
 
     // 4) allocate attributions
-    const auto credits(attributions2credits(config_));
+    const auto credits(attributions2credits(config));
 
     // 5) copy dataset; TODO: add symlink option
     const auto datasetFileName(fs::path(dataset_).filename());
@@ -770,7 +778,7 @@ int SetupResource::run()
         (utility::addExtension(datasetFileName
                                , "." + md5sum(dataset_)));
 
-    const auto rootDir(config_.mapproxyDataRoot / datasetHome);
+    const auto rootDir(config.mapproxyDataRoot / datasetHome);
     const auto baseDatasetPath("original-dataset" / datasetFileName);
     const auto datasetPath(rootDir / baseDatasetPath);
 
@@ -790,7 +798,7 @@ int SetupResource::run()
             ds.copyFiles(datasetPath);
 
             // 6) create vrtwo derived datasets
-            createVrtWO(cm, tmpDatasetPath , tmpRootDir, config_);
+            createVrtWO(cm, tmpDatasetPath , tmpRootDir, config);
 
             // commit
             fs::rename(tmpRootDir, rootDir);
@@ -814,7 +822,7 @@ int SetupResource::run()
     // 8) generate mapproxy resource configuration
     {
         const auto resourceConfigPath
-            (config_.mapproxyDefinitionDir / resourceId.group
+            (config.mapproxyDefinitionDir / resourceId.group
              / (resourceId.id + "." + resourceId_.referenceFrame + ".json"));
         LOG(info4) << "Generating mapproxy resource configuration at "
                    << resourceConfigPath << ".";
@@ -838,7 +846,7 @@ int SetupResource::run()
 
         // check whether there is a group include file
         const auto groupConfigPath
-            (config_.mapproxyDefinitionDir / (resourceId.group + ".json"));
+            (config.mapproxyDefinitionDir / (resourceId.group + ".json"));
         if (!fs::exists(groupConfigPath)) {
             // no -> create
             const auto path(utility::format("%s/*.json", resourceId.group));
@@ -849,7 +857,7 @@ int SetupResource::run()
     // 9) notify mapproxy
     LOG(info4) << "Notifying mapproxy.";
     {
-        Mapproxy mp(config_.mapproxyCtrl);
+        Mapproxy mp(config.mapproxyCtrl);
 
         const auto timestamp(mp.updateResources());
         LOG(info4)
