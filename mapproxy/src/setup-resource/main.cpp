@@ -44,6 +44,7 @@
 #include "utility/filesystem.hpp"
 #include "utility/format.hpp"
 #include "utility/md5.hpp"
+#include "utility/implicit-value.hpp"
 
 #include "service/cmdline.hpp"
 #include "service/ctrlclient.hpp"
@@ -103,6 +104,7 @@ class SetupResource : public service::Cmdline {
 public:
     SetupResource()
         : service::Cmdline("mapproxy-setup-resource", BUILD_TARGET_VERSION)
+        , linkDataset_(false)
     {}
 
 private:
@@ -118,6 +120,8 @@ private:
 
     std::string dataset_; // do not use fs::path since it needs quotes in case
                           // of spaces in filename
+
+    bool linkDataset_;
 
     boost::optional<ResourceType> resourceType_;
 
@@ -141,6 +145,10 @@ void SetupResource::configuration(po::options_description &cmdline
          , "Resource group ID. Deduced from filename if not provided.")
         ("dataset", po::value(&dataset_)->required()
          , "Path to input raster dataset.")
+        ("linkDataset", utility::implicit_value(&linkDataset_, true)
+         ->default_value(false)
+         , "Link dataset instead of copying. NB: dataset must stay at given "
+         "path while resource is used.")
         ("resourceType", po::value<ResourceType>()
          , "Resource type: TMS or TIN.")
 
@@ -771,7 +779,7 @@ int SetupResource::run()
     // 4) allocate attributions
     const auto credits(attributions2credits(config));
 
-    // 5) copy dataset; TODO: add symlink option
+    // 5) copy/symlink dataset
     const auto datasetFileName(fs::path(dataset_).filename());
 
     const auto datasetHome
@@ -785,7 +793,7 @@ int SetupResource::run()
     const auto mainDataset([&]()
     {
         if (!fs::exists(rootDir)) {
-            LOG(info4) << "Copying dataset to destination.";
+            LOG(info4) << "Copying/symlinking dataset to destination.";
 
             const auto tmpRootDir(utility::addExtension(rootDir, ".tmp"));
 
@@ -793,9 +801,15 @@ int SetupResource::run()
 
             fs::create_directories(tmpDatasetPath.parent_path());
 
-            // copy (overwrite)
-            utility::copy_file(dataset_, tmpDatasetPath, true);
-            ds.copyFiles(datasetPath);
+            if (linkDataset_) {
+                // symlink
+                fs::remove_all(tmpDatasetPath);
+                fs::create_symlink(dataset_, tmpDatasetPath);
+            } else {
+                // copy (overwrite)
+                utility::copy_file(dataset_, tmpDatasetPath, true);
+                ds.copyFiles(datasetPath);
+            }
 
             // 6) create vrtwo derived datasets
             createVrtWO(cm, tmpDatasetPath , tmpRootDir, config);
