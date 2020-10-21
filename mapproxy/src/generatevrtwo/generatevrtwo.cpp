@@ -912,7 +912,7 @@ fs::path createOverview(const Config &config
 
     // Dataset dataset(srcPath.string());
 
-    // use full dataset and distable safe-chunking
+    // use full dataset and disable safe-chunking
     geo::GeoDataset::WarpOptions warpOptions;
     warpOptions.overview = geo::GeoDataset::Overview();
     warpOptions.safeChunks = false;
