@@ -243,7 +243,13 @@ cv::Mat* warpValueMinMax(DatasetCache &cache, ManagedBuffer &mb
         {
             // skip invalid value
             auto value(*id);
-            if (value == ForcedNodata) { continue; }
+            if (value == ForcedNodata) {
+                if ((*idmin == ForcedNodata) || (*idmax == ForcedNodata)) {
+                    continue;
+                }
+                // no value but we have valid min/max -> average
+                value = (*idmin + *idmax) / 2;
+            }
 
             auto &sample(*itile);
             sample[0] = value;

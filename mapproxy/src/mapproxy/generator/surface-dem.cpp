@@ -420,6 +420,7 @@ void SurfaceDem::generateNavtile(const vts::TileId &tileId
     const auto *metanode(metatile.get(tileId, std::nothrow));
     if (!metanode) {
         sink.error(utility::makeError<NotFound>("Metatile not found."));
+        return;
     }
 
     const auto heightRange(metanode->heightRange);

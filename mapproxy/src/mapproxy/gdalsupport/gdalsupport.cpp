@@ -720,6 +720,9 @@ void GdalWarper::Detail::runManager(Process::Id parentId)
 
 void GdalWarper::Detail::killLeviathan()
 {
+    // stop if there are no workers (yet)
+    if (workers_.empty()) { return; }
+
     utility::PidList pids;
     for (const auto &item : workers_) { pids.push_back(item.first); }
 
@@ -767,13 +770,19 @@ void GdalWarper::Detail::killLeviathan()
             << "Killing large GDAL process " << u.pid
             << " occupying " << (double(total) / 1024) << "MB of memory.";
 
-        auto fworkers(workers_.find(u.pid));
-        if (fworkers != workers_.end()) {
-            fworkers->second->terminate();
-        } else {
-            // should not happen
-            Process::kill(u.pid);
+        try {
+            auto fworkers(workers_.find(u.pid));
+            if (fworkers != workers_.end()) {
+                fworkers->second->terminate();
+            } else {
+                // should not happen
+                Process::kill(u.pid);
+            }
+        } catch (const std::exception &e) {
+            LOG(warn2) << "Unable to kill worker process: <"
+                       << e.what() << ">; ignoring.";
         }
+
         total -= u.mem;
     }
 }

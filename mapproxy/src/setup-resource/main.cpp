@@ -587,7 +587,9 @@ fs::path createVrtWO(const calipers::Measurement &cm
         {
             LogLinePrefix linePrefix(" (dem)");
             createVrtWO(datasetPath, rootDir, "dem"
-                        , geo::GeoDataset::Resampling::dem, cm);
+                        // , geo::GeoDataset::Resampling::average
+                        , geo::GeoDataset::Resampling::cubicspline
+                        , cm);
         }
 
         LOG(info4) << "Generating minimum height overviews.";

@@ -47,9 +47,6 @@ DefinitionBase::pointer definition(const Resource::Generator &type)
     const auto &r(registry());
     auto fregistry(r.find(type));
     if (fregistry == r.end()) {
-        for (const auto &item : registry()) {
-            LOG(info4) << "    " << item.first;
-        }
         LOGTHROW(err1, UnknownGenerator)
             << "Unknown generator type <" << type << ">.";
     }
@@ -60,7 +57,6 @@ void registerDefinition(const Resource::Generator &type
                         , const std::function<DefinitionBase::pointer()>
                         &factory)
 {
-    LOG(info4) << "registering <" << type << ">.";
     registry().insert(Registry::value_type(type, factory));
 }
 

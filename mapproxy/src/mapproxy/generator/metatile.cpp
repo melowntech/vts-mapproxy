@@ -274,9 +274,15 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                    << ", size in tiles: " << vts::tileRangesSize(block.view)
                    << ".";
 
+#if 0
 #if GDAL_VERSION_NUM >= 2020000
         // force average since cubicspline is somewhat dubious on GDAL >= 2.2
+        // FIXME: disabled, seems to be working when GDAL is fixed
         const auto resampling(geo::GeoDataset::Resampling::average);
+#else
+        // use "dem" resampling (cubicspline or average)
+        const auto resampling(geo::GeoDataset::Resampling::dem);
+#endif
 #else
         // use "dem" resampling (cubicspline or average)
         const auto resampling(geo::GeoDataset::Resampling::dem);
