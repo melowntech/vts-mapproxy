@@ -80,8 +80,8 @@ UTILITY_GENERATE_ENUM_CI(ResourceType,
                          )
 
 UTILITY_GENERATE_ENUM(DatasetLink,
-                      ((nolink))
-                      ((absolute))
+                      ((nolink)("nolink")("0")("false"))
+                      ((absolute)("absolute")("1")("true"))
                       ((relative))
                       )
 
@@ -155,7 +155,9 @@ void SetupResource::configuration(po::options_description &cmdline
          (&linkDataset_, DatasetLink::absolute)
          ->default_value(DatasetLink::nolink)
          , "Link dataset instead of copying. NB: dataset must stay at given "
-         "path while resource is used.")
+         "path while resource is used. Can be used as a boolean or value "
+         "(nolink=false, absolute=true, relative). Relative link creates "
+         "link relative to resource dataset directory.")
         ("resourceType", po::value<ResourceType>()
          , "Resource type: TMS or TIN.")
 
