@@ -79,6 +79,12 @@ UTILITY_GENERATE_ENUM_CI(ResourceType,
                          ((tin)("TIN"))
                          )
 
+UTILITY_GENERATE_ENUM(DatasetLink,
+                      ((nolink))
+                      ((absolute))
+                      ((relative))
+                      )
+
 struct Config {
     boost::optional<std::string> geoidGrid;
     RasterFormat format;
@@ -104,7 +110,7 @@ class SetupResource : public service::Cmdline {
 public:
     SetupResource()
         : service::Cmdline("mapproxy-setup-resource", BUILD_TARGET_VERSION)
-        , linkDataset_(false)
+        , linkDataset_(DatasetLink::nolink)
     {}
 
 private:
@@ -121,7 +127,7 @@ private:
     std::string dataset_; // do not use fs::path since it needs quotes in case
                           // of spaces in filename
 
-    bool linkDataset_;
+    DatasetLink linkDataset_;
 
     boost::optional<ResourceType> resourceType_;
 
@@ -145,8 +151,9 @@ void SetupResource::configuration(po::options_description &cmdline
          , "Resource group ID. Deduced from filename if not provided.")
         ("dataset", po::value(&dataset_)->required()
          , "Path to input raster dataset.")
-        ("linkDataset", utility::implicit_value(&linkDataset_, true)
-         ->default_value(false)
+        ("linkDataset", utility::implicit_value
+         (&linkDataset_, DatasetLink::absolute)
+         ->default_value(DatasetLink::nolink)
          , "Link dataset instead of copying. NB: dataset must stay at given "
          "path while resource is used.")
         ("resourceType", po::value<ResourceType>()
@@ -219,6 +226,14 @@ void SetupResource::configure(const po::variables_map &vars)
         config_.bottomLod = vars["bottomLod"].as<vts::Lod>();
     }
 
+    // absolutize destination paths
+    config_.mapproxyDataRoot = fs::absolute(config_.mapproxyDataRoot);
+    config_.mapproxyDefinitionDir
+        = fs::absolute(config_.mapproxyDefinitionDir);
+
+    // make dataset path absolute
+    dataset_ = fs::absolute(fs::path(dataset_)).string();
+
     LOG(info3, log_)
         << "Config:"
         << "\nmapproxy.dataRoot = " << config_.mapproxyDataRoot
@@ -231,6 +246,8 @@ void SetupResource::configure(const po::variables_map &vars)
             if (config_.bottomLod) { os << *config_.bottomLod; }
             else { os << "none"; }
         })
+        << "\ndataset = " << dataset_
+        << "\nlinkDataset = " << linkDataset_
         << "\n"
         ;
 }
@@ -795,20 +812,28 @@ int SetupResource::run()
     const auto mainDataset([&]()
     {
         if (!fs::exists(rootDir)) {
-            LOG(info4) << "Copying/symlinking dataset to destination.";
-
             const auto tmpRootDir(utility::addExtension(rootDir, ".tmp"));
 
             const auto tmpDatasetPath(tmpRootDir / baseDatasetPath);
 
             fs::create_directories(tmpDatasetPath.parent_path());
 
-            if (linkDataset_) {
-                // symlink
-                fs::remove_all(tmpDatasetPath);
-                fs::create_symlink(dataset_, tmpDatasetPath);
+            fs::remove_all(tmpDatasetPath);
+
+            if (linkDataset_ != DatasetLink::nolink) {
+                LOG(info4) << "Symlinking dataset to destination.";
+                fs::path dst(dataset_);
+
+                if (linkDataset_ == DatasetLink::relative) {
+                    // relativize already absolute path
+                    dst = utility::lexically_relative(dst, rootDir);
+                }
+
+                // link
+                fs::create_symlink(dst, tmpDatasetPath);
             } else {
                 // copy (overwrite)
+                LOG(info4) << "Copying dataset to destination.";
                 utility::copy_file(dataset_, tmpDatasetPath, true);
                 ds.copyFiles(datasetPath);
             }
