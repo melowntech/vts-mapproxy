@@ -1,6 +1,6 @@
 vts-mapproxy (1.71) stable; urgency=medium
 
-  * setup-resource: fowarding --background to generatewrto
+  * setup-resource: fowarding --background to generatewrtwo
 
  -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 26 Oct 2020 22:51:49 +0100
 
