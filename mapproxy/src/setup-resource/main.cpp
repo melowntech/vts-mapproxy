@@ -62,6 +62,7 @@
 // mapproxy stuff
 #include "calipers/calipers.hpp"
 #include "generatevrtwo/generatevrtwo.hpp"
+#include "generatevrtwo/io.hpp"
 #include "tiling/tiling.hpp"
 #include "mapproxy/resource.hpp"
 #include "mapproxy/definition.hpp"
@@ -92,6 +93,8 @@ struct Config {
     bool transparent;
     std::vector<std::string> attributions;
     boost::optional<vts::Lod> bottomLod;
+
+    vrtwo::Color::optional background;
 
     int autoCreditId;
 
@@ -189,6 +192,12 @@ void SetupResource::configuration(po::options_description &cmdline
         ("bottomLod", po::value<vts::Lod>()
          , "Desired bottom LOD. The actual bottom might be deeper in "
          "case of more detail dataset.")
+
+        ("background", po::value<vrtwo::Color>()
+        , "Optional background. If whole warped tile contains this "
+         "color it is left empty in the output. Solid dataset with this color "
+         "is created and places as a first source for each band in "
+         "all overviews.")
         ;
 
     config.add_options()
@@ -228,6 +237,10 @@ void SetupResource::configure(const po::variables_map &vars)
         config_.bottomLod = vars["bottomLod"].as<vts::Lod>();
     }
 
+    if (vars.count("background")) {
+        config_.background = vars["background"].as<vrtwo::Color>();
+    }
+
     // absolutize destination paths
     config_.mapproxyDataRoot = fs::absolute(config_.mapproxyDataRoot);
     config_.mapproxyDefinitionDir
@@ -237,17 +250,15 @@ void SetupResource::configure(const po::variables_map &vars)
     dataset_ = fs::absolute(fs::path(dataset_)).string();
 
     LOG(info3, log_)
+        << std::boolalpha
         << "Config:"
         << "\nmapproxy.dataRoot = " << config_.mapproxyDataRoot
         << "\nmapproxy.definitionDir = " << config_.mapproxyDefinitionDir
         << "\nmapproxy.ctrl = " << config_.mapproxyCtrl
         << "\nreferenceFrame = " << resourceId_.referenceFrame
         << "\ncredits.firstNumericId = " << config_.autoCreditId
-        << "\nbottomLod = " << utility::LManip([&](std::ostream &os)
-        {
-            if (config_.bottomLod) { os << *config_.bottomLod; }
-            else { os << "none"; }
-        })
+        << "\nbottomLod = " << config_.bottomLod
+        << "\nbackground = " << config_.background
         << "\ndataset = " << dataset_
         << "\nlinkDataset = " << linkDataset_
         << "\n"
@@ -549,12 +560,14 @@ vr::Credit::dict attributions2credits(const Config &config)
 void createVrtWO(const fs::path &srcPath
                  , const fs::path &root, const fs::path &name
                  , geo::GeoDataset::Resampling resampling
-                 , const calipers::Measurement &cm)
+                 , const calipers::Measurement &cm
+                 , const Config &setupConfig)
 {
     vrtwo::Config config;
     config.resampling = resampling;
     config.overwrite = true;
     config.wrapx = cm.xOverlap;
+    config.background = setupConfig.background;
 
     config.createOptions
         ("TILED", true)
@@ -563,7 +576,7 @@ void createVrtWO(const fs::path &srcPath
         ("ZLEVEL", 9)
         ;
 
-    const auto ovrPathLocal("vttwo" / name);
+    const auto ovrPathLocal("vrtwo" / name);
 
     config.pathToOriginalDataset
         = vrtwo::PathToOriginalDataset::relativeSymlink;
@@ -608,21 +621,23 @@ fs::path createVrtWO(const calipers::Measurement &cm
             createVrtWO(datasetPath, rootDir, "dem"
                         // , geo::GeoDataset::Resampling::average
                         , geo::GeoDataset::Resampling::cubicspline
-                        , cm);
+                        , cm, config);
         }
 
         LOG(info4) << "Generating minimum height overviews.";
         {
             LogLinePrefix linePrefix(" (min)");
             createVrtWO(datasetPath, rootDir, "dem.min"
-                        , geo::GeoDataset::Resampling::minimum, cm);
+                        , geo::GeoDataset::Resampling::minimum, cm
+                        , config);
         }
 
         LOG(info4) << "Generating maximum height overviews.";
         {
             LogLinePrefix linePrefix(" (max)");
             createVrtWO(datasetPath, rootDir, "dem.max"
-                        , geo::GeoDataset::Resampling::maximum, cm);
+                        , geo::GeoDataset::Resampling::maximum, cm
+                        , config);
         }
         break;
 
@@ -632,7 +647,7 @@ fs::path createVrtWO(const calipers::Measurement &cm
             createVrtWO(datasetPath, rootDir, "ophoto"
                         , (config.tmsResampling ? *config.tmsResampling
                            : geo::GeoDataset::Resampling::texture)
-                        , cm);
+                        , cm, config);
         }
         break;
 
