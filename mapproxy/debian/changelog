@@ -1,3 +1,16 @@
+vts-mapproxy (1.71) stable; urgency=medium
+
+  * setup-resource: fowarding --background to generatewrto
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 26 Oct 2020 22:51:49 +0100
+
+vts-mapproxy (1.70) stable; urgency=medium
+
+  * setup-resource: fixed dataset linking
+  * --linkDataset changed from bool to enum (nolink/absolute/relative)
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Fri, 23 Oct 2020 16:27:50 +0200
+
 vts-mapproxy (1.69) stable; urgency=medium
 
   * setup-resource: supporting --linkDataset to link original dataset instead
