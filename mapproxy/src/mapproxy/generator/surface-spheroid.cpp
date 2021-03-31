@@ -368,7 +368,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
                 // compute tile extents and height range
                 auto heightRange(vs::Range<double>::emptyRange());
-                math::Extents3 te(math::InvalidExtents{});
+                // math::Extents3 te(math::InvalidExtents{});
                 double area(0);
                 int triangleCount(0);
                 double avgHeightSum(0.f);
@@ -383,14 +383,14 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
 
                         // update tile extents (if point valid)
                         if (p) {
-                            math::update(te, *p);
+                            // math::update(te, *p);
                             // convert point to proper SDS
-                            const auto sdsHeight(geConv(*p)[2]);
+                            const auto sdPoint(geConv(*p));
                             // update geom extents
-                            vts::update(node.geomExtents, sdsHeight);
+                            vts::update(node.geomExtents, sdPoint);
 
                             // accumulate average height (surrogate) calculator
-                            avgHeightSum += sdsHeight;
+                            avgHeightSum += sdPoint(2);
                             ++avgHeightCount;
                         }
 
@@ -424,7 +424,7 @@ void SurfaceSpheroid::generateMetatile(const vts::TileId &tileId
                 }
 
                 // set extents
-                node.extents = vr::normalizedExtents(rf, te);
+                // node.extents = vr::normalizedExtents(rf, te);
 
                 // build height range
                 node.heightRange.min = std::floor(heightRange.min);

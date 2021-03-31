@@ -11,9 +11,16 @@ enable_OpenMP()
 
 find_package(Boost 1.46 REQUIRED
   COMPONENTS thread program_options filesystem system date_time
-             serialization regex chrono iostreams)
+  serialization regex chrono iostreams)
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+
+if(${Boost_VERSION_MAJOR}.${Boost_VERSION_MINOR} VERSION_GREATER_EQUAL 1.73)
+  # Since Boost.Python and Boost.Iostreams in Boost >=1.73 still include
+  # deprecated headers we need to silence compiler
+  add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS
+    -DBOOST_ALLOW_DEPRECATED_HEADERS)
+endif()
 
 find_package(OpenCV REQUIRED)
 

@@ -70,10 +70,13 @@ struct Sample {
         , max(conv(math::Point3(x, y, value[2])))
         , heightRange(navConv(math::Point3(x, y, value[1]))(2)
                       , navConv(math::Point3(x, y, value[2]))(2))
-        , ge(geConv(math::Point3(x, y, value[1]))(2)
-             , geConv(math::Point3(x, y, value[2]))(2)
-             , geConv(math::Point3(x, y, value[0]))(2))
-    {}
+    {
+        // ge is invalid so far, update it with extremes
+        vts::update(ge, geConv(math::Point3(x, y, value[1])));
+        vts::update(ge, geConv(math::Point3(x, y, value[2])));
+        // set surrogate
+        ge.surrogate = geConv(math::Point3(x, y, value[0]))(2);
+    }
 };
 
 const Sample* getSample(const Sample &sample)
@@ -356,7 +359,7 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
 
                 // compute tile extents and height range
                 auto heightRange(HeightRange::emptyRange());
-                math::Extents3 te(math::InvalidExtents{});
+                // math::Extents3 te(math::InvalidExtents{});
                 double area(0.0);
                 int triangleCount(0);
                 double avgHeightSum(0.f);
@@ -373,8 +376,8 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                         // update tile extents (if sample valid)
                         if (p) {
                             // update by both minimum and maximum
-                            math::update(te, p->min);
-                            math::update(te, p->max);
+                            // math::update(te, p->min);
+                            // math::update(te, p->max);
                             vts::update(node.geomExtents, p->ge);
                             avgHeightSum += p->ge.surrogate;
                             ++avgHeightCount;
@@ -403,7 +406,7 @@ metatileFromDemImpl(const vts::TileId &tileId, Sink &sink, Arsenal &arsenal
                 setChildren(block, nodeId, node);
 
                 // set extents
-                node.extents = vr::normalizedExtents(rf, te);
+                // node.extents = vr::normalizedExtents(rf, te);
 
                 // build height range
                 node.heightRange.min = std::floor(heightRange.min);
