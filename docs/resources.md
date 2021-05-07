@@ -410,7 +410,7 @@ For example:
 ```javascript
 {
     ...
-    referenceFrame = [ "melown2015", "earth-qsc" ],
+    referenceFrames = [ "melown2015", "earth-qsc" ],
     ...
 ```
 
