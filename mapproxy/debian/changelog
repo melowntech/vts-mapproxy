@@ -1,3 +1,10 @@
+vts-mapproxy (1.73) stable; urgency=medium
+
+  * added option resource-backend.purgeRemoved: resources known to mapproxy removed 
+    from resource backend are purged from store if true
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 30 Aug 2021 18:13:36 +0200
+
 vts-mapproxy (1.72) stable; urgency=medium
 
   * meta/v5: using new version of metatiles (complete geom extents)
