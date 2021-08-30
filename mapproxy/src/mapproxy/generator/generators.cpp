@@ -426,6 +426,9 @@ void Generators::Detail::update(const Resource::map &resources)
     for (const auto &generator : toRemove) {
         {
             std::unique_lock<std::mutex> lock(lock_);
+            if (config_.purgeRemovedResources) {
+                generator->purge();
+            }
             serving_.erase(generator);
         }
     }

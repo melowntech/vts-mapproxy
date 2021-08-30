@@ -230,6 +230,10 @@ void Daemon::configuration(po::options_description &cmdline
           "of resource types (available types: "
           , enumerationString(Resource::Generator::Type{})
           , ").").c_str())
+        ("resource-backend.purgeRemoved"
+         , po::value(&generatorsConfig_.purgeRemovedResources)
+         ->default_value(generatorsConfig_.purgeRemovedResources)->required()
+         , "Removed resources are purged from store if true. Use with care.")
 
         ("vts.builtinBrowserUrl"
          , po::value(&variables_["VTS_BUILTIN_BROWSER_URL"])
@@ -324,6 +328,8 @@ void Daemon::configure(const po::variables_map &vars)
         << "\n\tresource-backend.freeze = ["
         << utility::join(generatorsConfig_.freezeResourceTypes, ",")
         << "]\n"
+        << "\n\tresource-backend.purgeRemoved = "
+        << generatorsConfig_.purgeRemovedResources << '\n'
         << "\thttp.externalUrl = " << generatorsConfig_.externalUrl << '\n'
         << utility::LManip([&](std::ostream &os) {
                 ResourceBackend::printConfig(os, "\t" + RBPrefixDotted

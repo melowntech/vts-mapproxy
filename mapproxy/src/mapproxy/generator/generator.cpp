@@ -313,3 +313,10 @@ void Generator::updateRevision(unsigned int revision)
 {
     resource_.revision = std::max(resource_.revision, revision);
 }
+
+void Generator::purge()
+{
+    boost::system::error_code ec;
+    fs::remove_all(root(), ec);
+}
+

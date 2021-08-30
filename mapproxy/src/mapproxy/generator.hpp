@@ -246,6 +246,10 @@ public:
     template <typename ProviderType>
     ProviderType* getProvider() const;
 
+    /** Purges resource from disk. Be careful!
+     */
+    void purge();
+
 protected:
     Generator(const Params &params, const Properties &props = Properties());
 
@@ -330,9 +334,10 @@ private:
 class Generators : public boost::noncopyable {
 public:
     struct Config : Generator::Config {
-        int resourceUpdatePeriod;
+        int resourceUpdatePeriod = 100;
+        bool purgeRemovedResources = false;
 
-        Config() : resourceUpdatePeriod(100) {}
+        Config() {}
     };
 
     /** Creates generator set.
