@@ -102,6 +102,8 @@ struct Config {
     fs::path mapproxyDefinitionDir;
     fs::path mapproxyCtrl;
 
+    bool parallel = true;
+
     Config()
         : format(RasterFormat::jpg)
         , transparent(false)
@@ -198,6 +200,12 @@ void SetupResource::configuration(po::options_description &cmdline
          "color it is left empty in the output. Solid dataset with this color "
          "is created and places as a first source for each band in "
          "all overviews.")
+
+        ("parallel", po::value(&config_.parallel)
+         ->default_value(config_.parallel)
+         , "Use OpenMP to parallelize work. Can be used "
+         "to disable parallelism in various parts of dataset processing "
+         "(currently only tiling).")
         ;
 
     config.add_options()
@@ -871,6 +879,7 @@ int SetupResource::run()
     {
         LogLinePrefix linePrefix(" (tiling)");
         tiling::Config tilingConfig;
+        tilingConfig.parallel = config_.parallel;
         auto ti(tiling::generate(mainDataset, *rf, cm.lodRange
                                  , cm.lodTileRanges(), tilingConfig));
 
