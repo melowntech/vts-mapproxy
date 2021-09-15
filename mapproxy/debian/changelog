@@ -1,3 +1,9 @@
+vts-mapproxy (1.74) stable; urgency=medium
+
+  * Fixed NodeInfo validity check when compiled on GDAL3
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Wed, 15 Sep 2021 15:27:17 +0200
+
 vts-mapproxy (1.73) stable; urgency=medium
 
   * added option resource-backend.purgeRemoved: resources known to mapproxy removed 
