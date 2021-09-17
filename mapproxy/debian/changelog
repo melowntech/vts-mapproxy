@@ -1,4 +1,4 @@
-vts-mapproxy (1.74) stable; urgency=medium
+vts-mapproxy (1.75) stable; urgency=medium
 
   * Fixed NodeInfo validity check when compiled on GDAL3
 
