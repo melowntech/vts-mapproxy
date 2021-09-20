@@ -1,3 +1,9 @@
+vts-mapproxy (1.76) stable; urgency=medium
+
+  * Compiled with libgeo=1.35 (GDAL3 compatibility fixes)
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 20 Sep 2021 10:40:23 +0200
+
 vts-mapproxy (1.75) stable; urgency=medium
 
   * Fixed NodeInfo validity check when compiled on GDAL3
