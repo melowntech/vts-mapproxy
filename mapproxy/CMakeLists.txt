@@ -60,7 +60,7 @@ find_package(LibProc REQUIRED)
 include_directories(${LIBPROC_INCLUDE_DIR})
 
 find_package(Eigen3 REQUIRED)
-include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 find_package(ICU COMPONENTS uc i18n REQUIRED)
 include_directories(${ICU_INCLUDE_DIRS})
@@ -73,6 +73,11 @@ include_directories(${TINYXML2_INCLUDE_DIR})
 
 find_package(Markdown REQUIRED)
 include_directories(${Markdown_INCLUDE_DIR})
+
+find_package(MGTS REQUIRED)
+include_directories(${MGTS_INCLUDE_DIRS})
+find_package(GLIB REQUIRED)
+include_directories(${GLIB_INCLUDE_DIRS})
 
 # dependencies
 add_subdirectory(src/dbglog)

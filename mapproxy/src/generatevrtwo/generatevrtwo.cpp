@@ -396,7 +396,11 @@ void VrtDs::addSimpleSource(int band, const fs::path &filename
 
     // try to create simple source from parsed string
     std::unique_ptr< ::VRTSimpleSource> src(new ::VRTSimpleSource());
-#if GDAL_VERSION_NUM >= 3000000
+#if GDAL_VERSION_NUM >= 3040000
+    std::map<CPLString, GDALDataset*> dsMap;
+    if (src->XMLInit(xmlNodeFromString(os.str()).get(), nullptr
+                     , dsMap) != CE_None)
+#elif GDAL_VERSION_NUM >= 3000000
     std::map<CPLString, GDALDataset*> dsMap;
     if (src->XMLInit(xmlNodeFromString(os.str()).get(), nullptr, nullptr
                      , dsMap) != CE_None)
