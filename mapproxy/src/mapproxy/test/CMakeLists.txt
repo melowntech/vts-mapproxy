@@ -12,6 +12,6 @@ set(generate-tileindex_SOURCES
 
 add_executable(mapproxy-generate-tileindex ${generate-tileindex_SOURCES})
 target_link_libraries(mapproxy-generate-tileindex ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-generate-tileindex ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-generate-tileindex PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-generate-tileindex)
 set_target_version(mapproxy-generate-tileindex ${vts-mapproxy_VERSION})

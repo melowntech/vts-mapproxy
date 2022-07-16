@@ -10,7 +10,7 @@ set(mp-tiling_SOURCES
 
 add_library(mp-tiling ${mp-tiling_SOURCES})
 target_link_libraries(mp-tiling ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mp-tiling ${MODULE_DEFINITIONS})
+target_compile_definitions(mp-tiling PRIVATE ${MODULE_DEFINITIONS})
 buildsys_library(mp-tiling)
 
 # ------------------------------------------------------------------------
@@ -29,7 +29,7 @@ set(mapproxy-tiling_SOURCES
 
 add_executable(mapproxy-tiling ${mapproxy-tiling_SOURCES})
 target_link_libraries(mapproxy-tiling mp-tiling ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-tiling ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-tiling PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-tiling)
 set_target_version(mapproxy-tiling ${vts-mapproxy_VERSION})
 
@@ -39,7 +39,7 @@ set(sub-tiling_SOURCES
 
 add_executable(mapproxy-sub-tiling ${sub-tiling_SOURCES})
 target_link_libraries(mapproxy-sub-tiling mp-tiling ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-sub-tiling ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-sub-tiling PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-sub-tiling)
 set_target_version(mapproxy-sub-tiling ${vts-mapproxy_VERSION})
 

@@ -10,7 +10,7 @@ set(mp-calipers_SOURCES
 
 add_library(mp-calipers ${mp-calipers_SOURCES})
 target_link_libraries(mp-calipers ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mp-calipers ${MODULE_DEFINITIONS})
+target_compile_definitions(mp-calipers PRIVATE ${MODULE_DEFINITIONS})
 buildsys_library(mp-calipers)
 
 # ------------------------------------------------------------------------
@@ -29,7 +29,7 @@ set(mapproxy-calipers_SOURCES
 
 add_executable(mapproxy-calipers ${mapproxy-calipers_SOURCES})
 target_link_libraries(mapproxy-calipers mp-calipers ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-calipers ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-calipers PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-calipers)
 set_target_version(mapproxy-calipers ${vts-mapproxy_VERSION})
 

@@ -100,9 +100,13 @@ struct Config {
 
     fs::path mapproxyDataRoot;
     fs::path mapproxyDefinitionDir;
-    fs::path mapproxyCtrl;
+    std::string mapproxyCtrl;
 
     bool parallel = true;
+
+    struct {
+        boost::optional<fs::path> datasetHome;
+    } override;
 
     Config()
         : format(RasterFormat::jpg)
@@ -195,6 +199,10 @@ void SetupResource::configuration(po::options_description &cmdline
          , "Desired bottom LOD. The actual bottom might be deeper in "
          "case of more detail dataset.")
 
+        ("override.datasetHome", po::value<fs::path>()
+         , "Dataset home path override if the default is undesirable. "
+         "Relative to --dataRoot. Use with caution.")
+
         ("background", po::value<vrtwo::Color>()
         , "Optional background. If whole warped tile contains this "
          "color it is left empty in the output. Solid dataset with this color "
@@ -215,7 +223,7 @@ void SetupResource::configuration(po::options_description &cmdline
          , po::value(&config_.mapproxyDefinitionDir)->required()
          , "Path to mapproxy resource definition directory.")
         ("mapproxy.ctrl", po::value(&config_.mapproxyCtrl)->required()
-         , "Path to mapproxy control socket.")
+         , "Mapproxy control socket path/CTRL URI.")
         ;
 
     pd.add("dataset", 1)
@@ -247,6 +255,11 @@ void SetupResource::configure(const po::variables_map &vars)
 
     if (vars.count("background")) {
         config_.background = vars["background"].as<vrtwo::Color>();
+    }
+
+    if (vars.count("override.datasetHome")) {
+        config_.override.datasetHome = vars["override.datasetHome"]
+            .as<fs::path>();
     }
 
     // absolutize destination paths
@@ -827,8 +840,9 @@ int SetupResource::run()
     const auto datasetFileName(fs::path(dataset_).filename());
 
     const auto datasetHome
-        (utility::addExtension(datasetFileName
-                               , "." + md5sum(dataset_)));
+        (config_.override.datasetHome.value_or
+         (utility::addExtension(datasetFileName
+                                , "." + md5sum(dataset_))));
 
     const auto rootDir(config.mapproxyDataRoot / datasetHome);
     const auto baseDatasetPath("original-dataset" / datasetFileName);
@@ -851,7 +865,7 @@ int SetupResource::run()
 
                 if (linkDataset_ == DatasetLink::relative) {
                     // relativize already absolute path
-                    dst = utility::lexically_relative(dst, rootDir);
+                    dst = dst.lexically_relative(rootDir / ".");
                 }
 
                 // link

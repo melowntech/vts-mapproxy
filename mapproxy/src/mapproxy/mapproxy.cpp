@@ -33,30 +33,30 @@ namespace fs = boost::filesystem;
 bool Mapproxy::supportsReferenceFrame(const std::string &referenceFrame)
 {
     const auto reply
-        (ctrl_.command("supports-reference-frame", referenceFrame));
+        (ctrl_->command("supports-reference-frame", referenceFrame));
     if (reply.empty()) {
         LOGTHROW(err2, std::runtime_error)
             << "Invalid reply from mapproxy.";
     }
 
-    return ctrl_.parseBoolean(reply.front());
+    return ctrl_->parseBoolean(reply.front());
 }
 
 bool Mapproxy::has(const Resource::Id &resourceId) const
 {
-    const auto reply(ctrl_.command("has-resource", resourceId.referenceFrame
+    const auto reply(ctrl_->command("has-resource", resourceId.referenceFrame
                                    , resourceId.group, resourceId.id));
     if (reply.empty()) {
         LOGTHROW(err2, std::runtime_error)
             << "Invalid reply from mapproxy.";
     }
 
-    return ctrl_.parseBoolean(reply.front());
+    return ctrl_->parseBoolean(reply.front());
 }
 
 bool Mapproxy::isReady(const Resource::Id &resourceId) const
 {
-    const auto reply(ctrl_.command("is-resource-ready"
+    const auto reply(ctrl_->command("is-resource-ready"
                                    , resourceId.referenceFrame
                                    , resourceId.group, resourceId.id));
     if (reply.empty()) {
@@ -64,12 +64,12 @@ bool Mapproxy::isReady(const Resource::Id &resourceId) const
             << "Invalid reply from mapproxy.";
     }
 
-    return ctrl_.parseBoolean(reply.front());
+    return ctrl_->parseBoolean(reply.front());
 }
 
 std::string Mapproxy::url(const Resource::Id &resourceId) const
 {
-    const auto reply(ctrl_.command("resource-url", resourceId.referenceFrame
+    const auto reply(ctrl_->command("resource-url", resourceId.referenceFrame
                                    , resourceId.group, resourceId.id));
     if (reply.empty()) {
         LOGTHROW(err2, std::runtime_error)
@@ -81,26 +81,26 @@ std::string Mapproxy::url(const Resource::Id &resourceId) const
 
 std::uint64_t Mapproxy::updateResources()
 {
-    auto reply(ctrl_.command("update-resources"));
+    auto reply(ctrl_->command("update-resources"));
     if (reply.size() < 2) { return 0; }
     return boost::lexical_cast<std::uint64_t>(reply[1]);
 }
 
 bool Mapproxy::updatedSince(std::uint64_t timestamp) const
 {
-    const auto reply(ctrl_.command("updated-since", timestamp));
+    const auto reply(ctrl_->command("updated-since", timestamp));
     if (reply.empty()) {
         LOGTHROW(err2, std::runtime_error)
             << "Invalid reply from mapproxy.";
     }
 
-    return ctrl_.parseBoolean(reply.front());
+    return ctrl_->parseBoolean(reply.front());
 }
 
 bool Mapproxy::updatedSince(const Resource::Id &resourceId
                             , std::uint64_t timestamp, bool nothrow) const
 {
-    const auto reply(ctrl_.command("updated-since", timestamp
+    const auto reply(ctrl_->command("updated-since", timestamp
                                    , resourceId.referenceFrame
                                    , resourceId.group, resourceId.id
                                    , nothrow ? "true" : "false"));
@@ -109,5 +109,5 @@ bool Mapproxy::updatedSince(const Resource::Id &resourceId
             << "Invalid reply from mapproxy.";
     }
 
-    return ctrl_.parseBoolean(reply.front());
+    return ctrl_->parseBoolean(reply.front());
 }
