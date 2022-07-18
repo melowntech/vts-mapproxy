@@ -14,7 +14,7 @@ set(mapproxy-ti2mmti_SOURCES
 
 add_executable(mapproxy-ti2mmti ${mapproxy-ti2mmti_SOURCES})
 target_link_libraries(mapproxy-ti2mmti ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-ti2mmti ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-ti2mmti PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-ti2mmti)
 set_target_version(mapproxy-ti2mmti ${vts-mapproxy_VERSION})
 
@@ -26,6 +26,6 @@ set(mapproxy-querymmti_SOURCES
 
 add_executable(mapproxy-querymmti ${mapproxy-querymmti_SOURCES})
 target_link_libraries(mapproxy-querymmti ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-querymmti ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-querymmti PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-querymmti)
 set_target_version(mapproxy-querymmti ${vts-mapproxy_VERSION})

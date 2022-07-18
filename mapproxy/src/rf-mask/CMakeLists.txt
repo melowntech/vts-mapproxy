@@ -12,7 +12,7 @@ set(rf-mask_SOURCES
 
 add_executable(mapproxy-rf-mask ${rf-mask_SOURCES})
 target_link_libraries(mapproxy-rf-mask ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-rf-mask ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-rf-mask PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-rf-mask)
 set_target_version(mapproxy-rf-mask ${vts-mapproxy_VERSION})
 

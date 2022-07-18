@@ -74,6 +74,7 @@ namespace ba = boost::algorithm;
 
 namespace vts = vtslibs::vts;
 namespace vr = vtslibs::registry;
+namespace vs = vtslibs::storage;
 
 UTILITY_GENERATE_ENUM_CI(ResourceType,
                          ((tms)("TMS"))
@@ -92,6 +93,7 @@ struct Config {
     boost::optional<geo::GeoDataset::Resampling> tmsResampling;
     bool transparent;
     std::vector<std::string> attributions;
+    vs::CreditIds credits;
     boost::optional<vts::Lod> bottomLod;
 
     vrtwo::Color::optional background;
@@ -100,9 +102,13 @@ struct Config {
 
     fs::path mapproxyDataRoot;
     fs::path mapproxyDefinitionDir;
-    fs::path mapproxyCtrl;
+    std::string mapproxyCtrl;
 
     bool parallel = true;
+
+    struct {
+        boost::optional<fs::path> datasetHome;
+    } override;
 
     Config()
         : format(RasterFormat::jpg)
@@ -146,6 +152,7 @@ void SetupResource::configuration(po::options_description &cmdline
                                 , po::positional_options_description &pd)
 {
     vr::registryConfiguration(config, vr::defaultPath());
+    vr::creditsConfiguration(cmdline);
 
     cmdline.add_options()
         ("referenceFrame", po::value(&resourceId_.referenceFrame)->required()
@@ -187,13 +194,17 @@ void SetupResource::configuration(po::options_description &cmdline
          ->default_value(config_.autoCreditId)->required()
          , "First numeric ID of the auto-generated credits.")
 
-        ("attribution", po::value(&config_.attributions)->required()
-         , "Atribution text, one per attribution. "
-         "At least one attribution is required.")
+        ("attribution", po::value(&config_.attributions)
+         , "Attribution text, one per attribution. "
+         "At least one attribution/credits is required.")
 
         ("bottomLod", po::value<vts::Lod>()
          , "Desired bottom LOD. The actual bottom might be deeper in "
          "case of more detail dataset.")
+
+        ("override.datasetHome", po::value<fs::path>()
+         , "Dataset home path override if the default is undesirable. "
+         "Relative to --dataRoot. Use with caution.")
 
         ("background", po::value<vrtwo::Color>()
         , "Optional background. If whole warped tile contains this "
@@ -215,7 +226,7 @@ void SetupResource::configuration(po::options_description &cmdline
          , po::value(&config_.mapproxyDefinitionDir)->required()
          , "Path to mapproxy resource definition directory.")
         ("mapproxy.ctrl", po::value(&config_.mapproxyCtrl)->required()
-         , "Path to mapproxy control socket.")
+         , "Mapproxy control socket path/CTRL URI.")
         ;
 
     pd.add("dataset", 1)
@@ -227,6 +238,11 @@ void SetupResource::configuration(po::options_description &cmdline
 void SetupResource::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
+    config_.credits = vr::creditsConfigure(vars);
+
+    if (config_.attributions.empty() && config_.credits.empty()) {
+        throw po::required_option("attribution-or-credits");
+    }
 
     if (vars.count("resourceType")) {
         resourceType_ = vars["resourceType"].as<ResourceType>();
@@ -247,6 +263,11 @@ void SetupResource::configure(const po::variables_map &vars)
 
     if (vars.count("background")) {
         config_.background = vars["background"].as<vrtwo::Color>();
+    }
+
+    if (vars.count("override.datasetHome")) {
+        config_.override.datasetHome = vars["override.datasetHome"]
+            .as<fs::path>();
     }
 
     // absolutize destination paths
@@ -723,6 +744,14 @@ void addCredits(Resource &r, const vr::Credit::dict &credits)
     r.registry.credits.update(credits);
 }
 
+void addCredits(Resource &r, const vs::CreditIds &credits)
+{
+    for (const auto &creditId : credits) {
+        r.credits.insert
+            (DualId(vr::system.credits(creditId).id, creditId));
+    }
+}
+
 std::string md5sum(const fs::path &path)
 {
     utility::ifstreambuf f(path.string());
@@ -827,8 +856,9 @@ int SetupResource::run()
     const auto datasetFileName(fs::path(dataset_).filename());
 
     const auto datasetHome
-        (utility::addExtension(datasetFileName
-                               , "." + md5sum(dataset_)));
+        (config_.override.datasetHome.value_or
+         (utility::addExtension(datasetFileName
+                                , "." + md5sum(dataset_))));
 
     const auto rootDir(config.mapproxyDataRoot / datasetHome);
     const auto baseDatasetPath("original-dataset" / datasetFileName);
@@ -851,7 +881,7 @@ int SetupResource::run()
 
                 if (linkDataset_ == DatasetLink::relative) {
                     // relativize already absolute path
-                    dst = utility::lexically_relative(dst, rootDir);
+                    dst = dst.lexically_relative(rootDir / ".");
                 }
 
                 // link
@@ -902,6 +932,7 @@ int SetupResource::run()
 
         // add credits
         addCredits(r, credits);
+        addCredits(r, config_.credits);
 
         r.lodRange = cm.lodRange;
         r.tileRange = cm.tileRange;

@@ -12,7 +12,7 @@ set(setup-resource_SOURCES
 
 add_executable(mapproxy-setup-resource ${setup-resource_SOURCES})
 target_link_libraries(mapproxy-setup-resource ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-setup-resource ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-setup-resource PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy-setup-resource)
 set_target_version(mapproxy-setup-resource ${vts-mapproxy_VERSION})
 

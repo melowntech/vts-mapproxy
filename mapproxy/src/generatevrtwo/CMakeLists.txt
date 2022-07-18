@@ -10,7 +10,7 @@ set(mp-generatevrtwo_SOURCES
 
 add_library(mp-generatevrtwo ${mp-generatevrtwo_SOURCES})
 target_link_libraries(mp-generatevrtwo ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mp-generatevrtwo ${MODULE_DEFINITIONS})
+target_compile_definitions(mp-generatevrtwo PRIVATE ${MODULE_DEFINITIONS})
 buildsys_library(mp-generatevrtwo)
 
 # ------------------------------------------------------------------------
@@ -29,7 +29,7 @@ set(generatevrtwo_SOURCES
 
 add_executable(generatevrtwo ${generatevrtwo_SOURCES})
 target_link_libraries(generatevrtwo mp-generatevrtwo ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(generatevrtwo ${MODULE_DEFINITIONS})
+target_compile_definitions(generatevrtwo PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(generatevrtwo)
 set_target_version(generatevrtwo ${vts-mapproxy_VERSION})
 

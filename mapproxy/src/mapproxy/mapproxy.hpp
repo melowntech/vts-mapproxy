@@ -40,8 +40,8 @@
  */
 class Mapproxy {
 public:
-    Mapproxy(const boost::filesystem::path &ctrl)
-        : ctrl_(ctrl)
+    Mapproxy(const std::string &ctrl)
+        : ctrl_(service::ctrlClientFactory(ctrl))
     {}
 
     /** Is given reference frame supported?
@@ -77,8 +77,7 @@ public:
         const;
 
 private:
-    // mutable because we want to mark non-changing functions as const
-    mutable service::CtrlClient ctrl_;
+    std::shared_ptr<service::CtrlClientBase> ctrl_;
 };
 
 

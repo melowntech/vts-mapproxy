@@ -82,7 +82,7 @@ define_module(LIBRARY mapproxy-core
 add_library(mapproxy-core STATIC ${mapproxy-core_SOURCES})
 buildsys_library(mapproxy-core)
 target_link_libraries(mapproxy-core ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-core ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-core PRIVATE ${MODULE_DEFINITIONS})
 
 # ------------------------------------------------------------------------
 # GDAL machinery
@@ -106,7 +106,7 @@ define_module(LIBRARY mapproxy-gdal
 add_library(mapproxy-gdal STATIC ${mapproxy-gdal_SOURCES})
 buildsys_library(mapproxy-gdal)
 target_link_libraries(mapproxy-gdal ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy-gdal ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy-gdal PRIVATE ${MODULE_DEFINITIONS})
 
 # ------------------------------------------------------------------------
 # Main mapproxy binary
@@ -225,7 +225,7 @@ add_executable(mapproxy
   ${mapproxy_OL_SOURCES}
   )
 target_link_libraries(mapproxy mapproxy-core ${MODULE_LIBRARIES})
-buildsys_target_compile_definitions(mapproxy ${MODULE_DEFINITIONS})
+target_compile_definitions(mapproxy PRIVATE ${MODULE_DEFINITIONS})
 buildsys_binary(mapproxy)
 set_target_version(mapproxy ${vts-mapproxy_VERSION})
 
