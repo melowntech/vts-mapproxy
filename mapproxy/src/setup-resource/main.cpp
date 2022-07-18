@@ -74,6 +74,7 @@ namespace ba = boost::algorithm;
 
 namespace vts = vtslibs::vts;
 namespace vr = vtslibs::registry;
+namespace vs = vtslibs::storage;
 
 UTILITY_GENERATE_ENUM_CI(ResourceType,
                          ((tms)("TMS"))
@@ -92,6 +93,7 @@ struct Config {
     boost::optional<geo::GeoDataset::Resampling> tmsResampling;
     bool transparent;
     std::vector<std::string> attributions;
+    vs::CreditIds credits;
     boost::optional<vts::Lod> bottomLod;
 
     vrtwo::Color::optional background;
@@ -150,6 +152,7 @@ void SetupResource::configuration(po::options_description &cmdline
                                 , po::positional_options_description &pd)
 {
     vr::registryConfiguration(config, vr::defaultPath());
+    vr::creditsConfiguration(cmdline);
 
     cmdline.add_options()
         ("referenceFrame", po::value(&resourceId_.referenceFrame)->required()
@@ -191,9 +194,9 @@ void SetupResource::configuration(po::options_description &cmdline
          ->default_value(config_.autoCreditId)->required()
          , "First numeric ID of the auto-generated credits.")
 
-        ("attribution", po::value(&config_.attributions)->required()
-         , "Atribution text, one per attribution. "
-         "At least one attribution is required.")
+        ("attribution", po::value(&config_.attributions)
+         , "Attribution text, one per attribution. "
+         "At least one attribution/credits is required.")
 
         ("bottomLod", po::value<vts::Lod>()
          , "Desired bottom LOD. The actual bottom might be deeper in "
@@ -235,6 +238,11 @@ void SetupResource::configuration(po::options_description &cmdline
 void SetupResource::configure(const po::variables_map &vars)
 {
     vr::registryConfigure(vars);
+    config_.credits = vr::creditsConfigure(vars);
+
+    if (config_.attributions.empty() && config_.credits.empty()) {
+        throw po::required_option("attribution-or-credits");
+    }
 
     if (vars.count("resourceType")) {
         resourceType_ = vars["resourceType"].as<ResourceType>();
@@ -736,6 +744,14 @@ void addCredits(Resource &r, const vr::Credit::dict &credits)
     r.registry.credits.update(credits);
 }
 
+void addCredits(Resource &r, const vs::CreditIds &credits)
+{
+    for (const auto &creditId : credits) {
+        r.credits.insert
+            (DualId(vr::system.credits(creditId).id, creditId));
+    }
+}
+
 std::string md5sum(const fs::path &path)
 {
     utility::ifstreambuf f(path.string());
@@ -916,6 +932,7 @@ int SetupResource::run()
 
         // add credits
         addCredits(r, credits);
+        addCredits(r, config_.credits);
 
         r.lodRange = cm.lodRange;
         r.tileRange = cm.tileRange;
