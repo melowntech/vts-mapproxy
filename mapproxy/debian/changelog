@@ -1,3 +1,10 @@
+vts-mapproxy (1.77) stable; urgency=medium
+
+  * mapproxy-setup-resource: remote CTRL URI support, datasetHome override,
+    --credits support
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 18 Jul 2022 16:02:24 +0200
+
 vts-mapproxy (1.76) stable; urgency=medium
 
   * Compiled with libgeo=1.35 (GDAL3 compatibility fixes)
