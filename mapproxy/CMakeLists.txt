@@ -26,7 +26,7 @@ find_package(OpenCV REQUIRED)
 
 find_package(GDAL REQUIRED)
 include_directories(SYSTEM ${GDAL_INCLUDE_DIR})
-find_package(Proj REQUIRED)
+find_package(PROJ REQUIRED)
 include_directories(${PROJ_INCLUDE_DIR})
 find_package(GeographicLib REQUIRED)
 include_directories(${GeographicLib_INCLUDE_DIR})
@@ -68,7 +68,7 @@ include_directories(${ICU_INCLUDE_DIRS})
 enable_python(3)
 include_directories(${PYTHONLIBS_INCLUDE_DIRS})
 
-find_package(TinyXML2 REQUIRED)
+find_package(tinyxml2 REQUIRED)
 include_directories(${TINYXML2_INCLUDE_DIR})
 
 find_package(Markdown REQUIRED)
