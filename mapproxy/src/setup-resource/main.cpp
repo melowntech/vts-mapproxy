@@ -860,7 +860,7 @@ int SetupResource::run()
          (utility::addExtension(datasetFileName
                                 , "." + md5sum(dataset_))));
 
-    const auto rootDir(config.mapproxyDataRoot / datasetHome);
+    const auto rootDir(fs::absolute(datasetHome, config.mapproxyDataRoot));
     const auto baseDatasetPath("original-dataset" / datasetFileName);
     const auto datasetPath(rootDir / baseDatasetPath);
 
@@ -881,15 +881,18 @@ int SetupResource::run()
 
                 if (linkDataset_ == DatasetLink::relative) {
                     // relativize already absolute path
-                    dst = dst.lexically_relative(rootDir / ".");
+                    dst = dst.lexically_relative(rootDir / "file");
                 }
 
                 // link
+                LOG(info3) << "    ln -s " << dst << " " << tmpDatasetPath;
                 fs::create_symlink(dst, tmpDatasetPath);
             } else {
                 // copy (overwrite)
                 LOG(info4) << "Copying dataset to destination.";
                 utility::copy_file(dataset_, tmpDatasetPath, true);
+                LOG(info3)
+                    << "    cp -av " << dataset_ << " " << tmpDatasetPath;
                 ds.copyFiles(datasetPath);
             }
 
@@ -899,7 +902,8 @@ int SetupResource::run()
             // commit
             fs::rename(tmpRootDir, rootDir);
         } else {
-            LOG(info4) << "Reusing existing dataset.";
+            LOG(info4) << "Reusing existing dataset from "
+                       << rootDir << ".";
         }
         return vrtWOPath(cm, rootDir);
     }());
