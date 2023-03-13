@@ -1,3 +1,9 @@
+vts-mapproxy (1.78) stable; urgency=medium
+
+  * Fixed symlinking problem in Boost.Filesystem >= 1.74
+
+ -- Vaclav Blazek <vaclav.blazek@melown.com>  Mon, 13 Mar 2023 15:31:56 +0100
+
 vts-mapproxy (1.77) stable; urgency=medium
 
   * mapproxy-setup-resource: remote CTRL URI support, datasetHome override,
