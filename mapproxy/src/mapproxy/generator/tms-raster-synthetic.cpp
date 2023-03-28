@@ -336,6 +336,7 @@ namespace MetaFlags {
 
 namespace {
 
+[[maybe_unused]]
 void meta2d(const vts::TileIndex &tileIndex, const vts::TileId &tileId
             , const TmsFileInfo &fi, Sink &sink)
 {

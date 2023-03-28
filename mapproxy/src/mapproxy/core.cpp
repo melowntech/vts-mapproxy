@@ -171,6 +171,7 @@ void Core::generate_impl(const http::Request &request
 
 namespace {
 
+[[maybe_unused]]
 const std::string& getItem(const std::string &s)
 {
     return s;

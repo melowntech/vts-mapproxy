@@ -156,6 +156,7 @@ std::pair<double, double> meshArea(const geometry::Mesh &mesh)
     return res;
 }
 
+[[maybe_unused]]
 double meshArea(const geometry::Mesh &mesh, const math::Points3d &alt)
 {
     double area(0.0);

@@ -148,9 +148,13 @@ public:
     void setError(Lock&, const EmptyGeoData &exc);
 
     GdalWarper::Raster getRaster(Lock &lock);
+
+    [[maybe_unused]]
     GdalWarper::Raster getRaster(bi::interprocess_mutex &mutex);
 
     GdalWarper::Heightcoded::pointer getHeightcoded(Lock &lock);
+
+    [[maybe_unused]]
     GdalWarper::Heightcoded::pointer getHeightcoded(bi::interprocess_mutex &mutex);
 
     WorkRequest::Response consumeWork(Lock &lock);

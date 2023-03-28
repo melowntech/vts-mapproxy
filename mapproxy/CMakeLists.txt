@@ -4,7 +4,7 @@ enable_language(Fortran)
 project(vts-mapproxy)
 # by default, this is OSS build (can be overrided by customer machinery)
 set(BUILDSYS_DEFAULT_CUSTOMER_NAME oss)
-set(BUILDSYS_CPP_STANDARD 14)
+set(BUILDSYS_CPP_STANDARD 17)
 include(buildsys/cmake/buildsys.cmake)
 
 enable_OpenMP()
