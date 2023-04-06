@@ -12,7 +12,6 @@ set(mapproxy-core_SOURCES
   support/introspection.hpp support/introspection.cpp
   support/serialization.cpp
   support/aborter.hpp
-  support/glob.hpp support/glob.cpp
   support/tilejson.hpp support/tilejson.cpp
   support/cesiumconf.hpp support/cesiumconf.cpp
   support/wmts.hpp support/wmts.cpp

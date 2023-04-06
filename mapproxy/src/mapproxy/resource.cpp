@@ -28,14 +28,14 @@
 
 #include "dbglog/dbglog.hpp"
 
+#include "utility/glob.hpp"
+
 #include "jsoncpp/json.hpp"
 #include "jsoncpp/as.hpp"
 #include "jsoncpp/io.hpp"
 
 #include "vts-libs/registry/json.hpp"
 #include "vts-libs/vts/tileop.hpp"
-
-#include "support/glob.hpp"
 
 #include "error.hpp"
 #include "resource.hpp"
@@ -254,11 +254,16 @@ void parseResources(Resource::map &resources, const Json::Value &value
     {
         const auto includePath(fs::absolute(value, dir));
 
-        auto paths(globPath(includePath));
-        for (const auto &path : paths) {
-            // ignore directories
-            if (path.filename() == ".") { continue; }
-            includeLoad(path);
+        try {
+            for (const auto &path : utility::globPath(includePath)) {
+                // ignore directories
+                if (path.filename() == ".") { continue; }
+                includeLoad(path);
+            }
+        } catch (const std::exception &e) {
+            LOGTHROW(err3, std::runtime_error)
+                << "Failed to include file(s) from " << path
+                << ": " << e.what() << ".";
         }
     });
 
