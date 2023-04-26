@@ -67,7 +67,7 @@ define_module(LIBRARY mapproxy-core
   DEPENDS
   qmf semantic
   pysupport pydbglog
-  vts-libs>=2.18 http>=1.0 geo>=1.35 geometry>=1.7
+  vts-libs>=3.0 http>=1.0 geo>=1.35 geometry>=1.7
   jsoncpp>=2.1
 
   Boost_SERIALIZATION

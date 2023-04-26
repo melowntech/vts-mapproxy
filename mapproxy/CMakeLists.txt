@@ -109,7 +109,7 @@ add_subdirectory(src/vts-libs)
 
 if(NOT DEFINED BUILDSYS_NOBUILD_TARGET_vts-tools)
   # force build of vts tool
-  add_custom_target(.vts ALL DEPENDS vts vts02vts vts2vts vts0)
+  add_custom_target(.vts ALL DEPENDS vts vts2vts)
 endif()
 
 # project
